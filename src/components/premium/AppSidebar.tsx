@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight, ReceiptText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { UserRole } from '@/hooks/useUserRole';
 import {
@@ -41,7 +41,9 @@ const driverItems: NavItem[] = [
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'fuel', label: 'Fuel', icon: Fuel },
+  { id: 'settlements', label: 'Settlements', icon: ReceiptText },
   { id: 'reports', label: 'Reports', icon: FileText },
+
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
   { id: 'nav:assistant-control', label: 'Assistants & Agency', icon: Users, href: '/driver/assistant-control' },
   { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },

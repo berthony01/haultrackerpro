@@ -38,6 +38,8 @@ import {
   endCarrierDriverRelationship,
   inviteCarrierDriverRelationship,
 } from '@/lib/settlements/carrierDriverRelationshipService';
+import { listVisibleCarrierDriverRelationships } from '@/lib/settlements/carrierDriverRelationshipReadService';
+
 
 /* -------------------------------------------------------------------------- */
 /* Query keys                                                                  */
@@ -55,7 +57,9 @@ export const settlementQueryKeys = {
 
 export const carrierDriverRelationshipQueryKeys = {
   all: ['carrier-driver-relationships'] as const,
+  list: () => ['carrier-driver-relationships', 'list'] as const,
 };
+
 
 /* -------------------------------------------------------------------------- */
 /* Read hooks                                                                  */
@@ -95,6 +99,14 @@ export function useVisibleSettlementEvents(settlementId: string) {
     queryFn: () => listVisibleSettlementEvents(settlementId),
   });
 }
+
+export function useVisibleCarrierDriverRelationships() {
+  return useQuery({
+    queryKey: carrierDriverRelationshipQueryKeys.list(),
+    queryFn: () => listVisibleCarrierDriverRelationships(),
+  });
+}
+
 
 /* -------------------------------------------------------------------------- */
 /* Internal mutation helpers                                                   */

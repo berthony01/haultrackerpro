@@ -48,7 +48,9 @@ export const DRIVER_ONLY_PAGES: ReadonlySet<DashboardPage> = new Set([
   'add_fuel',
   'closeout',
   'recurring_expenses',
+  'settlements',
   'opportunity-preferences',
+
 ]);
 
 /** Pages that render either driver OR recruiter content based on the

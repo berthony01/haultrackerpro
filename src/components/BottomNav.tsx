@@ -18,6 +18,7 @@ import {
   FileSignature,
   BarChart3,
   ArrowLeftRight,
+  ReceiptText,
 } from 'lucide-react';
 import {
   Sheet,
@@ -131,6 +132,7 @@ export function BottomNav(props: BottomNavProps) {
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
     { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') },
     { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') },
+    { label: 'Settlements', icon: ReceiptText, onClick: () => go('settlements'), description: 'Reconcile carrier statements against your loads.' },
     { label: 'Assistants & Agency', icon: Users, onClick: () => goHref('/driver/assistant-control'), description: 'Delegate access to assistants or an agency.' },
     { label: 'Switch Workspace', icon: ArrowLeftRight, onClick: () => goHref('/start'), description: 'Choose a different workspace on this account.' },
     { label: 'Settings', icon: Settings, onClick: () => go('settings') },
