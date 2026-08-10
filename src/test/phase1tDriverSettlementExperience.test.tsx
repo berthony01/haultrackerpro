@@ -1080,6 +1080,26 @@ describe('P. driver reconciliation controls (Free basic, Pro advanced)', () => {
     expect(state.loadRangeArgs[0]).toEqual({ from: '2026-07-01', to: '2026-07-07' });
   });
 
+  it('offers only completed loads as reconciliation candidates', () => {
+    state.loads = [
+      loadRow(),
+      loadRow({
+        id: 'cancelled-load-id',
+        status: 'cancelled',
+        pickup_location: 'Reno, NV',
+        dropoff_location: 'Boise, ID',
+      }),
+    ];
+    openDetail();
+    const select = screen.getByTestId('settlement-match-load-select') as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toContain(LOAD_ID);
+    expect(values).not.toContain('cancelled-load-id');
+    expect(select.textContent).not.toContain('Reno');
+    expect(select.textContent).not.toContain('cancelled-load-id');
+  });
+
+
   it('offers basic confirm-match to a Free driver with exact RPC arguments', () => {
     openDetail();
     fireEvent.change(screen.getByTestId('settlement-match-load-select'), {
