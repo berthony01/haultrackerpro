@@ -329,7 +329,15 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               onPost={handlePost}
               onManage={onManage}
               onApplications={onApplications}
+              settlementsOpen={settlementsOpen}
+              onToggleSettlements={() => setSettlementsOpen((v) => !v)}
             />
+
+            {settlementsOpen && (
+              <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+            )}
+
+
 
             <RecentPosts
               loading={oppsLoading}
