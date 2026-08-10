@@ -148,6 +148,9 @@ export default function AgencyDashboard() {
                   <TabsContent value="clients">
                     <ClientListSection agencyId={agency.id} />
                   </TabsContent>
+                  <TabsContent value="settlements">
+                    <AgencySettlementsPanel agencyId={agency.id} />
+                  </TabsContent>
                 </>
               )}
               <TabsContent value="work">
