@@ -211,6 +211,7 @@ function settlementRow(overrides: Record<string, unknown> = {}) {
 function loadRow(overrides: Record<string, unknown> = {}) {
   return {
     id: LOAD_ID,
+    status: 'completed',
     load_date: '2026-07-02',
     dropoff_date: '2026-07-03',
     pickup_location: 'Dallas, TX',
