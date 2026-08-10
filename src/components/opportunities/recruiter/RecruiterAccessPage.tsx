@@ -347,7 +347,14 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
             />
 
             {settlementsOpen && (
-              <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+              <div
+                ref={settlementsRef}
+                tabIndex={-1}
+                data-testid="recruiter-settlements-anchor"
+                className="scroll-mt-24 outline-none"
+              >
+                <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+              </div>
             )}
 
 
