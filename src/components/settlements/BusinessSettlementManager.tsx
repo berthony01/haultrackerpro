@@ -985,7 +985,7 @@ function BusinessSettlementDetail({
     try {
       const created = await correct.mutateAsync({ _settlement_id: settlement.id });
       toast.success('Correction draft created');
-      if (created?.id) onSelect(created.id);
+      if (created?.id) onSelect(created);
     } catch (error) {
       toast.error(describeSettlementError(error));
     }
