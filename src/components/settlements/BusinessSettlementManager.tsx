@@ -928,7 +928,7 @@ function BusinessSettlementDetail({
   mode: BusinessSettlementMode;
   canManage: boolean;
   onBack: () => void;
-  onSelect: (settlementId: string) => void;
+  onSelect: (settlement: BusinessSettlementLike) => void;
 }) {
   const itemsQuery = useVisibleSettlementItems(settlement.id);
   const eventsQuery = useVisibleSettlementEvents(settlement.id);
