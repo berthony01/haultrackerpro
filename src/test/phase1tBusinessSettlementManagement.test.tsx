@@ -280,12 +280,28 @@ describe('E1 · form validation', () => {
     ).toBeNull();
   });
 
-  it('rejects negative and non-finite numeric inputs', () => {
+  it('rejects non-finite numeric inputs but permits a negative reported net', () => {
     expect(isBlankOrNonNegativeFinite('')).toBe(true);
     expect(isBlankOrNonNegativeFinite('0')).toBe(true);
     expect(isBlankOrNonNegativeFinite('-1')).toBe(false);
     expect(isBlankOrNonNegativeFinite('abc')).toBe(false);
+
+    // Reported amounts are bounded by PostgreSQL, not by the client: a
+    // negative net (deductions exceeding earnings) must be submittable.
+    expect(isBlankOrFinite('')).toBe(true);
+    expect(isBlankOrFinite('-250.75')).toBe(true);
+    expect(isBlankOrFinite('abc')).toBe(false);
+    const base = {
+      ...EMPTY_DRAFT_FORM,
+      driverUserId: 'drv-1',
+      periodStart: '2026-08-03',
+      periodEnd: '2026-08-09',
+    };
+    expect(validateDraftForm({ ...base, reportedNet: '-250.75' })).toBeNull();
+    expect(validateDraftForm({ ...base, reportedGross: '-10' })).toBeNull();
+    expect(validateDraftForm({ ...base, reportedNet: 'abc' })).toBeTruthy();
   });
+
 
   it('item validation demands a type and an amount', () => {
     expect(validateItemForm(EMPTY_ITEM_FORM)).toBeTruthy();
