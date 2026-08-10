@@ -409,7 +409,16 @@ function SettlementDetail({
               item.expected_amount_snapshot,
             );
             const itemMatches = matchesByItem.get(item.id) ?? [];
+            const acceptedMatch = itemMatches.find((m) =>
+              ACCEPTED_MATCH_STATES.has((m.match_state ?? '').trim()),
+            );
+            const suggestions = itemMatches.filter((m) =>
+              SUGGESTION_MATCH_STATES.has((m.match_state ?? '').trim()),
+            );
+            const reconcilable =
+              actionable && (item.item_type ?? '').trim() === MATCHABLE_ITEM_TYPE;
             return (
+
               <div
                 key={item.id}
                 data-testid="settlement-item-row"
