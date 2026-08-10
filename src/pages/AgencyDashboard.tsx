@@ -149,13 +149,14 @@ export default function AgencyDashboard() {
                   </TabsContent>
                   <TabsContent value="clients">
                     <ClientListSection agencyId={agency.id} />
-                  </TabsContent>
-                  <TabsContent value="settlements">
-                    <AgencySettlementsPanel agencyId={agency.id} />
-                  </TabsContent>
+                </TabsContent>
                 </>
               )}
+              <TabsContent value="settlements">
+                <AgencySettlementsPanel agencyId={agency.id} />
+              </TabsContent>
               <TabsContent value="work">
+
                 <WorkQueueSection
                   agencyId={agency.id}
                   focusedWorkItemId={focusedWorkItemId}
