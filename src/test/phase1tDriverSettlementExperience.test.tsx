@@ -29,6 +29,8 @@ const SIDEBAR_PATH = 'src/components/premium/AppSidebar.tsx';
 const BOTTOMNAV_PATH = 'src/components/BottomNav.tsx';
 const INDEX_PATH = 'src/pages/Index.tsx';
 const TEST_PATH = 'src/test/phase1tDriverSettlementExperience.test.tsx';
+const PERMISSIONS_PATH = 'src/lib/assistantPermissions.ts';
+const ACCESS_SERVICE_PATH = 'src/lib/settlements/settlementAssistantAccessService.ts';
 
 const REL_SERVICE_SOURCE = read(REL_SERVICE_PATH);
 const HOOK_SOURCE = read(HOOK_PATH);
@@ -38,6 +40,8 @@ const SIDEBAR_SOURCE = read(SIDEBAR_PATH);
 const BOTTOMNAV_SOURCE = read(BOTTOMNAV_PATH);
 const INDEX_SOURCE = read(INDEX_PATH);
 const TEST_SOURCE = read(TEST_PATH);
+const PERMISSIONS_SOURCE = read(PERMISSIONS_PATH);
+const ACCESS_SERVICE_SOURCE = read(ACCESS_SERVICE_PATH);
 
 const DOUBLE_CAST = ['as', 'unknown', 'as'].join(' ');
 const LOOSE_ANY = [':', ' any'].join('');
