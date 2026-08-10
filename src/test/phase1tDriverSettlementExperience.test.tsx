@@ -129,9 +129,11 @@ vi.mock('@/hooks/settlements/useSettlementData', () => ({
 import {
   DriverSettlementsView,
   computeItemDifference,
+  describeItemBasis,
   humanizeToken,
   resolvePayerLabel,
 } from '@/components/settlements/DriverSettlementsView';
+
 
 function settlementRow(overrides: Record<string, unknown> = {}) {
   return {
