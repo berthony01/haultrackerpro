@@ -681,6 +681,72 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
 
   const busy = acceptInvite.isPending || declineInvite.isPending;
 
+  /* -------------------------------------------- manual outside-settlement -- */
+  // Presentation gating only. The backend RPC remains the sole authority on who
+  // may create a driver-imported settlement.
+  const { isPro, isLoading: isSubscriptionLoading } = useSubscription();
+  const advancedToolsVisible = !isSubscriptionLoading && isPro === true;
+
+  const createImportedDraft = useCreateDriverImportedSettlementDraft();
+  const [importOpen, setImportOpen] = useState(false);
+  const [importForm, setImportForm] = useState({
+    payer: '',
+    periodStart: '',
+    periodEnd: '',
+    payDate: '',
+    reference: '',
+    gross: '',
+    net: '',
+    notes: '',
+  });
+
+  const handleImportSubmit = () => {
+    if (!currentUserId) {
+      reportFailure('We couldn’t confirm your account. Please try again.');
+      return;
+    }
+    if (!importForm.periodStart.trim() || !importForm.periodEnd.trim()) {
+      reportFailure('Enter both a period start and a period end date.');
+      return;
+    }
+    if (!isBlankOrFinite(importForm.gross) || !isBlankOrFinite(importForm.net)) {
+      reportFailure('Reported amounts must be valid numbers.');
+      return;
+    }
+    createImportedDraft.mutate(
+      {
+        _driver_user_id: currentUserId,
+        _period_start: importForm.periodStart.trim(),
+        _period_end: importForm.periodEnd.trim(),
+        _pay_date: toNullableText(importForm.payDate),
+        _payer_name_snapshot: toNullableText(importForm.payer),
+        _statement_reference: toNullableText(importForm.reference),
+        _reported_gross_amount: toNullableAmount(importForm.gross),
+        _reported_net_amount: toNullableAmount(importForm.net),
+        _notes: toNullableText(importForm.notes),
+      },
+      {
+        onSuccess: () => {
+          toast.success('Outside settlement imported');
+          setImportOpen(false);
+          setImportForm({
+            payer: '',
+            periodStart: '',
+            periodEnd: '',
+            payDate: '',
+            reference: '',
+            gross: '',
+            net: '',
+            notes: '',
+          });
+        },
+        onError: () =>
+          reportFailure('We couldn’t import that settlement. Please try again.'),
+      },
+    );
+  };
+
+
   return (
     <div className="space-y-5" data-testid="driver-settlements-view">
       <header className="flex flex-wrap items-start justify-between gap-3">
