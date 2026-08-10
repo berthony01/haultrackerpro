@@ -115,6 +115,7 @@ export default function AgencyDashboard() {
             { value: 'packages', label: 'Packages', show: isOwnerOrAdmin },
             { value: 'requests', label: 'Requests', show: isOwnerOrAdmin },
             { value: 'clients', label: 'Clients', show: isOwnerOrAdmin },
+            { value: 'settlements', label: 'Settlements', show: isOwnerOrAdmin },
             { value: 'work', label: 'Work queue', show: true },
             { value: 'activity', label: 'Activity', show: isOwner },
           ].filter((t) => t.show);
