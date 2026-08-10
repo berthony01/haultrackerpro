@@ -717,6 +717,10 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
       reportFailure('Enter both a period start and a period end date.');
       return;
     }
+    if (importForm.periodEnd.trim() < importForm.periodStart.trim()) {
+      reportFailure('Period end cannot be before period start.');
+      return;
+    }
     if (!isBlankOrFinite(importForm.gross) || !isBlankOrFinite(importForm.net)) {
       reportFailure('Reported amounts must be valid numbers.');
       return;
