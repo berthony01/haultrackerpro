@@ -138,6 +138,7 @@ function settlementRow(overrides: Record<string, unknown> = {}) {
     id: SETTLEMENT_ID,
     driver_user_id: DRIVER_ID,
     status: 'finalized',
+    source: 'carrier_issued',
     period_start: '2026-07-01',
     period_end: '2026-07-07',
     pay_date: '2026-07-12',
@@ -146,10 +147,12 @@ function settlementRow(overrides: Record<string, unknown> = {}) {
     payer_name_snapshot: null,
     source_display_name_snapshot: 'Blue Ridge Carriers',
     statement_reference: 'STMT-4412',
+    notes: null,
     version_number: 2,
     ...overrides,
   };
 }
+
 
 beforeEach(() => {
   vi.clearAllMocks();
