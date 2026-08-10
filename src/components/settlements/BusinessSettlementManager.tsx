@@ -24,18 +24,27 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronRight,
+  Download,
   FilePlus2,
   Inbox,
   Loader2,
   Lock,
   Pencil,
   Plus,
+  Printer,
   ReceiptText,
   RefreshCw,
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  downloadSettlementCsv,
+  printSettlement,
+  type SettlementExportItem,
+  type SettlementExportStatement,
+} from '@/lib/settlements/settlementExport';
+
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -941,6 +950,68 @@ function BusinessSettlementDetail({
   const isFinalized = settlement.status === 'finalized';
   const editable = isDraft && canManage;
 
+  /**
+   * Read-only export payload. Exporting is a READ capability: it stays
+   * available even when `canManage` is false, and carries no raw identifiers.
+   */
+  const exportStatement: SettlementExportStatement = useMemo(
+    () => ({
+      sourceLabel: resolveBusinessSourceLabel(settlement),
+      payerLabel: resolveBusinessPayerLabel(settlement),
+      driverLabel,
+      status: settlement.status ?? '',
+      versionNumber: settlement.version_number,
+      periodStart: settlement.period_start ?? null,
+      periodEnd: settlement.period_end ?? null,
+      payDate: settlement.pay_date ?? null,
+      statementReference: settlement.statement_reference ?? null,
+      reportedGrossAmount: settlement.reported_gross_amount ?? null,
+      reportedNetAmount: settlement.reported_net_amount ?? null,
+      notes: settlement.notes ?? null,
+    }),
+    [settlement, driverLabel],
+  );
+
+  const exportItems: SettlementExportItem[] = useMemo(() => {
+    const rows = (itemsQuery.data as SettlementItemLike[] | null | undefined) ?? [];
+    return rows.map((item) => ({
+      itemType: item.item_type ?? null,
+      category: item.category ?? null,
+      description: item.description ?? null,
+      amount: item.amount ?? null,
+      payMethod: item.pay_method ?? null,
+      quantity: item.quantity ?? null,
+      rate: item.rate ?? null,
+      unitLabel: item.unit_label ?? null,
+      loadReference: item.load_reference_snapshot ?? null,
+      pickupDate: item.pickup_date_snapshot ?? null,
+      deliveryDate: item.delivery_date_snapshot ?? null,
+      origin: item.origin_snapshot ?? null,
+      destination: item.destination_snapshot ?? null,
+      loadedMiles: item.loaded_miles_snapshot ?? null,
+      deadheadMiles: item.deadhead_miles_snapshot ?? null,
+      payableMiles: item.payable_miles_snapshot ?? null,
+      eligibleRevenue: item.eligible_revenue_snapshot ?? null,
+    }));
+  }, [itemsQuery.data]);
+
+  const handleExportCsv = () => {
+    try {
+      downloadSettlementCsv(exportStatement, exportItems);
+    } catch {
+      toast.error('We couldn’t export this statement. Please try again.');
+    }
+  };
+
+  const handlePrint = () => {
+    try {
+      printSettlement(exportStatement, exportItems);
+    } catch {
+      toast.error('We couldn’t open the print view. Please try again.');
+    }
+  };
+
+
   const [header, setHeader] = useState<BusinessDraftFormValues>({
     driverUserId: settlement.driver_user_id,
     periodStart: settlement.period_start ?? '',
@@ -1047,6 +1118,29 @@ function BusinessSettlementDetail({
           <SummaryLine label="Notes">{settlement.notes ?? '—'}</SummaryLine>
 
         </CardContent>
+        <CardContent className="flex flex-wrap gap-2 pt-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            data-testid="business-settlement-export-csv"
+            onClick={handleExportCsv}
+          >
+            <Download className="h-4 w-4" />
+            Download CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            data-testid="business-settlement-print"
+            onClick={handlePrint}
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
+        </CardContent>
+
       </Card>
 
       {!isDraft && (
