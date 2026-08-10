@@ -38,6 +38,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { SettlementReconciliationSummary } from '@/components/settlements/SettlementReconciliationSummary';
 import {
   downloadSettlementCsv,
   printSettlement,
