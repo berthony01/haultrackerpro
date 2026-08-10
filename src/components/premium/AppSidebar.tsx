@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight, ReceiptText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { UserRole } from '@/hooks/useUserRole';
 import {
