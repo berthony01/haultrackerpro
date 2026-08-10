@@ -11,9 +11,10 @@
  *  - workspace integration mounts each panel in the correct workspace only.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import {
   buildAgencyDraftArgs,
@@ -26,11 +27,15 @@ import {
   EMPTY_ITEM_FORM,
   filterBusinessSettlements,
   formatMoney,
+  isBlankOrFinite,
   isBlankOrNonNegativeFinite,
   optionalNumber,
   optionalText,
+  resolveBusinessPayerLabel,
+  resolveBusinessSourceLabel,
   validateDraftForm,
   validateItemForm,
+  BusinessSettlementManager,
   type BusinessSettlementLike,
 } from '@/components/settlements/BusinessSettlementManager';
 import {
@@ -44,6 +49,47 @@ import {
   buildAgencyDriverOptions,
   canAgencyManageSettlementsPresentation,
 } from '@/components/settlements/AgencySettlementsPanel';
+
+/* Hook boundary is mocked: these acceptance proofs exercise the presentation
+ * contract only. Authorization stays with PostgreSQL in production. */
+const hookState = {
+  settlements: [] as BusinessSettlementLike[],
+  createdRow: null as unknown,
+};
+const createCarrierMutate = vi.fn(async () => hookState.createdRow);
+
+vi.mock('@/hooks/settlements/useSettlementData', () => {
+  const idleMutation = (fn: (args: unknown) => Promise<unknown>) => () => ({
+    mutateAsync: fn,
+    isPending: false,
+  });
+  const emptyQuery = () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+  return {
+    useVisibleSettlements: () => ({
+      data: hookState.settlements,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    }),
+    useVisibleSettlementItems: emptyQuery,
+    useVisibleSettlementEvents: emptyQuery,
+    useCreateCarrierSettlementDraft: idleMutation(createCarrierMutate),
+    useCreateAgencySettlementDraft: idleMutation(async () => null),
+    useCreateSettlementCorrectionDraft: idleMutation(async () => null),
+    useUpdateSettlementDraftHeader: idleMutation(async () => null),
+    useFinalizeSettlementDraft: idleMutation(async () => null),
+    useVoidFinalizedSettlement: idleMutation(async () => null),
+    useAddSettlementDraftItem: idleMutation(async () => null),
+    useUpdateSettlementDraftItem: idleMutation(async () => null),
+    useDeleteSettlementDraftItem: idleMutation(async () => null),
+  };
+});
+
 
 const root = process.cwd();
 const read = (p: string) => readFileSync(resolve(root, p), 'utf8');
