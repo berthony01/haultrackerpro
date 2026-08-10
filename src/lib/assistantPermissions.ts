@@ -94,6 +94,7 @@ export function assistantPageGate(page: string): PageGate {
     case 'expenses': return 'manage_expenses';
     case 'fuel': return 'manage_fuel';
     case 'reports': return 'view_reports';
+    case 'settlements': return 'settlements_view';
     case 'more': return null;
     default: return null;
   }
