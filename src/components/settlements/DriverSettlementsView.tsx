@@ -1,5 +1,7 @@
 /**
- * Phase 1T-D2 — Driver Settlements MVP (read + invitation response only).
+ * Phase 1T-D2 — Driver Settlements MVP + driver reconciliation and manual
+ * outside-settlement import surface.
+
  *
  * Recordkeeping / reconciliation surface. This component NEVER talks to the
  * backend directly: every read and every mutation goes through the accepted
@@ -25,10 +27,20 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
+import { useLoads } from '@/hooks/useLoads';
+import { useSubscription } from '@/hooks/useSubscription';
 import {
   useAcceptMyCarrierDriverRelationship,
+  useClearSettlementLoadMatch,
+  useConfirmSettlementLoadMatch,
+  useCreateDriverImportedSettlementDraft,
   useDeclineMyCarrierDriverRelationship,
+  useRefreshSettlementLoadMatchSuggestions,
+  useRejectSettlementLoadMatch,
   useVisibleCarrierDriverRelationships,
   useVisibleSettlementEvents,
   useVisibleSettlementItems,
@@ -141,6 +153,67 @@ export function describeItemBasis(item: {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/* ------------------------------------------------ reconciliation constants - */
+
+/** Match states the backend already treats as an accepted link. */
+const ACCEPTED_MATCH_STATES = new Set(['exact', 'confirmed']);
+/** Match states the backend produced as a suggestion awaiting a human answer. */
+const SUGGESTION_MATCH_STATES = new Set(['likely', 'possible']);
+/** Lifecycle states where no reconciliation control may ever be rendered. */
+const NON_ACTIONABLE_STATUSES = new Set(['voided', 'superseded']);
+/** The only statement line type that can be matched to a logged load. */
+const MATCHABLE_ITEM_TYPE = 'load_pay';
+
+/**
+ * Safe, user-facing failure text. Raw error objects, SQL, stacks, and database
+ * identifiers are never surfaced. The backend remains the authority; the UI
+ * only reports that the action did not complete.
+ */
+function reportFailure(message: string): void {
+  toast.error(message);
+}
+
+/** Human-readable label for a logged load. The identifier is never shown. */
+export function describeLoadOption(load: {
+  load_date: string;
+  dropoff_date?: string | null;
+  pickup_location?: string | null;
+  dropoff_location?: string | null;
+  estimated_pay?: number | null;
+}): string {
+  const when = formatDate(load.dropoff_date ?? load.load_date);
+  const from = load.pickup_location?.trim() || 'Unknown origin';
+  const to = load.dropoff_location?.trim() || 'Unknown destination';
+  const pay =
+    load.estimated_pay !== null &&
+    load.estimated_pay !== undefined &&
+    Number.isFinite(load.estimated_pay)
+      ? ` · ${formatMoney(load.estimated_pay)}`
+      : '';
+  return `${when} · ${from} → ${to}${pay}`;
+}
+
+/** Blank text becomes null; anything else keeps its trimmed value. */
+export function toNullableText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Blank numeric input is null. Non-blank must parse to a finite number. */
+export function isBlankOrFinite(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return true;
+  return Number.isFinite(Number(trimmed));
+}
+
+/** Blank numeric input becomes null; otherwise the finite parsed number. */
+export function toNullableAmount(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   const label = humanizeToken(status);
@@ -164,9 +237,11 @@ type SettlementRowView = NonNullable<ReturnType<typeof useVisibleSettlements>['d
 function SettlementDetail({
   settlement,
   onBack,
+  advancedToolsVisible,
 }: {
   settlement: SettlementRowView;
   onBack: () => void;
+  advancedToolsVisible: boolean;
 }) {
   const settlementId = settlement.id;
   const itemsQuery = useVisibleSettlementItems(settlementId);
@@ -174,6 +249,73 @@ function SettlementDetail({
   const itemIds = useMemo(() => items.map((i) => i.id), [items]);
   const matchesQuery = useVisibleSettlementMatches(itemIds);
   const eventsQuery = useVisibleSettlementEvents(settlementId);
+
+  // Only the selected statement period is requested — unrelated history is not
+  // loaded into this reconciliation surface.
+  const { loads } = useLoads({
+    from: settlement.period_start ?? undefined,
+    to: settlement.period_end ?? undefined,
+  });
+
+  const confirmMatch = useConfirmSettlementLoadMatch();
+  const clearMatch = useClearSettlementLoadMatch();
+  const refreshSuggestions = useRefreshSettlementLoadMatchSuggestions();
+  const rejectSuggestion = useRejectSettlementLoadMatch();
+
+  const [selectedLoadByItem, setSelectedLoadByItem] = useState<Record<string, string>>({});
+
+  const actionable = !NON_ACTIONABLE_STATUSES.has((settlement.status ?? '').trim());
+  const busy =
+    confirmMatch.isPending ||
+    clearMatch.isPending ||
+    refreshSuggestions.isPending ||
+    rejectSuggestion.isPending;
+
+  const handleConfirm = (itemId: string) => {
+    const driverLoadId = selectedLoadByItem[itemId];
+    if (!driverLoadId) {
+      reportFailure('Choose one of your logged loads first.');
+      return;
+    }
+    confirmMatch.mutate(
+      { _settlement_item_id: itemId, _driver_load_id: driverLoadId },
+      {
+        onSuccess: () => toast.success('Load matched to this statement line'),
+        onError: () => reportFailure('We couldn’t match that load. Please try again.'),
+      },
+    );
+  };
+
+  const handleClear = (itemId: string) => {
+    clearMatch.mutate(
+      { _settlement_item_id: itemId },
+      {
+        onSuccess: () => toast.success('Match cleared'),
+        onError: () => reportFailure('We couldn’t clear that match. Please try again.'),
+      },
+    );
+  };
+
+  const handleRefresh = (itemId: string) => {
+    refreshSuggestions.mutate(
+      { _settlement_item_id: itemId },
+      {
+        onSuccess: () => toast.success('Suggestions refreshed'),
+        onError: () => reportFailure('We couldn’t refresh suggestions. Please try again.'),
+      },
+    );
+  };
+
+  const handleReject = (itemId: string, driverLoadId: string) => {
+    rejectSuggestion.mutate(
+      { _settlement_item_id: itemId, _driver_load_id: driverLoadId },
+      {
+        onSuccess: () => toast.success('Suggestion rejected'),
+        onError: () => reportFailure('We couldn’t reject that suggestion. Please try again.'),
+      },
+    );
+  };
+
 
   const matchesByItem = useMemo(() => {
     const rows = matchesQuery.data ?? [];
@@ -269,7 +411,16 @@ function SettlementDetail({
               item.expected_amount_snapshot,
             );
             const itemMatches = matchesByItem.get(item.id) ?? [];
+            const acceptedMatch = itemMatches.find((m) =>
+              ACCEPTED_MATCH_STATES.has((m.match_state ?? '').trim()),
+            );
+            const suggestions = itemMatches.filter((m) =>
+              SUGGESTION_MATCH_STATES.has((m.match_state ?? '').trim()),
+            );
+            const reconcilable =
+              actionable && (item.item_type ?? '').trim() === MATCHABLE_ITEM_TYPE;
             return (
+
               <div
                 key={item.id}
                 data-testid="settlement-item-row"
@@ -325,22 +476,112 @@ function SettlementDetail({
                 </div>
 
                 {itemMatches.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2 border-t border-border/50 pt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
                     {itemMatches.map((m) => (
-                      <Badge
-                        key={m.id}
-                        variant="outline"
-                        data-testid="settlement-match-chip"
-                        className="text-[11px] font-medium"
-                      >
-                        Matched load · {humanizeToken(m.match_state)}
-                        {m.confidence !== null && m.confidence !== undefined
-                          ? ` · ${Math.round(m.confidence * 100)}%`
-                          : ''}
-                      </Badge>
+                      <span key={m.id} className="flex items-center gap-1">
+                        <Badge
+                          variant="outline"
+                          data-testid="settlement-match-chip"
+                          className="text-[11px] font-medium"
+                        >
+                          Matched load · {humanizeToken(m.match_state)}
+                          {m.confidence !== null && m.confidence !== undefined
+                            ? ` · ${Math.round(m.confidence * 100)}%`
+                            : ''}
+                        </Badge>
+                        {reconcilable &&
+                          advancedToolsVisible &&
+                          SUGGESTION_MATCH_STATES.has((m.match_state ?? '').trim()) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              data-testid="settlement-reject-suggestion"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => handleReject(item.id, m.driver_load_id)}
+                            >
+                              Reject suggestion
+                            </Button>
+                          )}
+                      </span>
                     ))}
                   </div>
                 )}
+
+                {reconcilable && (
+                  <div
+                    data-testid="settlement-reconcile-controls"
+                    className="mt-2 flex flex-wrap items-end gap-2 border-t border-border/50 pt-2"
+                  >
+                    {acceptedMatch ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        data-testid="settlement-clear-match"
+                        onClick={() => handleClear(item.id)}
+                      >
+                        Clear match
+                      </Button>
+                    ) : (
+                      <>
+                        <div className="min-w-[14rem] flex-1">
+                          <label
+                            className="text-[11px] font-medium text-muted-foreground"
+                            htmlFor={`match-load-${item.id}`}
+                          >
+                            Match to one of your logged loads
+                          </label>
+                          <select
+                            id={`match-load-${item.id}`}
+                            data-testid="settlement-match-load-select"
+                            className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                            value={selectedLoadByItem[item.id] ?? ''}
+                            onChange={(e) =>
+                              setSelectedLoadByItem((prev) => ({
+                                ...prev,
+                                [item.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Select a load…</option>
+                            {loads.map((load) => (
+                              <option key={load.id} value={load.id}>
+                                {describeLoadOption(load)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={busy}
+                          data-testid="settlement-confirm-match"
+                          onClick={() => handleConfirm(item.id)}
+                        >
+                          Confirm match
+                        </Button>
+                      </>
+                    )}
+                    {advancedToolsVisible && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        data-testid="settlement-find-suggestions"
+                        onClick={() => handleRefresh(item.id)}
+                      >
+                        Find suggestions
+                      </Button>
+                    )}
+                    {suggestions.length > 0 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {suggestions.length} suggestion
+                        {suggestions.length === 1 ? '' : 's'} awaiting your review
+                      </span>
+                    )}
+                  </div>
+                )}
+
               </div>
             );
           })}
@@ -442,6 +683,72 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
 
   const busy = acceptInvite.isPending || declineInvite.isPending;
 
+  /* -------------------------------------------- manual outside-settlement -- */
+  // Presentation gating only. The backend RPC remains the sole authority on who
+  // may create a driver-imported settlement.
+  const { isPro, isLoading: isSubscriptionLoading } = useSubscription();
+  const advancedToolsVisible = !isSubscriptionLoading && isPro === true;
+
+  const createImportedDraft = useCreateDriverImportedSettlementDraft();
+  const [importOpen, setImportOpen] = useState(false);
+  const [importForm, setImportForm] = useState({
+    payer: '',
+    periodStart: '',
+    periodEnd: '',
+    payDate: '',
+    reference: '',
+    gross: '',
+    net: '',
+    notes: '',
+  });
+
+  const handleImportSubmit = () => {
+    if (!currentUserId) {
+      reportFailure('We couldn’t confirm your account. Please try again.');
+      return;
+    }
+    if (!importForm.periodStart.trim() || !importForm.periodEnd.trim()) {
+      reportFailure('Enter both a period start and a period end date.');
+      return;
+    }
+    if (!isBlankOrFinite(importForm.gross) || !isBlankOrFinite(importForm.net)) {
+      reportFailure('Reported amounts must be valid numbers.');
+      return;
+    }
+    createImportedDraft.mutate(
+      {
+        _driver_user_id: currentUserId,
+        _period_start: importForm.periodStart.trim(),
+        _period_end: importForm.periodEnd.trim(),
+        _pay_date: toNullableText(importForm.payDate),
+        _payer_name_snapshot: toNullableText(importForm.payer),
+        _statement_reference: toNullableText(importForm.reference),
+        _reported_gross_amount: toNullableAmount(importForm.gross),
+        _reported_net_amount: toNullableAmount(importForm.net),
+        _notes: toNullableText(importForm.notes),
+      },
+      {
+        onSuccess: () => {
+          toast.success('Outside settlement imported');
+          setImportOpen(false);
+          setImportForm({
+            payer: '',
+            periodStart: '',
+            periodEnd: '',
+            payDate: '',
+            reference: '',
+            gross: '',
+            net: '',
+            notes: '',
+          });
+        },
+        onError: () =>
+          reportFailure('We couldn’t import that settlement. Please try again.'),
+      },
+    );
+  };
+
+
   return (
     <div className="space-y-5" data-testid="driver-settlements-view">
       <header className="flex flex-wrap items-start justify-between gap-3">
@@ -526,12 +833,149 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
         </Card>
       )}
 
+      {advancedToolsVisible && !selected && (
+        <Card data-testid="settlement-import-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Import an outside settlement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Recording a statement you received outside HaulTrackerPro keeps your own
+              records complete. It does not notify the payer or change what they owe.
+            </p>
+            {!importOpen ? (
+              <Button
+                size="sm"
+                data-testid="settlement-import-open"
+                onClick={() => setImportOpen(true)}
+              >
+                Import outside settlement
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="import-payer">Payer name</Label>
+                    <Input
+                      id="import-payer"
+                      value={importForm.payer}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, payer: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-reference">Statement reference</Label>
+                    <Input
+                      id="import-reference"
+                      value={importForm.reference}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, reference: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-period-start">Period start</Label>
+                    <Input
+                      id="import-period-start"
+                      type="date"
+                      value={importForm.periodStart}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, periodStart: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-period-end">Period end</Label>
+                    <Input
+                      id="import-period-end"
+                      type="date"
+                      value={importForm.periodEnd}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, periodEnd: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-pay-date">Pay date</Label>
+                    <Input
+                      id="import-pay-date"
+                      type="date"
+                      value={importForm.payDate}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, payDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-gross">Reported gross</Label>
+                    <Input
+                      id="import-gross"
+                      inputMode="decimal"
+                      value={importForm.gross}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, gross: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-net">Reported net</Label>
+                    <Input
+                      id="import-net"
+                      inputMode="decimal"
+                      value={importForm.net}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, net: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="import-notes">Notes</Label>
+                  <Textarea
+                    id="import-notes"
+                    rows={2}
+                    value={importForm.notes}
+                    onChange={(e) =>
+                      setImportForm((p) => ({ ...p, notes: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={createImportedDraft.isPending}
+                    data-testid="settlement-import-submit"
+                    onClick={handleImportSubmit}
+                  >
+                    Save imported settlement
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid="settlement-import-cancel"
+                    onClick={() => setImportOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {selected ? (
         <SettlementDetail
           settlement={selected}
           onBack={() => setSelectedSettlementId(null)}
+          advancedToolsVisible={advancedToolsVisible}
         />
       ) : (
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Settlement history</CardTitle>

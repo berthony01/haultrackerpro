@@ -57,6 +57,13 @@ const ITEM_ID = '55555555-5555-4555-8555-555555555555';
 const acceptMutate = vi.fn();
 const declineMutate = vi.fn();
 const refetchSettlements = vi.fn();
+const confirmMatchMutate = vi.fn();
+const clearMatchMutate = vi.fn();
+const refreshSuggestionsMutate = vi.fn();
+const rejectSuggestionMutate = vi.fn();
+const createImportedMutate = vi.fn();
+
+const LOAD_ID = '66666666-6666-4666-8666-666666666666';
 
 type QueryStub = {
   data: unknown;
@@ -75,6 +82,17 @@ const state: {
   matchesArgs: unknown[];
   itemsArgs: unknown[];
   eventsArgs: unknown[];
+  isPro: boolean;
+  isSubscriptionLoading: boolean;
+  loads: Array<{
+    id: string;
+    load_date: string;
+    dropoff_date: string | null;
+    pickup_location: string;
+    dropoff_location: string;
+    estimated_pay: number | null;
+  }>;
+  loadRangeArgs: unknown[];
 } = {
   user: null,
   settlements: { data: [], isLoading: false, isError: false, refetch: refetchSettlements },
@@ -85,7 +103,12 @@ const state: {
   matchesArgs: [],
   itemsArgs: [],
   eventsArgs: [],
+  isPro: false,
+  isSubscriptionLoading: false,
+  loads: [],
+  loadRangeArgs: [],
 };
+
 
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
@@ -99,6 +122,20 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: state.user }),
+}));
+
+vi.mock('@/hooks/useSubscription', () => ({
+  useSubscription: () => ({
+    isPro: state.isPro,
+    isLoading: state.isSubscriptionLoading,
+  }),
+}));
+
+vi.mock('@/hooks/useLoads', () => ({
+  useLoads: (range: unknown) => {
+    state.loadRangeArgs.push(range);
+    return { loads: state.loads };
+  },
 }));
 
 vi.mock('@/hooks/settlements/useSettlementData', () => ({
@@ -124,14 +161,30 @@ vi.mock('@/hooks/settlements/useSettlementData', () => ({
     mutate: declineMutate,
     isPending: false,
   }),
+  useConfirmSettlementLoadMatch: () => ({ mutate: confirmMatchMutate, isPending: false }),
+  useClearSettlementLoadMatch: () => ({ mutate: clearMatchMutate, isPending: false }),
+  useRefreshSettlementLoadMatchSuggestions: () => ({
+    mutate: refreshSuggestionsMutate,
+    isPending: false,
+  }),
+  useRejectSettlementLoadMatch: () => ({ mutate: rejectSuggestionMutate, isPending: false }),
+  useCreateDriverImportedSettlementDraft: () => ({
+    mutate: createImportedMutate,
+    isPending: false,
+  }),
 }));
+
 
 import {
   DriverSettlementsView,
   computeItemDifference,
   describeItemBasis,
+  describeLoadOption,
   humanizeToken,
+  isBlankOrFinite,
   resolvePayerLabel,
+  toNullableAmount,
+  toNullableText,
 } from '@/components/settlements/DriverSettlementsView';
 
 
@@ -155,6 +208,24 @@ function settlementRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function loadRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: LOAD_ID,
+    load_date: '2026-07-02',
+    dropoff_date: '2026-07-03',
+    pickup_location: 'Dallas, TX',
+    dropoff_location: 'Atlanta, GA',
+    estimated_pay: 1850,
+    ...overrides,
+  };
+}
+
+/** Opens the settlement detail view for the single seeded settlement. */
+function openDetail() {
+  render(<DriverSettlementsView />);
+  fireEvent.click(screen.getByTestId('settlement-card'));
+}
+
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -167,7 +238,12 @@ beforeEach(() => {
   state.matchesArgs = [];
   state.itemsArgs = [];
   state.eventsArgs = [];
+  state.isPro = false;
+  state.isSubscriptionLoading = false;
+  state.loads = [];
+  state.loadRangeArgs = [];
 });
+
 
 /* ----------------------------------------------------------------------- A - */
 
@@ -352,23 +428,26 @@ describe('D. invitation response uses the exact accepted mutation arguments', ()
     await waitFor(() => expect(toastError).toHaveBeenCalled());
   });
 
-  it('exposes no create/finalize/void/correction/import or match mutation actions', () => {
+  it('still exposes no company-side issuance or line-item authoring actions', () => {
     render(<DriverSettlementsView />);
-    for (const label of [/finalize/i, /void/i, /correction/i, /import/i, /new settlement/i, /confirm match/i, /reject match/i]) {
+    for (const label of [/finalize/i, /void/i, /correction/i, /new settlement/i, /add line/i]) {
       expect(screen.queryByRole('button', { name: label })).toBeNull();
     }
     for (const banned of [
       'useFinalizeSettlementDraft',
       'useVoidFinalizedSettlement',
       'useCreateSettlementCorrectionDraft',
-      'useCreateDriverImportedSettlementDraft',
-      'useConfirmSettlementLoadMatch',
-      'useRejectSettlementLoadMatch',
       'useAddSettlementDraftItem',
+      'useUpdateSettlementDraftItem',
+      'useDeleteSettlementDraftItem',
+      'useUpdateSettlementDraftHeader',
+      'useCreateCarrierSettlementDraft',
+      'useCreateAgencySettlementDraft',
     ]) {
       expect(VIEW_SOURCE).not.toContain(banned);
     }
   });
+
 });
 
 /* ----------------------------------------------------------------------- E - */
@@ -750,21 +829,24 @@ describe('L. the new UI performs no backend, authorization, or billing logic', (
     expect(VIEW_SOURCE).not.toMatch(/(^|[^A-Za-z])fetch\(/);
   });
 
-  it('contains no plan, entitlement, role or billing gating', () => {
+  it('contains no entitlement, role or billing logic beyond presentation-only Pro gating', () => {
     for (const banned of [
-      'isPro',
       'entitle',
       'capabilit',
       'hasRole',
-      'subscription',
       'stripe',
       'checkout',
-      'upgrade',
+      'plan_key',
       'admin',
     ]) {
       expect(VIEW_SOURCE.toLowerCase()).not.toContain(banned.toLowerCase());
     }
+    // Pro visibility is derived only from the shared subscription hook and is
+    // never used to decide authorization — the RPC layer stays authoritative.
+    expect([...VIEW_SOURCE.matchAll(/useSubscription\(/g)]).toHaveLength(1);
+    expect(VIEW_SOURCE).toContain('Presentation gating only');
   });
+
 
   it('reads and mutates exclusively through the accepted hook layer', () => {
     const imports = [...VIEW_SOURCE.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
@@ -962,5 +1044,314 @@ describe('P. statement line pay-basis details', () => {
 
     const diffs = screen.getAllByTestId('settlement-item-difference');
     expect(diffs).toHaveLength(1);
+  });
+});
+
+/* ----------------------------------------------------------------------- P - */
+
+describe('P. driver reconciliation controls (Free basic, Pro advanced)', () => {
+  const loadPayItem = {
+    id: ITEM_ID,
+    item_type: 'load_pay',
+    description: 'Linehaul',
+    category: null,
+    amount: 1850,
+    expected_amount_snapshot: null,
+    load_reference_snapshot: null,
+    origin_snapshot: null,
+    destination_snapshot: null,
+    pay_method: null,
+  };
+
+  beforeEach(() => {
+    state.settlements = {
+      data: [settlementRow()],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+    state.items = { data: [loadPayItem], isLoading: false, isError: false, refetch: vi.fn() };
+    state.loads = [loadRow()];
+  });
+
+  it('requests only the settlement period when listing candidate loads', () => {
+    openDetail();
+    expect(state.loadRangeArgs[0]).toEqual({ from: '2026-07-01', to: '2026-07-07' });
+  });
+
+  it('offers basic confirm-match to a Free driver with exact RPC arguments', () => {
+    openDetail();
+    fireEvent.change(screen.getByTestId('settlement-match-load-select'), {
+      target: { value: LOAD_ID },
+    });
+    fireEvent.click(screen.getByTestId('settlement-confirm-match'));
+    expect(confirmMatchMutate).toHaveBeenCalledTimes(1);
+    expect(confirmMatchMutate.mock.calls[0][0]).toEqual({
+      _settlement_item_id: ITEM_ID,
+      _driver_load_id: LOAD_ID,
+    });
+  });
+
+  it('refuses to confirm without a chosen load and never calls the backend', async () => {
+    openDetail();
+    fireEvent.click(screen.getByTestId('settlement-confirm-match'));
+    expect(confirmMatchMutate).not.toHaveBeenCalled();
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+  });
+
+  it('offers basic clear-match when an accepted match exists', () => {
+    state.matches = {
+      data: [
+        {
+          id: 'm1',
+          settlement_item_id: ITEM_ID,
+          driver_load_id: LOAD_ID,
+          match_state: 'confirmed',
+          confidence: 0.9,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    openDetail();
+    expect(screen.queryByTestId('settlement-match-load-select')).toBeNull();
+    fireEvent.click(screen.getByTestId('settlement-clear-match'));
+    expect(clearMatchMutate.mock.calls[0][0]).toEqual({ _settlement_item_id: ITEM_ID });
+  });
+
+  it('hides advanced suggestion tools from a Free driver', () => {
+    state.matches = {
+      data: [
+        {
+          id: 'm2',
+          settlement_item_id: ITEM_ID,
+          driver_load_id: LOAD_ID,
+          match_state: 'likely',
+          confidence: 0.7,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    openDetail();
+    expect(screen.queryByTestId('settlement-find-suggestions')).toBeNull();
+    expect(screen.queryByTestId('settlement-reject-suggestion')).toBeNull();
+  });
+
+  it('shows advanced refresh and reject to an active Pro driver with exact arguments', () => {
+    state.isPro = true;
+    state.matches = {
+      data: [
+        {
+          id: 'm3',
+          settlement_item_id: ITEM_ID,
+          driver_load_id: LOAD_ID,
+          match_state: 'likely',
+          confidence: 0.7,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    openDetail();
+    fireEvent.click(screen.getByTestId('settlement-find-suggestions'));
+    expect(refreshSuggestionsMutate.mock.calls[0][0]).toEqual({
+      _settlement_item_id: ITEM_ID,
+    });
+    fireEvent.click(screen.getByTestId('settlement-reject-suggestion'));
+    expect(rejectSuggestionMutate.mock.calls[0][0]).toEqual({
+      _settlement_item_id: ITEM_ID,
+      _driver_load_id: LOAD_ID,
+    });
+  });
+
+  it('renders no reconciliation controls for non-load_pay lines', () => {
+    state.items = {
+      data: [{ ...loadPayItem, item_type: 'deduction' }],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    openDetail();
+    expect(screen.queryByTestId('settlement-reconcile-controls')).toBeNull();
+  });
+
+  it.each(['voided', 'superseded'])(
+    'renders no reconciliation controls on a %s settlement',
+    (status) => {
+      state.settlements = {
+        data: [settlementRow({ status })],
+        isLoading: false,
+        isError: false,
+        refetch: refetchSettlements,
+      };
+      openDetail();
+      expect(screen.queryByTestId('settlement-reconcile-controls')).toBeNull();
+    },
+  );
+
+  it('reports match failures safely without raw errors or identifiers', async () => {
+    openDetail();
+    fireEvent.change(screen.getByTestId('settlement-match-load-select'), {
+      target: { value: LOAD_ID },
+    });
+    fireEvent.click(screen.getByTestId('settlement-confirm-match'));
+    confirmMatchMutate.mock.calls[0][1].onError(
+      new Error('permission denied for function settlement_confirm_load_match'),
+    );
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    const message = String(toastError.mock.calls[0][0]);
+    expect(message).not.toContain('permission denied');
+    expect(message).not.toContain(ITEM_ID);
+    expect(message).not.toContain(LOAD_ID);
+  });
+
+  it('never renders raw load or item identifiers as visible text', () => {
+    openDetail();
+    expect(screen.queryByText(LOAD_ID)).toBeNull();
+    expect(screen.queryByText(ITEM_ID)).toBeNull();
+    expect(screen.getByTestId('settlement-match-load-select').textContent).toContain(
+      'Dallas, TX',
+    );
+  });
+});
+
+/* ----------------------------------------------------------------------- Q - */
+
+describe('Q. manual driver_imported outside-settlement surface', () => {
+  it('is hidden from Free drivers and while subscription state is unresolved', () => {
+    render(<DriverSettlementsView />);
+    expect(screen.queryByTestId('settlement-import-card')).toBeNull();
+
+    state.isPro = true;
+    state.isSubscriptionLoading = true;
+    render(<DriverSettlementsView />);
+    expect(screen.queryByTestId('settlement-import-card')).toBeNull();
+  });
+
+  it('is offered to an active Pro driver', () => {
+    state.isPro = true;
+    render(<DriverSettlementsView />);
+    expect(screen.getByTestId('settlement-import-card')).toBeTruthy();
+    expect(screen.getByTestId('settlement-import-open')).toBeTruthy();
+  });
+
+  it('submits exact RPC arguments with blank optional fields normalized to null', () => {
+    state.isPro = true;
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-import-open'));
+    fireEvent.change(screen.getByLabelText('Period start'), {
+      target: { value: '2026-07-01' },
+    });
+    fireEvent.change(screen.getByLabelText('Period end'), {
+      target: { value: '2026-07-07' },
+    });
+    fireEvent.change(screen.getByLabelText('Payer name'), {
+      target: { value: '  Blue Ridge  ' },
+    });
+    fireEvent.change(screen.getByLabelText('Reported net'), { target: { value: '4100.5' } });
+    fireEvent.click(screen.getByTestId('settlement-import-submit'));
+
+    expect(createImportedMutate).toHaveBeenCalledTimes(1);
+    expect(createImportedMutate.mock.calls[0][0]).toEqual({
+      _driver_user_id: DRIVER_ID,
+      _period_start: '2026-07-01',
+      _period_end: '2026-07-07',
+      _pay_date: null,
+      _payer_name_snapshot: 'Blue Ridge',
+      _statement_reference: null,
+      _reported_gross_amount: null,
+      _reported_net_amount: 4100.5,
+      _notes: null,
+    });
+  });
+
+  it('blocks submission when the period is incomplete or amounts are not numeric', async () => {
+    state.isPro = true;
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-import-open'));
+    fireEvent.click(screen.getByTestId('settlement-import-submit'));
+    expect(createImportedMutate).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Period start'), {
+      target: { value: '2026-07-01' },
+    });
+    fireEvent.change(screen.getByLabelText('Period end'), {
+      target: { value: '2026-07-07' },
+    });
+    fireEvent.change(screen.getByLabelText('Reported gross'), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByTestId('settlement-import-submit'));
+    expect(createImportedMutate).not.toHaveBeenCalled();
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+  });
+
+  it('reports import failures safely and keeps the form open', async () => {
+    state.isPro = true;
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-import-open'));
+    fireEvent.change(screen.getByLabelText('Period start'), {
+      target: { value: '2026-07-01' },
+    });
+    fireEvent.change(screen.getByLabelText('Period end'), {
+      target: { value: '2026-07-07' },
+    });
+    fireEvent.click(screen.getByTestId('settlement-import-submit'));
+    createImportedMutate.mock.calls[0][1].onError(new Error('new row violates policy'));
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(String(toastError.mock.calls[0][0])).not.toContain('violates policy');
+    expect(screen.getByTestId('settlement-import-submit')).toBeTruthy();
+  });
+
+  it('is hidden while a settlement detail is open', () => {
+    state.isPro = true;
+    state.settlements = {
+      data: [settlementRow()],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+    openDetail();
+    expect(screen.queryByTestId('settlement-import-card')).toBeNull();
+  });
+});
+
+/* ----------------------------------------------------------------------- R - */
+
+describe('R. reconciliation and import pure helpers', () => {
+  it('describeLoadOption is human-readable and identifier-free', () => {
+    const label = describeLoadOption(loadRow());
+    expect(label).toBe('07/03/2026 · Dallas, TX → Atlanta, GA · $1,850.00');
+    expect(label).not.toContain(LOAD_ID);
+  });
+
+  it('describeLoadOption falls back to pickup date and safe placeholders', () => {
+    expect(
+      describeLoadOption({
+        load_date: '2026-07-02',
+        dropoff_date: null,
+        pickup_location: '',
+        dropoff_location: null,
+        estimated_pay: null,
+      }),
+    ).toBe('07/02/2026 · Unknown origin → Unknown destination');
+  });
+
+  it('normalizes blank optional text and amounts to null', () => {
+    expect(toNullableText('   ')).toBeNull();
+    expect(toNullableText(' STMT-1 ')).toBe('STMT-1');
+    expect(toNullableAmount('')).toBeNull();
+    expect(toNullableAmount(' 12.5 ')).toBe(12.5);
+    expect(toNullableAmount('abc')).toBeNull();
+  });
+
+  it('treats blank amounts as valid and non-numeric amounts as invalid', () => {
+    expect(isBlankOrFinite('')).toBe(true);
+    expect(isBlankOrFinite('  ')).toBe(true);
+    expect(isBlankOrFinite('0')).toBe(true);
+    expect(isBlankOrFinite('-4.25')).toBe(true);
+    expect(isBlankOrFinite('abc')).toBe(false);
   });
 });
