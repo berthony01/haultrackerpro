@@ -103,12 +103,30 @@ describe('Phase 1T-F3C — carrier settlement mobile overflow repair', () => {
 
   it('8. no overflow-hiding or clipping band-aid was introduced', () => {
     for (const [name, source] of IMPLEMENTATION_SOURCES) {
-      expect(source, `${name} must not clip horizontally`).not.toMatch(
+      expect(source, `${name} must not clip or scroll horizontally`).not.toMatch(
         /overflow-x-hidden|overflow-x-auto|overflow-x-scroll|max-w-screen/,
       );
-      expect(source, `${name} must not hide overflow`).not.toContain('overflow-hidden');
     }
+    // The recruiter grid root, its shrinkable left child, and the carrier /
+    // business settlement panel roots must not mask the defect by clipping.
+    const roots = [
+      '<div className="grid lg:grid-cols-[1.5fr_1fr] gap-6">',
+      '<div className="min-w-0 space-y-6">',
+      '<div className="space-y-4" data-testid="carrier-settlements-panel">',
+    ];
+    for (const root of roots) {
+      expect(recruiterAccessPage + carrierPanel).toContain(root);
+      expect(root).not.toContain('overflow');
+    }
+    // The single pre-existing `overflow-hidden` (recruiter hero Card) is
+    // untouched by this unit; no new occurrence was added anywhere.
+    const total = IMPLEMENTATION_SOURCES.reduce(
+      (sum, [, source]) => sum + (source.match(/overflow-hidden/g) ?? []).length,
+      0,
+    );
+    expect(total).toBe(1);
   });
+
 
   it('9. no touch-target sizing repair is smuggled into this unit', () => {
     // Buttons in these surfaces keep their existing default sizing: this unit
