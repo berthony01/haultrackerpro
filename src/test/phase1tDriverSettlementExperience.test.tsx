@@ -408,20 +408,45 @@ describe('E. settlement history list states and content', () => {
     expect(card.textContent).toContain('07/01/2026');
   });
 
-  it('falls back safely when the payer snapshot is missing', () => {
-    expect(resolvePayerLabel(null, 'Fallback Payer')).toBe('Fallback Payer');
-    expect(resolvePayerLabel(null, null)).toBe('Unnamed payer');
+  it('resolvePayerLabel honours snapshot precedence then a source-specific safe fallback', () => {
+    expect(resolvePayerLabel('Display Co', 'Payer Co', 'carrier_issued')).toBe('Display Co');
+    expect(resolvePayerLabel('   ', 'Payer Co', 'carrier_issued')).toBe('Payer Co');
+    expect(resolvePayerLabel(null, 'Fallback Payer', 'agency_prepared')).toBe('Fallback Payer');
+    expect(resolvePayerLabel(null, null, 'carrier_issued')).toBe('Carrier statement');
+    expect(resolvePayerLabel(null, null, 'agency_prepared')).toBe('Agency-prepared statement');
+    expect(resolvePayerLabel(null, null, 'driver_imported')).toBe('Driver-imported statement');
+    expect(resolvePayerLabel(null, null, 'something_else')).toBe('Settlement statement');
+    expect(resolvePayerLabel(null, null, null)).toBe('Settlement statement');
+    expect(resolvePayerLabel(null, null, undefined)).toBe('Settlement statement');
+    expect(resolvePayerLabel(null, null, SETTLEMENT_ID)).toBe('Settlement statement');
+  });
+
+  it.each([
+    ['carrier_issued', 'Carrier statement'],
+    ['agency_prepared', 'Agency-prepared statement'],
+    ['driver_imported', 'Driver-imported statement'],
+    ['mystery_source', 'Settlement statement'],
+  ])('list card uses the safe %s fallback when both snapshots are absent', (source, label) => {
     state.settlements = {
-      data: [settlementRow({ source_display_name_snapshot: null, payer_name_snapshot: null, version_number: 1 })],
+      data: [
+        settlementRow({
+          source,
+          source_display_name_snapshot: null,
+          payer_name_snapshot: null,
+          version_number: 1,
+        }),
+      ],
       isLoading: false,
       isError: false,
       refetch: refetchSettlements,
     };
     render(<DriverSettlementsView />);
     const card = screen.getByTestId('settlement-card');
-    expect(card.textContent).toContain('Unnamed payer');
+    expect(card.textContent).toContain(label);
+    expect(card.textContent).not.toContain('Unnamed payer');
     expect(card.textContent).not.toContain('Version 1');
   });
+
 
   it('states the recordkeeping / reconciliation boundary', () => {
     render(<DriverSettlementsView />);
