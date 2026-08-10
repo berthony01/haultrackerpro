@@ -53,7 +53,15 @@ import {
   useVisibleSettlements,
 } from '@/hooks/settlements/useSettlementData';
 
+import {
+  downloadSettlementCsv,
+  printSettlement,
+  type SettlementExportItem,
+  type SettlementExportStatement,
+} from '@/lib/settlements/settlementExport';
+
 /* ------------------------------------------------------------------ utils - */
+
 
 function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) return '—';
