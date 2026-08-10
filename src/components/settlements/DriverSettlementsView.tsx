@@ -240,10 +240,12 @@ function SettlementDetail({
   settlement,
   onBack,
   advancedToolsVisible,
+  basicReconcileVisible,
 }: {
   settlement: SettlementRowView;
   onBack: () => void;
   advancedToolsVisible: boolean;
+  basicReconcileVisible: boolean;
 }) {
   const settlementId = settlement.id;
   const itemsQuery = useVisibleSettlementItems(settlementId);
