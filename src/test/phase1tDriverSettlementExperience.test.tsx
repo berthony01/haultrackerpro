@@ -829,21 +829,24 @@ describe('L. the new UI performs no backend, authorization, or billing logic', (
     expect(VIEW_SOURCE).not.toMatch(/(^|[^A-Za-z])fetch\(/);
   });
 
-  it('contains no plan, entitlement, role or billing gating', () => {
+  it('contains no entitlement, role or billing logic beyond presentation-only Pro gating', () => {
     for (const banned of [
-      'isPro',
       'entitle',
       'capabilit',
       'hasRole',
-      'subscription',
       'stripe',
       'checkout',
-      'upgrade',
+      'plan_key',
       'admin',
     ]) {
       expect(VIEW_SOURCE.toLowerCase()).not.toContain(banned.toLowerCase());
     }
+    // Pro visibility is derived only from the shared subscription hook and is
+    // never used to decide authorization — the RPC layer stays authoritative.
+    expect([...VIEW_SOURCE.matchAll(/useSubscription\(/g)]).toHaveLength(1);
+    expect(VIEW_SOURCE).toContain('Presentation gating only');
   });
+
 
   it('reads and mutates exclusively through the accepted hook layer', () => {
     const imports = [...VIEW_SOURCE.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
