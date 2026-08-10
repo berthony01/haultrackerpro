@@ -537,7 +537,7 @@ describe('G. hook source performs no backend access and no local precheck', () =
     }
   });
 
-  it('imports only react-query and the three accepted service modules', () => {
+  it('imports only react-query and the four accepted service modules', () => {
     const imports = [...HOOK_SOURCE.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
     expect(new Set(imports)).toEqual(
       new Set([
@@ -545,9 +545,11 @@ describe('G. hook source performs no backend access and no local precheck', () =
         '@/lib/settlements/settlementReadService',
         '@/lib/settlements/settlementService',
         '@/lib/settlements/carrierDriverRelationshipService',
+        '@/lib/settlements/carrierDriverRelationshipReadService',
       ]),
     );
   });
+
 });
 
 describe('H. hook source imports no UI, router, or toast modules', () => {
