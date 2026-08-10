@@ -1006,6 +1006,7 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
           settlement={selected}
           onBack={() => setSelectedSettlementId(null)}
           advancedToolsVisible={advancedToolsVisible}
+          basicReconcileVisible={basicReconcileVisible}
         />
       ) : (
 
