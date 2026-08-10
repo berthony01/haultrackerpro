@@ -354,10 +354,10 @@ export function validateDraftForm(values: BusinessDraftFormValues): string | nul
   if (!values.periodStart || !values.periodEnd) return 'Enter the statement period.';
   if (values.periodEnd < values.periodStart)
     return 'The period end must be on or after the period start.';
-  if (!isBlankOrNonNegativeFinite(values.reportedGross))
-    return 'Reported gross must be a non-negative number.';
-  if (!isBlankOrNonNegativeFinite(values.reportedNet))
-    return 'Reported net must be a non-negative number.';
+  if (!isBlankOrFinite(values.reportedGross))
+    return 'Reported gross must be a number.';
+  if (!isBlankOrFinite(values.reportedNet))
+    return 'Reported net must be a number.';
   return null;
 }
 
