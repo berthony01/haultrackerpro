@@ -1034,7 +1034,18 @@ function BusinessSettlementDetail({
           <SummaryLine label="Statement reference">
             {settlement.statement_reference ?? '—'}
           </SummaryLine>
+          <SummaryLine label="Statement source">
+            <span data-testid="business-settlement-source-label">
+              {resolveBusinessSourceLabel(settlement)}
+            </span>
+          </SummaryLine>
+          <SummaryLine label="Payer">
+            <span data-testid="business-settlement-payer-label">
+              {resolveBusinessPayerLabel(settlement)}
+            </span>
+          </SummaryLine>
           <SummaryLine label="Notes">{settlement.notes ?? '—'}</SummaryLine>
+
         </CardContent>
       </Card>
 
