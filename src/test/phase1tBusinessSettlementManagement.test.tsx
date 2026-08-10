@@ -461,16 +461,42 @@ describe('E1 · workspace integration', () => {
     expect(recruiterPageSrc).not.toMatch(/AgencySettlementsPanel/);
   });
 
-  it('mounts the agency panel inside a dedicated agency tab only', () => {
+  it('shows the agency settlements tab to every active member', () => {
     expect(agencyPageSrc).toMatch(/AgencySettlementsPanel/);
-    expect(agencyPageSrc).toMatch(/value: 'settlements', label: 'Settlements'/);
+    expect(agencyPageSrc).toMatch(
+      /value: 'settlements', label: 'Settlements', show: true/,
+    );
+    expect(agencyPageSrc).not.toMatch(
+      /value: 'settlements'[^}]*show: isOwnerOrAdmin/,
+    );
     expect(agencyPageSrc).not.toMatch(/CarrierSettlementsPanel/);
   });
 
-  it('carrier settlements mount on demand rather than on every render', () => {
-    expect(recruiterPageSrc).toMatch(/settlementsOpen &&\s*\(?\s*<CarrierSettlementsPanel/);
+  it('mounts the agency settlements tab content outside the owner/admin block', () => {
+    const ownerBlock = agencyPageSrc.slice(
+      agencyPageSrc.indexOf('{isOwnerOrAdmin && ('),
+      agencyPageSrc.indexOf('<TabsContent value="work">'),
+    );
+    const gatedEnd = ownerBlock.indexOf('</>');
+    expect(gatedEnd).toBeGreaterThan(-1);
+    // The settlements TabsContent must appear AFTER the gated fragment closes.
+    expect(ownerBlock.slice(0, gatedEnd)).not.toMatch(/value="settlements"/);
+    expect(ownerBlock.slice(gatedEnd)).toMatch(/value="settlements"/);
+  });
+
+  it('carrier settlements mount on demand and receive scroll plus focus', () => {
+    expect(recruiterPageSrc).toMatch(/settlementsOpen && \(/);
+    expect(recruiterPageSrc).toMatch(/ref=\{settlementsRef\}/);
+    expect(recruiterPageSrc).toMatch(/tabIndex=\{-1\}/);
+    expect(recruiterPageSrc).toMatch(
+      /useEffect\(\(\) => \{\s*if \(!settlementsOpen\) return;/,
+    );
+    expect(recruiterPageSrc).toMatch(/node\.scrollIntoView\(/);
+    expect(recruiterPageSrc).toMatch(/node\.focus\(\{ preventScroll: true \}\)/);
+    expect(recruiterPageSrc).toMatch(/\}, \[settlementsOpen\]\)/);
   });
 });
+
 
 /* -------------------------------------------------- 10. truthfulness guard */
 
