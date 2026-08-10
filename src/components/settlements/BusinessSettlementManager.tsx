@@ -648,10 +648,11 @@ export function BusinessSettlementManager({
           mode={mode}
           businessId={businessId}
           driverOptions={driverOptions}
-          onCreated={(id) => {
+          onCreated={(row) => {
             setCreating(false);
-            setSelectedId(id);
+            openReturned(row);
           }}
+
         />
       )}
 
