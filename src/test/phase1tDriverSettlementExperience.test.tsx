@@ -793,3 +793,174 @@ describe('N. new and modified files avoid prohibited escapes', () => {
     }
   });
 });
+
+/* ----------------------------------------------------------------------- O - */
+
+describe('O. selected settlement detail renders the full statement summary', () => {
+  beforeEach(() => {
+    state.settlements = {
+      data: [
+        settlementRow({
+          notes: 'Detention approved by dispatch on 07/09.',
+          statement_reference: 'STMT-4412',
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+  });
+
+  it('shows payer, status, period, pay date, net, gross, version, reference and notes', () => {
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-card'));
+    const summary = screen.getByTestId('settlement-detail-summary');
+    expect(summary.textContent).toContain('Blue Ridge Carriers');
+    expect(summary.textContent).toContain('Finalized');
+    expect(summary.textContent).toContain('07/01/2026');
+    expect(summary.textContent).toContain('07/07/2026');
+    expect(summary.textContent).toContain('07/12/2026');
+    expect(summary.textContent).toContain('$4,100.50');
+    expect(summary.textContent).toContain('$5,200.00');
+    expect(summary.textContent).toContain('Version 2');
+    expect(summary.textContent).toContain('STMT-4412');
+    expect(summary.textContent).toContain('Detention approved by dispatch on 07/09.');
+  });
+
+  it('uses the safe source fallback in the summary when both snapshots are absent', () => {
+    state.settlements = {
+      data: [
+        settlementRow({
+          source: 'driver_imported',
+          source_display_name_snapshot: null,
+          payer_name_snapshot: null,
+          version_number: 1,
+          notes: null,
+        }),
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-card'));
+    const summary = screen.getByTestId('settlement-detail-summary');
+    expect(summary.textContent).toContain('Driver-imported statement');
+    expect(summary.textContent).not.toContain('Unnamed payer');
+    expect(summary.textContent).not.toContain('Version 1');
+  });
+
+  it('never mounts the summary or detail queries before selection', () => {
+    render(<DriverSettlementsView />);
+    expect(screen.queryByTestId('settlement-detail-summary')).toBeNull();
+    expect(state.itemsArgs).toHaveLength(0);
+    expect(state.eventsArgs).toHaveLength(0);
+    expect(state.matchesArgs).toHaveLength(0);
+  });
+
+  it('renders no raw identifiers in the detail surface', () => {
+    state.events = {
+      data: [
+        {
+          id: 'ev-1',
+          settlement_id: SETTLEMENT_ID,
+          event_type: 'settlement_finalized',
+          created_at: '2026-07-12T15:04:00Z',
+          actor_user_id: OTHER_DRIVER_ID,
+          metadata: { secret: 'x' },
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    const { container } = render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-card'));
+    const text = container.textContent ?? '';
+    expect(text).not.toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+    );
+    expect(text).not.toContain('secret');
+  });
+});
+
+/* ----------------------------------------------------------------------- P - */
+
+describe('P. statement line pay-basis details', () => {
+  it('describeItemBasis composes quantity/unit, rate and pay method only when present', () => {
+    expect(
+      describeItemBasis({ quantity: 2.5, unit_label: 'miles', rate: 0.7, pay_method: 'per_mile' }),
+    ).toBe('2.5 miles · Rate $0.70 · Per mile');
+    expect(describeItemBasis({ quantity: 3, unit_label: null, rate: null, pay_method: null })).toBe(
+      '3',
+    );
+    expect(describeItemBasis({ quantity: null, unit_label: null, rate: 125, pay_method: null })).toBe(
+      'Rate $125.00',
+    );
+    expect(
+      describeItemBasis({ quantity: null, unit_label: null, rate: null, pay_method: 'flat_rate' }),
+    ).toBe('Flat rate');
+    expect(
+      describeItemBasis({ quantity: null, unit_label: null, rate: null, pay_method: null }),
+    ).toBeNull();
+    expect(describeItemBasis({})).toBeNull();
+  });
+
+  it('renders the basis row for lines that carry pay-basis values and omits it otherwise', () => {
+    state.settlements = {
+      data: [settlementRow()],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+    state.items = {
+      data: [
+        {
+          id: ITEM_ID,
+          settlement_id: SETTLEMENT_ID,
+          item_type: 'line_haul',
+          category: null,
+          description: 'Line haul',
+          amount: 1800,
+          expected_amount_snapshot: 1950,
+          load_reference_snapshot: null,
+          origin_snapshot: null,
+          destination_snapshot: null,
+          quantity: 2.5,
+          rate: 0.7,
+          unit_label: 'miles',
+          pay_method: 'per_mile',
+        },
+        {
+          id: 'item-2',
+          settlement_id: SETTLEMENT_ID,
+          item_type: 'detention',
+          category: null,
+          description: 'Detention',
+          amount: 100,
+          expected_amount_snapshot: null,
+          load_reference_snapshot: null,
+          origin_snapshot: null,
+          destination_snapshot: null,
+          quantity: null,
+          rate: null,
+          unit_label: null,
+          pay_method: null,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-card'));
+    const bases = screen.getAllByTestId('settlement-item-basis');
+    expect(bases).toHaveLength(1);
+    expect(bases[0].textContent).toContain('2.5 miles');
+    expect(bases[0].textContent).toContain('Rate $0.70');
+    expect(bases[0].textContent).toContain('Per mile');
+
+    const diffs = screen.getAllByTestId('settlement-item-difference');
+    expect(diffs).toHaveLength(1);
+  });
+});
