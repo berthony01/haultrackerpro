@@ -179,8 +179,12 @@ import {
   DriverSettlementsView,
   computeItemDifference,
   describeItemBasis,
+  describeLoadOption,
   humanizeToken,
+  isBlankOrFinite,
   resolvePayerLabel,
+  toNullableAmount,
+  toNullableText,
 } from '@/components/settlements/DriverSettlementsView';
 
 
@@ -204,6 +208,24 @@ function settlementRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function loadRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: LOAD_ID,
+    load_date: '2026-07-02',
+    dropoff_date: '2026-07-03',
+    pickup_location: 'Dallas, TX',
+    dropoff_location: 'Atlanta, GA',
+    estimated_pay: 1850,
+    ...overrides,
+  };
+}
+
+/** Opens the settlement detail view for the single seeded settlement. */
+function openDetail() {
+  render(<DriverSettlementsView />);
+  fireEvent.click(screen.getByTestId('settlement-card'));
+}
+
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -216,7 +238,12 @@ beforeEach(() => {
   state.matchesArgs = [];
   state.itemsArgs = [];
   state.eventsArgs = [];
+  state.isPro = false;
+  state.isSubscriptionLoading = false;
+  state.loads = [];
+  state.loadRangeArgs = [];
 });
+
 
 /* ----------------------------------------------------------------------- A - */
 
