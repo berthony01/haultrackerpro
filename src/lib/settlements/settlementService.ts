@@ -5,7 +5,7 @@
  *
  * PostgreSQL remains the SOLE authority for authorization, entitlement,
  * lifecycle, locking, validation, and audit behavior. This module:
- *  - performs exactly one `supabase.rpc(...)` call per invocation;
+ *  - performs exactly one Supabase RPC call per invocation;
  *  - passes the caller's argument object through verbatim (no injected actor
  *    ids, defaults, derived entitlement flags, or rewritten values);
  *  - throws the Supabase error object unchanged, with no retry or fallback;
