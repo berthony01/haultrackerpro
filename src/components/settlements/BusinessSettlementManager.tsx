@@ -1242,15 +1242,14 @@ function BusinessSettlementDetail({
 
 const SETTLEMENT_EVENT_LABELS: Record<string, string> = {
   created: 'Statement created',
-  updated: 'Statement details updated',
-  item_added: 'Line added',
-  item_updated: 'Line updated',
-  item_deleted: 'Line removed',
+  updated: 'Statement updated',
   finalized: 'Statement finalized',
+  superseded: 'Statement superseded by a correction',
   voided: 'Statement voided',
-  superseded: 'Statement superseded',
-  correction_created: 'Correction draft created',
+  match_confirmed: 'Load match confirmed',
+  exported: 'Statement exported',
 };
+
 
 function SummaryLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (
