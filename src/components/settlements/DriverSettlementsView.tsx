@@ -347,6 +347,78 @@ function SettlementDetail({
     return map;
   }, [matchesQuery.data]);
 
+  /**
+   * Presentation-safe export payload. Read capability only: exporting a record
+   * the caller can already see is never gated by Pro, manage, or finalize.
+   * No raw identifier of any kind is copied into the export model.
+   */
+  const exportStatement: SettlementExportStatement = useMemo(
+    () => ({
+      sourceLabel: resolvePayerLabel(
+        settlement.source_display_name_snapshot,
+        null,
+        settlement.source,
+      ),
+      payerLabel: resolvePayerLabel(
+        settlement.source_display_name_snapshot,
+        settlement.payer_name_snapshot,
+        settlement.source,
+      ),
+      status: settlement.status ?? '',
+      versionNumber: settlement.version_number,
+      periodStart: settlement.period_start ?? null,
+      periodEnd: settlement.period_end ?? null,
+      payDate: settlement.pay_date ?? null,
+      statementReference: settlement.statement_reference ?? null,
+      reportedGrossAmount: settlement.reported_gross_amount ?? null,
+      reportedNetAmount: settlement.reported_net_amount ?? null,
+      notes: settlement.notes ?? null,
+    }),
+    [settlement],
+  );
+
+  const exportItems: SettlementExportItem[] = useMemo(
+    () =>
+      items.map((item) => ({
+        itemType: item.item_type ?? null,
+        category: item.category ?? null,
+        description: item.description ?? null,
+        amount: item.amount ?? null,
+        payMethod: item.pay_method ?? null,
+        quantity: item.quantity ?? null,
+        rate: item.rate ?? null,
+        unitLabel: item.unit_label ?? null,
+        loadReference: item.load_reference_snapshot ?? null,
+        pickupDate: item.pickup_date_snapshot ?? null,
+        deliveryDate: item.delivery_date_snapshot ?? null,
+        origin: item.origin_snapshot ?? null,
+        destination: item.destination_snapshot ?? null,
+        loadedMiles: item.loaded_miles_snapshot ?? null,
+        deadheadMiles: item.deadhead_miles_snapshot ?? null,
+        payableMiles: item.payable_miles_snapshot ?? null,
+        eligibleRevenue: item.eligible_revenue_snapshot ?? null,
+        expectedAmount: item.expected_amount_snapshot ?? null,
+      })),
+    [items],
+  );
+
+  const handleExportCsv = () => {
+    try {
+      downloadSettlementCsv(exportStatement, exportItems);
+    } catch {
+      reportFailure('We couldn’t export this statement. Please try again.');
+    }
+  };
+
+  const handlePrint = () => {
+    try {
+      printSettlement(exportStatement, exportItems);
+    } catch {
+      reportFailure('We couldn’t open the print view. Please try again.');
+    }
+  };
+
+
   return (
     <div className="space-y-4" data-testid="settlement-detail">
       <Button variant="ghost" size="sm" onClick={onBack} className="gap-2 px-2">
