@@ -669,10 +669,13 @@ describe('E1 · rendered draft creation opens the returned statement', () => {
     hookState.createdRow = fullRow();
     renderManager();
 
-    fireEvent.click(screen.getByTestId('business-settlement-new'));
+    fireEvent.click(screen.getByTestId('business-settlement-new-toggle'));
     const form = await screen.findByTestId('business-settlement-draft-form');
     expect(form).toBeTruthy();
 
+    fireEvent.change(screen.getByTestId('business-settlement-driver-select'), {
+      target: { value: 'drv-1' },
+    });
     fireEvent.change(screen.getByLabelText(/period start/i), {
       target: { value: '2026-08-03' },
     });
@@ -697,8 +700,11 @@ describe('E1 · rendered draft creation opens the returned statement', () => {
     hookState.createdRow = fullRow({ carrier_recruiter_profile_id: 'other-rec' });
     renderManager();
 
-    fireEvent.click(screen.getByTestId('business-settlement-new'));
+    fireEvent.click(screen.getByTestId('business-settlement-new-toggle'));
     await screen.findByTestId('business-settlement-draft-form');
+    fireEvent.change(screen.getByTestId('business-settlement-driver-select'), {
+      target: { value: 'drv-1' },
+    });
     fireEvent.change(screen.getByLabelText(/period start/i), {
       target: { value: '2026-08-03' },
     });
