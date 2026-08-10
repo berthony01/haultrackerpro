@@ -159,13 +159,16 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
 
 /* ------------------------------------------------------------- detail view - */
 
+type SettlementRowView = NonNullable<ReturnType<typeof useVisibleSettlements>['data']>[number];
+
 function SettlementDetail({
-  settlementId,
+  settlement,
   onBack,
 }: {
-  settlementId: string;
+  settlement: SettlementRowView;
   onBack: () => void;
 }) {
+  const settlementId = settlement.id;
   const itemsQuery = useVisibleSettlementItems(settlementId);
   const items = useMemo(() => itemsQuery.data ?? [], [itemsQuery.data]);
   const itemIds = useMemo(() => items.map((i) => i.id), [items]);
@@ -187,6 +190,60 @@ function SettlementDetail({
         <ArrowLeft className="h-4 w-4" />
         Back to settlements
       </Button>
+
+      <Card data-testid="settlement-detail-summary">
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-base">
+                {resolvePayerLabel(
+                  settlement.source_display_name_snapshot,
+                  settlement.payer_name_snapshot,
+                  settlement.source,
+                )}
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatDate(settlement.period_start)} – {formatDate(settlement.period_end)}
+                {settlement.pay_date ? ` · Paid ${formatDate(settlement.pay_date)}` : ''}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={settlement.status} />
+              {settlement.version_number > 1 && (
+                <Badge variant="outline" className="text-[11px]">
+                  Version {settlement.version_number}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Reported net
+              </p>
+              <p className="text-2xl font-black text-foreground">
+                {formatMoney(settlement.reported_net_amount)}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Gross {formatMoney(settlement.reported_gross_amount)}
+            </p>
+          </div>
+          {settlement.statement_reference && (
+            <p className="text-xs text-muted-foreground">
+              Statement {settlement.statement_reference}
+            </p>
+          )}
+          {settlement.notes?.trim() && (
+            <p className="rounded-lg border border-border/50 bg-muted/20 p-3 text-sm text-foreground">
+              {settlement.notes}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader className="pb-3">
