@@ -1513,7 +1513,7 @@ describe('1T-B2C5C — revision header, items, matches and audit', () => {
 
 // ---------------------------------------------------------------------------
 describe('1T-B2C5C — candidate source contract', () => {
-  it('35. first line marks the file as a not-applied candidate', () => {
+  it('35. candidate stays candidate-marked while its accepted promotion exists', () => {
     expect(B2C5C_SQL.split('\n')[0]).toBe(
       '-- CANDIDATE MIGRATION — NOT APPLIED LIVE.',
     );
@@ -1524,7 +1524,7 @@ describe('1T-B2C5C — candidate source contract', () => {
           '../../supabase/migrations/20260808190500_phase1t_b2c5c_settlement_correction_supersede.sql',
         ),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('36. exactly one explicit BEGIN/COMMIT transaction', () => {
