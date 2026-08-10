@@ -518,7 +518,7 @@ function SettlementDetail({
                   </div>
                 )}
 
-                {reconcilable && (
+                {reconcilable && basicReconcileVisible && (
                   <div
                     data-testid="settlement-reconcile-controls"
                     className="mt-2 flex flex-wrap items-end gap-2 border-t border-border/50 pt-2"
