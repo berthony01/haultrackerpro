@@ -42,6 +42,7 @@ import {
 } from '@/lib/opportunities/recruiterEligibility';
 import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
 import { RecruiterReadinessDialog } from '../RecruiterReadinessDialog';
+import { CarrierSettlementsPanel } from '@/components/settlements/CarrierSettlementsPanel';
 
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
