@@ -101,6 +101,20 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: state.user }),
 }));
 
+vi.mock('@/hooks/useSubscription', () => ({
+  useSubscription: () => ({
+    isPro: state.isPro,
+    isLoading: state.isSubscriptionLoading,
+  }),
+}));
+
+vi.mock('@/hooks/useLoads', () => ({
+  useLoads: (range: unknown) => {
+    state.loadRangeArgs.push(range);
+    return { loads: state.loads };
+  },
+}));
+
 vi.mock('@/hooks/settlements/useSettlementData', () => ({
   useVisibleSettlements: () => state.settlements,
   useVisibleCarrierDriverRelationships: () => state.relationships,
@@ -124,7 +138,19 @@ vi.mock('@/hooks/settlements/useSettlementData', () => ({
     mutate: declineMutate,
     isPending: false,
   }),
+  useConfirmSettlementLoadMatch: () => ({ mutate: confirmMatchMutate, isPending: false }),
+  useClearSettlementLoadMatch: () => ({ mutate: clearMatchMutate, isPending: false }),
+  useRefreshSettlementLoadMatchSuggestions: () => ({
+    mutate: refreshSuggestionsMutate,
+    isPending: false,
+  }),
+  useRejectSettlementLoadMatch: () => ({ mutate: rejectSuggestionMutate, isPending: false }),
+  useCreateDriverImportedSettlementDraft: () => ({
+    mutate: createImportedMutate,
+    isPending: false,
+  }),
 }));
+
 
 import {
   DriverSettlementsView,
