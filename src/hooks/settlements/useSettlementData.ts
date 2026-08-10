@@ -39,6 +39,7 @@ import {
   inviteCarrierDriverRelationship,
 } from '@/lib/settlements/carrierDriverRelationshipService';
 import { listVisibleCarrierDriverRelationships } from '@/lib/settlements/carrierDriverRelationshipReadService';
+import { canCurrentAssistantManageProDriverSettlements } from '@/lib/settlements/settlementAssistantAccessService';
 
 
 /* -------------------------------------------------------------------------- */
@@ -53,7 +54,25 @@ export const settlementQueryKeys = {
   matches: (settlementItemIds: readonly string[]) =>
     ['settlements', 'matches', [...settlementItemIds]] as const,
   events: (settlementId: string) => ['settlements', 'events', settlementId] as const,
+  assistantProManageAccess: (driverUserId: string) =>
+    ['settlements', 'assistant-pro-manage-access', driverUserId] as const,
 };
+
+/**
+ * Server-fact: may the acting assistant manage settlements for this driver,
+ * with the TARGET driver's active Pro required? Presentation gating only.
+ */
+export function useAssistantProSettlementManageAccess(
+  driverUserId: string | null,
+  enabled: boolean,
+) {
+  const id = driverUserId?.trim() ?? '';
+  return useQuery({
+    queryKey: settlementQueryKeys.assistantProManageAccess(id),
+    queryFn: () => canCurrentAssistantManageProDriverSettlements(id),
+    enabled: enabled === true && id.length > 0,
+  });
+}
 
 export const carrierDriverRelationshipQueryKeys = {
   all: ['carrier-driver-relationships'] as const,

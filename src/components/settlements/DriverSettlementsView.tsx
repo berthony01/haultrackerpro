@@ -31,10 +31,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
+import { useActingContext, useTargetUserId } from '@/hooks/useActingContext';
 import { useLoads } from '@/hooks/useLoads';
 import { useSubscription } from '@/hooks/useSubscription';
 import {
   useAcceptMyCarrierDriverRelationship,
+  useAssistantProSettlementManageAccess,
   useClearSettlementLoadMatch,
   useConfirmSettlementLoadMatch,
   useCreateDriverImportedSettlementDraft,
@@ -238,10 +240,12 @@ function SettlementDetail({
   settlement,
   onBack,
   advancedToolsVisible,
+  basicReconcileVisible,
 }: {
   settlement: SettlementRowView;
   onBack: () => void;
   advancedToolsVisible: boolean;
+  basicReconcileVisible: boolean;
 }) {
   const settlementId = settlement.id;
   const itemsQuery = useVisibleSettlementItems(settlementId);
@@ -514,7 +518,7 @@ function SettlementDetail({
                   </div>
                 )}
 
-                {reconcilable && (
+                {reconcilable && basicReconcileVisible && (
                   <div
                     data-testid="settlement-reconcile-controls"
                     className="mt-2 flex flex-wrap items-end gap-2 border-t border-border/50 pt-2"
@@ -632,7 +636,10 @@ function SettlementDetail({
 
 export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
   const { user } = useAuth();
-  const currentUserId = user?.id ?? null;
+  // Acting context is the sole source of the effective settlement driver.
+  const targetUserId = useTargetUserId();
+  const { isActingAsAssistant, permissions: actingPermissions } = useActingContext();
+  const currentUserId = targetUserId ?? user?.id ?? null;
   const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
 
   const settlementsQuery = useVisibleSettlements();
@@ -648,15 +655,19 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
     [settlementsQuery.data, currentUserId],
   );
 
+  // Accepting or declining a sharing request is a driver-self action: an
+  // acting assistant never sees those invitations.
   const pendingInvites = useMemo(
     () =>
-      (relationshipsQuery.data ?? []).filter(
-        (r) =>
-          !!currentUserId &&
-          r.driver_user_id === currentUserId &&
-          r.status === 'pending',
-      ),
-    [relationshipsQuery.data, currentUserId],
+      isActingAsAssistant
+        ? []
+        : (relationshipsQuery.data ?? []).filter(
+            (r) =>
+              !!currentUserId &&
+              r.driver_user_id === currentUserId &&
+              r.status === 'pending',
+          ),
+    [relationshipsQuery.data, currentUserId, isActingAsAssistant],
   );
 
   const selected = settlements.find((s) => s.id === selectedSettlementId) ?? null;
@@ -693,7 +704,19 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
   // Presentation gating only. The backend RPC remains the sole authority on who
   // may create a driver-imported settlement.
   const { isPro, isLoading: isSubscriptionLoading } = useSubscription();
-  const advancedToolsVisible = !isSubscriptionLoading && isPro === true;
+  // An acting assistant NEVER inherits its own plan: the server helper answers
+  // delegation + settlements_manage + the TARGET driver's active Pro.
+  const assistantManageAccess = useAssistantProSettlementManageAccess(
+    targetUserId,
+    isActingAsAssistant,
+  );
+  const advancedToolsVisible = isActingAsAssistant
+    ? assistantManageAccess.data === true
+    : !isSubscriptionLoading && isPro === true;
+  // Basic confirm/clear requires settlements_manage while acting.
+  const basicReconcileVisible = isActingAsAssistant
+    ? actingPermissions?.settlements_manage === true
+    : true;
 
   const createImportedDraft = useCreateDriverImportedSettlementDraft();
   const [importOpen, setImportOpen] = useState(false);
@@ -983,6 +1006,7 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
           settlement={selected}
           onBack={() => setSelectedSettlementId(null)}
           advancedToolsVisible={advancedToolsVisible}
+          basicReconcileVisible={basicReconcileVisible}
         />
       ) : (
 

@@ -15,6 +15,9 @@ export const ASSISTANT_PERMISSION_KEYS = [
   'export_reports',
   'view_dashboard',
   'manage_settings_limited',
+  'settlements_view',
+  'settlements_manage',
+  'settlements_finalize',
 ] as const;
 
 export type AssistantPermissionKey = (typeof ASSISTANT_PERMISSION_KEYS)[number];
@@ -29,6 +32,9 @@ export const PERMISSION_LABELS: Record<AssistantPermissionKey, string> = {
   export_reports: 'Reports — export PDF / CSV',
   view_dashboard: 'Dashboard — view KPIs and charts',
   manage_settings_limited: 'Limited settings (cost profile, default pay model)',
+  settlements_view: 'Settlements: view statements',
+  settlements_manage: 'Settlements: reconcile and manage',
+  settlements_finalize: 'Settlements: finalize managed statements',
 };
 
 export const PERMISSION_DEFAULTS: AssistantPermissions = {
@@ -37,6 +43,9 @@ export const PERMISSION_DEFAULTS: AssistantPermissions = {
   manage_fuel: true,
   view_reports: true,
   view_dashboard: true,
+  settlements_view: false,
+  settlements_manage: false,
+  settlements_finalize: false,
 };
 
 /** Hard blocks — assistants must NEVER reach these regardless of UI state. */
@@ -85,6 +94,7 @@ export function assistantPageGate(page: string): PageGate {
     case 'expenses': return 'manage_expenses';
     case 'fuel': return 'manage_fuel';
     case 'reports': return 'view_reports';
+    case 'settlements': return 'settlements_view';
     case 'more': return null;
     default: return null;
   }
@@ -96,6 +106,7 @@ export function firstAllowedAssistantPage(
 ): string {
   if (hasPerm(perms, 'view_dashboard')) return 'dashboard';
   if (hasPerm(perms, 'manage_loads')) return 'loads';
+  if (hasPerm(perms, 'settlements_view')) return 'settlements';
   if (hasPerm(perms, 'view_reports')) return 'reports';
   if (hasPerm(perms, 'manage_expenses')) return 'expenses';
   if (hasPerm(perms, 'manage_fuel')) return 'fuel';
