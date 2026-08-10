@@ -428,23 +428,26 @@ describe('D. invitation response uses the exact accepted mutation arguments', ()
     await waitFor(() => expect(toastError).toHaveBeenCalled());
   });
 
-  it('exposes no create/finalize/void/correction/import or match mutation actions', () => {
+  it('still exposes no company-side issuance or line-item authoring actions', () => {
     render(<DriverSettlementsView />);
-    for (const label of [/finalize/i, /void/i, /correction/i, /import/i, /new settlement/i, /confirm match/i, /reject match/i]) {
+    for (const label of [/finalize/i, /void/i, /correction/i, /new settlement/i, /add line/i]) {
       expect(screen.queryByRole('button', { name: label })).toBeNull();
     }
     for (const banned of [
       'useFinalizeSettlementDraft',
       'useVoidFinalizedSettlement',
       'useCreateSettlementCorrectionDraft',
-      'useCreateDriverImportedSettlementDraft',
-      'useConfirmSettlementLoadMatch',
-      'useRejectSettlementLoadMatch',
       'useAddSettlementDraftItem',
+      'useUpdateSettlementDraftItem',
+      'useDeleteSettlementDraftItem',
+      'useUpdateSettlementDraftHeader',
+      'useCreateCarrierSettlementDraft',
+      'useCreateAgencySettlementDraft',
     ]) {
       expect(VIEW_SOURCE).not.toContain(banned);
     }
   });
+
 });
 
 /* ----------------------------------------------------------------------- E - */
