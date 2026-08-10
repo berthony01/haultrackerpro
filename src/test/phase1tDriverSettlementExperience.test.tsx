@@ -789,7 +789,13 @@ describe('J. navigation surfaces expose settlements to drivers only', () => {
       BOTTOMNAV_SOURCE.indexOf('const driverMoreItemsAssistant'),
       BOTTOMNAV_SOURCE.indexOf('const recruiterActiveMoreItems'),
     );
-    expect(assistantMore).not.toContain('settlements');
+    // Settlements is exposed to an acting assistant ONLY behind settlements_view.
+    expect(assistantMore).toContain("hasPerm(assistantPermissions, 'settlements_view')");
+    expect(assistantMore).toContain("go('settlements')");
+    const settlementIndex = assistantMore.indexOf("go('settlements')");
+    const gateIndex = assistantMore.indexOf("hasPerm(assistantPermissions, 'settlements_view')");
+    expect(gateIndex).toBeGreaterThan(-1);
+    expect(gateIndex).toBeLessThan(settlementIndex);
 
     const recruiterMore = BOTTOMNAV_SOURCE.slice(
       BOTTOMNAV_SOURCE.indexOf('const recruiterActiveMoreItems'),
