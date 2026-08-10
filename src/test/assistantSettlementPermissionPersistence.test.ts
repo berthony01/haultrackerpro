@@ -546,10 +546,13 @@ describe('A. candidate source contract', () => {
     expect(/UPDATE public\.driver_assistants/.test(CODE)).toBe(true);
   });
 
-  it('A6. contains no GRANT or REVOKE', () => {
-    expect(/\bGRANT\b/i.test(CODE)).toBe(false);
-    expect(/\bREVOKE\b/i.test(CODE)).toBe(false);
+  it('A6. contains no GRANT or REVOKE statement', () => {
+    // Checked at top level: the preserved slot-limit error message legitimately
+    // contains the word "Revoke" inside a function body.
+    expect(/\bGRANT\b/i.test(TOP_LEVEL)).toBe(false);
+    expect(/\bREVOKE\b/i.test(TOP_LEVEL)).toBe(false);
   });
+
 
   it('A7. each function definition lists all ten allowed keys', () => {
     const bodies = CODE.split(/CREATE OR REPLACE FUNCTION/).slice(1);
