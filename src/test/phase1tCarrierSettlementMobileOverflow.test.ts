@@ -128,18 +128,35 @@ describe('Phase 1T-F3C — carrier settlement mobile overflow repair', () => {
   });
 
 
-  it('9. no touch-target sizing repair is smuggled into this unit', () => {
-    // Buttons in these surfaces keep their existing default sizing: this unit
-    // introduces no min-height or explicit height sizing on action buttons.
-    for (const [name, source] of IMPLEMENTATION_SOURCES) {
-      expect(source, `${name} must not add min-h-* sizing`).not.toMatch(/min-h-\[/);
-      expect(source, `${name} must not add min-h-* sizing`).not.toMatch(/\bmin-h-\d/);
+  it('9. F3D touch-target rules coexist with the unchanged F3C shrink contract', () => {
+    // Phase 1T-F3D deliberately supersedes the old F3C "no touch-target
+    // sizing" ban: touch sizing is now in scope and must be root-scoped.
+    const mobileRules = [
+      '[&_button]:min-h-11 sm:[&_button]:min-h-0',
+      '[&_select]:min-h-11 sm:[&_select]:min-h-0',
+      '[&_input]:min-h-11 sm:[&_input]:min-h-0',
+    ];
+    for (const rule of mobileRules) {
+      expect(carrierPanel, `carrier root missing ${rule}`).toContain(rule);
+      expect(businessManager, `business manager missing ${rule}`).toContain(rule);
     }
-    // The only h-10 in carrier scope is the pre-existing candidate select.
-    const h10Count = (carrierPanel.match(/\bh-10\b/g) ?? []).length;
-    expect(h10Count).toBe(1);
-    expect(carrierCandidateSelectClass()).toContain('h-10');
+    // Both business trees (list + detail) carry the shared touch rules.
+    for (const testid of ['business-settlement-manager', 'business-settlement-detail']) {
+      const idx = businessManager.indexOf(`data-testid="${testid}"`);
+      expect(idx, `${testid} root not found`).toBeGreaterThan(-1);
+      const rootBlock = businessManager.slice(Math.max(0, idx - 400), idx);
+      for (const rule of mobileRules) {
+        expect(rootBlock, `${testid} root missing ${rule}`).toContain(rule);
+      }
+    }
+    // The accepted F3C shrink contract on the candidate select is untouched.
+    const cls = carrierCandidateSelectClass();
+    for (const token of ['h-10', 'w-full', 'min-w-0', 'flex-1', 'sm:min-w-[14rem]']) {
+      expect(cls, `missing ${token}`).toContain(token);
+    }
+    expect(cls.split(/\s+/).filter(Boolean)).not.toContain('min-w-[14rem]');
   });
+
 
   it('10. no settlement/backend transport was added by this unit', () => {
     for (const [name, source] of IMPLEMENTATION_SOURCES) {
