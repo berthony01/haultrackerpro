@@ -106,6 +106,7 @@ export function firstAllowedAssistantPage(
 ): string {
   if (hasPerm(perms, 'view_dashboard')) return 'dashboard';
   if (hasPerm(perms, 'manage_loads')) return 'loads';
+  if (hasPerm(perms, 'settlements_view')) return 'settlements';
   if (hasPerm(perms, 'view_reports')) return 'reports';
   if (hasPerm(perms, 'manage_expenses')) return 'expenses';
   if (hasPerm(perms, 'manage_fuel')) return 'fuel';
