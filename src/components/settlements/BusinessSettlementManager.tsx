@@ -542,6 +542,12 @@ export function BusinessSettlementManager({
 }: BusinessSettlementManagerProps) {
   const settlementsQuery = useVisibleSettlements();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Narrow, short-lived hold of the EXACT row an accepted RPC just returned, so
+  // a freshly created draft opens immediately even while the list cache is
+  // still being invalidated. Never optimistic: only real returned rows.
+  const [returnedRow, setReturnedRow] = useState<BusinessSettlementLike | null>(
+    null,
+  );
   const [creating, setCreating] = useState(false);
 
   const rows = useMemo(
@@ -560,7 +566,23 @@ export function BusinessSettlementManager({
     return map;
   }, [driverOptions]);
 
-  const selected = rows.find((r) => r.id === selectedId) ?? null;
+  /** Only accept a returned row that satisfies this manager's exact filter. */
+  const openReturned = (row: BusinessSettlementLike | null | undefined) => {
+    if (!row?.id) return;
+    if (filterBusinessSettlements([row], mode, businessId).length !== 1) return;
+    setReturnedRow(row);
+    setSelectedId(row.id);
+  };
+
+  const closeSelected = () => {
+    setSelectedId(null);
+    setReturnedRow(null);
+  };
+
+  // Fresh list data always wins; the returned row is only a stopgap.
+  const selected =
+    rows.find((r) => r.id === selectedId) ??
+    (returnedRow && returnedRow.id === selectedId ? returnedRow : null);
 
   if (selected) {
     return (
@@ -569,11 +591,12 @@ export function BusinessSettlementManager({
         driverLabel={driverLabels[selected.driver_user_id] ?? 'Driver'}
         mode={mode}
         canManage={canManage}
-        onBack={() => setSelectedId(null)}
-        onSelect={setSelectedId}
+        onBack={closeSelected}
+        onSelect={openReturned}
       />
     );
   }
+
 
   return (
     <div className="space-y-4" data-testid="business-settlement-manager">
