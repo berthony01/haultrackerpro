@@ -100,6 +100,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const billingRef = useRef<HTMLDivElement | null>(null);
   const howRef = useRef<HTMLDivElement | null>(null);
   const onboardingRef = useRef<HTMLDivElement | null>(null);
+  const settlementsRef = useRef<HTMLDivElement | null>(null);
 
   const { state, canPost } = resolveState(profile, hasPremiumAccess, !!intentRecruiter);
   const apps = recruiterApplications;
