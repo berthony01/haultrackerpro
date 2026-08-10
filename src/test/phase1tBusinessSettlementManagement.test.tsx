@@ -341,15 +341,16 @@ describe('E1 · carrier driver candidates', () => {
     null,
   ];
 
-  it('dedupes and labels candidates without raw identifiers', () => {
+  it('dedupes and labels candidates, never passing a posting title off as a person', () => {
     const result = deriveCarrierDriverCandidates(applications);
     expect(result).toEqual([
       { driverUserId: 'drv-1', label: 'Dana Hauler' },
-      { driverUserId: 'drv-2', label: 'Regional Reefer' },
+      { driverUserId: 'drv-2', label: 'Driver applicant · Regional Reefer' },
       { driverUserId: 'drv-3', label: 'Driver applicant' },
     ]);
     for (const c of result) expect(c.label).not.toContain(c.driverUserId);
   });
+
 
   it('tolerates missing application data', () => {
     expect(deriveCarrierDriverCandidates(null)).toEqual([]);
