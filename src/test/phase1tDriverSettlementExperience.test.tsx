@@ -160,6 +160,10 @@ vi.mock('@/hooks/useLoads', () => ({
 vi.mock('@/hooks/settlements/useSettlementData', () => ({
   useVisibleSettlements: () => state.settlements,
   useVisibleCarrierDriverRelationships: () => state.relationships,
+  useAssistantProSettlementManageAccess: (driverUserId: string | null, enabled: boolean) => {
+    state.assistantAccessArgs.push([driverUserId, enabled]);
+    return state.assistantAccess;
+  },
   useVisibleSettlementItems: (id: string) => {
     state.itemsArgs.push(id);
     return state.items;
