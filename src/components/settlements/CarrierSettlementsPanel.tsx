@@ -98,10 +98,16 @@ export function deriveCarrierDriverCandidates(
 
     const profile = readObject(row, 'driver_profile');
     const opportunity = readObject(row, 'opportunities');
+    const fullName = profile ? readString(profile, 'full_name') : null;
+    const opportunityTitle = opportunity ? readString(opportunity, 'title') : null;
+    // A posting title is NOT an identity: when the driver's approved name is
+    // absent, label the person as an applicant and keep the posting as context.
     const label =
-      (profile ? readString(profile, 'full_name') : null) ??
-      (opportunity ? readString(opportunity, 'title') : null) ??
-      'Driver applicant';
+      fullName ??
+      (opportunityTitle
+        ? `Driver applicant · ${opportunityTitle}`
+        : 'Driver applicant');
+
 
     seen.set(driverUserId, { driverUserId, label });
   }

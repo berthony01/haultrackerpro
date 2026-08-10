@@ -212,6 +212,68 @@ export function isBlankOrNonNegativeFinite(value: string): boolean {
 }
 
 /**
+ * Form-integrity only: blank is allowed, a non-blank value must parse to a
+ * finite number. Sign and business bounds for reported amounts are decided by
+ * PostgreSQL (a negative reported net is legitimate), so the client never
+ * duplicates those server rules.
+ */
+export function isBlankOrFinite(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === '') return true;
+  return Number.isFinite(Number(trimmed));
+}
+
+/* ------------------------------------------------ safe identity resolution */
+
+/** Minimal identity shape used by the safe source/payer label helpers. */
+export interface BusinessSettlementIdentityLike {
+  source: string;
+  source_display_name_snapshot: string | null;
+  payer_name_snapshot: string | null;
+}
+
+const SOURCE_FALLBACK_LABELS: Record<string, string> = {
+  carrier_issued: 'Carrier statement',
+  agency_prepared: 'Agency-prepared statement',
+  driver_imported: 'Driver-imported statement',
+};
+
+function trimmedOrNull(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Server-captured source identity, else a source-specific safe fallback.
+ * NEVER falls back to any identifier (settlement, business, driver, relation).
+ */
+export function resolveBusinessSourceLabel(
+  row: BusinessSettlementIdentityLike,
+): string {
+  return (
+    trimmedOrNull(row.source_display_name_snapshot) ??
+    SOURCE_FALLBACK_LABELS[row.source] ??
+    'Settlement statement'
+  );
+}
+
+/**
+ * Server-captured payer identity. For carrier-issued statements the canonical
+ * carrier identity is the payer, so the safe source label is used. Otherwise a
+ * missing payer is stated plainly — never substituted with an identifier.
+ */
+export function resolveBusinessPayerLabel(
+  row: BusinessSettlementIdentityLike,
+): string {
+  const payer = trimmedOrNull(row.payer_name_snapshot);
+  if (payer) return payer;
+  if (row.source === 'carrier_issued') return resolveBusinessSourceLabel(row);
+  return 'Payer not listed';
+}
+
+
+/**
  * Safe, human-readable rendering of backend-controlled settlement errors.
  * Unknown failures degrade to a neutral message: no SQL, stack, or object dump
  * ever reaches the DOM.
@@ -292,10 +354,10 @@ export function validateDraftForm(values: BusinessDraftFormValues): string | nul
   if (!values.periodStart || !values.periodEnd) return 'Enter the statement period.';
   if (values.periodEnd < values.periodStart)
     return 'The period end must be on or after the period start.';
-  if (!isBlankOrNonNegativeFinite(values.reportedGross))
-    return 'Reported gross must be a non-negative number.';
-  if (!isBlankOrNonNegativeFinite(values.reportedNet))
-    return 'Reported net must be a non-negative number.';
+  if (!isBlankOrFinite(values.reportedGross))
+    return 'Reported gross must be a number.';
+  if (!isBlankOrFinite(values.reportedNet))
+    return 'Reported net must be a number.';
   return null;
 }
 
@@ -480,6 +542,12 @@ export function BusinessSettlementManager({
 }: BusinessSettlementManagerProps) {
   const settlementsQuery = useVisibleSettlements();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Narrow, short-lived hold of the EXACT row an accepted RPC just returned, so
+  // a freshly created draft opens immediately even while the list cache is
+  // still being invalidated. Never optimistic: only real returned rows.
+  const [returnedRow, setReturnedRow] = useState<BusinessSettlementLike | null>(
+    null,
+  );
   const [creating, setCreating] = useState(false);
 
   const rows = useMemo(
@@ -498,7 +566,23 @@ export function BusinessSettlementManager({
     return map;
   }, [driverOptions]);
 
-  const selected = rows.find((r) => r.id === selectedId) ?? null;
+  /** Only accept a returned row that satisfies this manager's exact filter. */
+  const openReturned = (row: BusinessSettlementLike | null | undefined) => {
+    if (!row?.id) return;
+    if (filterBusinessSettlements([row], mode, businessId).length !== 1) return;
+    setReturnedRow(row);
+    setSelectedId(row.id);
+  };
+
+  const closeSelected = () => {
+    setSelectedId(null);
+    setReturnedRow(null);
+  };
+
+  // Fresh list data always wins; the returned row is only a stopgap.
+  const selected =
+    rows.find((r) => r.id === selectedId) ??
+    (returnedRow && returnedRow.id === selectedId ? returnedRow : null);
 
   if (selected) {
     return (
@@ -507,11 +591,12 @@ export function BusinessSettlementManager({
         driverLabel={driverLabels[selected.driver_user_id] ?? 'Driver'}
         mode={mode}
         canManage={canManage}
-        onBack={() => setSelectedId(null)}
-        onSelect={setSelectedId}
+        onBack={closeSelected}
+        onSelect={openReturned}
       />
     );
   }
+
 
   return (
     <div className="space-y-4" data-testid="business-settlement-manager">
@@ -563,10 +648,11 @@ export function BusinessSettlementManager({
           mode={mode}
           businessId={businessId}
           driverOptions={driverOptions}
-          onCreated={(id) => {
+          onCreated={(row) => {
             setCreating(false);
-            setSelectedId(id);
+            openReturned(row);
           }}
+
         />
       )}
 
@@ -652,7 +738,7 @@ function BusinessDraftForm({
   mode: BusinessSettlementMode;
   businessId: string;
   driverOptions: readonly BusinessDriverOption[];
-  onCreated: (settlementId: string) => void;
+  onCreated: (settlement: BusinessSettlementLike) => void;
 }) {
   const [values, setValues] = useState<BusinessDraftFormValues>(EMPTY_DRAFT_FORM);
   const createCarrier = useCreateCarrierSettlementDraft();
@@ -682,7 +768,8 @@ function BusinessDraftForm({
         );
         toast.success('Draft statement created');
         setValues(EMPTY_DRAFT_FORM);
-        if (created?.id) onCreated(created.id);
+        if (created?.id) onCreated(created);
+
         return;
       }
       const created = await createAgency.mutateAsync(
@@ -690,7 +777,7 @@ function BusinessDraftForm({
       );
       toast.success('Draft statement created');
       setValues(EMPTY_DRAFT_FORM);
-      if (created?.id) onCreated(created.id);
+      if (created?.id) onCreated(created);
     } catch (error) {
       toast.error(describeSettlementError(error));
     }
@@ -841,7 +928,7 @@ function BusinessSettlementDetail({
   mode: BusinessSettlementMode;
   canManage: boolean;
   onBack: () => void;
-  onSelect: (settlementId: string) => void;
+  onSelect: (settlement: BusinessSettlementLike) => void;
 }) {
   const itemsQuery = useVisibleSettlementItems(settlement.id);
   const eventsQuery = useVisibleSettlementEvents(settlement.id);
@@ -898,7 +985,7 @@ function BusinessSettlementDetail({
     try {
       const created = await correct.mutateAsync({ _settlement_id: settlement.id });
       toast.success('Correction draft created');
-      if (created?.id) onSelect(created.id);
+      if (created?.id) onSelect(created);
     } catch (error) {
       toast.error(describeSettlementError(error));
     }
@@ -947,7 +1034,18 @@ function BusinessSettlementDetail({
           <SummaryLine label="Statement reference">
             {settlement.statement_reference ?? '—'}
           </SummaryLine>
+          <SummaryLine label="Statement source">
+            <span data-testid="business-settlement-source-label">
+              {resolveBusinessSourceLabel(settlement)}
+            </span>
+          </SummaryLine>
+          <SummaryLine label="Payer">
+            <span data-testid="business-settlement-payer-label">
+              {resolveBusinessPayerLabel(settlement)}
+            </span>
+          </SummaryLine>
           <SummaryLine label="Notes">{settlement.notes ?? '—'}</SummaryLine>
+
         </CardContent>
       </Card>
 
@@ -1144,15 +1242,14 @@ function BusinessSettlementDetail({
 
 const SETTLEMENT_EVENT_LABELS: Record<string, string> = {
   created: 'Statement created',
-  updated: 'Statement details updated',
-  item_added: 'Line added',
-  item_updated: 'Line updated',
-  item_deleted: 'Line removed',
+  updated: 'Statement updated',
   finalized: 'Statement finalized',
+  superseded: 'Statement superseded by a correction',
   voided: 'Statement voided',
-  superseded: 'Statement superseded',
-  correction_created: 'Correction draft created',
+  match_confirmed: 'Load match confirmed',
+  exported: 'Statement exported',
 };
+
 
 function SummaryLine({ label, children }: { label: string; children: React.ReactNode }) {
   return (

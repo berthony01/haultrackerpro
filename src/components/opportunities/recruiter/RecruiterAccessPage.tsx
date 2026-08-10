@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +100,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const billingRef = useRef<HTMLDivElement | null>(null);
   const howRef = useRef<HTMLDivElement | null>(null);
   const onboardingRef = useRef<HTMLDivElement | null>(null);
+  const settlementsRef = useRef<HTMLDivElement | null>(null);
 
   const { state, canPost } = resolveState(profile, hasPremiumAccess, !!intentRecruiter);
   const apps = recruiterApplications;
@@ -169,6 +170,18 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Opening the settlements tool must bring the mounted panel into view and
+  // move keyboard focus to it; closing it must not steal focus.
+  useEffect(() => {
+    if (!settlementsOpen) return;
+    const node = settlementsRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    node.focus({ preventScroll: true });
+  }, [settlementsOpen]);
+
+
 
   if (profileLoading) {
     return (
@@ -334,7 +347,14 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
             />
 
             {settlementsOpen && (
-              <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+              <div
+                ref={settlementsRef}
+                tabIndex={-1}
+                data-testid="recruiter-settlements-anchor"
+                className="scroll-mt-24 outline-none"
+              >
+                <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+              </div>
             )}
 
 

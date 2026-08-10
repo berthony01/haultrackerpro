@@ -11,9 +11,10 @@
  *  - workspace integration mounts each panel in the correct workspace only.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import {
   buildAgencyDraftArgs,
@@ -26,11 +27,15 @@ import {
   EMPTY_ITEM_FORM,
   filterBusinessSettlements,
   formatMoney,
+  isBlankOrFinite,
   isBlankOrNonNegativeFinite,
   optionalNumber,
   optionalText,
+  resolveBusinessPayerLabel,
+  resolveBusinessSourceLabel,
   validateDraftForm,
   validateItemForm,
+  BusinessSettlementManager,
   type BusinessSettlementLike,
 } from '@/components/settlements/BusinessSettlementManager';
 import {
@@ -44,6 +49,53 @@ import {
   buildAgencyDriverOptions,
   canAgencyManageSettlementsPresentation,
 } from '@/components/settlements/AgencySettlementsPanel';
+
+/* Hook boundary is mocked: these acceptance proofs exercise the presentation
+ * contract only. Authorization stays with PostgreSQL in production. */
+const { hookState, createCarrierMutate } = vi.hoisted(() => {
+  const state = {
+    settlements: [] as unknown[],
+    createdRow: null as unknown,
+  };
+  return {
+    hookState: state,
+    createCarrierMutate: vi.fn(async () => state.createdRow),
+  };
+});
+
+
+vi.mock('@/hooks/settlements/useSettlementData', () => {
+  const idleMutation = (fn: (args: unknown) => Promise<unknown>) => () => ({
+    mutateAsync: fn,
+    isPending: false,
+  });
+  const emptyQuery = () => ({
+    data: [],
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  });
+  return {
+    useVisibleSettlements: () => ({
+      data: hookState.settlements,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    }),
+    useVisibleSettlementItems: emptyQuery,
+    useVisibleSettlementEvents: emptyQuery,
+    useCreateCarrierSettlementDraft: idleMutation(createCarrierMutate),
+    useCreateAgencySettlementDraft: idleMutation(async () => null),
+    useCreateSettlementCorrectionDraft: idleMutation(async () => null),
+    useUpdateSettlementDraftHeader: idleMutation(async () => null),
+    useFinalizeSettlementDraft: idleMutation(async () => null),
+    useVoidFinalizedSettlement: idleMutation(async () => null),
+    useAddSettlementDraftItem: idleMutation(async () => null),
+    useUpdateSettlementDraftItem: idleMutation(async () => null),
+    useDeleteSettlementDraftItem: idleMutation(async () => null),
+  };
+});
+
 
 const root = process.cwd();
 const read = (p: string) => readFileSync(resolve(root, p), 'utf8');
@@ -234,12 +286,28 @@ describe('E1 · form validation', () => {
     ).toBeNull();
   });
 
-  it('rejects negative and non-finite numeric inputs', () => {
+  it('rejects non-finite numeric inputs but permits a negative reported net', () => {
     expect(isBlankOrNonNegativeFinite('')).toBe(true);
     expect(isBlankOrNonNegativeFinite('0')).toBe(true);
     expect(isBlankOrNonNegativeFinite('-1')).toBe(false);
     expect(isBlankOrNonNegativeFinite('abc')).toBe(false);
+
+    // Reported amounts are bounded by PostgreSQL, not by the client: a
+    // negative net (deductions exceeding earnings) must be submittable.
+    expect(isBlankOrFinite('')).toBe(true);
+    expect(isBlankOrFinite('-250.75')).toBe(true);
+    expect(isBlankOrFinite('abc')).toBe(false);
+    const base = {
+      ...EMPTY_DRAFT_FORM,
+      driverUserId: 'drv-1',
+      periodStart: '2026-08-03',
+      periodEnd: '2026-08-09',
+    };
+    expect(validateDraftForm({ ...base, reportedNet: '-250.75' })).toBeNull();
+    expect(validateDraftForm({ ...base, reportedGross: '-10' })).toBeNull();
+    expect(validateDraftForm({ ...base, reportedNet: 'abc' })).toBeTruthy();
   });
+
 
   it('item validation demands a type and an amount', () => {
     expect(validateItemForm(EMPTY_ITEM_FORM)).toBeTruthy();
@@ -279,15 +347,16 @@ describe('E1 · carrier driver candidates', () => {
     null,
   ];
 
-  it('dedupes and labels candidates without raw identifiers', () => {
+  it('dedupes and labels candidates, never passing a posting title off as a person', () => {
     const result = deriveCarrierDriverCandidates(applications);
     expect(result).toEqual([
       { driverUserId: 'drv-1', label: 'Dana Hauler' },
-      { driverUserId: 'drv-2', label: 'Regional Reefer' },
+      { driverUserId: 'drv-2', label: 'Driver applicant · Regional Reefer' },
       { driverUserId: 'drv-3', label: 'Driver applicant' },
     ]);
     for (const c of result) expect(c.label).not.toContain(c.driverUserId);
   });
+
 
   it('tolerates missing application data', () => {
     expect(deriveCarrierDriverCandidates(null)).toEqual([]);
@@ -398,16 +467,42 @@ describe('E1 · workspace integration', () => {
     expect(recruiterPageSrc).not.toMatch(/AgencySettlementsPanel/);
   });
 
-  it('mounts the agency panel inside a dedicated agency tab only', () => {
+  it('shows the agency settlements tab to every active member', () => {
     expect(agencyPageSrc).toMatch(/AgencySettlementsPanel/);
-    expect(agencyPageSrc).toMatch(/value: 'settlements', label: 'Settlements'/);
+    expect(agencyPageSrc).toMatch(
+      /value: 'settlements', label: 'Settlements', show: true/,
+    );
+    expect(agencyPageSrc).not.toMatch(
+      /value: 'settlements'[^}]*show: isOwnerOrAdmin/,
+    );
     expect(agencyPageSrc).not.toMatch(/CarrierSettlementsPanel/);
   });
 
-  it('carrier settlements mount on demand rather than on every render', () => {
-    expect(recruiterPageSrc).toMatch(/settlementsOpen &&\s*\(?\s*<CarrierSettlementsPanel/);
+  it('mounts the agency settlements tab content outside the owner/admin block', () => {
+    const ownerBlock = agencyPageSrc.slice(
+      agencyPageSrc.indexOf('{isOwnerOrAdmin && ('),
+      agencyPageSrc.indexOf('<TabsContent value="work">'),
+    );
+    const gatedEnd = ownerBlock.indexOf('</>');
+    expect(gatedEnd).toBeGreaterThan(-1);
+    // The settlements TabsContent must appear AFTER the gated fragment closes.
+    expect(ownerBlock.slice(0, gatedEnd)).not.toMatch(/value="settlements"/);
+    expect(ownerBlock.slice(gatedEnd)).toMatch(/value="settlements"/);
+  });
+
+  it('carrier settlements mount on demand and receive scroll plus focus', () => {
+    expect(recruiterPageSrc).toMatch(/settlementsOpen && \(/);
+    expect(recruiterPageSrc).toMatch(/ref=\{settlementsRef\}/);
+    expect(recruiterPageSrc).toMatch(/tabIndex=\{-1\}/);
+    expect(recruiterPageSrc).toMatch(
+      /useEffect\(\(\) => \{\s*if \(!settlementsOpen\) return;/,
+    );
+    expect(recruiterPageSrc).toMatch(/node\.scrollIntoView\(/);
+    expect(recruiterPageSrc).toMatch(/node\.focus\(\{ preventScroll: true \}\)/);
+    expect(recruiterPageSrc).toMatch(/\}, \[settlementsOpen\]\)/);
   });
 });
+
 
 /* -------------------------------------------------- 10. truthfulness guard */
 
@@ -428,5 +523,197 @@ describe('E1 · copy truthfulness', () => {
       expect(src).not.toMatch(/\{[a-zA-Z.]*driver_user_id\}/);
       expect(src).not.toMatch(/\{[a-zA-Z.]*\.id\}\s*</);
     }
+  });
+});
+
+/* --------------------------------------- 11. safe source / payer identity */
+
+describe('E1 · safe source and payer identity', () => {
+  const identity = (over: Record<string, unknown>) =>
+    ({
+      source: 'carrier_issued',
+      source_display_name_snapshot: null,
+      payer_name_snapshot: null,
+      ...over,
+    }) as never;
+
+  it('prefers the server-captured snapshots', () => {
+    expect(
+      resolveBusinessSourceLabel(
+        identity({ source_display_name_snapshot: 'Blue Ridge Carriers' }),
+      ),
+    ).toBe('Blue Ridge Carriers');
+    expect(
+      resolveBusinessPayerLabel(identity({ payer_name_snapshot: 'Blue Ridge LLC' })),
+    ).toBe('Blue Ridge LLC');
+  });
+
+  it('falls back per source, never to an identifier', () => {
+    expect(resolveBusinessSourceLabel(identity({ source: 'carrier_issued' }))).toBe(
+      'Carrier statement',
+    );
+    expect(resolveBusinessSourceLabel(identity({ source: 'agency_prepared' }))).toBe(
+      'Agency-prepared statement',
+    );
+    expect(resolveBusinessSourceLabel(identity({ source: 'driver_imported' }))).toBe(
+      'Driver-imported statement',
+    );
+    expect(resolveBusinessSourceLabel(identity({ source: 'something_else' }))).toBe(
+      'Settlement statement',
+    );
+  });
+
+  it('treats blank snapshots as missing', () => {
+    expect(
+      resolveBusinessSourceLabel(identity({ source_display_name_snapshot: '   ' })),
+    ).toBe('Carrier statement');
+    expect(
+      resolveBusinessPayerLabel(
+        identity({ source: 'agency_prepared', payer_name_snapshot: '  ' }),
+      ),
+    ).toBe('Payer not listed');
+  });
+
+  it('states a missing payer plainly instead of substituting an id', () => {
+    const row = identity({ source: 'agency_prepared', id: 'set-abc-123' });
+    expect(resolveBusinessPayerLabel(row)).toBe('Payer not listed');
+    expect(resolveBusinessPayerLabel(row)).not.toMatch(/set-abc-123/);
+    // Carrier-issued statements: the carrier IS the payer.
+    expect(
+      resolveBusinessPayerLabel(
+        identity({ source_display_name_snapshot: 'Blue Ridge Carriers' }),
+      ),
+    ).toBe('Blue Ridge Carriers');
+  });
+
+  it('renders both safe labels in the statement summary', () => {
+    expect(managerSrc).toMatch(/resolveBusinessSourceLabel\(settlement\)/);
+    expect(managerSrc).toMatch(/resolveBusinessPayerLabel\(settlement\)/);
+  });
+});
+
+/* ----------------------------------------------- 12. event vocabulary --- */
+
+describe('E1 · settlement event vocabulary', () => {
+  it('labels exactly the accepted backend event types', () => {
+    const block = managerSrc.slice(
+      managerSrc.indexOf('const SETTLEMENT_EVENT_LABELS'),
+      managerSrc.indexOf('function SummaryLine'),
+    );
+    for (const type of [
+      'created',
+      'updated',
+      'finalized',
+      'superseded',
+      'voided',
+      'match_confirmed',
+      'exported',
+    ]) {
+      expect(block).toMatch(new RegExp(`\\b${type}:`));
+    }
+    for (const invented of [
+      'item_added',
+      'item_updated',
+      'item_deleted',
+      'correction_created',
+    ]) {
+      expect(block).not.toMatch(new RegExp(`\\b${invented}:`));
+    }
+  });
+});
+
+/* --------------------------------- 13. rendered draft-open interaction --- */
+
+function fullRow(over: Partial<BusinessSettlementLike> = {}): BusinessSettlementLike {
+  return {
+    id: 's-new',
+    status: 'draft',
+    source: 'carrier_issued',
+    carrier_recruiter_profile_id: RECRUITER_ID,
+    agency_id: null,
+    driver_user_id: 'drv-1',
+    period_start: '2026-08-03',
+    period_end: '2026-08-09',
+    pay_date: '2026-08-15',
+    reported_gross_amount: 4200,
+    reported_net_amount: -125.5,
+    statement_reference: 'STMT-77',
+    payer_name_snapshot: null,
+    source_display_name_snapshot: null,
+    notes: null,
+    version_number: 1,
+    ...over,
+  } as BusinessSettlementLike;
+}
+
+describe('E1 · rendered draft creation opens the returned statement', () => {
+  beforeEach(() => {
+    hookState.settlements = [];
+    hookState.createdRow = null;
+    createCarrierMutate.mockClear();
+  });
+
+  const renderManager = () =>
+    render(
+      <BusinessSettlementManager
+        mode="carrier"
+        businessId={RECRUITER_ID}
+        driverOptions={[
+          { driverUserId: 'drv-1', relationshipId: 'rel-1', label: 'Dana Hauler' },
+        ]}
+        canManage
+      />,
+    );
+
+  it('opens the exact returned draft even while the list cache is stale', async () => {
+    hookState.createdRow = fullRow();
+    renderManager();
+
+    fireEvent.click(screen.getByTestId('business-settlement-new-toggle'));
+    const form = await screen.findByTestId('business-settlement-draft-form');
+    expect(form).toBeTruthy();
+
+    fireEvent.change(screen.getByTestId('business-settlement-driver-select'), {
+      target: { value: 'drv-1' },
+    });
+    fireEvent.change(screen.getByLabelText(/period start/i), {
+      target: { value: '2026-08-03' },
+    });
+    fireEvent.change(screen.getByLabelText(/period end/i), {
+      target: { value: '2026-08-09' },
+    });
+    fireEvent.click(screen.getByTestId('business-settlement-create'));
+
+    // The list query still returns nothing; the detail must still open.
+    await waitFor(() =>
+      expect(screen.getByTestId('business-settlement-source-label')).toBeTruthy(),
+    );
+    expect(screen.getByTestId('business-settlement-source-label').textContent).toBe(
+      'Carrier statement',
+    );
+    expect(screen.getByTestId('business-settlement-payer-label').textContent).toBe(
+      'Carrier statement',
+    );
+  });
+
+  it('never opens a returned row that fails the provenance/ownership filter', async () => {
+    hookState.createdRow = fullRow({ carrier_recruiter_profile_id: 'other-rec' });
+    renderManager();
+
+    fireEvent.click(screen.getByTestId('business-settlement-new-toggle'));
+    await screen.findByTestId('business-settlement-draft-form');
+    fireEvent.change(screen.getByTestId('business-settlement-driver-select'), {
+      target: { value: 'drv-1' },
+    });
+    fireEvent.change(screen.getByLabelText(/period start/i), {
+      target: { value: '2026-08-03' },
+    });
+    fireEvent.change(screen.getByLabelText(/period end/i), {
+      target: { value: '2026-08-09' },
+    });
+    fireEvent.click(screen.getByTestId('business-settlement-create'));
+
+    await waitFor(() => expect(createCarrierMutate).toHaveBeenCalled());
+    expect(screen.queryByTestId('business-settlement-source-label')).toBeNull();
   });
 });

@@ -115,7 +115,9 @@ export default function AgencyDashboard() {
             { value: 'packages', label: 'Packages', show: isOwnerOrAdmin },
             { value: 'requests', label: 'Requests', show: isOwnerOrAdmin },
             { value: 'clients', label: 'Clients', show: isOwnerOrAdmin },
-            { value: 'settlements', label: 'Settlements', show: isOwnerOrAdmin },
+            // Settlements are visible to every active member; PostgreSQL, not
+            // this tab, decides who may prepare or change a statement.
+            { value: 'settlements', label: 'Settlements', show: true },
             { value: 'work', label: 'Work queue', show: true },
             { value: 'activity', label: 'Activity', show: isOwner },
           ].filter((t) => t.show);
@@ -148,12 +150,14 @@ export default function AgencyDashboard() {
                   <TabsContent value="clients">
                     <ClientListSection agencyId={agency.id} />
                   </TabsContent>
-                  <TabsContent value="settlements">
-                    <AgencySettlementsPanel agencyId={agency.id} />
-                  </TabsContent>
                 </>
               )}
+              <TabsContent value="settlements">
+                <AgencySettlementsPanel agencyId={agency.id} />
+              </TabsContent>
               <TabsContent value="work">
+
+
                 <WorkQueueSection
                   agencyId={agency.id}
                   focusedWorkItemId={focusedWorkItemId}
