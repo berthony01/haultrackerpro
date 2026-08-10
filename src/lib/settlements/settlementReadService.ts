@@ -6,7 +6,7 @@
  * authorization, no helper precheck, and no role or plan evaluation.
  *
  * Contract:
- *  - read-only: table SELECTs only, and no other transport of a kind;
+ *  - read-only: table SELECTs only; no other transport is used;
  *  - errors from the client are re-thrown unchanged (no retry, no translation);
  *  - returned data is passed through unchanged;
  *  - row shapes are derived exclusively from the generated Database types.
