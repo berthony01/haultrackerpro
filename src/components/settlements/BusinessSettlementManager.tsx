@@ -24,18 +24,27 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronRight,
+  Download,
   FilePlus2,
   Inbox,
   Loader2,
   Lock,
   Pencil,
   Plus,
+  Printer,
   ReceiptText,
   RefreshCw,
   ShieldCheck,
   Trash2,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  downloadSettlementCsv,
+  printSettlement,
+  type SettlementExportItem,
+  type SettlementExportStatement,
+} from '@/lib/settlements/settlementExport';
+
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
