@@ -397,10 +397,11 @@ export function CarrierSettlementsPanel({ onManagePlan }: CarrierSettlementsPane
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel className="min-h-11 sm:min-h-0">
+                            Cancel
+                          </AlertDialogCancel>
                           <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                            onClick={() => {
+                            className="min-h-11 sm:min-h-0 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                               void runEnd(row.id);
                             }}
                           >
