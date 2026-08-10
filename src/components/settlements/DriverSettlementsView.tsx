@@ -528,7 +528,7 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
 
       {selected ? (
         <SettlementDetail
-          settlementId={selected.id}
+          settlement={selected}
           onBack={() => setSelectedSettlementId(null)}
         />
       ) : (
