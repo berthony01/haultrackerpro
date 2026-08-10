@@ -636,7 +636,10 @@ function SettlementDetail({
 
 export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
   const { user } = useAuth();
-  const currentUserId = user?.id ?? null;
+  // Acting context is the sole source of the effective settlement driver.
+  const targetUserId = useTargetUserId();
+  const { isActingAsAssistant, permissions: actingPermissions } = useActingContext();
+  const currentUserId = targetUserId ?? user?.id ?? null;
   const [selectedSettlementId, setSelectedSettlementId] = useState<string | null>(null);
 
   const settlementsQuery = useVisibleSettlements();
@@ -652,15 +655,19 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
     [settlementsQuery.data, currentUserId],
   );
 
+  // Accepting or declining a sharing request is a driver-self action: an
+  // acting assistant never sees those invitations.
   const pendingInvites = useMemo(
     () =>
-      (relationshipsQuery.data ?? []).filter(
-        (r) =>
-          !!currentUserId &&
-          r.driver_user_id === currentUserId &&
-          r.status === 'pending',
-      ),
-    [relationshipsQuery.data, currentUserId],
+      isActingAsAssistant
+        ? []
+        : (relationshipsQuery.data ?? []).filter(
+            (r) =>
+              !!currentUserId &&
+              r.driver_user_id === currentUserId &&
+              r.status === 'pending',
+          ),
+    [relationshipsQuery.data, currentUserId, isActingAsAssistant],
   );
 
   const selected = settlements.find((s) => s.id === selectedSettlementId) ?? null;
