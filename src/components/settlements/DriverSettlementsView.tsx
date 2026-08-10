@@ -91,17 +91,56 @@ export function computeItemDifference(
   return amount - expectedAmountSnapshot;
 }
 
-/** Privacy-safe payer label. Never falls back to a raw identifier. */
+/**
+ * Privacy-safe payer label. Snapshot names take precedence; when both are
+ * blank the label degrades to a neutral source-specific description. It never
+ * falls back to a raw identifier.
+ */
 export function resolvePayerLabel(
   sourceDisplayNameSnapshot: string | null | undefined,
   payerNameSnapshot: string | null | undefined,
+  source?: string | null,
 ): string {
-  const source = sourceDisplayNameSnapshot?.trim();
-  if (source) return source;
+  const display = sourceDisplayNameSnapshot?.trim();
+  if (display) return display;
   const payer = payerNameSnapshot?.trim();
   if (payer) return payer;
-  return 'Unnamed payer';
+  switch (source?.trim()) {
+    case 'carrier_issued':
+      return 'Carrier statement';
+    case 'agency_prepared':
+      return 'Agency-prepared statement';
+    case 'driver_imported':
+      return 'Driver-imported statement';
+    default:
+      return 'Settlement statement';
+  }
 }
+
+/** Compact pay-basis description for a statement line. Never interprets payroll. */
+export function describeItemBasis(item: {
+  quantity?: number | null;
+  rate?: number | null;
+  unit_label?: string | null;
+  pay_method?: string | null;
+}): string | null {
+  const parts: string[] = [];
+  const qty = item.quantity;
+  const unit = item.unit_label?.trim();
+  if (qty !== null && qty !== undefined && Number.isFinite(qty)) {
+    parts.push(unit ? `${qty} ${unit}` : `${qty}`);
+  } else if (unit) {
+    parts.push(unit);
+  }
+  const rate = item.rate;
+  if (rate !== null && rate !== undefined && Number.isFinite(rate)) {
+    parts.push(`Rate ${formatMoney(rate)}`);
+  }
+  const method = item.pay_method?.trim();
+  if (method) parts.push(humanizeToken(method));
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   const label = humanizeToken(status);
