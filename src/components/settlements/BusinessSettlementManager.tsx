@@ -212,6 +212,68 @@ export function isBlankOrNonNegativeFinite(value: string): boolean {
 }
 
 /**
+ * Form-integrity only: blank is allowed, a non-blank value must parse to a
+ * finite number. Sign and business bounds for reported amounts are decided by
+ * PostgreSQL (a negative reported net is legitimate), so the client never
+ * duplicates those server rules.
+ */
+export function isBlankOrFinite(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed === '') return true;
+  return Number.isFinite(Number(trimmed));
+}
+
+/* ------------------------------------------------ safe identity resolution */
+
+/** Minimal identity shape used by the safe source/payer label helpers. */
+export interface BusinessSettlementIdentityLike {
+  source: string;
+  source_display_name_snapshot: string | null;
+  payer_name_snapshot: string | null;
+}
+
+const SOURCE_FALLBACK_LABELS: Record<string, string> = {
+  carrier_issued: 'Carrier statement',
+  agency_prepared: 'Agency-prepared statement',
+  driver_imported: 'Driver-imported statement',
+};
+
+function trimmedOrNull(value: string | null | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed;
+}
+
+/**
+ * Server-captured source identity, else a source-specific safe fallback.
+ * NEVER falls back to any identifier (settlement, business, driver, relation).
+ */
+export function resolveBusinessSourceLabel(
+  row: BusinessSettlementIdentityLike,
+): string {
+  return (
+    trimmedOrNull(row.source_display_name_snapshot) ??
+    SOURCE_FALLBACK_LABELS[row.source] ??
+    'Settlement statement'
+  );
+}
+
+/**
+ * Server-captured payer identity. For carrier-issued statements the canonical
+ * carrier identity is the payer, so the safe source label is used. Otherwise a
+ * missing payer is stated plainly — never substituted with an identifier.
+ */
+export function resolveBusinessPayerLabel(
+  row: BusinessSettlementIdentityLike,
+): string {
+  const payer = trimmedOrNull(row.payer_name_snapshot);
+  if (payer) return payer;
+  if (row.source === 'carrier_issued') return resolveBusinessSourceLabel(row);
+  return 'Payer not listed';
+}
+
+
+/**
  * Safe, human-readable rendering of backend-controlled settlement errors.
  * Unknown failures degrade to a neutral message: no SQL, stack, or object dump
  * ever reaches the DOM.
