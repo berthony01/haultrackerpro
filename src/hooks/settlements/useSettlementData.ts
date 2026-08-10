@@ -57,7 +57,9 @@ export const settlementQueryKeys = {
 
 export const carrierDriverRelationshipQueryKeys = {
   all: ['carrier-driver-relationships'] as const,
+  list: () => ['carrier-driver-relationships', 'list'] as const,
 };
+
 
 /* -------------------------------------------------------------------------- */
 /* Read hooks                                                                  */
