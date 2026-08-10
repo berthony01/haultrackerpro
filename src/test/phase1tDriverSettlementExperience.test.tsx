@@ -82,6 +82,17 @@ const state: {
   matchesArgs: unknown[];
   itemsArgs: unknown[];
   eventsArgs: unknown[];
+  isPro: boolean;
+  isSubscriptionLoading: boolean;
+  loads: Array<{
+    id: string;
+    load_date: string;
+    dropoff_date: string | null;
+    pickup_location: string;
+    dropoff_location: string;
+    estimated_pay: number | null;
+  }>;
+  loadRangeArgs: unknown[];
 } = {
   user: null,
   settlements: { data: [], isLoading: false, isError: false, refetch: refetchSettlements },
@@ -92,7 +103,12 @@ const state: {
   matchesArgs: [],
   itemsArgs: [],
   eventsArgs: [],
+  isPro: false,
+  isSubscriptionLoading: false,
+  loads: [],
+  loadRangeArgs: [],
 };
+
 
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
