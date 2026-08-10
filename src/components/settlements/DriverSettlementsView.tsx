@@ -53,6 +53,8 @@ import {
   useVisibleSettlements,
 } from '@/hooks/settlements/useSettlementData';
 
+import { SettlementReconciliationSummary } from '@/components/settlements/SettlementReconciliationSummary';
+
 import {
   downloadSettlementCsv,
   printSettlement,
@@ -501,6 +503,13 @@ function SettlementDetail({
 
         </CardContent>
       </Card>
+
+      <SettlementReconciliationSummary
+        items={items}
+        reportedNetAmount={settlement.reported_net_amount}
+      />
+
+
 
 
       <Card>
