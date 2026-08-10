@@ -91,17 +91,56 @@ export function computeItemDifference(
   return amount - expectedAmountSnapshot;
 }
 
-/** Privacy-safe payer label. Never falls back to a raw identifier. */
+/**
+ * Privacy-safe payer label. Snapshot names take precedence; when both are
+ * blank the label degrades to a neutral source-specific description. It never
+ * falls back to a raw identifier.
+ */
 export function resolvePayerLabel(
   sourceDisplayNameSnapshot: string | null | undefined,
   payerNameSnapshot: string | null | undefined,
+  source?: string | null,
 ): string {
-  const source = sourceDisplayNameSnapshot?.trim();
-  if (source) return source;
+  const display = sourceDisplayNameSnapshot?.trim();
+  if (display) return display;
   const payer = payerNameSnapshot?.trim();
   if (payer) return payer;
-  return 'Unnamed payer';
+  switch (source?.trim()) {
+    case 'carrier_issued':
+      return 'Carrier statement';
+    case 'agency_prepared':
+      return 'Agency-prepared statement';
+    case 'driver_imported':
+      return 'Driver-imported statement';
+    default:
+      return 'Settlement statement';
+  }
 }
+
+/** Compact pay-basis description for a statement line. Never interprets payroll. */
+export function describeItemBasis(item: {
+  quantity?: number | null;
+  rate?: number | null;
+  unit_label?: string | null;
+  pay_method?: string | null;
+}): string | null {
+  const parts: string[] = [];
+  const qty = item.quantity;
+  const unit = item.unit_label?.trim();
+  if (qty !== null && qty !== undefined && Number.isFinite(qty)) {
+    parts.push(unit ? `${qty} ${unit}` : `${qty}`);
+  } else if (unit) {
+    parts.push(unit);
+  }
+  const rate = item.rate;
+  if (rate !== null && rate !== undefined && Number.isFinite(rate)) {
+    parts.push(`Rate ${formatMoney(rate)}`);
+  }
+  const method = item.pay_method?.trim();
+  if (method) parts.push(humanizeToken(method));
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   const label = humanizeToken(status);
@@ -120,13 +159,16 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
 
 /* ------------------------------------------------------------- detail view - */
 
+type SettlementRowView = NonNullable<ReturnType<typeof useVisibleSettlements>['data']>[number];
+
 function SettlementDetail({
-  settlementId,
+  settlement,
   onBack,
 }: {
-  settlementId: string;
+  settlement: SettlementRowView;
   onBack: () => void;
 }) {
+  const settlementId = settlement.id;
   const itemsQuery = useVisibleSettlementItems(settlementId);
   const items = useMemo(() => itemsQuery.data ?? [], [itemsQuery.data]);
   const itemIds = useMemo(() => items.map((i) => i.id), [items]);
@@ -148,6 +190,60 @@ function SettlementDetail({
         <ArrowLeft className="h-4 w-4" />
         Back to settlements
       </Button>
+
+      <Card data-testid="settlement-detail-summary">
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-base">
+                {resolvePayerLabel(
+                  settlement.source_display_name_snapshot,
+                  settlement.payer_name_snapshot,
+                  settlement.source,
+                )}
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatDate(settlement.period_start)} – {formatDate(settlement.period_end)}
+                {settlement.pay_date ? ` · Paid ${formatDate(settlement.pay_date)}` : ''}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={settlement.status} />
+              {settlement.version_number > 1 && (
+                <Badge variant="outline" className="text-[11px]">
+                  Version {settlement.version_number}
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Reported net
+              </p>
+              <p className="text-2xl font-black text-foreground">
+                {formatMoney(settlement.reported_net_amount)}
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Gross {formatMoney(settlement.reported_gross_amount)}
+            </p>
+          </div>
+          {settlement.statement_reference && (
+            <p className="text-xs text-muted-foreground">
+              Statement {settlement.statement_reference}
+            </p>
+          )}
+          {settlement.notes?.trim() && (
+            <p className="rounded-lg border border-border/50 bg-muted/20 p-3 text-sm text-foreground">
+              {settlement.notes}
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
 
       <Card>
         <CardHeader className="pb-3">
@@ -196,7 +292,16 @@ function SettlementDetail({
                         {item.origin_snapshot ?? '—'} → {item.destination_snapshot ?? '—'}
                       </p>
                     )}
+                    {describeItemBasis(item) && (
+                      <p
+                        data-testid="settlement-item-basis"
+                        className="mt-1 text-xs text-muted-foreground"
+                      >
+                        {describeItemBasis(item)}
+                      </p>
+                    )}
                   </div>
+
                   <div className="text-right">
                     <p className="text-sm font-bold text-foreground">
                       {formatMoney(item.amount)}
@@ -423,7 +528,7 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
 
       {selected ? (
         <SettlementDetail
-          settlementId={selected.id}
+          settlement={selected}
           onBack={() => setSelectedSettlementId(null)}
         />
       ) : (
@@ -491,7 +596,9 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
                       {resolvePayerLabel(
                         s.source_display_name_snapshot,
                         s.payer_name_snapshot,
+                        s.source,
                       )}
+
                     </p>
                     <StatusBadge status={s.status} />
                     {s.version_number > 1 && (
