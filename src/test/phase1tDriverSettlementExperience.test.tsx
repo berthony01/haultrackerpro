@@ -93,6 +93,11 @@ const state: {
     estimated_pay: number | null;
   }>;
   loadRangeArgs: unknown[];
+  targetUserId: string | null;
+  isActingAsAssistant: boolean;
+  actingPermissions: Record<string, boolean> | null;
+  assistantAccess: { data: boolean | undefined; isLoading: boolean; isError: boolean };
+  assistantAccessArgs: unknown[];
 } = {
   user: null,
   settlements: { data: [], isLoading: false, isError: false, refetch: refetchSettlements },
@@ -107,6 +112,11 @@ const state: {
   isSubscriptionLoading: false,
   loads: [],
   loadRangeArgs: [],
+  targetUserId: null,
+  isActingAsAssistant: false,
+  actingPermissions: null,
+  assistantAccess: { data: undefined, isLoading: false, isError: false },
+  assistantAccessArgs: [],
 };
 
 
