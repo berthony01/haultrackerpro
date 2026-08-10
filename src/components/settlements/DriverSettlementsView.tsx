@@ -16,13 +16,16 @@ import {
   ArrowLeft,
   CheckCircle2,
   ChevronRight,
+  Download,
   Inbox,
   Loader2,
+  Printer,
   ReceiptText,
   RefreshCw,
   ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
