@@ -53,6 +53,8 @@ import {
   useVisibleSettlements,
 } from '@/hooks/settlements/useSettlementData';
 
+import { SettlementReconciliationSummary } from '@/components/settlements/SettlementReconciliationSummary';
+
 import {
   downloadSettlementCsv,
   printSettlement,
