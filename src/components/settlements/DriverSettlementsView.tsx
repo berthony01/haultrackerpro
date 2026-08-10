@@ -898,7 +898,10 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
 
 
   return (
-    <div className="space-y-5" data-testid="driver-settlements-view">
+    <div
+      className="space-y-5 [&_button]:min-h-11 sm:[&_button]:min-h-0 [&_select]:min-h-11 sm:[&_select]:min-h-0 [&_input]:min-h-11 sm:[&_input]:min-h-0"
+      data-testid="driver-settlements-view"
+    >
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

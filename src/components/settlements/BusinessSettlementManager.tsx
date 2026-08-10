@@ -609,7 +609,10 @@ export function BusinessSettlementManager({
 
 
   return (
-    <div className="space-y-4" data-testid="business-settlement-manager">
+    <div
+      className="space-y-4 [&_button]:min-h-11 sm:[&_button]:min-h-0 [&_select]:min-h-11 sm:[&_select]:min-h-0 [&_input]:min-h-11 sm:[&_input]:min-h-0"
+      data-testid="business-settlement-manager"
+    >
       <Card className="border-border/60">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1073,7 +1076,10 @@ function BusinessSettlementDetail({
   };
 
   return (
-    <div className="space-y-4" data-testid="business-settlement-detail">
+    <div
+      className="space-y-4 [&_button]:min-h-11 sm:[&_button]:min-h-0 [&_select]:min-h-11 sm:[&_select]:min-h-0 [&_input]:min-h-11 sm:[&_input]:min-h-0"
+      data-testid="business-settlement-detail"
+    >
       <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
         <ArrowLeft className="h-4 w-4" /> Back to statements
       </Button>
@@ -1804,12 +1810,12 @@ function ConfirmAction({
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel className="min-h-11 sm:min-h-0">Cancel</AlertDialogCancel>
           <AlertDialogAction
             className={
               destructive
-                ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
-                : undefined
+                ? 'min-h-11 sm:min-h-0 bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                : 'min-h-11 sm:min-h-0'
             }
             onClick={() => {
               void onConfirm();

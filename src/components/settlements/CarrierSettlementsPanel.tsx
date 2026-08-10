@@ -246,7 +246,10 @@ export function CarrierSettlementsPanel({ onManagePlan }: CarrierSettlementsPane
       : false);
 
   return (
-    <div className="space-y-4" data-testid="carrier-settlements-panel">
+    <div
+      className="space-y-4 [&_button]:min-h-11 sm:[&_button]:min-h-0 [&_select]:min-h-11 sm:[&_select]:min-h-0 [&_input]:min-h-11 sm:[&_input]:min-h-0"
+      data-testid="carrier-settlements-panel"
+    >
       <Card className="border-border/60">
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
@@ -394,9 +397,11 @@ export function CarrierSettlementsPanel({ onManagePlan }: CarrierSettlementsPane
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel className="min-h-11 sm:min-h-0">
+                            Cancel
+                          </AlertDialogCancel>
                           <AlertDialogAction
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            className="min-h-11 sm:min-h-0 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                             onClick={() => {
                               void runEnd(row.id);
                             }}
