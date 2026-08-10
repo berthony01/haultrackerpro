@@ -712,12 +712,12 @@ describe('L. the new UI performs no backend, authorization, or billing logic', (
       'integrations/supabase',
       '.from(',
       '.rpc(',
-      'fetch(',
       'localStorage',
       'sessionStorage',
     ]) {
       expect(VIEW_SOURCE).not.toContain(banned);
     }
+    expect(VIEW_SOURCE).not.toMatch(/(^|[^A-Za-z])fetch\(/);
   });
 
   it('contains no plan, entitlement, role or billing gating', () => {

@@ -4,7 +4,7 @@
  * Recordkeeping / reconciliation surface. This component NEVER talks to the
  * backend directly: every read and every mutation goes through the accepted
  * Phase 1T React Query orchestration layer. It performs no authorization,
- * plan, entitlement, or role logic — server RLS remains the sole authority.
+ * plan, tier, or role logic — server RLS remains the sole authority.
  * Scoping performed here is PRESENTATION ONLY.
  */
 

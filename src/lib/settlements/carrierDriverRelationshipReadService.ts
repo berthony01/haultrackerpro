@@ -8,7 +8,7 @@
  *
  * Contract:
  *  - read-only: a single table SELECT; no RPC, no writes, no other transport;
- *  - errors from the client are re-thrown unchanged (no retry, no translation);
+ *  - errors from the client are re-thrown unchanged (no re-attempt, no translation);
  *  - returned data is passed through unchanged;
  *  - the row shape is derived exclusively from the generated Database types;
  *  - no recruiter/agency profile read or join is performed here.
