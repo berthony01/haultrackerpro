@@ -100,6 +100,14 @@ export function useVisibleSettlementEvents(settlementId: string) {
   });
 }
 
+export function useVisibleCarrierDriverRelationships() {
+  return useQuery({
+    queryKey: carrierDriverRelationshipQueryKeys.list(),
+    queryFn: () => listVisibleCarrierDriverRelationships(),
+  });
+}
+
+
 /* -------------------------------------------------------------------------- */
 /* Internal mutation helpers                                                   */
 /* -------------------------------------------------------------------------- */
