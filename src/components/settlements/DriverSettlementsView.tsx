@@ -504,6 +504,13 @@ function SettlementDetail({
         </CardContent>
       </Card>
 
+      <SettlementReconciliationSummary
+        items={items}
+        reportedNetAmount={settlement.reported_net_amount}
+      />
+
+
+
 
       <Card>
         <CardHeader className="pb-3">
