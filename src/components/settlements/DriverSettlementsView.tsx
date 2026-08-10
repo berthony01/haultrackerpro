@@ -134,10 +134,10 @@ function SettlementDetail({
   const eventsQuery = useVisibleSettlementEvents(settlementId);
 
   const matchesByItem = useMemo(() => {
-    const map = new Map<string, ReturnType<() => typeof matchesQuery.data>>();
-    for (const m of matchesQuery.data ?? []) {
-      const list = map.get(m.settlement_item_id) ?? [];
-      map.set(m.settlement_item_id, [...(list ?? []), m]);
+    const rows = matchesQuery.data ?? [];
+    const map = new Map<string, typeof rows>();
+    for (const m of rows) {
+      map.set(m.settlement_item_id, [...(map.get(m.settlement_item_id) ?? []), m]);
     }
     return map;
   }, [matchesQuery.data]);
