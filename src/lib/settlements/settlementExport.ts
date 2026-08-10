@@ -171,10 +171,15 @@ export function buildSettlementCsv(
 /* -------------------------------------------------------------- download - */
 
 /** Filenames only ever contain date-range text — never an identifier. */
+/**
+ * Only a plain calendar date may reach a filename. Anything else — including
+ * any identifier-shaped value — degrades to `unspecified`.
+ */
 export function sanitizeFilenameSegment(value: string | null | undefined): string {
-  const cleaned = (value ?? '').trim().replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-  return cleaned.length > 0 ? cleaned.slice(0, 40) : 'unspecified';
+  const trimmed = (value ?? '').trim().slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(trimmed) ? trimmed : 'unspecified';
 }
+
 
 export function buildSettlementCsvFilename(
   statement: SettlementExportStatement,
