@@ -24,6 +24,7 @@ import {
   Edit,
   Sparkles,
   Info,
+  Receipt,
 } from 'lucide-react';
 import { useRecruiterProfile, type RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunities/useRecruiterBilling';
