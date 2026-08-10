@@ -3,10 +3,10 @@
  *
  * Thin, typed read adapter over the four settlement tables. PostgreSQL RLS is
  * the SOLE read-authorization authority: this module performs no client-side
- * authorization, no helper precheck, no entitlement or role evaluation.
+ * authorization, no helper precheck, and no role or plan evaluation.
  *
  * Contract:
- *  - read-only: no writes, no RPC, no edge functions, no storage, no fetch;
+ *  - read-only: table SELECTs only, and no other transport of a kind;
  *  - errors from the client are re-thrown unchanged (no retry, no translation);
  *  - returned data is passed through unchanged;
  *  - row shapes are derived exclusively from the generated Database types.
