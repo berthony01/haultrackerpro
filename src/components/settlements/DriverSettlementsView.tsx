@@ -704,7 +704,19 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
   // Presentation gating only. The backend RPC remains the sole authority on who
   // may create a driver-imported settlement.
   const { isPro, isLoading: isSubscriptionLoading } = useSubscription();
-  const advancedToolsVisible = !isSubscriptionLoading && isPro === true;
+  // An acting assistant NEVER inherits its own plan: the server helper answers
+  // delegation + settlements_manage + the TARGET driver's active Pro.
+  const assistantManageAccess = useAssistantProSettlementManageAccess(
+    targetUserId,
+    isActingAsAssistant,
+  );
+  const advancedToolsVisible = isActingAsAssistant
+    ? assistantManageAccess.data === true
+    : !isSubscriptionLoading && isPro === true;
+  // Basic confirm/clear requires settlements_manage while acting.
+  const basicReconcileVisible = isActingAsAssistant
+    ? actingPermissions?.settlements_manage === true
+    : true;
 
   const createImportedDraft = useCreateDriverImportedSettlementDraft();
   const [importOpen, setImportOpen] = useState(false);
