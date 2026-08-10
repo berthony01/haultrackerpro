@@ -738,7 +738,7 @@ function BusinessDraftForm({
   mode: BusinessSettlementMode;
   businessId: string;
   driverOptions: readonly BusinessDriverOption[];
-  onCreated: (settlementId: string) => void;
+  onCreated: (settlement: BusinessSettlementLike) => void;
 }) {
   const [values, setValues] = useState<BusinessDraftFormValues>(EMPTY_DRAFT_FORM);
   const createCarrier = useCreateCarrierSettlementDraft();
