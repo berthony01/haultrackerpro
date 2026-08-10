@@ -831,12 +831,149 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
         </Card>
       )}
 
+      {advancedToolsVisible && !selected && (
+        <Card data-testid="settlement-import-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="h-4 w-4 text-primary" />
+              Import an outside settlement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Recording a statement you received outside HaulTrackerPro keeps your own
+              records complete. It does not notify the payer or change what they owe.
+            </p>
+            {!importOpen ? (
+              <Button
+                size="sm"
+                data-testid="settlement-import-open"
+                onClick={() => setImportOpen(true)}
+              >
+                Import outside settlement
+              </Button>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="import-payer">Payer name</Label>
+                    <Input
+                      id="import-payer"
+                      value={importForm.payer}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, payer: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-reference">Statement reference</Label>
+                    <Input
+                      id="import-reference"
+                      value={importForm.reference}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, reference: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-period-start">Period start</Label>
+                    <Input
+                      id="import-period-start"
+                      type="date"
+                      value={importForm.periodStart}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, periodStart: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-period-end">Period end</Label>
+                    <Input
+                      id="import-period-end"
+                      type="date"
+                      value={importForm.periodEnd}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, periodEnd: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-pay-date">Pay date</Label>
+                    <Input
+                      id="import-pay-date"
+                      type="date"
+                      value={importForm.payDate}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, payDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-gross">Reported gross</Label>
+                    <Input
+                      id="import-gross"
+                      inputMode="decimal"
+                      value={importForm.gross}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, gross: e.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="import-net">Reported net</Label>
+                    <Input
+                      id="import-net"
+                      inputMode="decimal"
+                      value={importForm.net}
+                      onChange={(e) =>
+                        setImportForm((p) => ({ ...p, net: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="import-notes">Notes</Label>
+                  <Textarea
+                    id="import-notes"
+                    rows={2}
+                    value={importForm.notes}
+                    onChange={(e) =>
+                      setImportForm((p) => ({ ...p, notes: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={createImportedDraft.isPending}
+                    data-testid="settlement-import-submit"
+                    onClick={handleImportSubmit}
+                  >
+                    Save imported settlement
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-testid="settlement-import-cancel"
+                    onClick={() => setImportOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {selected ? (
         <SettlementDetail
           settlement={selected}
           onBack={() => setSelectedSettlementId(null)}
+          advancedToolsVisible={advancedToolsVisible}
         />
       ) : (
+
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Settlement history</CardTitle>
