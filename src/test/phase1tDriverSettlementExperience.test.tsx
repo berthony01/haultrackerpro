@@ -1260,7 +1260,7 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
     expect(screen.getByTestId('settlement-import-open')).toBeTruthy();
   });
 
-  it('submits exact RPC arguments with blank optional fields normalized to null', () => {
+  it('submits exact RPC arguments with a negative reported net and blank optionals nulled', () => {
     state.isPro = true;
     render(<DriverSettlementsView />);
     fireEvent.click(screen.getByTestId('settlement-import-open'));
@@ -1273,7 +1273,7 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
     fireEvent.change(screen.getByLabelText('Payer name'), {
       target: { value: '  Blue Ridge  ' },
     });
-    fireEvent.change(screen.getByLabelText('Reported net'), { target: { value: '4100.5' } });
+    fireEvent.change(screen.getByLabelText('Reported net'), { target: { value: '-125.5' } });
     fireEvent.click(screen.getByTestId('settlement-import-submit'));
 
     expect(createImportedMutate).toHaveBeenCalledTimes(1);
@@ -1285,9 +1285,12 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
       _payer_name_snapshot: 'Blue Ridge',
       _statement_reference: null,
       _reported_gross_amount: null,
-      _reported_net_amount: 4100.5,
+      _reported_net_amount: -125.5,
       _notes: null,
     });
+    const sentNet = createImportedMutate.mock.calls[0][0]._reported_net_amount;
+    expect(Number.isFinite(sentNet)).toBe(true);
+    expect(sentNet).toBeLessThan(0);
   });
 
   it('blocks submission when the period is incomplete or amounts are not numeric', async () => {
@@ -1308,6 +1311,23 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
     expect(createImportedMutate).not.toHaveBeenCalled();
     await waitFor(() => expect(toastError).toHaveBeenCalled());
   });
+
+  it('blocks submission when the period end is earlier than the period start', async () => {
+    state.isPro = true;
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-import-open'));
+    fireEvent.change(screen.getByLabelText('Period start'), {
+      target: { value: '2026-07-07' },
+    });
+    fireEvent.change(screen.getByLabelText('Period end'), {
+      target: { value: '2026-07-01' },
+    });
+    fireEvent.click(screen.getByTestId('settlement-import-submit'));
+    expect(createImportedMutate).not.toHaveBeenCalled();
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(String(toastError.mock.calls[0][0])).toContain('Period end');
+  });
+
 
   it('reports import failures safely and keeps the form open', async () => {
     state.isPro = true;
