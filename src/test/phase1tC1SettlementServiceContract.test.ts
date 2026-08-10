@@ -32,6 +32,14 @@ const SERVICE_PATH = path.resolve(
 );
 const SERVICE_SOURCE = readFileSync(SERVICE_PATH, 'utf8');
 
+// Escape patterns are assembled at runtime so that this guardrail file does not
+// itself contain the literals it forbids.
+const DOUBLE_CAST = ['as', 'unknown', 'as'].join(' ');
+const TS_IGNORE = ['@ts', 'ignore'].join('-');
+const TS_EXPECT_ERROR = ['@ts', 'expect', 'error'].join('-');
+const ESLINT_DISABLE = ['eslint', 'disable'].join('-');
+const LOOSE_TYPE_PATTERN = new RegExp(String.raw`\b` + 'an' + 'y' + String.raw`\b`);
+
 const SETTLEMENT_ROW = Object.freeze({ id: 'settlement-1', status: 'draft' });
 const ITEM_ROW = Object.freeze({ id: 'item-1', item_type: 'load_pay' });
 const MATCH_ROW = Object.freeze({
@@ -171,12 +179,77 @@ const CASES: readonly WrapperCase[] = [
   },
 ];
 
-// Runtime shape used only to invoke the wrappers dynamically in these proofs.
-type WrapperFn = (args: Record<string, unknown>) => Promise<unknown>;
-
-function invoke(name: keyof typeof service, args: Record<string, unknown>) {
-  const fn = service[name] as unknown as WrapperFn;
-  return fn(args);
+/**
+ * Compile-safe dynamic dispatch: an exhaustive switch over the 14 exported
+ * wrapper names. Each branch applies at most a single direct cast from the
+ * generic test argument record to that wrapper's exported generated Args
+ * alias — never through `unknown`. The production service remains fully
+ * generated-type-driven.
+ */
+function invoke(
+  name: keyof typeof service,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  switch (name) {
+    case 'createDriverImportedSettlementDraft':
+      return service.createDriverImportedSettlementDraft(
+        args as service.CreateDriverImportedSettlementDraftArgs,
+      );
+    case 'createCarrierSettlementDraft':
+      return service.createCarrierSettlementDraft(
+        args as service.CreateCarrierSettlementDraftArgs,
+      );
+    case 'createAgencySettlementDraft':
+      return service.createAgencySettlementDraft(
+        args as service.CreateAgencySettlementDraftArgs,
+      );
+    case 'updateSettlementDraftHeader':
+      return service.updateSettlementDraftHeader(
+        args as service.UpdateSettlementDraftHeaderArgs,
+      );
+    case 'addSettlementDraftItem':
+      return service.addSettlementDraftItem(
+        args as service.AddSettlementDraftItemArgs,
+      );
+    case 'updateSettlementDraftItem':
+      return service.updateSettlementDraftItem(
+        args as service.UpdateSettlementDraftItemArgs,
+      );
+    case 'deleteSettlementDraftItem':
+      return service.deleteSettlementDraftItem(
+        args as service.DeleteSettlementDraftItemArgs,
+      );
+    case 'confirmSettlementLoadMatch':
+      return service.confirmSettlementLoadMatch(
+        args as service.ConfirmSettlementLoadMatchArgs,
+      );
+    case 'clearSettlementLoadMatch':
+      return service.clearSettlementLoadMatch(
+        args as service.ClearSettlementLoadMatchArgs,
+      );
+    case 'refreshSettlementLoadMatchSuggestions':
+      return service.refreshSettlementLoadMatchSuggestions(
+        args as service.RefreshSettlementLoadMatchSuggestionsArgs,
+      );
+    case 'rejectSettlementLoadMatch':
+      return service.rejectSettlementLoadMatch(
+        args as service.RejectSettlementLoadMatchArgs,
+      );
+    case 'finalizeSettlementDraft':
+      return service.finalizeSettlementDraft(
+        args as service.FinalizeSettlementDraftArgs,
+      );
+    case 'voidFinalizedSettlement':
+      return service.voidFinalizedSettlement(
+        args as service.VoidFinalizedSettlementArgs,
+      );
+    case 'createSettlementCorrectionDraft':
+      return service.createSettlementCorrectionDraft(
+        args as service.CreateSettlementCorrectionDraftArgs,
+      );
+    default:
+      return Promise.reject(new Error(`unknown wrapper: ${String(name)}`));
+  }
 }
 
 beforeEach(() => {
@@ -251,11 +324,11 @@ describe('Phase 1T-C1 — settlement service transport contract', () => {
   });
 
   it('8. source uses no type escapes', () => {
-    expect(SERVICE_SOURCE).not.toMatch(/\bany\b/);
-    expect(SERVICE_SOURCE).not.toContain('@ts-ignore');
-    expect(SERVICE_SOURCE).not.toContain('@ts-expect-error');
-    expect(SERVICE_SOURCE).not.toContain('as unknown as');
-    expect(SERVICE_SOURCE).not.toContain('eslint-disable');
+    expect(SERVICE_SOURCE).not.toMatch(LOOSE_TYPE_PATTERN);
+    expect(SERVICE_SOURCE).not.toContain(TS_IGNORE);
+    expect(SERVICE_SOURCE).not.toContain(TS_EXPECT_ERROR);
+    expect(SERVICE_SOURCE).not.toContain(DOUBLE_CAST);
+    expect(SERVICE_SOURCE).not.toContain(ESLINT_DISABLE);
   });
 
   it('9. source uses one rpc call per wrapper and no other transport', () => {
@@ -273,5 +346,17 @@ describe('Phase 1T-C1 — settlement service transport contract', () => {
     );
     expect(self).not.toMatch(/\b(it|describe)\.only\b/);
     expect(self).not.toMatch(/\b(it|describe)\.skip\b/);
+  });
+
+  it('11. this suite itself uses no type escapes', () => {
+    const self = readFileSync(
+      path.resolve(__dirname, 'phase1tC1SettlementServiceContract.test.ts'),
+      'utf8',
+    );
+    expect(self).not.toContain(DOUBLE_CAST);
+    expect(self).not.toContain(TS_IGNORE);
+    expect(self).not.toContain(TS_EXPECT_ERROR);
+    expect(self).not.toContain(ESLINT_DISABLE);
+    expect(self).not.toMatch(LOOSE_TYPE_PATTERN);
   });
 });
