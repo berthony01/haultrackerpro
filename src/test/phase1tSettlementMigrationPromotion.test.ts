@@ -149,21 +149,21 @@ describe('Phase 1T — settlement migration promotion', () => {
 
   it('10. no focused/skipped tests or snapshot assertions in this suite', () => {
     const self = readText(resolve(__dirname, 'phase1tSettlementMigrationPromotion.test.ts'));
-    for (const forbidden of [
-      'it.only',
-      'describe.only',
-      'test.only',
-      'it.skip',
-      'describe.skip',
-      'test.skip',
-      'it.todo',
-      'test.todo',
-      'fit(',
-      'fdescribe(',
-      'toMatchSnapshot',
-      'toMatchInlineSnapshot',
-    ]) {
+    // Tokens are assembled at runtime so this suite never contains them literally.
+    const dot = '.';
+    const forbiddenTokens = [
+      ...['it', 'describe', 'test'].flatMap((fn) =>
+        ['only', 'skip', 'todo'].map((mod) => `${fn}${dot}${mod}`),
+      ),
+      'f' + 'it(',
+      'f' + 'describe(',
+      'toMatch' + 'Snapshot',
+      'toMatchInline' + 'Snapshot',
+    ];
+
+    for (const forbidden of forbiddenTokens) {
       expect(self.includes(forbidden), `forbidden token ${forbidden}`).toBe(false);
     }
+
   });
 });
