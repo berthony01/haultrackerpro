@@ -134,6 +134,15 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: state.user }),
 }));
 
+vi.mock('@/hooks/useActingContext', () => ({
+  useTargetUserId: () => state.targetUserId ?? state.user?.id ?? null,
+  useActingContext: () => ({
+    targetUserId: state.targetUserId ?? state.user?.id ?? null,
+    isActingAsAssistant: state.isActingAsAssistant,
+    permissions: state.actingPermissions,
+  }),
+}));
+
 vi.mock('@/hooks/useSubscription', () => ({
   useSubscription: () => ({
     isPro: state.isPro,
