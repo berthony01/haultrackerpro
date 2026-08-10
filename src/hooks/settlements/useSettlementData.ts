@@ -39,6 +39,7 @@ import {
   inviteCarrierDriverRelationship,
 } from '@/lib/settlements/carrierDriverRelationshipService';
 import { listVisibleCarrierDriverRelationships } from '@/lib/settlements/carrierDriverRelationshipReadService';
+import { canCurrentAssistantManageProDriverSettlements } from '@/lib/settlements/settlementAssistantAccessService';
 
 
 /* -------------------------------------------------------------------------- */
