@@ -266,6 +266,11 @@ beforeEach(() => {
   state.isSubscriptionLoading = false;
   state.loads = [];
   state.loadRangeArgs = [];
+  state.targetUserId = null;
+  state.isActingAsAssistant = false;
+  state.actingPermissions = null;
+  state.assistantAccess = { data: undefined, isLoading: false, isError: false };
+  state.assistantAccessArgs = [];
 });
 
 
