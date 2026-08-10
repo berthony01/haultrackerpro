@@ -57,6 +57,13 @@ const ITEM_ID = '55555555-5555-4555-8555-555555555555';
 const acceptMutate = vi.fn();
 const declineMutate = vi.fn();
 const refetchSettlements = vi.fn();
+const confirmMatchMutate = vi.fn();
+const clearMatchMutate = vi.fn();
+const refreshSuggestionsMutate = vi.fn();
+const rejectSuggestionMutate = vi.fn();
+const createImportedMutate = vi.fn();
+
+const LOAD_ID = '66666666-6666-4666-8666-666666666666';
 
 type QueryStub = {
   data: unknown;
