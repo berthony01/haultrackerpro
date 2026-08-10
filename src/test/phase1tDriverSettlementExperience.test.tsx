@@ -211,6 +211,7 @@ function settlementRow(overrides: Record<string, unknown> = {}) {
 function loadRow(overrides: Record<string, unknown> = {}) {
   return {
     id: LOAD_ID,
+    status: 'completed',
     load_date: '2026-07-02',
     dropoff_date: '2026-07-03',
     pickup_location: 'Dallas, TX',
@@ -1079,6 +1080,26 @@ describe('P. driver reconciliation controls (Free basic, Pro advanced)', () => {
     expect(state.loadRangeArgs[0]).toEqual({ from: '2026-07-01', to: '2026-07-07' });
   });
 
+  it('offers only completed loads as reconciliation candidates', () => {
+    state.loads = [
+      loadRow(),
+      loadRow({
+        id: 'cancelled-load-id',
+        status: 'cancelled',
+        pickup_location: 'Reno, NV',
+        dropoff_location: 'Boise, ID',
+      }),
+    ];
+    openDetail();
+    const select = screen.getByTestId('settlement-match-load-select') as HTMLSelectElement;
+    const values = Array.from(select.options).map((o) => o.value);
+    expect(values).toContain(LOAD_ID);
+    expect(values).not.toContain('cancelled-load-id');
+    expect(select.textContent).not.toContain('Reno');
+    expect(select.textContent).not.toContain('cancelled-load-id');
+  });
+
+
   it('offers basic confirm-match to a Free driver with exact RPC arguments', () => {
     openDetail();
     fireEvent.change(screen.getByTestId('settlement-match-load-select'), {
@@ -1239,7 +1260,7 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
     expect(screen.getByTestId('settlement-import-open')).toBeTruthy();
   });
 
-  it('submits exact RPC arguments with blank optional fields normalized to null', () => {
+  it('submits exact RPC arguments with a negative reported net and blank optionals nulled', () => {
     state.isPro = true;
     render(<DriverSettlementsView />);
     fireEvent.click(screen.getByTestId('settlement-import-open'));
@@ -1252,7 +1273,7 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
     fireEvent.change(screen.getByLabelText('Payer name'), {
       target: { value: '  Blue Ridge  ' },
     });
-    fireEvent.change(screen.getByLabelText('Reported net'), { target: { value: '4100.5' } });
+    fireEvent.change(screen.getByLabelText('Reported net'), { target: { value: '-125.5' } });
     fireEvent.click(screen.getByTestId('settlement-import-submit'));
 
     expect(createImportedMutate).toHaveBeenCalledTimes(1);
@@ -1264,9 +1285,12 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
       _payer_name_snapshot: 'Blue Ridge',
       _statement_reference: null,
       _reported_gross_amount: null,
-      _reported_net_amount: 4100.5,
+      _reported_net_amount: -125.5,
       _notes: null,
     });
+    const sentNet = createImportedMutate.mock.calls[0][0]._reported_net_amount;
+    expect(Number.isFinite(sentNet)).toBe(true);
+    expect(sentNet).toBeLessThan(0);
   });
 
   it('blocks submission when the period is incomplete or amounts are not numeric', async () => {
@@ -1287,6 +1311,23 @@ describe('Q. manual driver_imported outside-settlement surface', () => {
     expect(createImportedMutate).not.toHaveBeenCalled();
     await waitFor(() => expect(toastError).toHaveBeenCalled());
   });
+
+  it('blocks submission when the period end is earlier than the period start', async () => {
+    state.isPro = true;
+    render(<DriverSettlementsView />);
+    fireEvent.click(screen.getByTestId('settlement-import-open'));
+    fireEvent.change(screen.getByLabelText('Period start'), {
+      target: { value: '2026-07-07' },
+    });
+    fireEvent.change(screen.getByLabelText('Period end'), {
+      target: { value: '2026-07-01' },
+    });
+    fireEvent.click(screen.getByTestId('settlement-import-submit'));
+    expect(createImportedMutate).not.toHaveBeenCalled();
+    await waitFor(() => expect(toastError).toHaveBeenCalled());
+    expect(String(toastError.mock.calls[0][0])).toContain('Period end');
+  });
+
 
   it('reports import failures safely and keeps the form open', async () => {
     state.isPro = true;

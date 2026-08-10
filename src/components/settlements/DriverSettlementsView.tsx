@@ -252,10 +252,16 @@ function SettlementDetail({
 
   // Only the selected statement period is requested — unrelated history is not
   // loaded into this reconciliation surface.
-  const { loads } = useLoads({
+  const { loads: allLoads } = useLoads({
     from: settlement.period_start ?? undefined,
     to: settlement.period_end ?? undefined,
   });
+
+  // Only completed loads are reconciliation candidates.
+  const loads = useMemo(
+    () => allLoads.filter((load) => load.status === 'completed'),
+    [allLoads],
+  );
 
   const confirmMatch = useConfirmSettlementLoadMatch();
   const clearMatch = useClearSettlementLoadMatch();
@@ -709,6 +715,10 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
     }
     if (!importForm.periodStart.trim() || !importForm.periodEnd.trim()) {
       reportFailure('Enter both a period start and a period end date.');
+      return;
+    }
+    if (importForm.periodEnd.trim() < importForm.periodStart.trim()) {
+      reportFailure('Period end cannot be before period start.');
       return;
     }
     if (!isBlankOrFinite(importForm.gross) || !isBlankOrFinite(importForm.net)) {
