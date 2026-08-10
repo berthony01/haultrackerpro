@@ -235,9 +235,11 @@ type SettlementRowView = NonNullable<ReturnType<typeof useVisibleSettlements>['d
 function SettlementDetail({
   settlement,
   onBack,
+  advancedToolsVisible,
 }: {
   settlement: SettlementRowView;
   onBack: () => void;
+  advancedToolsVisible: boolean;
 }) {
   const settlementId = settlement.id;
   const itemsQuery = useVisibleSettlementItems(settlementId);
@@ -245,6 +247,73 @@ function SettlementDetail({
   const itemIds = useMemo(() => items.map((i) => i.id), [items]);
   const matchesQuery = useVisibleSettlementMatches(itemIds);
   const eventsQuery = useVisibleSettlementEvents(settlementId);
+
+  // Only the selected statement period is requested — unrelated history is not
+  // loaded into this reconciliation surface.
+  const { loads } = useLoads({
+    from: settlement.period_start ?? undefined,
+    to: settlement.period_end ?? undefined,
+  });
+
+  const confirmMatch = useConfirmSettlementLoadMatch();
+  const clearMatch = useClearSettlementLoadMatch();
+  const refreshSuggestions = useRefreshSettlementLoadMatchSuggestions();
+  const rejectSuggestion = useRejectSettlementLoadMatch();
+
+  const [selectedLoadByItem, setSelectedLoadByItem] = useState<Record<string, string>>({});
+
+  const actionable = !NON_ACTIONABLE_STATUSES.has((settlement.status ?? '').trim());
+  const busy =
+    confirmMatch.isPending ||
+    clearMatch.isPending ||
+    refreshSuggestions.isPending ||
+    rejectSuggestion.isPending;
+
+  const handleConfirm = (itemId: string) => {
+    const driverLoadId = selectedLoadByItem[itemId];
+    if (!driverLoadId) {
+      reportFailure('Choose one of your logged loads first.');
+      return;
+    }
+    confirmMatch.mutate(
+      { _settlement_item_id: itemId, _driver_load_id: driverLoadId },
+      {
+        onSuccess: () => toast.success('Load matched to this statement line'),
+        onError: () => reportFailure('We couldn’t match that load. Please try again.'),
+      },
+    );
+  };
+
+  const handleClear = (itemId: string) => {
+    clearMatch.mutate(
+      { _settlement_item_id: itemId },
+      {
+        onSuccess: () => toast.success('Match cleared'),
+        onError: () => reportFailure('We couldn’t clear that match. Please try again.'),
+      },
+    );
+  };
+
+  const handleRefresh = (itemId: string) => {
+    refreshSuggestions.mutate(
+      { _settlement_item_id: itemId },
+      {
+        onSuccess: () => toast.success('Suggestions refreshed'),
+        onError: () => reportFailure('We couldn’t refresh suggestions. Please try again.'),
+      },
+    );
+  };
+
+  const handleReject = (itemId: string, driverLoadId: string) => {
+    rejectSuggestion.mutate(
+      { _settlement_item_id: itemId, _driver_load_id: driverLoadId },
+      {
+        onSuccess: () => toast.success('Suggestion rejected'),
+        onError: () => reportFailure('We couldn’t reject that suggestion. Please try again.'),
+      },
+    );
+  };
+
 
   const matchesByItem = useMemo(() => {
     const rows = matchesQuery.data ?? [];
