@@ -150,6 +150,8 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   // instead of silently disabling the button. The dialog surfaces the exact
   // missing tokens and routes recruiters into onboarding.
   const [readinessOpen, setReadinessOpen] = useState(false);
+  // Phase 1T-E1: carrier settlements mount on demand only.
+  const [settlementsOpen, setSettlementsOpen] = useState(false);
   const readiness = resolveRecruiterReadiness(profile);
 
   const handlePost = () => {
