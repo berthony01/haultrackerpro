@@ -151,6 +151,67 @@ export function describeItemBasis(item: {
   return parts.length > 0 ? parts.join(' · ') : null;
 }
 
+/* ------------------------------------------------ reconciliation constants - */
+
+/** Match states the backend already treats as an accepted link. */
+const ACCEPTED_MATCH_STATES = new Set(['exact', 'confirmed']);
+/** Match states the backend produced as a suggestion awaiting a human answer. */
+const SUGGESTION_MATCH_STATES = new Set(['likely', 'possible']);
+/** Lifecycle states where no reconciliation control may ever be rendered. */
+const NON_ACTIONABLE_STATUSES = new Set(['voided', 'superseded']);
+/** The only statement line type that can be matched to a logged load. */
+const MATCHABLE_ITEM_TYPE = 'load_pay';
+
+/**
+ * Safe, user-facing failure text. Raw error objects, SQL, stacks, and database
+ * identifiers are never surfaced. The backend remains the authority; the UI
+ * only reports that the action did not complete.
+ */
+function reportFailure(message: string): void {
+  toast.error(message);
+}
+
+/** Human-readable label for a logged load. The identifier is never shown. */
+export function describeLoadOption(load: {
+  load_date: string;
+  dropoff_date?: string | null;
+  pickup_location?: string | null;
+  dropoff_location?: string | null;
+  estimated_pay?: number | null;
+}): string {
+  const when = formatDate(load.dropoff_date ?? load.load_date);
+  const from = load.pickup_location?.trim() || 'Unknown origin';
+  const to = load.dropoff_location?.trim() || 'Unknown destination';
+  const pay =
+    load.estimated_pay !== null &&
+    load.estimated_pay !== undefined &&
+    Number.isFinite(load.estimated_pay)
+      ? ` · ${formatMoney(load.estimated_pay)}`
+      : '';
+  return `${when} · ${from} → ${to}${pay}`;
+}
+
+/** Blank text becomes null; anything else keeps its trimmed value. */
+export function toNullableText(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/** Blank numeric input is null. Non-blank must parse to a finite number. */
+export function isBlankOrFinite(value: string): boolean {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return true;
+  return Number.isFinite(Number(trimmed));
+}
+
+/** Blank numeric input becomes null; otherwise the finite parsed number. */
+export function toNullableAmount(value: string): number | null {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   const label = humanizeToken(status);
