@@ -1,5 +1,7 @@
 /**
- * Phase 1T-D2 — Driver Settlements MVP (read + invitation response only).
+ * Phase 1T-D2 — Driver Settlements MVP + driver reconciliation and manual
+ * outside-settlement import surface.
+
  *
  * Recordkeeping / reconciliation surface. This component NEVER talks to the
  * backend directly: every read and every mutation goes through the accepted
