@@ -32,6 +32,14 @@ const SERVICE_PATH = path.resolve(
 );
 const SERVICE_SOURCE = readFileSync(SERVICE_PATH, 'utf8');
 
+// Escape patterns are assembled at runtime so that this guardrail file does not
+// itself contain the literals it forbids.
+const DOUBLE_CAST = ['as', 'unknown', 'as'].join(' ');
+const TS_IGNORE = ['@ts', 'ignore'].join('-');
+const TS_EXPECT_ERROR = ['@ts', 'expect', 'error'].join('-');
+const ESLINT_DISABLE = ['eslint', 'disable'].join('-');
+const LOOSE_TYPE_PATTERN = new RegExp(String.raw`\b` + 'an' + 'y' + String.raw`\b`);
+
 const SETTLEMENT_ROW = Object.freeze({ id: 'settlement-1', status: 'draft' });
 const ITEM_ROW = Object.freeze({ id: 'item-1', item_type: 'load_pay' });
 const MATCH_ROW = Object.freeze({
@@ -316,11 +324,11 @@ describe('Phase 1T-C1 — settlement service transport contract', () => {
   });
 
   it('8. source uses no type escapes', () => {
-    expect(SERVICE_SOURCE).not.toMatch(/\bany\b/);
-    expect(SERVICE_SOURCE).not.toContain('@ts-ignore');
-    expect(SERVICE_SOURCE).not.toContain('@ts-expect-error');
-    expect(SERVICE_SOURCE).not.toContain('as unknown as');
-    expect(SERVICE_SOURCE).not.toContain('eslint-disable');
+    expect(SERVICE_SOURCE).not.toMatch(LOOSE_TYPE_PATTERN);
+    expect(SERVICE_SOURCE).not.toContain(TS_IGNORE);
+    expect(SERVICE_SOURCE).not.toContain(TS_EXPECT_ERROR);
+    expect(SERVICE_SOURCE).not.toContain(DOUBLE_CAST);
+    expect(SERVICE_SOURCE).not.toContain(ESLINT_DISABLE);
   });
 
   it('9. source uses one rpc call per wrapper and no other transport', () => {
@@ -345,14 +353,10 @@ describe('Phase 1T-C1 — settlement service transport contract', () => {
       path.resolve(__dirname, 'phase1tC1SettlementServiceContract.test.ts'),
       'utf8',
     );
-    const DOUBLE_CAST = ['as', 'unknown', 'as'].join(' ');
-    const TS_IGNORE = ['@ts', 'ignore'].join('-');
-    const TS_EXPECT_ERROR = ['@ts', 'expect', 'error'].join('-');
-    const ESLINT_DISABLE = ['eslint', 'disable'].join('-');
     expect(self).not.toContain(DOUBLE_CAST);
     expect(self).not.toContain(TS_IGNORE);
     expect(self).not.toContain(TS_EXPECT_ERROR);
     expect(self).not.toContain(ESLINT_DISABLE);
-    expect(self).not.toMatch(new RegExp(String.raw`\b` + 'any' + String.raw`\b`));
+    expect(self).not.toMatch(LOOSE_TYPE_PATTERN);
   });
 });
