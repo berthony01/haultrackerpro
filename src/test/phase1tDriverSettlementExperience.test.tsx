@@ -1434,3 +1434,161 @@ describe('R. reconciliation and import pure helpers', () => {
     expect(isBlankOrFinite('abc')).toBe(false);
   });
 });
+
+
+/* ----------------------------------------------------------------------- S - */
+
+describe('S. assistant settlement permission constants and page gate', () => {
+  it('extends the permission key allowlist with exactly the three settlement keys', () => {
+    for (const key of ['settlements_view', 'settlements_manage', 'settlements_finalize']) {
+      expect(PERMISSIONS_SOURCE).toContain(`'${key}'`);
+    }
+  });
+
+  it('defaults every settlement permission to false', () => {
+    const defaults = PERMISSIONS_SOURCE.slice(
+      PERMISSIONS_SOURCE.indexOf('PERMISSION_DEFAULTS'),
+      PERMISSIONS_SOURCE.indexOf('assistantPageGate'),
+    );
+    expect(defaults).toMatch(/settlements_view:\s*false/);
+    expect(defaults).toMatch(/settlements_manage:\s*false/);
+    expect(defaults).toMatch(/settlements_finalize:\s*false/);
+  });
+
+  it('gates the settlements page on settlements_view only', () => {
+    const gate = PERMISSIONS_SOURCE.slice(PERMISSIONS_SOURCE.indexOf('assistantPageGate'));
+    expect(gate).toMatch(/settlements[^\n]*settlements_view/);
+    expect(gate).not.toMatch(/settlements:[^\n]*settlements_manage/);
+  });
+
+  it('labels all three settlement permissions for the invite UI', () => {
+    const labels = PERMISSIONS_SOURCE.slice(
+      PERMISSIONS_SOURCE.indexOf('PERMISSION_LABELS'),
+      PERMISSIONS_SOURCE.indexOf('PERMISSION_DEFAULTS'),
+    );
+    expect(labels).toContain('settlements_view');
+    expect(labels).toContain('settlements_manage');
+    expect(labels).toContain('settlements_finalize');
+  });
+});
+
+
+/* ----------------------------------------------------------------------- T - */
+
+describe('T. assistant settlement access service contract', () => {
+  it('calls the server helper RPC and never trusts local plan state', () => {
+    expect(ACCESS_SERVICE_SOURCE).toContain('settlement_current_user_can_assist_driver');
+    expect(ACCESS_SERVICE_SOURCE).toContain('_require_pro');
+    expect(ACCESS_SERVICE_SOURCE).not.toContain('useSubscription');
+    expect(ACCESS_SERVICE_SOURCE).not.toContain('localStorage');
+  });
+
+  it('exposes the access hook from the settlement data hook module', () => {
+    expect(HOOK_SOURCE).toContain('useAssistantProSettlementManageAccess');
+    expect(HOOK_SOURCE).toContain('canCurrentAssistantManageProDriverSettlements');
+  });
+});
+
+
+/* ----------------------------------------------------------------------- U - */
+
+describe('U. managed-driver settlement scoping and assistant gating', () => {
+  const loadPayItem = {
+    id: ITEM_ID,
+    item_type: 'load_pay',
+    description: 'Linehaul',
+    category: null,
+    amount: 1850,
+    expected_amount_snapshot: null,
+    load_reference_snapshot: null,
+    origin_snapshot: null,
+    destination_snapshot: null,
+    pay_method: null,
+  };
+
+  function actAsAssistant(permissions: Record<string, boolean>) {
+    state.user = { id: OTHER_DRIVER_ID };
+    state.targetUserId = DRIVER_ID;
+    state.isActingAsAssistant = true;
+    state.actingPermissions = permissions;
+  }
+
+  it('scopes settlements to the managed driver, not the assistant auth user', () => {
+    actAsAssistant({ settlements_view: true });
+    state.settlements = {
+      data: [settlementRow(), settlementRow({ id: 'x', driver_user_id: OTHER_DRIVER_ID })],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+    render(<DriverSettlementsView />);
+    expect(screen.getAllByTestId('settlement-card')).toHaveLength(1);
+  });
+
+  it('never shows driver-self sharing invitations to an acting assistant', () => {
+    actAsAssistant({ settlements_view: true, settlements_manage: true });
+    state.relationships = {
+      data: [{ id: REL_ID, driver_user_id: DRIVER_ID, status: 'pending' }],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    };
+    render(<DriverSettlementsView />);
+    expect(screen.queryByTestId('pending-invitations')).toBeNull();
+  });
+
+  it('hides basic reconcile controls for a view-only assistant', () => {
+    actAsAssistant({ settlements_view: true });
+    state.settlements = {
+      data: [settlementRow()],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+    state.items = { data: [loadPayItem], isLoading: false, isError: false, refetch: vi.fn() };
+    state.loads = [loadRow()];
+    openDetail();
+    expect(screen.queryByTestId('settlement-reconcile-controls')).toBeNull();
+  });
+
+  it('shows basic reconcile controls once settlements_manage is granted', () => {
+    actAsAssistant({ settlements_view: true, settlements_manage: true });
+    state.settlements = {
+      data: [settlementRow()],
+      isLoading: false,
+      isError: false,
+      refetch: refetchSettlements,
+    };
+    state.items = { data: [loadPayItem], isLoading: false, isError: false, refetch: vi.fn() };
+    state.loads = [loadRow()];
+    openDetail();
+    expect(screen.getByTestId('settlement-reconcile-controls')).toBeTruthy();
+  });
+
+  it('queries the server for target-driver Pro access with the managed driver id', () => {
+    actAsAssistant({ settlements_view: true, settlements_manage: true });
+    render(<DriverSettlementsView />);
+    expect(state.assistantAccessArgs[0]).toEqual([DRIVER_ID, true]);
+  });
+
+  it('hides the manual import card when the server denies target-Pro access', () => {
+    actAsAssistant({ settlements_view: true, settlements_manage: true });
+    state.assistantAccess = { data: false, isLoading: false, isError: false };
+    state.isPro = true;
+    render(<DriverSettlementsView />);
+    expect(screen.queryByTestId('settlement-import-card')).toBeNull();
+  });
+
+  it('shows advanced tools only when the server confirms target-Pro access', () => {
+    actAsAssistant({ settlements_view: true, settlements_manage: true });
+    state.assistantAccess = { data: true, isLoading: false, isError: false };
+    state.isPro = false;
+    render(<DriverSettlementsView />);
+    expect(screen.getByTestId('settlement-import-card')).toBeTruthy();
+  });
+
+  it('does not consult the assistant access hook for a real driver session', () => {
+    render(<DriverSettlementsView />);
+    expect(state.assistantAccessArgs[0]).toEqual([DRIVER_ID, false]);
+  });
+});
