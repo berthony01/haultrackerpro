@@ -112,7 +112,9 @@ describe('Phase 1T-F3C — carrier settlement mobile overflow repair', () => {
     const roots = [
       '<div className="grid lg:grid-cols-[1.5fr_1fr] gap-6">',
       '<div className="min-w-0 space-y-6">',
-      '<div className="space-y-4" data-testid="carrier-settlements-panel">',
+      // F3D reformatted this root onto multiple lines and appended
+      // touch-target rules only; it still must not clip.
+      'data-testid="carrier-settlements-panel"',
     ];
     for (const root of roots) {
       expect(recruiterAccessPage + carrierPanel).toContain(root);
