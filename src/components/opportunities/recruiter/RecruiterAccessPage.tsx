@@ -519,6 +519,13 @@ function ToolsGrid({
           disabled={!canPost}
         />
         <ToolCard
+          icon={Receipt}
+          title="Driver Settlements"
+          body="Connect drivers and issue settlement statements for your carrier operation."
+          cta={settlementsOpen ? 'Hide Settlements' : 'Open Settlements'}
+          onClick={onToggleSettlements}
+        />
+        <ToolCard
           icon={BarChart3}
           title="Recruiting Analytics"
           body="Track pipeline activity and improve your results."
