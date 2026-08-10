@@ -775,6 +775,53 @@ export type Database = {
         }
         Relationships: []
       }
+      carrier_driver_relationships: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          created_by_user_id: string
+          driver_user_id: string
+          ended_at: string | null
+          id: string
+          invited_at: string
+          recruiter_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          created_by_user_id: string
+          driver_user_id: string
+          ended_at?: string | null
+          id?: string
+          invited_at?: string
+          recruiter_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          driver_user_id?: string
+          ended_at?: string | null
+          id?: string
+          invited_at?: string
+          recruiter_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carrier_driver_relationships_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_audit_log: {
         Row: {
           action: string
@@ -1488,6 +1535,273 @@ export type Database = {
             columns: ["recruiter_id"]
             isOneToOne: false
             referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_settlement_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          settlement_id: string
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          settlement_id: string
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          settlement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_settlement_events_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "driver_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_settlement_items: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          created_by_user_id: string
+          deadhead_miles_snapshot: number | null
+          delivery_date_snapshot: string | null
+          description: string | null
+          destination_snapshot: string | null
+          eligible_revenue_snapshot: number | null
+          expected_amount_snapshot: number | null
+          id: string
+          item_type: string
+          load_reference_snapshot: string | null
+          loaded_miles_snapshot: number | null
+          origin_snapshot: string | null
+          pay_method: string | null
+          payable_miles_snapshot: number | null
+          pickup_date_snapshot: string | null
+          quantity: number | null
+          rate: number | null
+          settlement_id: string
+          sort_order: number
+          unit_label: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string
+          created_by_user_id: string
+          deadhead_miles_snapshot?: number | null
+          delivery_date_snapshot?: string | null
+          description?: string | null
+          destination_snapshot?: string | null
+          eligible_revenue_snapshot?: number | null
+          expected_amount_snapshot?: number | null
+          id?: string
+          item_type: string
+          load_reference_snapshot?: string | null
+          loaded_miles_snapshot?: number | null
+          origin_snapshot?: string | null
+          pay_method?: string | null
+          payable_miles_snapshot?: number | null
+          pickup_date_snapshot?: string | null
+          quantity?: number | null
+          rate?: number | null
+          settlement_id: string
+          sort_order?: number
+          unit_label?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          deadhead_miles_snapshot?: number | null
+          delivery_date_snapshot?: string | null
+          description?: string | null
+          destination_snapshot?: string | null
+          eligible_revenue_snapshot?: number | null
+          expected_amount_snapshot?: number | null
+          id?: string
+          item_type?: string
+          load_reference_snapshot?: string | null
+          loaded_miles_snapshot?: number | null
+          origin_snapshot?: string | null
+          pay_method?: string | null
+          payable_miles_snapshot?: number | null
+          pickup_date_snapshot?: string | null
+          quantity?: number | null
+          rate?: number | null
+          settlement_id?: string
+          sort_order?: number
+          unit_label?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_settlement_items_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "driver_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_settlement_matches: {
+        Row: {
+          confidence: number | null
+          created_at: string
+          driver_load_id: string
+          id: string
+          match_state: string
+          matched_at: string | null
+          matched_by_user_id: string | null
+          settlement_item_id: string
+        }
+        Insert: {
+          confidence?: number | null
+          created_at?: string
+          driver_load_id: string
+          id?: string
+          match_state: string
+          matched_at?: string | null
+          matched_by_user_id?: string | null
+          settlement_item_id: string
+        }
+        Update: {
+          confidence?: number | null
+          created_at?: string
+          driver_load_id?: string
+          id?: string
+          match_state?: string
+          matched_at?: string | null
+          matched_by_user_id?: string | null
+          settlement_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_settlement_matches_driver_load_id_fkey"
+            columns: ["driver_load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_settlement_matches_settlement_item_id_fkey"
+            columns: ["settlement_item_id"]
+            isOneToOne: false
+            referencedRelation: "driver_settlement_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_settlements: {
+        Row: {
+          agency_id: string | null
+          calculation_version: string
+          carrier_driver_relationship_id: string | null
+          carrier_recruiter_profile_id: string | null
+          created_at: string
+          created_by_user_id: string
+          driver_user_id: string
+          finalized_at: string | null
+          finalized_by_user_id: string | null
+          id: string
+          notes: string | null
+          pay_date: string | null
+          payer_name_snapshot: string | null
+          period_end: string
+          period_start: string
+          reported_gross_amount: number | null
+          reported_net_amount: number | null
+          source: string
+          source_display_name_snapshot: string | null
+          statement_reference: string | null
+          status: string
+          supersedes_settlement_id: string | null
+          updated_at: string
+          version_number: number
+          voided_at: string | null
+          voided_by_user_id: string | null
+        }
+        Insert: {
+          agency_id?: string | null
+          calculation_version?: string
+          carrier_driver_relationship_id?: string | null
+          carrier_recruiter_profile_id?: string | null
+          created_at?: string
+          created_by_user_id: string
+          driver_user_id: string
+          finalized_at?: string | null
+          finalized_by_user_id?: string | null
+          id?: string
+          notes?: string | null
+          pay_date?: string | null
+          payer_name_snapshot?: string | null
+          period_end: string
+          period_start: string
+          reported_gross_amount?: number | null
+          reported_net_amount?: number | null
+          source: string
+          source_display_name_snapshot?: string | null
+          statement_reference?: string | null
+          status?: string
+          supersedes_settlement_id?: string | null
+          updated_at?: string
+          version_number?: number
+          voided_at?: string | null
+          voided_by_user_id?: string | null
+        }
+        Update: {
+          agency_id?: string | null
+          calculation_version?: string
+          carrier_driver_relationship_id?: string | null
+          carrier_recruiter_profile_id?: string | null
+          created_at?: string
+          created_by_user_id?: string
+          driver_user_id?: string
+          finalized_at?: string | null
+          finalized_by_user_id?: string | null
+          id?: string
+          notes?: string | null
+          pay_date?: string | null
+          payer_name_snapshot?: string | null
+          period_end?: string
+          period_start?: string
+          reported_gross_amount?: number | null
+          reported_net_amount?: number | null
+          source?: string
+          source_display_name_snapshot?: string | null
+          statement_reference?: string | null
+          status?: string
+          supersedes_settlement_id?: string | null
+          updated_at?: string
+          version_number?: number
+          voided_at?: string | null
+          voided_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_settlements_supersedes_settlement_id_fkey"
+            columns: ["supersedes_settlement_id"]
+            isOneToOne: false
+            referencedRelation: "driver_settlements"
             referencedColumns: ["id"]
           },
         ]
@@ -5229,6 +5543,126 @@ export type Database = {
       set_agency_slug: {
         Args: { _agency_id: string; _slug: string }
         Returns: string
+      }
+      settlement_accept_my_carrier_relationship: {
+        Args: { _relationship_id: string }
+        Returns: {
+          accepted_at: string | null
+          created_at: string
+          created_by_user_id: string
+          driver_user_id: string
+          ended_at: string | null
+          id: string
+          invited_at: string
+          recruiter_id: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "carrier_driver_relationships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      settlement_current_user_can_administer_carrier: {
+        Args: { _recruiter_id: string }
+        Returns: boolean
+      }
+      settlement_current_user_can_assist_driver: {
+        Args: {
+          _driver_user_id: string
+          _permission: string
+          _require_pro?: boolean
+        }
+        Returns: boolean
+      }
+      settlement_current_user_can_manage_agency: {
+        Args: {
+          _agency_id: string
+          _driver_user_id: string
+          _permission: string
+        }
+        Returns: boolean
+      }
+      settlement_current_user_can_manage_carrier: {
+        Args: {
+          _driver_user_id: string
+          _recruiter_id: string
+          _relationship_id: string
+        }
+        Returns: boolean
+      }
+      settlement_current_user_can_manage_driver_import: {
+        Args: never
+        Returns: boolean
+      }
+      settlement_current_user_can_view_settlement: {
+        Args: { _settlement_id: string }
+        Returns: boolean
+      }
+      settlement_decline_my_carrier_relationship: {
+        Args: { _relationship_id: string }
+        Returns: {
+          accepted_at: string | null
+          created_at: string
+          created_by_user_id: string
+          driver_user_id: string
+          ended_at: string | null
+          id: string
+          invited_at: string
+          recruiter_id: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "carrier_driver_relationships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      settlement_end_carrier_relationship: {
+        Args: { _relationship_id: string }
+        Returns: {
+          accepted_at: string | null
+          created_at: string
+          created_by_user_id: string
+          driver_user_id: string
+          ended_at: string | null
+          id: string
+          invited_at: string
+          recruiter_id: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "carrier_driver_relationships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      settlement_invite_carrier_driver: {
+        Args: { _driver_user_id: string; _recruiter_id: string }
+        Returns: {
+          accepted_at: string | null
+          created_at: string
+          created_by_user_id: string
+          driver_user_id: string
+          ended_at: string | null
+          id: string
+          invited_at: string
+          recruiter_id: string
+          status: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "carrier_driver_relationships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       submit_agency_client_request: {
         Args: {
