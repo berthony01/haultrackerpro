@@ -339,4 +339,20 @@ describe('Phase 1T-C1 — settlement service transport contract', () => {
     expect(self).not.toMatch(/\b(it|describe)\.only\b/);
     expect(self).not.toMatch(/\b(it|describe)\.skip\b/);
   });
+
+  it('11. this suite itself uses no type escapes', () => {
+    const self = readFileSync(
+      path.resolve(__dirname, 'phase1tC1SettlementServiceContract.test.ts'),
+      'utf8',
+    );
+    const DOUBLE_CAST = ['as', 'unknown', 'as'].join(' ');
+    const TS_IGNORE = ['@ts', 'ignore'].join('-');
+    const TS_EXPECT_ERROR = ['@ts', 'expect', 'error'].join('-');
+    const ESLINT_DISABLE = ['eslint', 'disable'].join('-');
+    expect(self).not.toContain(DOUBLE_CAST);
+    expect(self).not.toContain(TS_IGNORE);
+    expect(self).not.toContain(TS_EXPECT_ERROR);
+    expect(self).not.toContain(ESLINT_DISABLE);
+    expect(self).not.toMatch(new RegExp(String.raw`\b` + 'any' + String.raw`\b`));
+  });
 });
