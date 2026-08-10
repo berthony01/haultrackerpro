@@ -52,11 +52,17 @@ import {
 
 /* Hook boundary is mocked: these acceptance proofs exercise the presentation
  * contract only. Authorization stays with PostgreSQL in production. */
-const hookState = {
-  settlements: [] as BusinessSettlementLike[],
-  createdRow: null as unknown,
-};
-const createCarrierMutate = vi.fn(async () => hookState.createdRow);
+const { hookState, createCarrierMutate } = vi.hoisted(() => {
+  const state = {
+    settlements: [] as unknown[],
+    createdRow: null as unknown,
+  };
+  return {
+    hookState: state,
+    createCarrierMutate: vi.fn(async () => state.createdRow),
+  };
+});
+
 
 vi.mock('@/hooks/settlements/useSettlementData', () => {
   const idleMutation = (fn: (args: unknown) => Promise<unknown>) => () => ({
