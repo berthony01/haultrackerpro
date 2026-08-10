@@ -1118,6 +1118,29 @@ function BusinessSettlementDetail({
           <SummaryLine label="Notes">{settlement.notes ?? '—'}</SummaryLine>
 
         </CardContent>
+        <CardContent className="flex flex-wrap gap-2 pt-0">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            data-testid="business-settlement-export-csv"
+            onClick={handleExportCsv}
+          >
+            <Download className="h-4 w-4" />
+            Download CSV
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2"
+            data-testid="business-settlement-print"
+            onClick={handlePrint}
+          >
+            <Printer className="h-4 w-4" />
+            Print
+          </Button>
+        </CardContent>
+
       </Card>
 
       {!isDraft && (
