@@ -348,7 +348,7 @@ function SettlementDetail({
   }, [matchesQuery.data]);
 
   /**
-   * Presentation-safe export payload. Read capability only: exporting a record
+   * Presentation-safe export payload. Read-only action: exporting a record
    * the caller can already see is never gated by Pro, manage, or finalize.
    * No raw identifier of any kind is copied into the export model.
    */
