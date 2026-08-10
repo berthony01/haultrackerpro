@@ -335,7 +335,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       {(state === 'active_billing' || state === 'active_no_billing') && (
         <div className="grid lg:grid-cols-[1.5fr_1fr] gap-6">
           {/* Left column */}
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <ToolsGrid
               canPost={canPost}
               newRequests={snapshot.newReq}

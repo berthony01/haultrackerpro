@@ -704,7 +704,7 @@ export function BusinessSettlementManager({
                 >
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-medium">
+                      <span className="min-w-0 max-w-full truncate text-sm font-medium">
                         {driverLabels[row.driver_user_id] ?? 'Driver'}
                       </span>
                       <Badge variant="outline">
