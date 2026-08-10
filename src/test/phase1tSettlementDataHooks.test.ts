@@ -59,6 +59,9 @@ const LOOSE_ANY = [':', ' ', 'any'].join('');
 const TS_IGNORE = ['@ts', '-', 'ignore'].join('');
 const TS_EXPECT = ['@ts', '-', 'expect-error'].join('');
 const ESLINT_DISABLE = ['eslint', '-', 'disable'].join('');
+const FOCUSED = ['it', 'describe'].flatMap((fn) =>
+  ['only', 'skip'].map((mod) => [fn, mod].join('.')),
+);
 
 function makeClient() {
   return new QueryClient({
@@ -573,9 +576,8 @@ describe('I. both new files avoid prohibited escapes', () => {
     expect(source).not.toContain(TS_IGNORE);
     expect(source).not.toContain(TS_EXPECT);
     expect(source).not.toContain(ESLINT_DISABLE);
-    expect(source).not.toContain('it.only');
-    expect(source).not.toContain('describe.only');
-    expect(source).not.toContain('it.skip');
-    expect(source).not.toContain('describe.skip');
+    for (const marker of FOCUSED) {
+      expect(source).not.toContain(marker);
+    }
   });
 });
