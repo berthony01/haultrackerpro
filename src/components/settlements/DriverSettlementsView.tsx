@@ -476,6 +476,29 @@ function SettlementDetail({
               {settlement.notes}
             </p>
           )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              data-testid="settlement-export-csv"
+              onClick={handleExportCsv}
+            >
+              <Download className="h-4 w-4" />
+              Download CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              data-testid="settlement-print"
+              onClick={handlePrint}
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+          </div>
+
         </CardContent>
       </Card>
 
