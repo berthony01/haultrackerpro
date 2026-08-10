@@ -609,7 +609,10 @@ export function BusinessSettlementManager({
 
 
   return (
-    <div className="space-y-4" data-testid="business-settlement-manager">
+    <div
+      className="space-y-4 [&_button]:min-h-11 sm:[&_button]:min-h-0 [&_select]:min-h-11 sm:[&_select]:min-h-0 [&_input]:min-h-11 sm:[&_input]:min-h-0"
+      data-testid="business-settlement-manager"
+    >
       <Card className="border-border/60">
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
