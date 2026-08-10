@@ -171,12 +171,77 @@ const CASES: readonly WrapperCase[] = [
   },
 ];
 
-// Runtime shape used only to invoke the wrappers dynamically in these proofs.
-type WrapperFn = (args: Record<string, unknown>) => Promise<unknown>;
-
-function invoke(name: keyof typeof service, args: Record<string, unknown>) {
-  const fn = service[name] as unknown as WrapperFn;
-  return fn(args);
+/**
+ * Compile-safe dynamic dispatch: an exhaustive switch over the 14 exported
+ * wrapper names. Each branch applies at most a single direct cast from the
+ * generic test argument record to that wrapper's exported generated Args
+ * alias — never through `unknown`. The production service remains fully
+ * generated-type-driven.
+ */
+function invoke(
+  name: keyof typeof service,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  switch (name) {
+    case 'createDriverImportedSettlementDraft':
+      return service.createDriverImportedSettlementDraft(
+        args as service.CreateDriverImportedSettlementDraftArgs,
+      );
+    case 'createCarrierSettlementDraft':
+      return service.createCarrierSettlementDraft(
+        args as service.CreateCarrierSettlementDraftArgs,
+      );
+    case 'createAgencySettlementDraft':
+      return service.createAgencySettlementDraft(
+        args as service.CreateAgencySettlementDraftArgs,
+      );
+    case 'updateSettlementDraftHeader':
+      return service.updateSettlementDraftHeader(
+        args as service.UpdateSettlementDraftHeaderArgs,
+      );
+    case 'addSettlementDraftItem':
+      return service.addSettlementDraftItem(
+        args as service.AddSettlementDraftItemArgs,
+      );
+    case 'updateSettlementDraftItem':
+      return service.updateSettlementDraftItem(
+        args as service.UpdateSettlementDraftItemArgs,
+      );
+    case 'deleteSettlementDraftItem':
+      return service.deleteSettlementDraftItem(
+        args as service.DeleteSettlementDraftItemArgs,
+      );
+    case 'confirmSettlementLoadMatch':
+      return service.confirmSettlementLoadMatch(
+        args as service.ConfirmSettlementLoadMatchArgs,
+      );
+    case 'clearSettlementLoadMatch':
+      return service.clearSettlementLoadMatch(
+        args as service.ClearSettlementLoadMatchArgs,
+      );
+    case 'refreshSettlementLoadMatchSuggestions':
+      return service.refreshSettlementLoadMatchSuggestions(
+        args as service.RefreshSettlementLoadMatchSuggestionsArgs,
+      );
+    case 'rejectSettlementLoadMatch':
+      return service.rejectSettlementLoadMatch(
+        args as service.RejectSettlementLoadMatchArgs,
+      );
+    case 'finalizeSettlementDraft':
+      return service.finalizeSettlementDraft(
+        args as service.FinalizeSettlementDraftArgs,
+      );
+    case 'voidFinalizedSettlement':
+      return service.voidFinalizedSettlement(
+        args as service.VoidFinalizedSettlementArgs,
+      );
+    case 'createSettlementCorrectionDraft':
+      return service.createSettlementCorrectionDraft(
+        args as service.CreateSettlementCorrectionDraftArgs,
+      );
+    default:
+      return Promise.reject(new Error(`unknown wrapper: ${String(name)}`));
+  }
 }
 
 beforeEach(() => {
