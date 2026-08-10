@@ -292,7 +292,16 @@ function SettlementDetail({
                         {item.origin_snapshot ?? '—'} → {item.destination_snapshot ?? '—'}
                       </p>
                     )}
+                    {describeItemBasis(item) && (
+                      <p
+                        data-testid="settlement-item-basis"
+                        className="mt-1 text-xs text-muted-foreground"
+                      >
+                        {describeItemBasis(item)}
+                      </p>
+                    )}
                   </div>
+
                   <div className="text-right">
                     <p className="text-sm font-bold text-foreground">
                       {formatMoney(item.amount)}
