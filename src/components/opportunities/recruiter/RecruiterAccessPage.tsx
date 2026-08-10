@@ -171,6 +171,18 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const scrollTo = (ref: React.RefObject<HTMLDivElement>) =>
     ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
+  // Opening the settlements tool must bring the mounted panel into view and
+  // move keyboard focus to it; closing it must not steal focus.
+  useEffect(() => {
+    if (!settlementsOpen) return;
+    const node = settlementsRef.current;
+    if (!node) return;
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    node.focus({ preventScroll: true });
+  }, [settlementsOpen]);
+
+
+
   if (profileLoading) {
     return (
       <div className="space-y-6 animate-fade-in">
