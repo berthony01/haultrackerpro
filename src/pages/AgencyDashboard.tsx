@@ -34,6 +34,7 @@ import { ClientRequestsSection } from '@/components/agency/ClientRequestsSection
 import { ClientListSection } from '@/components/agency/ClientListSection';
 import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
 import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
+import { AgencySettlementsPanel } from '@/components/settlements/AgencySettlementsPanel';
 import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 import { AgencyPlanLimitsCard } from '@/components/agency/AgencyPlanLimitsCard';
 import {
@@ -114,6 +115,7 @@ export default function AgencyDashboard() {
             { value: 'packages', label: 'Packages', show: isOwnerOrAdmin },
             { value: 'requests', label: 'Requests', show: isOwnerOrAdmin },
             { value: 'clients', label: 'Clients', show: isOwnerOrAdmin },
+            { value: 'settlements', label: 'Settlements', show: isOwnerOrAdmin },
             { value: 'work', label: 'Work queue', show: true },
             { value: 'activity', label: 'Activity', show: isOwner },
           ].filter((t) => t.show);
@@ -145,6 +147,9 @@ export default function AgencyDashboard() {
                   </TabsContent>
                   <TabsContent value="clients">
                     <ClientListSection agencyId={agency.id} />
+                  </TabsContent>
+                  <TabsContent value="settlements">
+                    <AgencySettlementsPanel agencyId={agency.id} />
                   </TabsContent>
                 </>
               )}

@@ -24,6 +24,7 @@ import {
   Edit,
   Sparkles,
   Info,
+  Receipt,
 } from 'lucide-react';
 import { useRecruiterProfile, type RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunities/useRecruiterBilling';
@@ -41,6 +42,7 @@ import {
 } from '@/lib/opportunities/recruiterEligibility';
 import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
 import { RecruiterReadinessDialog } from '../RecruiterReadinessDialog';
+import { CarrierSettlementsPanel } from '@/components/settlements/CarrierSettlementsPanel';
 
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
@@ -148,6 +150,8 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   // instead of silently disabling the button. The dialog surfaces the exact
   // missing tokens and routes recruiters into onboarding.
   const [readinessOpen, setReadinessOpen] = useState(false);
+  // Phase 1T-E1: carrier settlements mount on demand only.
+  const [settlementsOpen, setSettlementsOpen] = useState(false);
   const readiness = resolveRecruiterReadiness(profile);
 
   const handlePost = () => {
@@ -325,7 +329,15 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               onPost={handlePost}
               onManage={onManage}
               onApplications={onApplications}
+              settlementsOpen={settlementsOpen}
+              onToggleSettlements={() => setSettlementsOpen((v) => !v)}
             />
+
+            {settlementsOpen && (
+              <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+            )}
+
+
 
             <RecentPosts
               loading={oppsLoading}
@@ -457,12 +469,16 @@ function ToolsGrid({
   onPost,
   onManage,
   onApplications,
+  settlementsOpen,
+  onToggleSettlements,
 }: {
   canPost: boolean;
   newRequests: number;
   onPost: () => void;
   onManage: () => void;
   onApplications: () => void;
+  settlementsOpen: boolean;
+  onToggleSettlements: () => void;
 }) {
   return (
     <Card className="p-5 border-border/60">
@@ -501,6 +517,13 @@ function ToolsGrid({
           cta="Manage Contact Requests"
           onClick={onApplications}
           disabled={!canPost}
+        />
+        <ToolCard
+          icon={Receipt}
+          title="Driver Settlements"
+          body="Connect drivers and issue settlement statements for your carrier operation."
+          cta={settlementsOpen ? 'Hide Settlements' : 'Open Settlements'}
+          onClick={onToggleSettlements}
         />
         <ToolCard
           icon={BarChart3}
