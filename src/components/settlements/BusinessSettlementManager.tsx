@@ -1076,7 +1076,10 @@ function BusinessSettlementDetail({
   };
 
   return (
-    <div className="space-y-4" data-testid="business-settlement-detail">
+    <div
+      className="space-y-4 [&_button]:min-h-11 sm:[&_button]:min-h-0 [&_select]:min-h-11 sm:[&_select]:min-h-0 [&_input]:min-h-11 sm:[&_input]:min-h-0"
+      data-testid="business-settlement-detail"
+    >
       <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
         <ArrowLeft className="h-4 w-4" /> Back to statements
       </Button>
