@@ -596,7 +596,9 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
                       {resolvePayerLabel(
                         s.source_display_name_snapshot,
                         s.payer_name_snapshot,
+                        s.source,
                       )}
+
                     </p>
                     <StatusBadge status={s.status} />
                     {s.version_number > 1 && (
