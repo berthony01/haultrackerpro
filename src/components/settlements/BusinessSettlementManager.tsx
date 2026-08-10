@@ -1143,6 +1143,13 @@ function BusinessSettlementDetail({
 
       </Card>
 
+      <SettlementReconciliationSummary
+        items={(itemsQuery.data as SettlementItemLike[] | null | undefined) ?? []}
+        reportedNetAmount={settlement.reported_net_amount}
+      />
+
+
+
       {!isDraft && (
         <p
           className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs text-muted-foreground"
