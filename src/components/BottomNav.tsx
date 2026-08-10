@@ -146,6 +146,14 @@ export function BottomNav(props: BottomNavProps) {
       ? { label: 'Expenses', icon: Receipt, onClick: () => go('expenses') } : null,
     hasPerm(assistantPermissions, 'manage_fuel')
       ? { label: 'Fuel', icon: Fuel, onClick: () => go('fuel') } : null,
+    hasPerm(assistantPermissions, 'settlements_view')
+      ? {
+          label: 'Settlements',
+          icon: ReceiptText,
+          onClick: () => go('settlements'),
+          description: "View the selected driver's settlement statements.",
+        }
+      : null,
     { label: 'Switch driver / exit', icon: UserCog, onClick: () => go('assistant_exit'), description: 'Stop acting for this driver.' },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ].filter(Boolean) as MoreItem[];
