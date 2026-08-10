@@ -777,7 +777,7 @@ function BusinessDraftForm({
       );
       toast.success('Draft statement created');
       setValues(EMPTY_DRAFT_FORM);
-      if (created?.id) onCreated(created.id);
+      if (created?.id) onCreated(created);
     } catch (error) {
       toast.error(describeSettlementError(error));
     }
