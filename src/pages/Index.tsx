@@ -57,6 +57,7 @@ const DriverScorecard = lazy(() => import('@/components/DriverScorecard').then(m
 const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => ({ default: m.WhatsNewModal })));
 const DriverContractsView = lazy(() => import('@/components/contracts/DriverContractsView').then(m => ({ default: m.DriverContractsView })));
 const RecruiterContractsView = lazy(() => import('@/components/contracts/RecruiterContractsView').then(m => ({ default: m.RecruiterContractsView })));
+const DriverSettlementsView = lazy(() => import('@/components/settlements/DriverSettlementsView').then(m => ({ default: m.DriverSettlementsView })));
 import { ContractActionsCard } from '@/components/contracts/ContractActionsCard';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import AssistantBlockedNotice from '@/components/assistants/AssistantBlockedNotice';
@@ -860,6 +861,7 @@ const Index = () => {
     settings: 'Customize your experience',
     opportunities: 'Verified driver opportunities',
     contracts: 'Review and sign contracts',
+    settlements: 'Reconcile carrier settlement statements',
   };
   const navSubtitle = NAV_SUBTITLES[navKey] ?? '';
 
@@ -1193,6 +1195,9 @@ const Index = () => {
               />
             )}
             {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
+            {page === 'settlements' && !isRecruiterView && (
+              <DriverSettlementsView onBack={() => setPage('dashboard')} />
+            )}
             {page === 'contracts' && (isRecruiterView ? (
               <RecruiterContractsView onOpenApplications={() => handleNavigate('recruiter-access:applications')} />
             ) : (
