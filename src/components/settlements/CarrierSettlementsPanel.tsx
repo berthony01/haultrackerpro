@@ -402,6 +402,7 @@ export function CarrierSettlementsPanel({ onManagePlan }: CarrierSettlementsPane
                           </AlertDialogCancel>
                           <AlertDialogAction
                             className="min-h-11 sm:min-h-0 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => {
                               void runEnd(row.id);
                             }}
                           >
