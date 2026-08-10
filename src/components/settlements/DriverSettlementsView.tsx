@@ -252,10 +252,16 @@ function SettlementDetail({
 
   // Only the selected statement period is requested — unrelated history is not
   // loaded into this reconciliation surface.
-  const { loads } = useLoads({
+  const { loads: allLoads } = useLoads({
     from: settlement.period_start ?? undefined,
     to: settlement.period_end ?? undefined,
   });
+
+  // Only completed loads are reconciliation candidates.
+  const loads = useMemo(
+    () => allLoads.filter((load) => load.status === 'completed'),
+    [allLoads],
+  );
 
   const confirmMatch = useConfirmSettlementLoadMatch();
   const clearMatch = useClearSettlementLoadMatch();
