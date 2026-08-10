@@ -474,22 +474,112 @@ function SettlementDetail({
                 </div>
 
                 {itemMatches.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2 border-t border-border/50 pt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-border/50 pt-2">
                     {itemMatches.map((m) => (
-                      <Badge
-                        key={m.id}
-                        variant="outline"
-                        data-testid="settlement-match-chip"
-                        className="text-[11px] font-medium"
-                      >
-                        Matched load · {humanizeToken(m.match_state)}
-                        {m.confidence !== null && m.confidence !== undefined
-                          ? ` · ${Math.round(m.confidence * 100)}%`
-                          : ''}
-                      </Badge>
+                      <span key={m.id} className="flex items-center gap-1">
+                        <Badge
+                          variant="outline"
+                          data-testid="settlement-match-chip"
+                          className="text-[11px] font-medium"
+                        >
+                          Matched load · {humanizeToken(m.match_state)}
+                          {m.confidence !== null && m.confidence !== undefined
+                            ? ` · ${Math.round(m.confidence * 100)}%`
+                            : ''}
+                        </Badge>
+                        {reconcilable &&
+                          advancedToolsVisible &&
+                          SUGGESTION_MATCH_STATES.has((m.match_state ?? '').trim()) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              disabled={busy}
+                              data-testid="settlement-reject-suggestion"
+                              className="h-7 px-2 text-xs"
+                              onClick={() => handleReject(item.id, m.driver_load_id)}
+                            >
+                              Reject suggestion
+                            </Button>
+                          )}
+                      </span>
                     ))}
                   </div>
                 )}
+
+                {reconcilable && (
+                  <div
+                    data-testid="settlement-reconcile-controls"
+                    className="mt-2 flex flex-wrap items-end gap-2 border-t border-border/50 pt-2"
+                  >
+                    {acceptedMatch ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        data-testid="settlement-clear-match"
+                        onClick={() => handleClear(item.id)}
+                      >
+                        Clear match
+                      </Button>
+                    ) : (
+                      <>
+                        <div className="min-w-[14rem] flex-1">
+                          <label
+                            className="text-[11px] font-medium text-muted-foreground"
+                            htmlFor={`match-load-${item.id}`}
+                          >
+                            Match to one of your logged loads
+                          </label>
+                          <select
+                            id={`match-load-${item.id}`}
+                            data-testid="settlement-match-load-select"
+                            className="mt-1 h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                            value={selectedLoadByItem[item.id] ?? ''}
+                            onChange={(e) =>
+                              setSelectedLoadByItem((prev) => ({
+                                ...prev,
+                                [item.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Select a load…</option>
+                            {loads.map((load) => (
+                              <option key={load.id} value={load.id}>
+                                {describeLoadOption(load)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={busy}
+                          data-testid="settlement-confirm-match"
+                          onClick={() => handleConfirm(item.id)}
+                        >
+                          Confirm match
+                        </Button>
+                      </>
+                    )}
+                    {advancedToolsVisible && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        data-testid="settlement-find-suggestions"
+                        onClick={() => handleRefresh(item.id)}
+                      >
+                        Find suggestions
+                      </Button>
+                    )}
+                    {suggestions.length > 0 && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {suggestions.length} suggestion
+                        {suggestions.length === 1 ? '' : 's'} awaiting your review
+                      </span>
+                    )}
+                  </div>
+                )}
+
               </div>
             );
           })}
