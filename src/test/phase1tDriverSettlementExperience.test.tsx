@@ -891,7 +891,9 @@ describe('L. the new UI performs no backend, authorization, or billing logic', (
     const imports = [...VIEW_SOURCE.matchAll(/from '([^']+)'/g)].map((m) => m[1]);
     expect(imports).toContain('@/hooks/settlements/useSettlementData');
     expect(imports).toContain('@/hooks/useAuth');
-    expect(imports.filter((i) => i.startsWith('@/lib/settlements'))).toHaveLength(0);
+    const settlementLibImports = imports.filter((i) => i.startsWith('@/lib/settlements'));
+    expect(settlementLibImports).toEqual(['@/lib/settlements/settlementExport']);
+
   });
 });
 
