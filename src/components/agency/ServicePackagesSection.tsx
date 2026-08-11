@@ -161,19 +161,20 @@ function PackageEditorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => (disabled ? setOpen(false) : setOpen(o))}>
       <DialogTrigger asChild>
         {existing ? (
           <Button variant="ghost" size="sm">
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         ) : (
-          <Button size="sm">
+          <Button size="sm" disabled={disabled}>
             <Plus className="mr-1 h-4 w-4" />
             New package
           </Button>
         )}
       </DialogTrigger>
+
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{existing ? 'Edit package' : 'New service package'}</DialogTitle>
