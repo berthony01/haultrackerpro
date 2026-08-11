@@ -109,10 +109,13 @@ function PackageRow({ pkg, agencyId }: { pkg: ServicePackage; agencyId: string }
 function PackageEditorDialog({
   agencyId,
   existing,
+  disabled,
 }: {
   agencyId: string;
   existing?: ServicePackage;
+  disabled?: boolean;
 }) {
+
   const { create, update } = useAgencyPackageMutations();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
