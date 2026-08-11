@@ -45,13 +45,13 @@ export interface DocsArticle {
   readonly category: DocsCategory;
   readonly audiences: readonly DocsAudience[];
   /** Fixed literal string date. Never runtime-generated. */
-  readonly reviewedForProductAccuracy: '2026-07-24';
+  readonly reviewedForProductAccuracy: '2026-08-10';
   readonly sections: readonly DocsArticleSection[];
   readonly callouts?: readonly DocsArticleCallout[];
   readonly relatedRoutes?: readonly DocsArticleRelatedRoute[];
 }
 
-const REVIEWED = '2026-07-24' as const;
+const REVIEWED = '2026-08-10' as const;
 
 // ---------------------------------------------------------------------------
 // Article 1 — Billing, renewals, cancellation, and permanent deletion
@@ -106,7 +106,7 @@ const ARTICLE_BILLING: DocsArticle = {
       heading: 'Refunds and proration',
       paragraphs: [
         'Refund and proration treatment depends on the applicable checkout terms, your payment status, and any published refund policy in effect for your plan or promotion.',
-        'HaulTrackerPro does not promise refunds or prorated refunds for every cancellation. If a charge looks incorrect, contact support@haultrackerpro.com with your Stripe confirmation or receipt and we will review it.',
+        'HaulTrackerPro does not promise refunds or prorated refunds for every cancellation. If a charge looks incorrect, contact HaulTrackerPro through Settings → Send Feedback with your Stripe confirmation or receipt and we will review it.',
       ],
     },
     {
@@ -135,7 +135,7 @@ const ARTICLE_BILLING: DocsArticle = {
       heading: 'If a payment fails or status is unclear',
       paragraphs: [
         'A failed payment may restrict access. The portal / payment provider status controls, not the in-app messaging.',
-        'Save your Stripe confirmation or receipt and contact support@haultrackerpro.com if the status shown is unclear or does not match what you expect.',
+        'Save your Stripe confirmation or receipt and contact HaulTrackerPro through Settings → Send Feedback if the status shown is unclear or does not match what you expect.',
       ],
     },
   ],
@@ -231,7 +231,7 @@ const ARTICLE_DELETION: DocsArticle = {
     {
       heading: 'If the deletion flow fails',
       paragraphs: [
-        'If the deletion flow reports an error — for example due to an owner block, a Stripe issue, or a transient network failure — contact support@haultrackerpro.com and include the exact error message shown.',
+        'If the deletion flow reports an error — for example due to an owner block, a Stripe issue, or a transient network failure — contact HaulTrackerPro through Settings → Send Feedback and include the exact error message shown.',
         'Do not repeatedly retry a destructive request while billing status is uncertain. Repeated submissions can complicate reconciliation.',
       ],
     },
@@ -285,7 +285,7 @@ const ARTICLE_ROLES: DocsArticle = {
         'The following self-service controls are being designed but are not exposed in the current product. Do not assume they exist; use the listed workaround instead.',
       ],
       bullets: [
-        'A self-service assistant "leave driver" control is not yet available. The assistant should ask the driver or agency owner to revoke access, or contact support@haultrackerpro.com.',
+        'A self-service assistant "leave driver" control is not yet available. The assistant should ask the driver or agency owner to revoke access, or contact HaulTrackerPro through Settings → Send Feedback.',
         'A self-service agency-member "leave agency" control is not yet available. Contact the agency owner or admin, or contact support.',
         'Self-service agency ownership transfer and self-service agency closure are not yet available. The owner must contact support, and cannot permanently delete the personal account first.',
         'A self-service recruiter-profile-only closure is not yet available. A recruiter may manage billing and listings; permanent personal deletion affects the login and every other context it owns.',
@@ -449,7 +449,7 @@ const ARTICLE_OPPORTUNITY: DocsArticle = {
     {
       heading: 'For drivers — how to report a concern',
       paragraphs: [
-        'Report misleading, discriminatory, fraudulent, abusive, expired, or unauthorized listings to support@haultrackerpro.com with the opportunity link and a short description.',
+        'Report misleading, discriminatory, fraudulent, abusive, expired, or unauthorized listings to HaulTrackerPro through Settings → Send Feedback with the opportunity link and a short description.',
       ],
     },
     {
