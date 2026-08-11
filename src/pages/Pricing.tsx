@@ -100,6 +100,8 @@ const freeFeatures = [
   'CSV exports',
   'Paste Load Parser (5 per week)',
   'Custom week start day',
+  'View finalized settlement statements issued to you',
+  'Basic settlement reconciliation (confirm or clear a load match)',
 ];
 
 const proFeatures = [
