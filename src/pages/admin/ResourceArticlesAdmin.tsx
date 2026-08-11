@@ -116,6 +116,9 @@ export default function ResourceArticlesAdmin() {
   const [justApproved, setJustApproved] = useState(false);
   const [justPublishedSlug, setJustPublishedSlug] = useState<string | null>(null);
   const handledPrefillRef = useRef<string | null>(null);
+  const handledCalendarGenerateRef = useRef<string | null>(null);
+  const [calendarGenerating, setCalendarGenerating] = useState<string | null>(null);
+  const [calendarGenerateError, setCalendarGenerateError] = useState<string | null>(null);
 
   // AI form
   const [aiTopic, setAiTopic] = useState('');
