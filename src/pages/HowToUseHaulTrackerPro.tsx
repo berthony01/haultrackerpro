@@ -209,6 +209,17 @@ export default function HowToUseHaulTrackerPro() {
             </Card>
           ))}
         </div>
+        <div className="mt-10 rounded-2xl border border-border bg-muted/30 p-5 sm:p-6">
+          <h3 className="text-base font-bold font-heading mb-3">Working a settlement statement</h3>
+          <ul className="space-y-2 text-sm text-muted-foreground leading-relaxed list-disc list-inside">
+            <li>Compare the statement lines against your own load records, and confirm or clear each load match as you go.</li>
+            <li>The difference between the net implied by the visible lines and the reported net on the header is informational.</li>
+            <li>A mismatch alone is not proof of underpayment or overpayment, and it does not block finalization.</li>
+            <li>CSV export and your browser's print function are available for any statement you can view.</li>
+            <li>HaulTrackerPro does not process payroll and does not pay drivers — settlements here are recordkeeping only.</li>
+          </ul>
+          <p className="mt-3 text-xs text-muted-foreground">Not every driver receives a settlement statement. This applies only if a carrier or agency you have an accepted relationship with issues one to you, or you record one you received elsewhere.</p>
+        </div>
         <div className="flex justify-center gap-3 mt-8">
           <Button asChild variant="outline" size="sm" className="rounded-xl font-bold">
             <Link to="/tools/load-profit-calculator">Load Profit Calculator</Link>

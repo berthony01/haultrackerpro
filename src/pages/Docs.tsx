@@ -199,6 +199,12 @@ const Docs = () => {
                 must be independently reviewed by you before you rely on them for
                 financial, legal, safety or tax decisions.
               </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                Settlement statements and reconciliation are documented product functionality,
+                but HaulTrackerPro does not process payroll or settlement payments. The
+                settlement tools are recordkeeping and reconciliation only — HaulTrackerPro
+                does not pay, hold, transfer, verify or guarantee any settlement amount.
+              </p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 For the terms governing use of the product, see the{' '}
                 <Link to="/terms" className="text-primary underline">Terms of Service</Link>{' '}
