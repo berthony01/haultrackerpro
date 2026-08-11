@@ -31,7 +31,15 @@ const faqs = [
   },
   {
     q: 'Does HaulTracker Pro handle payments between drivers and assistants?',
-    a: 'Not yet. Drivers pay for their own HaulTracker Pro subscription. Any payment between a driver and an assistant or agency for back-office services is arranged outside the platform for now. Future agency billing features may come later.',
+    a: 'Agency software subscriptions are already live and billed through Stripe. What remains outside HaulTracker Pro is service payments between a driver and an assistant or agency for back-office work — those are arranged directly between them.',
+  },
+  {
+    q: 'Can a direct assistant work on settlement statements?',
+    a: 'Only with the matching driver-approved permission. Settlement view permission is required to view a statement, settlement-management permission is required to manage or prepare one, and settlement-finalize permission is required to finalize one. Advanced reconciliation and imported outside settlements follow the recipient driver\'s own Pro entitlement, never the assistant\'s plan, and assistant finalization also requires the recipient driver to be on Pro.',
+  },
+  {
+    q: 'What can a paid agency do with settlements?',
+    a: 'A paid agency plan can prepare settlement statements for delegated driver clients when settlement-management permission has been granted. Finalizing additionally requires settlement-finalize permission. The recipient driver being Free or Pro does not gate paid agency preparation.',
   },
   {
     q: 'Can drivers revoke assistant or agency access?',
@@ -128,6 +136,7 @@ export default function AssistantsAgencies() {
                     'Help drivers with load entry, expenses, fuel logs, and reports',
                     'Each driver approves you and chooses your permissions',
                     'Every action is audit-logged on the driver\'s account',
+                    'Settlements only with the matching permission: settlement view to view, settlement-management to manage, settlement-finalize to finalize',
                   ],
                   cta: 'Become a Driver Assistant',
                   onClick: handleAssistantCTA,
@@ -140,7 +149,7 @@ export default function AssistantsAgencies() {
                     'Publish service packages and share a private request link',
                     'Driver-approved delegation, never silent access',
                     'Shared work queue with waiting-on-driver responses',
-                    'Paid agency plans can prepare settlement statements for approved driver clients (recordkeeping only)',
+                    'Paid agency plans can prepare settlement statements for approved driver clients (recordkeeping only) with settlement-management permission; finalizing also requires settlement-finalize permission',
                   ],
                   cta: 'Create Agency Workspace',
                   onClick: handleAgencyCTA,
@@ -202,10 +211,10 @@ export default function AssistantsAgencies() {
               </ul>
             </div>
             <div className="rounded-2xl border p-6" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
-              <h3 className="text-lg font-black text-white mb-3">What HaulTracker Pro does NOT do yet</h3>
+              <h3 className="text-lg font-black text-white mb-3">What HaulTracker Pro does NOT do</h3>
               <ul className="space-y-2 text-sm" style={{ color: TEXT_MUTED }}>
                 {[
-                  'Process payments between drivers and assistants or agencies',
+                  'Process service payments between drivers and assistants or agencies',
                   'Guarantee clients, customers, or income',
                   'Run a public marketplace where anyone can hire anyone',
                   'Grant assistant or agency access without explicit driver approval',
@@ -216,9 +225,10 @@ export default function AssistantsAgencies() {
                 ))}
               </ul>
               <p className="mt-4 text-xs" style={{ color: TEXT_DIM }}>
-                Payments for assistant or agency services are handled outside HaulTracker Pro for now. Future agency billing features may come later.
+                Agency software subscriptions are already live and billed through Stripe. Only service payments between drivers and assistants or agencies remain outside HaulTracker Pro.
               </p>
             </div>
+
           </div>
         </section>
 

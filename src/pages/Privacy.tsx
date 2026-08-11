@@ -28,7 +28,7 @@ export default function Privacy() {
         <h2 className="text-2xl font-black font-heading">HaulTrackerPro Privacy Policy</h2>
 
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-foreground/90">
-          <span className="font-semibold text-primary">Coverage note:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data.
+          <span className="font-semibold text-primary">Coverage note:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data. It also describes data from driver assistants, agencies and delegated access, settlement statements and reconciliation, and AI, OCR and automated extraction features.
         </div>
 
         <section className="space-y-2">
@@ -38,8 +38,12 @@ export default function Privacy() {
             <li>Email address and optional first name submitted via free resource downloads (e.g., the Free Trucker Starter Kit) — used only to deliver the requested resource and occasional related updates. You can unsubscribe at any time.</li>
             <li>Load data (pickup/dropoff locations, miles, rates, fees)</li>
             <li>Expense data (categories, amounts, dates)</li>
-            <li>Opportunity Preferences (preferences, experience, trailer types) — only used for matching opportunities and only visible to recruiters after you request information on their listing</li>
+            <li>Fuel and operational data (gallons, fuel purchases, odometer and mileage entries, and related operating records)</li>
+            <li>Opportunity Preferences (preferences, experience, trailer types) — used for matching opportunities and shared with a recruiter as part of an application or information request to that recruiter's listing. Your private phone number and email address are not shared merely because you applied or requested information; they are disclosed only after you approve a separate contact request.</li>
             <li>Recruiter / company profile data (company name, contact info, verification documents) for users with recruiter access</li>
+            <li>Driver assistant, agency, and delegation records (assistant and agency profiles, memberships, client requests, delegations, permission grants, work items, service packages, audit activity, and notifications)</li>
+            <li>Settlement and reconciliation records (statement headers, line items including deductions and withholdings, load matches, reconciliation results, and lifecycle and audit events)</li>
+            <li>AI, OCR, and automated extraction inputs (pasted load text, pasted opportunity text, uploaded rate confirmations, receipts and screenshots, clause or contract text, and other content you submit when you invoke extraction)</li>
             <li>Billing data — handled and stored by Stripe; we store only customer and subscription identifiers, never card numbers</li>
             <li>Usage data (app interactions for product improvement)</li>
           </ul>
@@ -51,7 +55,9 @@ export default function Privacy() {
             <li>Provide and maintain the HaulTrackerPro service</li>
             <li>Generate reports and summaries for your use</li>
             <li>Match drivers to opportunities and calculate Profit Intelligence estimates</li>
-            <li>Process recruiter subscriptions through Stripe</li>
+            <li>Process subscription billing through Stripe across driver, recruiter, and agency contexts</li>
+            <li>Operate delegated workflows between drivers and their approved assistants or agencies</li>
+            <li>Provide settlement statement recordkeeping and reconciliation</li>
             <li>Improve product features and user experience</li>
             <li>Internal analytics to understand usage patterns</li>
           </ul>
@@ -64,7 +70,7 @@ export default function Privacy() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">4. Data Sharing</h3>
-          <p className="text-muted-foreground">We do NOT sell your data. We do not share your personal information with third parties except infrastructure providers necessary to operate the service (cloud hosting, database services, and Stripe for recruiter billing). Emails collected through free resource downloads (lead magnets) follow these same rules — they are never sold or shared.</p>
+          <p className="text-muted-foreground">We do NOT sell your data. We do not share your personal information with third parties except infrastructure providers necessary to operate the service (cloud hosting, database services, and Stripe for subscription billing). Emails collected through free resource downloads (lead magnets) follow these same rules — they are never sold or shared.</p>
           <p className="text-muted-foreground">When a driver applies to an opportunity, the driver's application and submitted profile details are shared with the recruiter that posted that specific opportunity. The driver's private phone number and email address are disclosed to that recruiter only after the driver approves a separate contact request. This information is visible only to that recruiter and to HaulTrackerPro administrators for moderation purposes.</p>
         </section>
 
@@ -85,7 +91,7 @@ export default function Privacy() {
             <li>Right to access and export all your data at any time</li>
             <li>Right to request permanent deletion of your account, subject to the retention behavior described in Section 6</li>
             <li>Right to correct inaccurate information</li>
-            <li>Right to withdraw an opportunity request at any time (note: contact information already shared with the recruiter cannot be retroactively recalled)</li>
+            <li>Right to withdraw an opportunity request at any time (note: application and profile data you already submitted may already have been shared with the recruiter for that listing and cannot be retroactively recalled; your private phone number and email address are shared only after you approve a separate contact request)</li>
           </ul>
         </section>
 
@@ -134,7 +140,7 @@ export default function Privacy() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">14. Recruiter &amp; Carrier Data</h3>
-          <p className="text-muted-foreground">For users with recruiter access, we additionally collect company legal name, USDOT/MC numbers, company and recruiter phone numbers, business address, hiring states, equipment types, and verification metadata. Billing details are handled by Stripe; we store only the Stripe customer/subscription identifiers, plan tier, status, and (where surfaced by Stripe) the last four digits and brand of the payment method. We never store full card numbers.</p>
+          <p className="text-muted-foreground">For users with recruiter access, we additionally collect company legal name, company and recruiter phone numbers, business address, hiring states, equipment types, and verification metadata. USDOT and MC numbers are collected where applicable to Carrier / Motor Carrier recruiter profiles. Billing details are handled by Stripe; we store only the Stripe customer/subscription identifiers, plan tier, status, and (where surfaced by Stripe) the last four digits and brand of the payment method. We never store full card numbers.</p>
           <p className="text-muted-foreground"><span className="font-semibold text-foreground">What drivers see:</span> only public recruiter fields — company name, verified badge, hiring states, equipment types, and the contact channel for the specific opportunity a driver inquires on. Internal verification documents, admin notes, billing data, and unapproved listings are never shown to drivers.</p>
           <p className="text-muted-foreground"><span className="font-semibold text-foreground">Retention:</span> recruiter accounts and their billing records are retained while active and for up to 24 months after closure for tax, audit, fraud-prevention, and dispute-resolution purposes. Recruiters may request deletion of personal contact data subject to those retention limits.</p>
         </section>
@@ -200,20 +206,21 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">Settlement Statement Data</h3>
-          <p className="text-muted-foreground">When a carrier or agency prepares a settlement statement for a driver, HaulTrackerPro stores the statement header (period, source, status, reported net), its line items (type, description, amount, and any linked load), carrier↔driver relationship records, reconciliation and load-match state, finalization, void and correction history, and related audit metadata.</p>
-          <p className="text-muted-foreground"><span className="font-semibold text-foreground">Who can see it:</span> the issuing carrier or agency and its authorized members, the recipient driver, any assistant or agency the driver has granted settlement permissions to — limited to the specific settlement view, settlement-management, or settlement-finalize permission granted — and HaulTrackerPro administrators where access is needed for support, security, moderation, or dispute review. Settlement records are used for recordkeeping and reconciliation only — HaulTrackerPro does not process, hold, or verify settlement payments, does not run payroll, ACH, or direct deposit, does not issue or file employer tax forms, and does not collect bank account or payout information for settlements.</p>
+          <h3 className="text-base font-bold">Driver Assistants, Agencies &amp; Delegated Access Data</h3>
+          <p className="text-muted-foreground">When a driver works with an assistant or an agency, HaulTrackerPro stores assistant and agency profiles, agency memberships, client requests, delegation records, the specific permission grants a driver approved, work items exchanged in the workspace, published service packages, audit activity, and delegation-related notifications. Access is limited by role and by the permissions the driver approved — an assistant or agency can only act on drivers who approved them, cannot grant themselves new permissions, and cannot see data outside the granted scope. Drivers can review this activity and revoke access at any time. Agency-owned workspace records may remain with the workspace after an individual membership ends.</p>
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">AI &amp; OCR Processing of Your Content</h3>
-          <p className="text-muted-foreground">Optional AI and OCR features — voice expense capture, receipt and rate-confirmation scanning, pasted load text, and AI summaries — send the content you submit to third-party AI or OCR processing services through HaulTrackerPro's processing layer so the requested output can be returned. Output may be incomplete or inaccurate and should be compared against the original document before you rely on it.</p>
+          <h3 className="text-base font-bold">Settlement &amp; Reconciliation Data</h3>
+          <p className="text-muted-foreground">When a carrier or agency prepares a settlement statement for a driver, or a driver imports one received outside HaulTrackerPro, HaulTrackerPro stores the statement source and provenance, the period, reference and payer snapshots, gross and reported net amounts, the line items (type, description, amount, and any linked load) including deductions and withholdings, carrier↔driver relationship records, load matches and reconciliation results, and finalization, void, correction, lifecycle and audit events.</p>
+          <p className="text-muted-foreground"><span className="font-semibold text-foreground">Who can see it:</span> the issuing carrier or agency and its authorized members, the recipient driver, any assistant or agency delegate the driver has granted settlement permissions to — limited to the specific settlement view, settlement-management, or settlement-finalize permission granted — and HaulTrackerPro administrators where access is needed for support, security, moderation, or dispute review. Settlement records are used for recordkeeping and reconciliation only — HaulTrackerPro does not process, hold, or verify settlement payments, does not run payroll, ACH, or direct deposit, and does not issue or file employer tax forms. HaulTrackerPro does not collect bank account or payout information for settlements, and no bank payout instructions are collected for settlement payroll because the feature does not pay drivers.</p>
         </section>
 
         <section className="space-y-2">
-          <h3 className="text-base font-bold">Assistant &amp; Agency Access Data</h3>
-          <p className="text-muted-foreground">When a driver approves an assistant or agency delegation, HaulTrackerPro stores the delegation record, the specific permissions granted, work items and requests exchanged in the workspace, and an audit log of actions taken on the driver's account. Drivers can review this activity and revoke access at any time. Agency-owned workspace records may remain with the workspace after an individual membership ends.</p>
+          <h3 className="text-base font-bold">AI, OCR &amp; Automated Extraction Data</h3>
+          <p className="text-muted-foreground">Optional AI, OCR, and automated extraction features — voice expense capture, receipt and screenshot scanning, rate confirmations, pasted load text, pasted opportunity text, clause and contract text, AI summaries, and other inputs you submit when extraction is invoked — send the content you submit to third-party AI or OCR processing services through HaulTrackerPro's processing layer so the requested output can be returned. Output may be incomplete or inaccurate and should be compared against the original document before you rely on it. The opportunity paste extractor does not save the pasted text as an opportunity until you submit the form.</p>
         </section>
+
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">21. Contact Information</h3>

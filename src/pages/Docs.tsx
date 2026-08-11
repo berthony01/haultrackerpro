@@ -103,7 +103,8 @@ const Docs = () => {
           <p className="max-w-3xl text-base sm:text-lg text-muted-foreground leading-relaxed">
             Guides are organized by role — <strong>drivers</strong>,{' '}
             <strong>recruiters</strong>, <strong>driver assistants</strong> and{' '}
-            <strong>agencies</strong> — plus billing, account, AI/OCR and opportunity topics.
+            <strong>agencies</strong> — plus billing, account, AI/OCR,{' '}
+            <strong>settlement statements and reconciliation</strong>, and opportunity topics.
             Live guides link directly to the product. Items marked{' '}
             <em>Coming soon</em> are being prepared and are not clickable yet.
           </p>
@@ -197,6 +198,12 @@ const Docs = () => {
                 parking reports and tax estimates are provided for convenience only and
                 must be independently reviewed by you before you rely on them for
                 financial, legal, safety or tax decisions.
+              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                Settlement statements and reconciliation are documented product functionality,
+                but HaulTrackerPro does not process payroll or settlement payments. The
+                settlement tools are recordkeeping and reconciliation only — HaulTrackerPro
+                does not pay, hold, transfer, verify or guarantee any settlement amount.
               </p>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 For the terms governing use of the product, see the{' '}
