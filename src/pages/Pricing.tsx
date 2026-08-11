@@ -191,11 +191,14 @@ const recruiterStandardBullets = [
   '1 active opportunity at a time',
   'Unlimited drafts',
   'Standard marketplace placement',
-  'Basic applicant and contact-request flow',
+  'Basic applicant and contact-request flow — driver phone and email are released only after the driver approves a separate contact request',
   'Opportunity management: edit, pause, and close listings',
-  'Verified Recruiter badge shown only after separate badge approval',
-  'Carrier settlement issuance is not included — it requires a paid recruiter plan',
+  'Paste an existing job post and let AI auto-fill the opportunity form — you review and edit every field before submitting',
+  'Requires recruiter name, company name, recruiter email, company type, and accepted posting terms — DOT/MC is required only for Carrier / Motor Carrier company types',
+  'Verified Recruiter badge shown only after separate badge approval — it does not gate standard posting',
+  'Carrier settlement issuance is not included — it requires an active standalone paid recruiter plan plus an accepted carrier↔driver relationship',
 ];
+
 
 const recruiterPaidPlans: Array<{
   name: string;
