@@ -117,8 +117,9 @@ export const featureList: FeatureCategory[] = [
       { icon: Sparkles, title: 'Advanced Reconciliation (Pro)', description: 'Driver Pro adds refreshing and rejecting suggested load matches so you can work through a long statement faster.', pro: true },
       { icon: ClipboardList, title: 'Manual Outside-Settlement Records (Pro)', description: 'Driver Pro can create a manual settlement record for a statement you received outside HaulTrackerPro, so your reconciliation history stays in one place.', pro: true },
       { icon: BarChart3, title: 'Line Total vs Reported Net', description: 'HaulTrackerPro shows the net implied by the visible line items next to the reported net on the statement header, so a difference is visible instead of hidden. This is a neutral comparison, not an accusation or an audit.' },
-      { icon: Building2, title: 'Carrier & Agency Issuance (Paid)', description: 'Issuing carrier settlements requires a paid standalone recruiter/carrier plan. Preparing settlements inside an Agency Workspace requires an active paid agency plan.' },
-      { icon: Shield, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. Settlement statements are records; actual payment happens outside the platform between you and the company.' },
+      { icon: Building2, title: 'Carrier & Agency Issuance (Paid)', description: 'Issuing a carrier settlement requires an active standalone paid recruiter/carrier entitlement plus an active carrier↔driver relationship. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlement authority. Preparing settlements inside an Agency Workspace requires an active paid agency plan plus delegated settlement-management permission; finalizing additionally requires settlement-finalize permission. The recipient driver being Free or Pro does not gate paid agency preparation.' },
+      { icon: Shield, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. It does not process payroll, send ACH or direct deposit, calculate or remit employer payroll taxes, issue or file employer tax forms, determine worker classification, or determine whether a deduction is lawful. Settlement statements are records; actual payment happens outside the platform between you and the company.' },
+
     ],
   },
   {
@@ -142,7 +143,9 @@ export const featureList: FeatureCategory[] = [
   {
     category: 'Team & Agency Workflow',
     features: [
-      { icon: Users, title: 'Driver Assistants', description: 'Direct driver invitations to a spouse, dispatcher, or back-office helper are available without a Driver Pro subscription. Access always remains driver-approved and permission-based (loads, expenses, fuel, reports, settings). Every action is logged and you can revoke access any time.' },
+      { icon: Users, title: 'Driver Assistants', description: 'Direct driver invitations to a spouse, dispatcher, or back-office helper are available without a Driver Pro subscription. Access always remains driver-approved and permission-based (loads, expenses, fuel, reports, settings). Settlement access follows the same rule: an assistant can view settlements only with settlement view permission, and can manage or finalize only with the matching settlement-management or settlement-finalize permission. Advanced reconciliation and imported statements follow the recipient driver\'s Pro entitlement, never the assistant\'s own plan, and finalizing requires finalize permission plus recipient driver Pro. Every action is logged and you can revoke access any time.' },
+      { icon: ClipboardPaste, title: 'Recruiter Paste Opportunity to Auto-Fill', description: 'Recruiters can paste an existing job post, recruiter pitch, or rate sheet and AI extracts the structured opportunity fields into the form. The recruiter reviews and edits every extracted field, and the extractor itself does not save anything — nothing is saved until the recruiter submits the form.' },
+
       { icon: Shield, title: 'Driver Control Center', description: 'One screen at /driver/assistant-control to see every person and agency with access to your account — direct invites and agency delegations — and end any access in one tap.' },
       { icon: Building2, title: 'Agency Workspace', description: 'Run a multi-driver back-office: publish service packages, accept private client requests, manage a shared work queue, and track every action in an agency audit log.' },
       { icon: UserCheck, title: 'Driver-Approved Delegation', description: 'Agencies can only act on a driver\'s account after the driver explicitly approves the delegation request — and the driver can revoke it instantly. No silent access.' },
@@ -159,6 +162,8 @@ export function generateFeatureMarkdown(): string {
   let md = `# HaulTrackerPro — Feature Overview\n`;
   md += `Generated: ${now}\n\n`;
   md += `For drivers, recruiters, driver assistants, and back-office agencies. Driver Assistants and Agencies can use HaulTracker Pro as a side-hustle / agency workflow to manage approved driver clients. Access is always driver-approved and permission-based. HaulTracker Pro does not currently process payments between drivers and assistants or agencies, and does not guarantee income or clients.\n\n`;
+  md += `Settlement statements in HaulTracker Pro are recordkeeping and reconciliation records only. HaulTracker Pro does not process payroll, pay drivers, send ACH or direct deposit, calculate or remit employer payroll taxes, issue or file employer tax forms, determine worker classification, or determine whether a deduction is lawful.\n\n`;
+
   md += `---\n\n`;
 
   for (const cat of featureList) {

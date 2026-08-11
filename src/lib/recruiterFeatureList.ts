@@ -1,7 +1,8 @@
 import {
   Building2, Briefcase, Users, ShieldCheck, BarChart3, FileSignature,
-  CreditCard, FileText, Sparkles, AlertCircle, Mail, ClipboardList, Eye, Share2,
+  CreditCard, FileText, Sparkles, AlertCircle, Mail, ClipboardList, ClipboardPaste, Eye, Share2,
 } from 'lucide-react';
+
 
 export interface RecruiterFeature {
   icon: typeof Building2;
@@ -27,6 +28,8 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
     category: 'Post Structured Opportunities',
     features: [
       { icon: Briefcase, title: 'Structured Opportunity Form', description: 'Capture pay model, CPM/percentage/flat, deductions, deadhead, escrow, home time, equipment, and bonuses in a clear schema drivers actually understand.' },
+      { icon: ClipboardPaste, title: 'Paste Opportunity to Auto-Fill', description: 'Paste an existing job post, recruiter pitch, or rate sheet and AI extracts the structured opportunity fields into the form for you. You review and edit every extracted field before submitting. The extractor itself does not save anything — nothing is saved as an opportunity until you submit the form.' },
+
       { icon: ClipboardList, title: 'Opportunity Manager', description: 'Edit, pause, close, or resubmit your opportunities. See active vs draft vs closed status at a glance.' },
       { icon: Eye, title: 'View Counts', description: 'See how many drivers have viewed each opportunity so you know what is resonating.' },
       { icon: ShieldCheck, title: 'Active Opportunity Limits by Plan', description: 'Recruiter Standard includes 1 active opportunity with unlimited drafts. Starter includes 5 active opportunities, Growth includes 15, and Fleet includes 25 active opportunities for existing or included Fleet access — new standalone Fleet checkout is unavailable. Drafts are always unlimited; only active listings count toward your plan limit.' },
@@ -79,9 +82,9 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
     category: 'Settlement Statements (Paid Plans)',
     features: [
       { icon: Users, title: 'Carrier↔Driver Relationships', description: 'Invite a driver into a carrier-to-driver relationship. Once the driver accepts, you can prepare settlement statements for that driver.' },
-      { icon: FileText, title: 'Prepare, Finalize, Void & Correct', description: 'Build a settlement draft with line items — load pay, other earnings, reimbursements, deductions, withholdings — then finalize it for the driver, void it, or supersede it with a correction. Issuing carrier settlements requires a paid standalone recruiter/carrier plan; agency settlement preparation requires an active paid agency plan.' },
+      { icon: FileText, title: 'Prepare, Finalize, Void & Correct', description: 'Build a settlement draft with line items — load pay, other earnings, reimbursements, deductions, withholdings — then finalize it for the driver, void it, or supersede it with a correction. Issuing carrier settlements requires an active standalone paid recruiter/carrier entitlement plus an active carrier↔driver relationship. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlement authority. Agency settlement preparation requires an active paid agency plan plus delegated settlement-management permission, and finalizing additionally requires settlement-finalize permission.' },
       { icon: BarChart3, title: 'Line Total vs Reported Net', description: 'HaulTrackerPro shows the net implied by the visible line items next to the reported net on the statement header, so a difference is visible to both sides. This is a neutral comparison, not an audit.' },
-      { icon: ShieldCheck, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. Settlement statements are records; actual payment happens outside the platform between you and the driver.' },
+      { icon: ShieldCheck, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. It does not process payroll, send ACH or direct deposit, calculate or remit employer payroll taxes, issue or file employer tax forms, determine worker classification, or determine whether a deduction is lawful. Settlement statements are records; actual payment happens outside the platform between you and the driver.' },
     ],
   },
 ];

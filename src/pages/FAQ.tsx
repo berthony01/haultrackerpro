@@ -594,7 +594,13 @@ const faqs: Faq[] = [
   {
     id: 'how-recruiters-post',
     question: 'How do recruiters post opportunities?',
-    answer: 'A recruiter completes the required recruiter profile fields and accepts the current posting terms. Once the profile is complete and the account is active, Recruiter Standard allows 1 active opportunity at a time with unlimited drafts. Paid recruiter plans raise the active-opportunity limit and add premium recruiting tools.',
+    answer: 'A recruiter completes the canonical readiness fields — recruiter name, company name, a valid recruiter email, and company type — accepts the current posting terms, and keeps a non-suspended account. A DOT or MC number is required only when the company type is Carrier / Motor Carrier; third-party recruiters, staffing agencies, and independent recruiters do not need DOT or MC for standard posting. Standard posting is not gated on Verified Recruiter badge approval or on admin approval. Once ready, Recruiter Standard allows 1 active opportunity at a time with unlimited drafts. Paid recruiter plans raise the active-opportunity limit and add premium recruiting tools.',
+  },
+  {
+    id: 'recruiter-paste-autofill',
+    question: 'Can recruiters paste an existing job post to fill the opportunity form?',
+    answer: 'Yes. A recruiter can paste an existing job post, recruiter pitch, or rate sheet, AI extracts the structured opportunity fields, and the recruiter reviews and edits those fields before submitting. The extractor itself does not save anything — nothing is saved as an opportunity until the recruiter submits the form.',
+    keywords: 'recruiter paste opportunity auto-fill extract',
   },
   {
     id: 'recruiter-plans',
@@ -604,21 +610,52 @@ const faqs: Faq[] = [
   {
     id: 'settlement-statements',
     question: 'What are settlement statements in HaulTrackerPro?',
-    answer: 'A carrier or agency you have an accepted relationship with can issue you a finalized settlement statement listing pay, deductions, and other line items. Every driver plan — Free and Pro — can view finalized statements issued to them.',
+    answer: 'A carrier or agency you have an accepted relationship with can issue you a finalized settlement statement listing pay, deductions, and other line items. Every driver plan — Free and Pro — can view finalized statements issued to them and use basic reconciliation.',
     keywords: 'settlement statement carrier agency pay',
   },
   {
     id: 'settlement-reconciliation',
     question: 'How does settlement reconciliation work?',
-    answer: 'Basic reconciliation — confirming or clearing the load match on a settlement line — is available on every driver plan. Driver Pro adds advanced reconciliation (refreshing and rejecting suggested load matches) and the ability to create a manual record for a settlement you received outside HaulTrackerPro. HaulTrackerPro also shows the net implied by the visible line items next to the reported net so a difference is visible.',
-    keywords: 'settlement reconciliation load match pro',
+    answer: 'Driver Free covers delivered statements and basic reconciliation — confirming or clearing the load match on a settlement line. Driver Pro adds advanced reconciliation (refreshing and rejecting suggested load matches) and driver-imported records for a settlement you received outside HaulTrackerPro. HaulTrackerPro also shows the net implied by the visible line items next to the reported net so a difference is visible.',
+    keywords: 'settlement reconciliation load match pro import',
+  },
+  {
+    id: 'settlement-assistant-access',
+    question: 'Can my assistant work on my settlements?',
+    answer: 'Only within the permissions you granted on an active delegation. Settlement view permission lets an assistant view your statements. Settlement management controls require settlement-management permission, and finalizing requires settlement-finalize permission plus your own Driver Pro entitlement. Advanced reconciliation and imported statements always follow your Pro entitlement as the recipient driver, never the assistant\'s own plan.',
+    keywords: 'assistant settlement permission view manage finalize',
+  },
+  {
+    id: 'settlement-agency-preparation',
+    question: 'Can a paid agency prepare settlements for me?',
+    answer: 'Yes. A paid Agency Starter, Team, or Growth workspace can prepare settlement statements for a delegated driver client when you granted settlement-management permission, and finalizing additionally requires settlement-finalize permission. Whether you are on Driver Free or Driver Pro does not gate paid agency preparation.',
+    keywords: 'agency settlement preparation permission finalize',
+  },
+  {
+    id: 'settlement-carrier-issuance',
+    question: 'What does a carrier need to issue me a settlement?',
+    answer: 'Carrier-issued settlement creation and finalization require an active standalone paid recruiter/carrier entitlement plus an active carrier↔driver relationship you accepted. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlement authority.',
+    keywords: 'carrier settlement issuance standalone paid relationship',
+  },
+  {
+    id: 'settlement-line-net-difference',
+    question: 'What does a difference between line total and reported net mean?',
+    answer: 'It is informational only. A difference between the net implied by the visible line items and the reported net does not by itself prove underpayment or overpayment, and it does not block finalization. A difference can also come from lines you cannot see, rounding, or data entry. Confirm amounts against the original statement from the company.',
+    keywords: 'settlement line net reported net difference informational',
+  },
+  {
+    id: 'settlement-lifecycle-export',
+    question: 'Can settlements be corrected, voided, or exported?',
+    answer: 'Yes. A draft can be finalized, a finalized statement can be voided, and a correction can supersede an earlier statement so the version history stays visible to both sides. You can export a statement to CSV and print it from your browser.',
+    keywords: 'settlement correction supersede void finalize version history csv print export',
   },
   {
     id: 'settlement-payments',
     question: 'Does HaulTrackerPro pay or guarantee settlement amounts?',
-    answer: 'No. Settlement statements are recordkeeping only. HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount, and a settlement record is not proof that payment occurred. Payment happens outside the platform between you and the company that issued the statement.',
-    keywords: 'settlement payment guarantee recordkeeping',
+    answer: 'No. Settlement statements are recordkeeping only. HaulTrackerPro does not process payroll, send ACH or direct deposit, calculate or remit employer payroll taxes, issue or file employer tax forms, determine worker classification, or determine whether a deduction is lawful. It does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount, and a settlement record is not proof that payment occurred. Payment happens outside the platform between you and the company that issued the statement.',
+    keywords: 'settlement payment guarantee recordkeeping payroll ach',
   },
+
   {
     id: 'driver-refer-driver',
     question: 'Can drivers refer other drivers to a recruiter opportunity?',

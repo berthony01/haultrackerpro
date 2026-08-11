@@ -86,7 +86,7 @@ describe('article registry shape', () => {
 
   it('every article has the fixed reviewed-for-product-accuracy date literal', () => {
     for (const a of getAllArticles()) {
-      expect(a.reviewedForProductAccuracy).toBe('2026-07-24');
+      expect(a.reviewedForProductAccuracy).toBe('2026-08-10');
     }
   });
 
@@ -471,7 +471,7 @@ describe('DocsArticle page', () => {
     const productDocMatches = screen.getAllByText(/product documentation/i);
     expect(productDocMatches.length).toBeGreaterThanOrEqual(2);
     // Reviewed-for-product-accuracy fixed literal appears.
-    expect(screen.getByText(/2026-07-24/)).toBeTruthy();
+    expect(screen.getByText(/2026-08-10/)).toBeTruthy();
     // No raw HTML in source.
     const src = readFileSync('src/pages/DocsArticle.tsx', 'utf8');
     expect(src).not.toContain('dangerouslySetInnerHTML');

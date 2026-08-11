@@ -8,12 +8,17 @@ import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 const faqs = [
   {
     q: 'How do I unlock standard recruiter posting?',
-    a: 'Add the recruiter workspace to your account and complete the required recruiter profile fields — company name, DOT and/or MC number, address, hiring states, equipment types, and a valid recruiter contact email — then accept the current posting terms. Once your account is active and not suspended, Recruiter Standard lets you keep 1 active opportunity at a time with unlimited drafts. No admin approval and no paid plan are required to post a standard opportunity.',
+    a: 'Add the recruiter workspace to your account and complete the canonical readiness fields — recruiter name, company name, a valid recruiter email, and company type — then accept the current posting terms. A DOT or MC number is required only when your company type is Carrier / Motor Carrier; third-party recruiters, staffing agencies, and independent recruiters do not need DOT or MC for standard posting. Once those fields are complete and your account is not suspended, Recruiter Standard lets you keep 1 active opportunity at a time with unlimited drafts. No admin approval, no verification gate, and no paid plan are required to post a standard opportunity.',
+  },
+  {
+    q: 'Can I paste an existing job post instead of typing the form?',
+    a: 'Yes. Paste an existing job post, recruiter pitch, or rate sheet into the opportunity paste tool and AI extracts the structured fields into the form. You review and edit every extracted field before submitting. The extractor itself does not save anything — nothing is saved as an opportunity until you submit the form.',
   },
   {
     q: 'How does Verified Recruiter badge review work?',
-    a: 'The Verified Recruiter badge is a separate trust-display process. HaulTrackerPro reviews eligible recruiter profiles for the badge shown on driver listings. Pending or rejected badge review affects the badge and trust display only — it does not by itself remove your ability to post standard opportunities once your profile is complete and active. You will see your badge review status and any reviewer notes in Recruiter Settings.',
+    a: 'The Verified Recruiter badge is a separate trust-display process and does not gate standard posting. HaulTrackerPro reviews eligible recruiter profiles for the badge shown on driver listings. Pending or rejected badge review affects the badge and trust display only — it does not by itself remove your ability to post standard opportunities once your profile is complete and active. You will see your badge review status and any reviewer notes in Recruiter Settings.',
   },
+
   {
     q: 'What can I post after setup is complete?',
     a: 'Structured opportunities — pay model (CPM, percentage, flat), deductions, deadhead pay, escrow, home time, equipment, sign-on bonuses, and benefits. Pay claims must be truthful and supportable. Opportunity moderation and review remain available to the platform; misleading or vague "up to $X" copy without supporting structure may be flagged or removed.',
@@ -24,7 +29,7 @@ const faqs = [
   },
   {
     q: 'What plans are available and what do they include?',
-    a: 'Recruiter Standard is free for complete, active recruiter workspaces and includes 1 active opportunity at a time with unlimited drafts. Starter ($19/mo) allows up to 5 active opportunities and adds applicant status history, a basic referral tracking view, and carrier settlement issuance. Growth ($49/mo) allows up to 15 active opportunities and adds priority-placement eligibility, featured-listing eligibility, recruiter reports (PDF + CSV), the recruiter contract-management dashboard, AI-assisted contract risk review, full referral progress tracking, pipeline analytics, and opportunity performance insights. Fleet ($149/mo) allows up to 25 active opportunities for existing or included Fleet access and adds top-placement eligibility and priority support — new standalone Fleet checkout is unavailable, and team seats, bulk opportunity tools, custom recruiter profile, and a company-level hiring dashboard are coming soon. Drafts are unlimited on every plan. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
+    a: 'Recruiter Standard is free for complete, active recruiter workspaces and includes 1 active opportunity at a time with unlimited drafts. Starter ($19/mo) allows up to 5 active opportunities and adds applicant status history, a basic referral tracking view, and carrier settlement issuance. Growth ($49/mo) allows up to 15 active opportunities and adds priority-placement eligibility, featured-listing eligibility, recruiter reports (PDF + CSV), the recruiter contract-management dashboard, AI-assisted contract risk review, full referral progress tracking, pipeline analytics, and opportunity performance insights. Fleet ($149/mo) allows up to 25 active opportunities for existing or included Fleet access and adds top-placement eligibility and priority support — new standalone Fleet checkout is unavailable, and team seats, bulk opportunity tools, custom recruiter profile, and a company-level hiring dashboard are coming soon. Drafts are unlimited on every plan. You can change or cancel plans from Recruiter Settings → Billing; the Stripe portal is the source of truth for your account-specific billing status and the effective date of any change you make there.',
   },
   {
     q: 'How are payments processed and is my card data safe?',
@@ -32,7 +37,7 @@ const faqs = [
   },
   {
     q: 'Can I issue settlement statements to drivers?',
-    a: 'Yes, on a paid recruiter/carrier plan. Once a driver accepts your carrier-to-driver relationship invitation, you can prepare a settlement statement with line items, finalize it, void it, or supersede it with a correction, and the driver can view and reconcile the finalized statement. This is recordkeeping only — HaulTrackerPro does not pay, hold, transfer, verify, or guarantee any settlement amount, and payment happens outside the platform.',
+    a: 'Yes, with an active STANDALONE paid recruiter subscription plus an active carrier↔driver relationship the driver has accepted. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlements. Once a driver accepts your carrier-to-driver relationship invitation, you can prepare a settlement statement with line items, finalize it, void it, or supersede it with a correction, and the driver can view and reconcile the finalized statement. This is recordkeeping only — HaulTrackerPro does not process payroll, send ACH or direct deposit, or pay, hold, transfer, verify, or guarantee any settlement amount, and payment happens outside the platform.',
   },
   {
     q: 'When and how do I get a driver\'s contact info?',
