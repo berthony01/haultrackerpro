@@ -1233,9 +1233,11 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
             Agency Workspace
           </h3>
           <p className="text-sm mt-2" style={{ color: 'hsl(220, 10%, 60%)' }}>
-            Multi-client back-office plans. Software access only — HaulTracker Pro does not
-            process service payments.
+            Multi-client back-office plans. Agency subscriptions are live and billed through Stripe —
+            that subscription pays HaulTracker Pro for software access only. HaulTracker Pro does not
+            process service payments between an agency and its driver clients.
           </p>
+
         </div>
 
         {/* Agency plan cards */}
