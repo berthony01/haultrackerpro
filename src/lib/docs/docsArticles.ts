@@ -498,9 +498,10 @@ const ARTICLE_SETTLEMENTS: DocsArticle = {
     {
       heading: 'Who can issue or prepare one',
       bullets: [
-        'A carrier or recruiter issuing settlements needs a paid standalone recruiter/carrier plan.',
-        'An agency preparing settlements for an approved driver client needs an active paid agency plan.',
-        'An assistant or agency member can only act on a driver-approved delegation, and only if the driver granted settlement permissions.',
+        'A carrier or recruiter issuing settlements needs an active standalone paid recruiter/carrier entitlement plus an active carrier↔driver relationship. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlement authority.',
+        'An agency preparing settlements for an approved driver client needs an active paid agency plan plus delegated settlement-management permission; finalizing additionally requires settlement-finalize permission. The recipient driver being Free or Pro does not gate paid agency preparation.',
+        'An assistant or agency member can only act on a driver-approved delegation: settlement view permission to view, settlement-management permission to prepare or modify, and settlement-finalize permission to finalize. Advanced reconciliation and imported statements follow the recipient driver\'s Pro entitlement, never the assistant\'s own plan.',
+
         'Drafts can be edited, finalized, voided, or superseded by a correction; the driver sees finalized statements.',
       ],
     },
