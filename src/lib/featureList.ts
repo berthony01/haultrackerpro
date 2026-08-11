@@ -110,6 +110,18 @@ export const featureList: FeatureCategory[] = [
     ],
   },
   {
+    category: 'Settlement Statements & Reconciliation',
+    features: [
+      { icon: FileText, title: 'View Finalized Settlement Statements', description: 'Carriers and agencies you have an accepted relationship with can issue you a finalized settlement statement. You can open the statement, its line items, and its reported net on every driver plan — Free and Pro.' },
+      { icon: FileCheck, title: 'Basic Reconciliation (Free)', description: 'Confirm or clear the load match on a settlement line so your own load records line up with what the company reported. Available on every driver plan.' },
+      { icon: Sparkles, title: 'Advanced Reconciliation (Pro)', description: 'Driver Pro adds refreshing and rejecting suggested load matches so you can work through a long statement faster.', pro: true },
+      { icon: ClipboardList, title: 'Manual Outside-Settlement Records (Pro)', description: 'Driver Pro can create a manual settlement record for a statement you received outside HaulTrackerPro, so your reconciliation history stays in one place.', pro: true },
+      { icon: BarChart3, title: 'Line Total vs Reported Net', description: 'HaulTrackerPro shows the net implied by the visible line items next to the reported net on the statement header, so a difference is visible instead of hidden. This is a neutral comparison, not an accusation or an audit.' },
+      { icon: Building2, title: 'Carrier & Agency Issuance (Paid)', description: 'Issuing carrier settlements requires a paid standalone recruiter/carrier plan. Preparing settlements inside an Agency Workspace requires an active paid agency plan.' },
+      { icon: Shield, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. Settlement statements are records; actual payment happens outside the platform between you and the company.' },
+    ],
+  },
+  {
     category: 'Settings & Customization',
     features: [
       { icon: DollarSign, title: 'Pay Type Configuration', description: 'Choose between CPM (cost per mile) or percentage-based pay structures to match your carrier agreement.' },
