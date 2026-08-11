@@ -67,6 +67,34 @@ function slugify(t: string) {
     .slice(0, 80);
 }
 
+// Preserve AI-generated FAQ, internal links, and disclaimer by appending
+// them to the markdown content so the admin can edit before saving.
+function mergeDraftIntoMarkdown(draft: Record<string, unknown>): string {
+  let mergedContent = String(draft.content ?? '').trimEnd();
+  const faqItems = Array.isArray(draft.faq_items) ? (draft.faq_items as Array<{ q?: unknown; a?: unknown }>) : [];
+  const validFaq = faqItems
+    .map((f) => ({ q: String(f?.q ?? '').trim(), a: String(f?.a ?? '').trim() }))
+    .filter((f) => f.q && f.a);
+  if (validFaq.length && !/##\s+Frequently Asked Questions/i.test(mergedContent)) {
+    mergedContent += '\n\n## Frequently Asked Questions\n' +
+      validFaq.map((f) => `\n### ${f.q}\n\n${f.a}`).join('\n');
+  }
+  const links = Array.isArray(draft.suggested_internal_links)
+    ? (draft.suggested_internal_links as Array<{ label?: unknown; path?: unknown }>) : [];
+  const validLinks = links
+    .map((l) => ({ label: String(l?.label ?? '').trim(), path: String(l?.path ?? '').trim() }))
+    .filter((l) => l.label && l.path.startsWith('/'));
+  if (validLinks.length && !/##\s+Related Resources/i.test(mergedContent)) {
+    mergedContent += '\n\n## Related Resources\n\n' +
+      validLinks.map((l) => `- [${l.label}](${l.path})`).join('\n');
+  }
+  const disclaimer = String(draft.disclaimer ?? '').trim();
+  if (disclaimer && !/##\s+Disclaimer/i.test(mergedContent)) {
+    mergedContent += `\n\n## Disclaimer\n\n${disclaimer}`;
+  }
+  return mergedContent;
+}
+
 export default function ResourceArticlesAdmin() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
