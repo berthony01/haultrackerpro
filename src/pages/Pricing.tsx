@@ -193,6 +193,7 @@ const recruiterStandardBullets = [
   'Basic applicant and contact-request flow',
   'Opportunity management: edit, pause, and close listings',
   'Verified Recruiter badge shown only after separate badge approval',
+  'Carrier settlement issuance is not included — it requires a paid recruiter plan',
 ];
 
 const recruiterPaidPlans: Array<{
