@@ -1015,7 +1015,7 @@ function RecruiterView({
               </div>
               <p
                 className="text-[10px] font-bold uppercase tracking-wider mb-2"
-                style={{ color: 'hsl(152, 60%, 52%)' }}
+                style={{ color: p.previewOnly ? 'hsl(220, 10%, 55%)' : 'hsl(152, 60%, 52%)' }}
               >
                 {p.previewOnly ? 'Existing / Included Access' : 'Available Now'}
               </p>
