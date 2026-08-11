@@ -61,6 +61,7 @@ const features = [
   { title: 'Reports & Exports', icon: FileText, description: 'Export your data as CSV, PDF summary, or full profit report. Download everything for your accountant or records.' },
   { title: 'Tax Set-Aside Planner', icon: Calculator, description: 'Configure federal, state, and self-employment tax rates. Uses the IRS method for SE tax (92.35% adjustment) and deducts half of SE tax before income tax — more accurate than a flat percentage estimate.' },
   { title: 'Real-Time Parking Finder', icon: ParkingCircle, description: 'Pro feature: see live truck parking availability reported by drivers, with safety ratings and one-tap reporting. Earn points and climb the community leaderboard while helping fellow truckers.' },
+  { title: 'Settlement Statements', icon: FileText, description: 'View finalized settlement statements issued to you by a carrier or agency you have an accepted relationship with, and reconcile the lines against your own loads. Recordkeeping only — HaulTrackerPro does not pay, hold, verify, or guarantee any settlement amount.' },
 ];
 
 const freePlan = [
@@ -70,6 +71,8 @@ const freePlan = [
   'Basic dashboard',
   'Basic profit visibility',
   'Basic monthly summary',
+  'View finalized settlement statements issued to you',
+  'Basic settlement reconciliation (confirm or clear a load match)',
 ];
 
 const proPlan = [
