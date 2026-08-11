@@ -155,12 +155,13 @@ describe('Phase 1U-A-R1 — agency billing and docs freshness', () => {
   });
 });
 
-describe('Phase 1U-A-R1 — locked legal sentences preserved', () => {
-  it('Terms feedback sentence is unchanged', () => {
-    expect(TERMS).toContain('For questions about these Terms of Service, please contact us at support@haultrackerpro.com.');
+describe('Phase 1U-A-R1 — locked legal contact sentences preserved', () => {
+  it('Terms contact sentence is unchanged', () => {
+    expect(TERMS).toContain('For questions about these Terms of Service, sign in to your HaulTrackerPro account, open Settings, and select Send Feedback.');
   });
 
-  it('Privacy feedback sentence is unchanged', () => {
-    expect(PRIVACY).toContain('For questions about this Privacy Policy or your data, please contact us at support@haultrackerpro.com.');
+  it('Privacy contact sentence is unchanged', () => {
+    expect(PRIVACY).toContain('For questions about this Privacy Policy or your data, sign in to your HaulTrackerPro account, open Settings, and select Send Feedback.');
   });
 });
+
