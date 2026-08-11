@@ -27,7 +27,7 @@ export default function Terms() {
         <h2 className="text-2xl font-black font-heading">HaulTrackerPro Terms of Service</h2>
 
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-foreground/90">
-          <span className="font-semibold text-primary">Coverage note:</span> These terms now cover both driver/owner-operator accounts and recruiter/carrier accounts, including verification, anti-harassment, anti-scam, and billing terms.
+          <span className="font-semibold text-primary">Coverage note:</span> These terms now cover both driver/owner-operator accounts and recruiter/carrier accounts, including verification, anti-harassment, anti-scam, and billing terms. They also cover driver assistants, agencies, delegated access, and settlement statement recordkeeping and reconciliation.
         </div>
 
         <section className="space-y-2">
