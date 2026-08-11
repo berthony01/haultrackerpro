@@ -591,6 +591,7 @@ const ARTICLES: readonly DocsArticle[] = Object.freeze(
     ARTICLE_ROLES,
     ARTICLE_AI,
     ARTICLE_OPPORTUNITY,
+    ARTICLE_SETTLEMENTS,
   ].map(freezeArticle),
 );
 
