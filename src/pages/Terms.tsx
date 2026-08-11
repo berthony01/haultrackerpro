@@ -72,7 +72,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">9. Opportunities Marketplace (Drivers)</h3>
-          <p className="text-muted-foreground">The Opportunities section displays trucking opportunities submitted by recruiters and carriers. All pay figures, weekly mileage, deductions, and Profit Intelligence breakdowns are <span className="font-semibold text-foreground">estimates based on recruiter-provided data</span> and are not guaranteed earnings or guaranteed jobs. When you request more information about an opportunity, your contact details (name, email, and phone if provided) are shared with that specific recruiter so they can respond. You may withdraw a request at any time, but a recruiter may have already received your contact information.</p>
+          <p className="text-muted-foreground">The Opportunities section displays trucking opportunities submitted by recruiters and carriers. All pay figures, weekly mileage, deductions, and Profit Intelligence breakdowns are <span className="font-semibold text-foreground">estimates based on recruiter-provided data</span> and are not guaranteed earnings or guaranteed jobs. When you apply to an opportunity, your application and the profile details you submitted are shared with that specific recruiter. Your private phone number and email address are disclosed to that recruiter only after you approve a separate contact request. You may withdraw a request at any time, but a recruiter may have already received information you previously approved.</p>
         </section>
 
         <section className="space-y-2">

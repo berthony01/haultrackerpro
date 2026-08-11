@@ -65,7 +65,7 @@ export default function Privacy() {
         <section className="space-y-2">
           <h3 className="text-base font-bold">4. Data Sharing</h3>
           <p className="text-muted-foreground">We do NOT sell your data. We do not share your personal information with third parties except infrastructure providers necessary to operate the service (cloud hosting, database services, and Stripe for recruiter billing). Emails collected through free resource downloads (lead magnets) follow these same rules — they are never sold or shared.</p>
-          <p className="text-muted-foreground">When a driver requests more information on an opportunity, the driver's name, email, and phone number (if provided) are shared with the recruiter that posted that specific opportunity so they can respond. This contact snapshot is taken at the moment of the request and is visible only to that recruiter and HaulTrackerPro administrators for moderation purposes.</p>
+          <p className="text-muted-foreground">When a driver applies to an opportunity, the driver's application and submitted profile details are shared with the recruiter that posted that specific opportunity. The driver's private phone number and email address are disclosed to that recruiter only after the driver approves a separate contact request. This information is visible only to that recruiter and to HaulTrackerPro administrators for moderation purposes.</p>
         </section>
 
         <section className="space-y-2">
