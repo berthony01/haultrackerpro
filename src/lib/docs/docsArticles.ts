@@ -529,6 +529,7 @@ const ARTICLE_SETTLEMENTS: DocsArticle = {
       paragraphs: [
         'HaulTrackerPro shows the net implied by the visible line items next to the reported net on the statement header. Load pay, earnings, and reimbursements add; deductions and withholdings subtract.',
         'This is a neutral comparison so a difference is visible instead of hidden. It is not an accusation, an audit, or a finding that anyone did anything wrong. A difference can also come from lines you cannot see, rounding, or data entry.',
+        'A difference is informational only. It does not by itself prove underpayment or overpayment, and it does not block finalization of the statement. Verify against the original source statement from the company before acting on it.',
       ],
       callouts: [
         {
