@@ -189,6 +189,8 @@ serve(async (req) => {
       ? body.related_links.slice(0, 10).map((l: unknown) => String(l).slice(0, 200))
       : [];
 
+    const calendarBrief = sanitizeCalendarBrief(body.calendar_brief);
+
     if (!topic || topic.length < 4) {
       return new Response(JSON.stringify({ error: "topic is required (min 4 chars)" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -207,8 +209,8 @@ Angle: ${angle || "(none)"}
 Target keyword: ${target_keyword || "(none)"}
 Author notes: ${notes || "(none)"}
 Related internal links available: ${related_links.join(", ") || "(none)"}
-
-Write the article now. Return JSON only — no prose before or after.`;
+${calendarBrief ? `\n${renderBrief(calendarBrief)}\n` : ""}
+Write the COMPLETE, publish-ready article now — finished prose only, no outline, no placeholders, no notes to the editor. Return JSON only — no prose before or after.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
