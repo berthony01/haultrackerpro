@@ -549,10 +549,10 @@ describe('Phase 1T-B2C1 — invite authorization', () => {
     expect(await relCount(recruiterPaid, ghost)).toBe(0);
   });
 
-  it('paid standalone starter/growth/fleet, active or trialing, can invite (proof 8)', async () => {
+  it('paid standalone starter/growth/fleet, active or trialing, can invite (proof 8)', async () => { // trial-allowlist
     for (const [plan, status] of [
       ['starter', 'active'],
-      ['growth', 'trialing'],
+      ['growth', 'trialing'], // trial-allowlist: Stripe status literal, fixture
       ['fleet', 'active'],
     ]) {
       await db.query(
