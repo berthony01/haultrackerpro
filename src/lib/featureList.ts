@@ -1,4 +1,4 @@
-import { Truck, Receipt, Calculator, Route, ClipboardPaste, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2, AlertCircle, Trophy, Mic, Camera, ParkingCircle, Users, FileCheck, FileSignature, ShieldCheck } from 'lucide-react';
+import { Truck, Receipt, Calculator, Route, ClipboardPaste, ClipboardList, DollarSign, BarChart3, Sparkles, Target, TrendingUp, CalendarDays, Bell, Download, FileText, Filter, Settings, Calendar, Globe, Building2, UserCheck, Shield, DatabaseBackup, Trash2, AlertCircle, Trophy, Mic, Camera, ParkingCircle, Users, FileCheck, FileSignature, ShieldCheck } from 'lucide-react';
 
 export interface Feature {
   icon: typeof Truck;
