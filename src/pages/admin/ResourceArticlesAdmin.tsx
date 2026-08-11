@@ -244,13 +244,15 @@ export default function ResourceArticlesAdmin() {
     };
   }, [user?.id]);
 
-  // Calendar → Article Manager handoff. Reads ?new=1&calendarId=<id>,
-  // looks up the planned article, opens the editor prefilled (never saved).
+  // Calendar → Article Manager MANUAL handoff. Reads ?new=1&calendarId=<id>
+  // (without generate=1), looks up the planned article, opens the editor
+  // prefilled with the outline skeleton (never saved).
   useEffect(() => {
     if (!isAdmin) return;
     const isNew = searchParams.get('new') === '1';
     const calendarId = searchParams.get('calendarId');
-    if (!isNew || !calendarId) return;
+    const wantsGenerate = searchParams.get('generate') === '1';
+    if (!isNew || !calendarId || wantsGenerate) return;
     if (handledPrefillRef.current === calendarId) return;
 
     const plan = getPlannedArticleById(calendarId);
@@ -275,6 +277,113 @@ export default function ResourceArticlesAdmin() {
     next.delete('new'); next.delete('calendarId');
     setSearchParams(next, { replace: true });
   }, [isAdmin, searchParams, setSearchParams, buildPrefillFromPlan, rows]);
+
+  // Calendar → FULL AI DRAFT handoff. Reads ?new=1&calendarId=<id>&generate=1,
+  // invokes the existing edge function exactly once with the full calendar brief,
+  // and opens the editor with the complete AI article for human review.
+  // Never auto-saves, auto-approves, or auto-publishes.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const isNew = searchParams.get('new') === '1';
+    const calendarId = searchParams.get('calendarId');
+    const wantsGenerate = searchParams.get('generate') === '1';
+    if (!isNew || !calendarId || !wantsGenerate) return;
+    // StrictMode / double-effect protection: mark handled BEFORE awaiting the
+    // network call so AI generation can never be charged twice.
+    if (handledCalendarGenerateRef.current === calendarId) return;
+    handledCalendarGenerateRef.current = calendarId;
+
+    const clearParams = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('new'); next.delete('calendarId'); next.delete('generate');
+      setSearchParams(next, { replace: true });
+    };
+
+    const plan = getPlannedArticleById(calendarId);
+    if (!plan) {
+      toast.error('Calendar article not found. No AI article was created.');
+      clearParams();
+      return;
+    }
+
+    const cluster = resolveGeneratorCluster(plan.topic_cluster);
+    setCalendarGenerateError(null);
+    setCalendarGenerating(plan.title);
+    clearParams();
+
+    void (async () => {
+      const { data, error } = await supabase.functions.invoke('generate-resource-article-draft', {
+        body: {
+          topic: plan.title,
+          audience: plan.target_audience.join(', '),
+          topic_cluster: cluster,
+          angle: plan.content_angle,
+          target_keyword: plan.primary_keyword,
+          notes: `Search intent: ${plan.search_intent}. Recommended CTA: ${plan.recommended_cta}.`,
+          related_links: plan.suggested_internal_links.map((l) => l.path),
+          calendar_brief: {
+            title: plan.title,
+            slug: plan.slug,
+            primary_keyword: plan.primary_keyword,
+            secondary_keywords: plan.secondary_keywords,
+            target_audience: plan.target_audience,
+            search_intent: plan.search_intent,
+            content_angle: plan.content_angle,
+            outline_sections: plan.outline_sections,
+            suggested_faqs: plan.suggested_faqs,
+            suggested_internal_links: plan.suggested_internal_links,
+            recommended_cta: plan.recommended_cta,
+            disclaimer_required: plan.disclaimer_required,
+          },
+        },
+      });
+      setCalendarGenerating(null);
+
+      if (error) {
+        const msg = error.message || 'Full AI generation failed. No AI article was created.';
+        setCalendarGenerateError(msg);
+        toast.error('Full AI generation failed. No AI article was created.', {
+          description: 'You can retry, or use Open Manual Draft from the content calendar.',
+        });
+        return;
+      }
+
+      const d = (data as { draft?: Record<string, unknown>; ai_generation_prompt?: string }) ?? {};
+      const draft = (d.draft ?? {}) as Record<string, unknown>;
+      const mergedContent = mergeDraftIntoMarkdown(draft);
+      if (!String(draft.title ?? '').trim() || !mergedContent.trim()) {
+        setCalendarGenerateError('The AI response was incomplete. No AI article was created.');
+        toast.error('Full AI generation failed. No AI article was created.', {
+          description: 'The response was incomplete. Use Open Manual Draft as a fallback.',
+        });
+        return;
+      }
+
+      setEditing({
+        ...EMPTY,
+        title: String(draft.title ?? plan.title),
+        slug: slugify(String(draft.slug ?? plan.slug)),
+        seo_title: String(draft.seo_title ?? '').slice(0, 60),
+        meta_description: String(draft.meta_description ?? '').slice(0, 160),
+        excerpt: String(draft.excerpt ?? ''),
+        content: mergedContent,
+        topic_cluster: cluster,
+        author_name: 'Haul Tracker Pro',
+        generated_by_ai: true,
+        ai_generation_prompt: d.ai_generation_prompt ?? buildDraftPrompt(plan),
+        status: 'draft',
+        approval_status: 'pending_review',
+        created_by: user?.id,
+      });
+      setSafetyChecked(false);
+      setPrefillNotice({
+        title: plan.title,
+        duplicateSlug: rows.some((r) => r.slug === plan.slug),
+      });
+      setEditorOpen(true);
+      toast.success('Full AI draft generated. Review carefully before approving.');
+    })();
+  }, [isAdmin, searchParams, setSearchParams, rows, user?.id]);
 
 
   const canPublish = useMemo(() => {
