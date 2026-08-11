@@ -1014,8 +1014,9 @@ function RecruiterView({
                 className="text-[10px] font-bold uppercase tracking-wider mb-2"
                 style={{ color: 'hsl(152, 60%, 52%)' }}
               >
-                Available Now
+                {p.previewOnly ? 'Existing / Included Access' : 'Available Now'}
               </p>
+
               <ul className="space-y-2.5 mb-5">
                 {p.availableBullets.map((b) => (
                   <li
