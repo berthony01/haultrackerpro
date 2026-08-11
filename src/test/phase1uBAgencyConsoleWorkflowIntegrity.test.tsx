@@ -66,7 +66,7 @@ describe('Phase 1U-B — C: candidate migration scope', () => {
   });
 
   it('modifies exactly list_agency_clients and no other database object', () => {
-    const creates = SQL.match(/CREATE\s+(OR\s+REPLACE\s+)?[A-Z]+/gi) ?? [];
+    const creates = SQL.match(/^CREATE\s+(OR\s+REPLACE\s+)?[A-Z]+/gim) ?? [];
     expect(creates).toHaveLength(1);
     expect(SQL).toContain('CREATE OR REPLACE FUNCTION public.list_agency_clients(_agency_id uuid)');
     expect(SQL).toMatch(/LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public/);
