@@ -532,7 +532,7 @@ const ARTICLE_SETTLEMENTS: DocsArticle = {
     {
       heading: 'Recordkeeping only — no money movement',
       paragraphs: [
-        'HaulTrackerPro does not pay, hold, transfer, escrow, collect, verify, audit, or guarantee any settlement amount, and is not a paying agent, factoring company, payroll provider, or accountant.',
+        'HaulTrackerPro does not pay, hold, transfer, escrow, collect, verify, audit, or guarantee any settlement amount, and is not a paying agent, factoring company, payroll provider, or accountant. It does not process payroll, send ACH or direct deposit, calculate or remit employer payroll taxes, issue or file employer tax forms, or determine worker classification.',
         'A finalized statement, a matched load, or a reconciliation state is not proof that payment occurred or that an amount or deduction is correct or lawful. Payment and any dispute happen outside the platform between the driver and the company that issued the statement.',
       ],
       callouts: [
