@@ -103,7 +103,8 @@ const Docs = () => {
           <p className="max-w-3xl text-base sm:text-lg text-muted-foreground leading-relaxed">
             Guides are organized by role — <strong>drivers</strong>,{' '}
             <strong>recruiters</strong>, <strong>driver assistants</strong> and{' '}
-            <strong>agencies</strong> — plus billing, account, AI/OCR and opportunity topics.
+            <strong>agencies</strong> — plus billing, account, AI/OCR,{' '}
+            <strong>settlement statements and reconciliation</strong>, and opportunity topics.
             Live guides link directly to the product. Items marked{' '}
             <em>Coming soon</em> are being prepared and are not clickable yet.
           </p>
