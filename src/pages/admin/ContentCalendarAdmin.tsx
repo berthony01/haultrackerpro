@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Copy, ExternalLink, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, ShieldAlert, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CONTENT_CALENDAR,
