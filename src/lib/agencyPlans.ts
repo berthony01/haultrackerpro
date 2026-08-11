@@ -80,8 +80,12 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Free — no HaulTracker Pro fee just to assist a driver',
       'Access begins only after a driver-approved delegation',
       'Help with loads, expenses, fuel logs, and reports (per-driver permissions)',
+      'Settlements: view only if the driver granted settlement view permission',
+      'Manage or finalize a settlement only with the matching granted settlement permission',
+      "Advanced reconciliation and imported statements follow the recipient driver's Pro entitlement, never your assistant plan",
       'Service payments handled outside HaulTracker Pro',
     ],
+
     limitationsCopy:
       'Driver Assistants cannot publish service packages or a private agency request link. To run a multi-driver back-office business, create an Agency Workspace.',
   },
