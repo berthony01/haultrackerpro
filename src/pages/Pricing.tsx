@@ -1345,16 +1345,20 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
             Payments for assistant &amp; agency services
           </h3>
           <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
-            HaulTracker Pro does <b>not</b> currently process payments between drivers and
+            HaulTracker Pro agency subscriptions are live and billed through Stripe for software
+            access. HaulTracker Pro does <b>not</b> currently process service payments between drivers and
             assistants or agencies. Service agreements and payments happen outside the platform for now.
             HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
           </p>
           <p className="text-sm mt-2" style={{ color: 'hsl(220, 10%, 75%)' }}>
             {AGENCY_SETTLEMENT_RECORDKEEPING_DISCLAIMER} Settlement statements prepared in an Agency
             Workspace are records shared with an approved driver client — payment still happens
-            outside HaulTracker Pro.
+            outside HaulTracker Pro. Preparation requires delegated settlement-management permission
+            and finalization requires settlement-finalize permission; HaulTracker Pro does not process
+            payroll, send ACH or direct deposit, or issue employer tax forms.
           </p>
           <p className="sr-only">{OUTSIDE_PAYMENTS_DISCLAIMER}</p>
+
         </div>
 
         {/* Back-office final CTA */}
