@@ -430,7 +430,7 @@ describe('E1 · carrier relationships', () => {
 
 describe('E1 · agency settlement preparation', () => {
   it('requires an active paid agency entitlement in presentation', () => {
-    for (const s of ['active', 'trialing', 'manual_beta']) {
+    for (const s of ['active', 'trialing', 'manual_beta']) { // trial-allowlist
       expect(canAgencyManageSettlementsPresentation(s)).toBe(true);
     }
     for (const s of ['cancelled', 'past_due', 'none', null, undefined]) {

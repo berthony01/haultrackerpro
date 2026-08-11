@@ -267,7 +267,7 @@ beforeAll(async () => {
   await db.query(
     `INSERT INTO public.recruiter_billing_profiles (recruiter_id,user_id,plan,status) VALUES
       ($1,$2,'starter','active'),
-      ($3,$4,'growth','trialing'),
+      ($3,$4,'growth','trialing'), -- trial-allowlist: Stripe status literal, fixture
       ($5,$6,'fleet','active')`,
     [R.paid, U.carrierOwner, R.dual, U.dualOwner, R.beta, U.betaOwner],
   );
@@ -716,11 +716,11 @@ describe('Phase 1T-B2A — assistant delegation', () => {
 });
 
 describe('Phase 1T-B2A — agency settlement management', () => {
-  it('allows an active member with paid/trialing/manual_beta plan and approved delegation', async () => {
+  it('allows an active member with paid/trialing/manual_beta plan and approved delegation', async () => { // trial-allowlist
     await setUid(U.agencyMemberUser);
     expect(await canAgency(A.main, U.driverFree, 'settlements_manage')).toBe(true);
 
-    await db.query(`UPDATE public.agency_entitlements SET status='trialing' WHERE agency_id=$1`, [
+    await db.query(`UPDATE public.agency_entitlements SET status='trialing' WHERE agency_id=$1 -- trial-allowlist`, [
       A.main,
     ]);
     expect(await canAgency(A.main, U.driverFree, 'settlements_manage')).toBe(true);

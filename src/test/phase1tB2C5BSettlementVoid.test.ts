@@ -958,7 +958,7 @@ describe('1T-B2C5B — CURRENT authorization is re-evaluated at void time', () =
     ]);
 
     // Entitlement cessation expressed exactly as the accepted helper reads it:
-    // status must be one of active / trialing / manual_beta.
+    // status must be one of active / trialing / manual_beta. trial-allowlist
     await db.query(
       `UPDATE public.agency_entitlements SET status='canceled' WHERE agency_id=$1`,
       [lapseAgencyId],

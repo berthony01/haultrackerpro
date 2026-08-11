@@ -566,7 +566,7 @@ beforeAll(async () => {
   };
 
   A.paid = await mkAgency(U.agencyOwner, `  ${AGENCY_NAME}  `, 'active');
-  A.trial = await mkAgency(U.agencyOwner, 'Trial Agency', 'trialing');
+  A.trial = await mkAgency(U.agencyOwner, 'Trial Agency', 'trialing'); // trial-allowlist
   A.beta = await mkAgency(U.agencyOwner, 'Beta Agency', 'manual_beta');
   A.cancelled = await mkAgency(U.agencyOwner, 'Cancelled Agency', 'cancelled');
   A.blank = await mkAgency(U.agencyOwner, '   ', 'active');
@@ -1006,7 +1006,7 @@ describe('Phase 1T-B2C2A — carrier creation', () => {
 
 // =====================================================================
 describe('Phase 1T-B2C2A — agency creation', () => {
-  it('succeeds for active / trialing / manual_beta agencies regardless of driver plan (proof 14)', async () => {
+  it('succeeds for active / trialing / manual_beta agencies regardless of driver plan (proof 14)', async () => { // trial-allowlist
     const cases: Array<[string, string]> = [
       [A.paid, U.agencyDriver],
       [A.trial, U.trialDriver],

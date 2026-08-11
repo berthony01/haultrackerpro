@@ -21,7 +21,7 @@ import {
 /** Canonical presentation-manage statuses. Backend remains authoritative. */
 export const AGENCY_SETTLEMENT_MANAGE_STATUSES = [
   'active',
-  'trialing',
+  'trialing', // trial-allowlist: Stripe subscription status literal, not user-facing trial copy
   'manual_beta',
 ] as const;
 
