@@ -171,11 +171,7 @@ export default function ResourceArticlesAdmin() {
   };
 
   const buildPrefillFromPlan = useCallback((plan: PlannedArticle): Partial<Article> => {
-    const allowed = TOPIC_CLUSTERS as readonly string[];
-    const clusterMap: Record<string, string> = { spreadsheets: 'profit', quickbooks: 'bookkeeping' };
-    const cluster = allowed.includes(plan.topic_cluster)
-      ? plan.topic_cluster
-      : (clusterMap[plan.topic_cluster] ?? 'profit');
+    const cluster = resolveGeneratorCluster(plan.topic_cluster);
 
     const seoTitleFull = `${plan.title} | Haul Tracker Pro`;
     const seoTitle = seoTitleFull.length <= 60 ? seoTitleFull : plan.title.slice(0, 60);
