@@ -77,7 +77,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">10. Recruiter Accounts &amp; Opportunity Listings</h3>
-          <p className="text-muted-foreground">Recruiter accounts are subject to verification before opportunities can be posted. Submitted opportunities go through admin review and may be approved, rejected, flagged, or removed at HaulTrackerPro's sole discretion. Recruiters are solely responsible for the accuracy and legality of opportunity listings, hiring practices, and communications with drivers. Misleading pay claims, fake postings, or harassing behavior may result in suspension of recruiter access. Drivers' applications and contact information are made available only to the recruiter who posted the opportunity the driver requested information on.</p>
+          <p className="text-muted-foreground">Recruiter accounts are subject to verification before opportunities can be posted. Submitted opportunities go through admin review and may be approved, rejected, flagged, or removed at HaulTrackerPro's sole discretion. Recruiters are solely responsible for the accuracy and legality of opportunity listings, hiring practices, and communications with drivers. Misleading pay claims, fake postings, or harassing behavior may result in suspension of recruiter access. Driver applications are made available only to the recruiter who posted the opportunity the driver applied to, and a driver's private phone and email are released to that recruiter only after the driver approves a contact request.</p>
         </section>
 
         <section className="space-y-2">
