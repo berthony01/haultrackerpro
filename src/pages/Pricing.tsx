@@ -216,6 +216,7 @@ const recruiterPaidPlans: Array<{
       
       'Applicant status history',
       'Basic referral tracking view',
+      'Carrier↔driver relationship invitations and carrier settlement issuance (recordkeeping only)',
     ],
   },
   {
