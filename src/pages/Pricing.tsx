@@ -28,6 +28,7 @@ import {
   ASSISTANT_AGENCY_PLANS,
   ALL_AGENCY_PLAN_KEYS,
   OUTSIDE_PAYMENTS_DISCLAIMER,
+  AGENCY_SETTLEMENT_RECORDKEEPING_DISCLAIMER,
 } from '@/lib/agencyPlans';
 
 // ---------------------------------------------------------------------------
