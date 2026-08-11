@@ -1074,7 +1074,7 @@ describe('1T-B2C5A — immutability and write boundary', () => {
 
 // ---------------------------------------------------------------------------
 describe('1T-B2C5A — candidate source contract', () => {
-  it('26. first line marks the file as a not-applied candidate', () => {
+  it('26. candidate stays candidate-marked while its accepted promotion exists', () => {
     expect(B2C5A_SQL.split('\n')[0]).toBe(
       '-- CANDIDATE MIGRATION — NOT APPLIED LIVE.',
     );
@@ -1085,7 +1085,7 @@ describe('1T-B2C5A — candidate source contract', () => {
           '../../supabase/migrations/20260808183500_phase1t_b2c5a_settlement_finalization.sql',
         ),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('27. exactly one explicit BEGIN/COMMIT transaction', () => {

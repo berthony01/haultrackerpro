@@ -742,7 +742,7 @@ describe('Phase 1T-B2C4A — catalog, ACL and source contract (proof 1)', () => 
     }
   });
 
-  it('source contract: candidate-only, no dynamic SQL, no bypass, no load writes', () => {
+  it('source contract: candidate preserved with accepted promotion, no dynamic SQL, no bypass, no load writes', () => {
     expect(B2C4A_SQL).toContain('CANDIDATE MIGRATION — NOT APPLIED LIVE');
     // exactly the two named functions, no replace/drop semantics
     expect(CODE.match(/CREATE FUNCTION/g)?.length).toBe(2);
@@ -782,7 +782,7 @@ describe('Phase 1T-B2C4A — catalog, ACL and source contract (proof 1)', () => 
     // suggestion states are never authored here
     expect(/'(likely|possible|rejected)'\s*(,|\))/.test(CODE)).toBe(false);
     expect(/'confirmed',\n\s+NULL,/.test(CODE)).toBe(true);
-    // candidate never lands under supabase/migrations
+    // accepted promotion file exists under supabase/migrations
     expect(
       fs.existsSync(
         fileURLToPath(
@@ -792,7 +792,7 @@ describe('Phase 1T-B2C4A — catalog, ACL and source contract (proof 1)', () => 
           ),
         ),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('anon cannot execute either RPC', async () => {
