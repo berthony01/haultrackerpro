@@ -134,7 +134,7 @@ describe('Phase 1U-A — E. Legal pages cover settlement records', () => {
   });
 
   it('Privacy adds an unnumbered settlement data section', () => {
-    expect(PRIVACY).toContain('Settlement Statement Data');
+    expect(PRIVACY).toContain('Settlement &amp; Reconciliation Data');
     expect(PRIVACY).toContain('does not collect bank account or payout information for settlements');
     expect(PRIVACY).toContain('21. Contact Information');
   });
@@ -324,7 +324,7 @@ describe('Phase 1U-A-R2 — D/E. Docs registry and settlement article metadata',
 
   it('article keeps the no-payroll / no-ACH boundary and authority rules', () => {
     expect(DOCS_ARTICLES).toContain('does not process payroll, send ACH or direct deposit');
-    expect(DOCS_ARTICLES).toContain('an agency-included recruiter entitlement is a recruiting entitlement only');
+    expect(DOCS_ARTICLES).toContain('An agency-included recruiter entitlement is a recruiting entitlement only');
     expect(DOCS_ARTICLES).toContain('settlement view permission to view, settlement-management permission to prepare or modify, and settlement-finalize permission to finalize');
   });
 });
@@ -365,7 +365,7 @@ describe('Phase 1U-A-R2 — H. Assistants & agencies page', () => {
 
   it('states direct-assistant settlement permission truth', () => {
     expect(ASSISTANTS).toContain('Settlement view permission is required to view a statement, settlement-management permission is required to manage or prepare one, and settlement-finalize permission is required to finalize one.');
-    expect(ASSISTANTS).toContain("Advanced reconciliation and imported outside settlements follow the recipient driver's own Pro entitlement, never the assistant's plan");
+    expect(ASSISTANTS).toContain("Advanced reconciliation and imported outside settlements follow the recipient driver\\'s own Pro entitlement, never the assistant\\'s plan");
     expect(ASSISTANTS).toContain('assistant finalization also requires the recipient driver to be on Pro');
   });
 
