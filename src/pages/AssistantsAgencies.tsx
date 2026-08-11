@@ -140,6 +140,7 @@ export default function AssistantsAgencies() {
                     'Publish service packages and share a private request link',
                     'Driver-approved delegation, never silent access',
                     'Shared work queue with waiting-on-driver responses',
+                    'Paid agency plans can prepare settlement statements for approved driver clients (recordkeeping only)',
                   ],
                   cta: 'Create Agency Workspace',
                   onClick: handleAgencyCTA,
