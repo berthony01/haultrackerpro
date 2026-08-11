@@ -228,16 +228,19 @@ describe('phase1nF2C5A — structural preservation vs start SHA', () => {
     expect(currentHeadings).toEqual(startHeadings);
   });
 
-  it('Terms differs from the phase-start SHA source only by the exact contact-sentence swap', () => {
+  // Phase 1U-A: Terms/Privacy legitimately gained later unnumbered sections
+  // (settlements, AI/OCR, delegated access). The phase-1N-F2-C5A invariant is
+  // the contact-sentence swap itself, not byte-equality with the start SHA.
+  it('Terms still contains only the swapped contact sentence from the phase start SHA', () => {
     expect(termsAtStart).toContain(TERMS_OLD_SENTENCE);
-    const projected = termsAtStart.replace(TERMS_OLD_SENTENCE, TERMS_NEW_SENTENCE);
-    expect(terms).toBe(projected);
+    expect(terms).not.toContain(TERMS_OLD_SENTENCE);
+    expect(terms).toContain(TERMS_NEW_SENTENCE);
   });
 
-  it('Privacy differs from the phase-start SHA source only by the exact contact-sentence swap', () => {
+  it('Privacy still contains only the swapped contact sentence from the phase start SHA', () => {
     expect(privacyAtStart).toContain(PRIVACY_OLD_SENTENCE);
-    const projected = privacyAtStart.replace(PRIVACY_OLD_SENTENCE, PRIVACY_NEW_SENTENCE);
-    expect(privacy).toBe(projected);
+    expect(privacy).not.toContain(PRIVACY_OLD_SENTENCE);
+    expect(privacy).toContain(PRIVACY_NEW_SENTENCE);
   });
 });
 
