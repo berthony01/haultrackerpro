@@ -148,7 +148,7 @@ describe('Phase 1J-D2A — Pricing.tsx source structure', () => {
 });
 
 describe('Phase 1J-D2A — Pricing.tsx rendered proof', () => {
-  it('recruiter audience view: every card has an AVAILABLE NOW label and Fleet has a distinct COMING SOON', () => {
+  it('recruiter audience view: three current cards are AVAILABLE NOW and Fleet shows existing/included access plus COMING SOON', () => {
     render(
       <HelmetProvider>
         <MemoryRouter initialEntries={["/pricing?audience=recruiter"]}>
@@ -168,12 +168,18 @@ describe('Phase 1J-D2A — Pricing.tsx rendered proof', () => {
       ).toBeTruthy();
     }
 
-    // Every recruiter card renders "Available Now" (four cards → four labels).
+    // Recruiter Standard, Starter, and Growth render "Available Now"; Fleet renders
+    // "Existing / Included Access" because it is preview-only for new standalone checkout.
     const availableLabels = screen.getAllByText(/Available Now/i);
     expect(
       availableLabels.length,
-      'Expected an AVAILABLE NOW label on each of the 4 recruiter plan cards.',
-    ).toBeGreaterThanOrEqual(4);
+      'Expected an AVAILABLE NOW label on each of the 3 currently purchasable recruiter plan cards.',
+    ).toBeGreaterThanOrEqual(3);
+
+    expect(
+      screen.getAllByText(/Existing \/ Included Access/i).length,
+      'Fleet card must render EXISTING / INCLUDED ACCESS.',
+    ).toBeGreaterThanOrEqual(1);
 
     // Fleet renders a visible COMING SOON heading.
     expect(
