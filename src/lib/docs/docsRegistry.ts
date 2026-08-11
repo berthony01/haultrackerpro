@@ -101,11 +101,11 @@ const DOCS_ENTRIES: readonly DocsEntry[] = Object.freeze(
         title: 'Settlement statements & reconciliation',
         description:
           'How company-issued settlement statements, load matching, and driver reconciliation work today — and why they are recordkeeping only.',
-        category: 'drivers',
-        audiences: ['driver', 'recruiter', 'agency'],
+        category: 'accounts_roles_data',
+        audiences: ['driver', 'recruiter', 'driver_assistant', 'agency'],
         route: '/docs/settlement-statements-reconciliation',
         status: 'live',
-        keywords: ['settlement', 'statement', 'reconciliation', 'deduction', 'carrier', 'agency', 'pay'],
+        keywords: ['settlement', 'statement', 'pay statement', 'pay-statement', 'reconciliation', 'deduction', 'carrier', 'agency', 'pay'],
       },
 
 
