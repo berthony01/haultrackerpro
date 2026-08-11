@@ -31,7 +31,15 @@ const faqs = [
   },
   {
     q: 'Does HaulTracker Pro handle payments between drivers and assistants?',
-    a: 'Not yet. Drivers pay for their own HaulTracker Pro subscription. Any payment between a driver and an assistant or agency for back-office services is arranged outside the platform for now. Future agency billing features may come later.',
+    a: 'Agency software subscriptions are already live and billed through Stripe. What remains outside HaulTracker Pro is service payments between a driver and an assistant or agency for back-office work — those are arranged directly between them.',
+  },
+  {
+    q: 'Can a direct assistant work on settlement statements?',
+    a: 'Only with the matching driver-approved permission. Settlement view permission is required to view a statement, settlement-management permission is required to manage or prepare one, and settlement-finalize permission is required to finalize one. Advanced reconciliation and imported outside settlements follow the recipient driver\'s own Pro entitlement, never the assistant\'s plan, and assistant finalization also requires the recipient driver to be on Pro.',
+  },
+  {
+    q: 'What can a paid agency do with settlements?',
+    a: 'A paid agency plan can prepare settlement statements for delegated driver clients when settlement-management permission has been granted. Finalizing additionally requires settlement-finalize permission. The recipient driver being Free or Pro does not gate paid agency preparation.',
   },
   {
     q: 'Can drivers revoke assistant or agency access?',
