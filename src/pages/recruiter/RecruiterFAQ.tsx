@@ -8,7 +8,7 @@ import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 const faqs = [
   {
     q: 'How do I unlock standard recruiter posting?',
-    a: 'Add the recruiter workspace to your account and complete the required recruiter profile fields — company name, DOT and/or MC number, address, hiring states, equipment types, and a valid recruiter contact email — then accept the current posting terms. Once your account is active and not suspended, you can post unlimited standard opportunities. No admin approval and no paid plan are required to post standard opportunities.',
+    a: 'Add the recruiter workspace to your account and complete the required recruiter profile fields — company name, DOT and/or MC number, address, hiring states, equipment types, and a valid recruiter contact email — then accept the current posting terms. Once your account is active and not suspended, Recruiter Standard lets you keep 1 active opportunity at a time with unlimited drafts. No admin approval and no paid plan are required to post a standard opportunity.',
   },
   {
     q: 'How does Verified Recruiter badge review work?',
@@ -24,19 +24,23 @@ const faqs = [
   },
   {
     q: 'What plans are available and what do they include?',
-    a: 'Recruiter Standard is free for complete, active recruiter workspaces and includes unlimited standard opportunity posts — no paid subscription required. Starter ($19/mo) adds enhanced applicant tracking, applicant status history, and a basic referral tracking view. Growth ($49/mo) adds Priority-placement eligibility, featured-listing eligibility, recruiter reports (PDF + CSV), the recruiter contract-management dashboard, AI-assisted contract risk review, full referral progress tracking, pipeline analytics, and opportunity performance insights. Fleet ($149/mo) includes everything in Growth plus top-placement eligibility and priority support today; team seats, bulk opportunity tools, custom recruiter profile, and a company-level hiring dashboard are coming soon. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
+    a: 'Recruiter Standard is free for complete, active recruiter workspaces and includes 1 active opportunity at a time with unlimited drafts. Starter ($19/mo) allows up to 5 active opportunities and adds applicant status history, a basic referral tracking view, and carrier settlement issuance. Growth ($49/mo) allows up to 15 active opportunities and adds priority-placement eligibility, featured-listing eligibility, recruiter reports (PDF + CSV), the recruiter contract-management dashboard, AI-assisted contract risk review, full referral progress tracking, pipeline analytics, and opportunity performance insights. Fleet ($149/mo) allows up to 25 active opportunities for existing or included Fleet access and adds top-placement eligibility and priority support — new standalone Fleet checkout is unavailable, and team seats, bulk opportunity tools, custom recruiter profile, and a company-level hiring dashboard are coming soon. Drafts are unlimited on every plan. You can change or cancel plans from Recruiter Settings → Billing. Cancellations take effect at the end of the current period.',
   },
   {
     q: 'How are payments processed and is my card data safe?',
     a: 'Billing runs through Stripe. HaulTrackerPro never stores card numbers — only Stripe customer and subscription identifiers. Manage your card and billing history through the in-app billing portal.',
   },
   {
+    q: 'Can I issue settlement statements to drivers?',
+    a: 'Yes, on a paid recruiter/carrier plan. Once a driver accepts your carrier-to-driver relationship invitation, you can prepare a settlement statement with line items, finalize it, void it, or supersede it with a correction, and the driver can view and reconcile the finalized statement. This is recordkeeping only — HaulTrackerPro does not pay, hold, transfer, verify, or guarantee any settlement amount, and payment happens outside the platform.',
+  },
+  {
     q: 'When and how do I get a driver\'s contact info?',
-    a: 'When a driver requests info on your opportunity, you receive a contact snapshot (name, email, and phone if provided) at the moment of the request. The driver also sees their info will be shared. Contact only the drivers who request info on your specific listing — scraping or contacting other recruiters\' applicants is prohibited.',
+    a: 'When a driver applies to your opportunity, you receive the profile details the driver submitted. The driver\'s private phone number and email are disclosed only after the driver approves a separate contact request. Contact only the drivers who applied to your specific listing — scraping or contacting other recruiters\' applicants is prohibited.',
   },
   {
     q: 'Can I message drivers in-app?',
-    a: 'Today, drivers receive your contact info and you respond via email or phone. In-app messaging is on the roadmap; meanwhile every status change on an application is logged so you and the driver share a clean timeline.',
+    a: 'Today, once a driver approves your contact request you respond via email or phone. In-app messaging is on the roadmap; meanwhile every status change on an application is logged so you and the driver share a clean timeline.',
   },
   {
     q: 'Can drivers refer other drivers to my opportunities?',
