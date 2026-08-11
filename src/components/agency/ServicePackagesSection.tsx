@@ -14,13 +14,14 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Copy, Package, Pencil, Plus } from 'lucide-react';
+import { Package, Pencil, Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   useAgencyPackageMutations,
   useAgencyPackages,
   type ServicePackage,
 } from '@/hooks/useAgencyWorkflow';
+import { useAgencyEntitlement } from '@/hooks/useAgencyEntitlement';
 import {
   ASSISTANT_PERMISSION_KEYS,
   PERMISSION_LABELS,
@@ -30,16 +31,8 @@ import {
 
 export function ServicePackagesSection({ agencyId }: { agencyId: string }) {
   const { data: packages, isLoading } = useAgencyPackages(agencyId);
-  const { toast } = useToast();
-  const [shareCopied, setShareCopied] = useState(false);
-  const requestLink = `${window.location.origin}/agency/request/${agencyId}`;
-
-  function copyLink() {
-    navigator.clipboard.writeText(requestLink);
-    setShareCopied(true);
-    toast({ title: 'Private request link copied' });
-    setTimeout(() => setShareCopied(false), 2000);
-  }
+  const { entitlement } = useAgencyEntitlement(agencyId);
+  const billingCancelled = entitlement.status === 'cancelled';
 
   return (
     <Card>
@@ -49,24 +42,22 @@ export function ServicePackagesSection({ agencyId }: { agencyId: string }) {
             <Package className="h-4 w-4 text-primary" />
             Service packages
           </CardTitle>
-          <PackageEditorDialog agencyId={agencyId} />
+          <PackageEditorDialog agencyId={agencyId} disabled={billingCancelled} />
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-md border bg-muted/30 p-3 text-xs space-y-2">
-          <p className="font-medium">Your private request link</p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded bg-background px-2 py-1">{requestLink}</code>
-            <Button size="sm" variant="outline" onClick={copyLink}>
-              <Copy className="h-3.5 w-3.5" />
-              {shareCopied ? 'Copied' : 'Copy'}
-            </Button>
-          </div>
-          <p className="text-muted-foreground">
-            Share with drivers you're already in touch with. Only active packages will be
-            visible to drivers.
+        <p className="text-xs text-muted-foreground">
+          Drivers can request your active packages through the “Share request link” in the
+          Overview tab.
+        </p>
+
+        {billingCancelled && (
+          <p className="text-xs text-muted-foreground">
+            Agency billing is not active. Start or restart billing from Overview before creating a
+            new service package. Existing packages can still be edited or deactivated.
           </p>
-        </div>
+        )}
+
 
         {isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
@@ -118,10 +109,13 @@ function PackageRow({ pkg, agencyId }: { pkg: ServicePackage; agencyId: string }
 function PackageEditorDialog({
   agencyId,
   existing,
+  disabled,
 }: {
   agencyId: string;
   existing?: ServicePackage;
+  disabled?: boolean;
 }) {
+
   const { create, update } = useAgencyPackageMutations();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -167,19 +161,20 @@ function PackageEditorDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(o) => (disabled ? setOpen(false) : setOpen(o))}>
       <DialogTrigger asChild>
         {existing ? (
           <Button variant="ghost" size="sm">
             <Pencil className="h-3.5 w-3.5" />
           </Button>
         ) : (
-          <Button size="sm">
+          <Button size="sm" disabled={disabled}>
             <Plus className="mr-1 h-4 w-4" />
             New package
           </Button>
         )}
       </DialogTrigger>
+
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{existing ? 'Edit package' : 'New service package'}</DialogTitle>

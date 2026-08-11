@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSetAgencySlug } from '@/hooks/useAgencyWorkflow';
+import { useAgencyEntitlement } from '@/hooks/useAgencyEntitlement';
+
 
 /**
  * Owner-only: pick a memorable public slug so drivers can reach the agency
@@ -37,7 +39,11 @@ export function AgencySlugCard({ agencyId, isOwner }: { agencyId: string; isOwne
     setValue(slug ?? '');
   }, [slug]);
 
-  const publicUrl = slug
+  const { entitlement } = useAgencyEntitlement(agencyId);
+  const billingCancelled = entitlement.status === 'cancelled';
+  const isClearing = value.trim() === '';
+
+  const shareUrl = slug
     ? `${window.location.origin}/a/${slug}`
     : `${window.location.origin}/agency/request/${agencyId}`;
 
@@ -46,7 +52,7 @@ export function AgencySlugCard({ agencyId, isOwner }: { agencyId: string; isOwne
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Link2 className="h-4 w-4 text-primary" />
-          Public request link
+          Share request link
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -54,6 +60,13 @@ export function AgencySlugCard({ agencyId, isOwner }: { agencyId: string; isOwne
           Share this link with drivers so they can request help. They still must approve any
           specific assistant before you can act on their account.
         </p>
+
+        {billingCancelled && (
+          <p className="text-xs text-muted-foreground">
+            Agency billing is not active, so the request page is unavailable until billing is
+            restarted from Overview. You can still remove an existing link.
+          </p>
+        )}
 
         {isOwner ? (
           <div className="space-y-2">
@@ -68,12 +81,16 @@ export function AgencySlugCard({ agencyId, isOwner }: { agencyId: string; isOwne
               />
               <Button
                 size="sm"
-                disabled={set.isPending || value === (slug ?? '')}
+                disabled={
+                  set.isPending ||
+                  value === (slug ?? '') ||
+                  (billingCancelled && !isClearing)
+                }
                 onClick={async () => {
                   try {
                     await set.mutateAsync({
                       agencyId,
-                      slug: value.trim() === '' ? null : value.trim(),
+                      slug: isClearing ? null : value.trim(),
                     });
                     qc.invalidateQueries({ queryKey: ['agency-profile-slug', agencyId] });
                     toast({ title: 'Slug saved' });
@@ -98,12 +115,13 @@ export function AgencySlugCard({ agencyId, isOwner }: { agencyId: string; isOwne
         <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-2">
           <p className="font-medium">Share this link</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded bg-background px-2 py-1">{publicUrl}</code>
+            <code className="flex-1 truncate rounded bg-background px-2 py-1">{shareUrl}</code>
             <Button
               size="sm"
               variant="outline"
+              disabled={billingCancelled}
               onClick={() => {
-                navigator.clipboard.writeText(publicUrl);
+                navigator.clipboard.writeText(shareUrl);
                 toast({ title: 'Link copied' });
               }}
             >
@@ -111,6 +129,7 @@ export function AgencySlugCard({ agencyId, isOwner }: { agencyId: string; isOwne
             </Button>
           </div>
         </div>
+
       </CardContent>
     </Card>
   );
