@@ -484,8 +484,8 @@ const ARTICLE_SETTLEMENTS: DocsArticle = {
   title: 'Settlement statements & reconciliation',
   summary:
     'How company-issued settlement statements, load matching, and driver reconciliation work today in HaulTrackerPro — and why they are recordkeeping only.',
-  category: 'drivers',
-  audiences: ['driver', 'recruiter', 'agency'],
+  category: 'accounts_roles_data',
+  audiences: ['driver', 'recruiter', 'driver_assistant', 'agency'],
   reviewedForProductAccuracy: REVIEWED,
   sections: [
     {
@@ -512,7 +512,16 @@ const ARTICLE_SETTLEMENTS: DocsArticle = {
         'Driver Pro: advanced reconciliation — refresh or reject suggested load matches — plus creating a manual record for a settlement you received outside HaulTrackerPro.',
       ],
       paragraphs: [
-        'Plan gating in the interface is presentation only. The server-side rules are the authority for what an account may actually do.',
+        'Plan gating in the interface is presentation only.',
+      ],
+    },
+    {
+      heading: 'Corrections, version history, export and printing',
+      bullets: [
+        'A finalized statement is not edited in place. The issuer voids it, or creates a correction draft that supersedes the earlier version, so the version history of a settlement stays visible.',
+        'Finalize, void, correction and supersede events are recorded, so you can follow which version is current and what replaced what.',
+        'You can export settlement data to CSV, and you can produce a paper or PDF copy using your browser print function.',
+        'Always verify a statement independently against the original source statement you received from the company. HaulTrackerPro records what was entered or imported; it does not confirm it.',
       ],
     },
     {
