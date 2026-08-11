@@ -1346,9 +1346,10 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
           </h3>
           <p className="text-sm" style={{ color: 'hsl(220, 10%, 75%)' }}>
             HaulTracker Pro agency subscriptions are live and billed through Stripe for software
-            access. HaulTracker Pro does <b>not</b> currently process service payments between drivers and
+            access. HaulTracker Pro does <b>not</b> currently process payments between drivers and
             assistants or agencies. Service agreements and payments happen outside the platform for now.
             HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
+
           </p>
           <p className="text-sm mt-2" style={{ color: 'hsl(220, 10%, 75%)' }}>
             {AGENCY_SETTLEMENT_RECORDKEEPING_DISCLAIMER} Settlement statements prepared in an Agency
