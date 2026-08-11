@@ -200,6 +200,22 @@ export default function Privacy() {
         </section>
 
         <section className="space-y-2">
+          <h3 className="text-base font-bold">Settlement Statement Data</h3>
+          <p className="text-muted-foreground">When a carrier or agency prepares a settlement statement for a driver, HaulTrackerPro stores the statement header (period, source, status, reported net), its line items (type, description, amount, and any linked load), carrier↔driver relationship records, reconciliation and load-match state, finalization, void and correction history, and related audit metadata.</p>
+          <p className="text-muted-foreground"><span className="font-semibold text-foreground">Who can see it:</span> the issuing carrier or agency and its authorized members, the recipient driver, any assistant or agency the driver has granted settlement permissions to, and HaulTrackerPro administrators where access is needed for support, security, moderation, or dispute review. Settlement records are used for recordkeeping and reconciliation only — HaulTrackerPro does not process, hold, or verify settlement payments and does not collect bank account or payout information for settlements.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">AI &amp; OCR Processing of Your Content</h3>
+          <p className="text-muted-foreground">Optional AI and OCR features — voice expense capture, receipt and rate-confirmation scanning, pasted load text, and AI summaries — send the content you submit to third-party AI or OCR processing services through HaulTrackerPro's processing layer so the requested output can be returned. Output may be incomplete or inaccurate and should be compared against the original document before you rely on it.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">Assistant &amp; Agency Access Data</h3>
+          <p className="text-muted-foreground">When a driver approves an assistant or agency delegation, HaulTrackerPro stores the delegation record, the specific permissions granted, work items and requests exchanged in the workspace, and an audit log of actions taken on the driver's account. Drivers can review this activity and revoke access at any time. Agency-owned workspace records may remain with the workspace after an individual membership ends.</p>
+        </section>
+
+        <section className="space-y-2">
           <h3 className="text-base font-bold">21. Contact Information</h3>
           <p className="text-muted-foreground">For questions about this Privacy Policy or your data, sign in to your HaulTrackerPro account, open Settings, and select Send Feedback.</p>
         </section>

@@ -634,7 +634,7 @@ const faqs: Faq[] = [
   {
     id: 'request-info-contact',
     question: 'What happens when a driver requests info?',
-    answer: 'The driver\'s contact snapshot is shared only with the recruiter connected to that opportunity so they can follow up.',
+    answer: 'The application and the driver\'s submitted profile details go to the recruiter connected to that opportunity. Private phone and email details are disclosed to that recruiter only after the driver approves a separate contact request.',
   },
   {
     id: 'contract-protection-overview',

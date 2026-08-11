@@ -185,6 +185,17 @@ export default function Terms() {
         </section>
 
         <section className="space-y-2">
+          <h3 className="text-base font-bold">Settlement Statements &amp; Reconciliation (Recordkeeping Only)</h3>
+          <p className="text-muted-foreground">HaulTrackerPro provides settlement statement and reconciliation <span className="font-semibold text-foreground">recordkeeping tools only</span>. A carrier or agency with an accepted relationship to a driver may prepare, finalize, void, or supersede a settlement statement, and a driver may view finalized statements issued to them and reconcile the lines against their own load records. Carrier settlement issuance requires a paid standalone recruiter/carrier plan; agency settlement preparation requires an active paid agency plan. Basic driver reconciliation is available on every driver plan; advanced reconciliation and manual outside-settlement records require Driver Pro.</p>
+          <p className="text-muted-foreground">HaulTrackerPro does <span className="font-semibold text-foreground">not</span> pay, hold, transfer, escrow, collect, verify, audit, or guarantee any settlement amount, and does not act as a paying agent, factoring company, payroll provider, or accountant. A finalized settlement record, a matched load, a reconciliation state, or a comparison between line totals and a reported net is not proof that any payment occurred, that any amount is correct, or that any deduction is lawful. Amounts, deductions, and disputes remain between the driver and the company that issued the statement. Users are responsible for the accuracy of the settlement data they enter or import.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">Assistant &amp; Agency Delegated Access</h3>
+          <p className="text-muted-foreground">Driver assistants and agencies may act on a driver's account only after the driver explicitly approves the delegation, and only within the permissions the driver granted — including any settlement permissions. Submitting an agency request does not by itself grant access. Drivers may revoke delegated access at any time, and delegated actions are recorded in an audit log. Payments for assistant or agency services are arranged outside HaulTrackerPro.</p>
+        </section>
+
+        <section className="space-y-2">
           <h3 className="text-base font-bold">30. Contact Information</h3>
           <p className="text-muted-foreground">For questions about these Terms of Service, sign in to your HaulTrackerPro account, open Settings, and select Send Feedback.</p>
         </section>
