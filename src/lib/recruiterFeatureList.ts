@@ -75,7 +75,6 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: FileText, title: 'Audit Trail', description: 'Every contract upload, status change, AI run, decision, and signature is logged for moderation and dispute support.' },
     ],
   },
-];
   {
     category: 'Settlement Statements (Paid Plans)',
     features: [
@@ -85,6 +84,9 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: ShieldCheck, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. Settlement statements are records; actual payment happens outside the platform between you and the driver.' },
     ],
   },
+];
+
+
 
 export function generateRecruiterFeatureMarkdown(): string {
   const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
