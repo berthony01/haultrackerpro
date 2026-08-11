@@ -193,7 +193,7 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">Assistant &amp; Agency Delegated Access</h3>
-          <p className="text-muted-foreground">Driver assistants and agencies may act on a driver's account only after the driver explicitly approves the delegation, and only within the permissions the driver granted — including any settlement permissions. Submitting an agency request does not by itself grant access. Drivers may revoke delegated access at any time, and delegated actions are recorded in an audit log. Payments for assistant or agency services are arranged outside HaulTrackerPro.</p>
+          <p className="text-muted-foreground">Driver assistants and agencies may act on a driver's account only after the driver explicitly approves the delegation, and only within the permissions the driver granted — including any settlement permissions. Settlement permissions are scoped separately: settlement view permission allows viewing statements, settlement-management permission is required to prepare or modify a settlement, and settlement-finalize permission is required to finalize one. Advanced reconciliation and manual outside-settlement records always follow the recipient driver's own Driver Pro entitlement, never the assistant's or agency's plan. Submitting an agency request does not by itself grant access. Drivers may revoke delegated access at any time, and delegated actions are recorded in an audit log. Payments for assistant or agency services are arranged outside HaulTrackerPro.</p>
         </section>
 
         <section className="space-y-2">
