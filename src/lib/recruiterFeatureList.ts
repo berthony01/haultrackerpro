@@ -1,7 +1,8 @@
 import {
   Building2, Briefcase, Users, ShieldCheck, BarChart3, FileSignature,
-  CreditCard, FileText, Sparkles, AlertCircle, Mail, ClipboardList, Eye, Share2,
+  CreditCard, FileText, Sparkles, AlertCircle, Mail, ClipboardList, ClipboardPaste, Eye, Share2,
 } from 'lucide-react';
+
 
 export interface RecruiterFeature {
   icon: typeof Building2;
@@ -81,7 +82,7 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
     category: 'Settlement Statements (Paid Plans)',
     features: [
       { icon: Users, title: 'Carrier↔Driver Relationships', description: 'Invite a driver into a carrier-to-driver relationship. Once the driver accepts, you can prepare settlement statements for that driver.' },
-      { icon: FileText, title: 'Prepare, Finalize, Void & Correct', description: 'Build a settlement draft with line items — load pay, other earnings, reimbursements, deductions, withholdings — then finalize it for the driver, void it, or supersede it with a correction. Issuing carrier settlements requires a paid standalone recruiter/carrier plan; agency settlement preparation requires an active paid agency plan.' },
+      { icon: FileText, title: 'Prepare, Finalize, Void & Correct', description: 'Build a settlement draft with line items — load pay, other earnings, reimbursements, deductions, withholdings — then finalize it for the driver, void it, or supersede it with a correction. Issuing carrier settlements requires an active standalone paid recruiter/carrier entitlement plus an active carrier↔driver relationship. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlement authority. Agency settlement preparation requires an active paid agency plan plus delegated settlement-management permission, and finalizing additionally requires settlement-finalize permission.' },
       { icon: BarChart3, title: 'Line Total vs Reported Net', description: 'HaulTrackerPro shows the net implied by the visible line items next to the reported net on the statement header, so a difference is visible to both sides. This is a neutral comparison, not an audit.' },
       { icon: ShieldCheck, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. Settlement statements are records; actual payment happens outside the platform between you and the driver.' },
     ],
