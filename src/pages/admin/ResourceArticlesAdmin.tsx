@@ -67,6 +67,13 @@ function slugify(t: string) {
     .slice(0, 80);
 }
 
+// Map calendar topic clusters onto the generator's allowed cluster list.
+function resolveGeneratorCluster(planCluster: string): string {
+  const allowed = TOPIC_CLUSTERS as readonly string[];
+  const clusterMap: Record<string, string> = { spreadsheets: 'profit', quickbooks: 'bookkeeping' };
+  return allowed.includes(planCluster) ? planCluster : (clusterMap[planCluster] ?? 'profit');
+}
+
 // Preserve AI-generated FAQ, internal links, and disclaimer by appending
 // them to the markdown content so the admin can edit before saving.
 function mergeDraftIntoMarkdown(draft: Record<string, unknown>): string {
