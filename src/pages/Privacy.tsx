@@ -91,7 +91,7 @@ export default function Privacy() {
             <li>Right to access and export all your data at any time</li>
             <li>Right to request permanent deletion of your account, subject to the retention behavior described in Section 6</li>
             <li>Right to correct inaccurate information</li>
-            <li>Right to withdraw an opportunity request at any time (note: contact information already shared with the recruiter cannot be retroactively recalled)</li>
+            <li>Right to withdraw an opportunity request at any time (note: application and profile data you already submitted may already have been shared with the recruiter for that listing and cannot be retroactively recalled; your private phone number and email address are shared only after you approve a separate contact request)</li>
           </ul>
         </section>
 
