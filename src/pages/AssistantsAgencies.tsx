@@ -210,10 +210,10 @@ export default function AssistantsAgencies() {
               </ul>
             </div>
             <div className="rounded-2xl border p-6" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
-              <h3 className="text-lg font-black text-white mb-3">What HaulTracker Pro does NOT do yet</h3>
+              <h3 className="text-lg font-black text-white mb-3">What HaulTracker Pro does NOT do</h3>
               <ul className="space-y-2 text-sm" style={{ color: TEXT_MUTED }}>
                 {[
-                  'Process payments between drivers and assistants or agencies',
+                  'Process service payments between drivers and assistants or agencies',
                   'Guarantee clients, customers, or income',
                   'Run a public marketplace where anyone can hire anyone',
                   'Grant assistant or agency access without explicit driver approval',
@@ -224,9 +224,10 @@ export default function AssistantsAgencies() {
                 ))}
               </ul>
               <p className="mt-4 text-xs" style={{ color: TEXT_DIM }}>
-                Payments for assistant or agency services are handled outside HaulTracker Pro for now. Future agency billing features may come later.
+                Agency software subscriptions are already live and billed through Stripe. Only service payments between drivers and assistants or agencies remain outside HaulTracker Pro.
               </p>
             </div>
+
           </div>
         </section>
 
