@@ -77,7 +77,7 @@ const freePlan = [
 
 const proPlan = [
   'AI Voice Expense Logging',
-  'AI Receipt Scanning',
+  'Receipt & screenshot scanning (OCR text extraction)',
   'Scan Rate Con Screenshots (OCR)',
   'Driver Scorecard with coaching advice',
   'Weekly Closeout with Week in Review',
@@ -89,6 +89,7 @@ const proPlan = [
   '"Pro Saved You Time" dashboard card',
   'Real-time Parking Finder with driver-verified availability',
   'Driver points, streaks & community leaderboard',
+  'Advanced settlement reconciliation and manual outside-settlement records',
 ];
 
 const checklist = [
