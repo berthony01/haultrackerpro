@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Copy, ExternalLink, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Copy, ExternalLink, ShieldAlert, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   CONTENT_CALENDAR,
@@ -205,12 +205,17 @@ function ArticleCard({ a, onCopy }: { a: PlannedArticle; onCopy: () => void }) {
         <Field label="Recommended CTA" value={a.recommended_cta} />
       </CardContent>
       <div className="px-6 pb-4 flex flex-wrap gap-2">
+        <Button size="sm" asChild>
+          <Link to={`/admin/resource-articles?new=1&calendarId=${encodeURIComponent(a.id)}&generate=1`}>
+            <Sparkles className="h-4 w-4 mr-1" /> Generate Full AI Draft
+          </Link>
+        </Button>
         <Button size="sm" variant="outline" onClick={onCopy}>
           <Copy className="h-4 w-4 mr-1" /> Copy AI Draft Prompt
         </Button>
-        <Button size="sm" asChild>
+        <Button size="sm" variant="outline" asChild>
           <Link to={`/admin/resource-articles?new=1&calendarId=${encodeURIComponent(a.id)}`}>
-            <ExternalLink className="h-4 w-4 mr-1" /> Open Article Manager
+            <ExternalLink className="h-4 w-4 mr-1" /> Open Manual Draft
           </Link>
         </Button>
       </div>

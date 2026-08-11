@@ -67,6 +67,41 @@ function slugify(t: string) {
     .slice(0, 80);
 }
 
+// Map calendar topic clusters onto the generator's allowed cluster list.
+function resolveGeneratorCluster(planCluster: string): string {
+  const allowed = TOPIC_CLUSTERS as readonly string[];
+  const clusterMap: Record<string, string> = { spreadsheets: 'profit', quickbooks: 'bookkeeping' };
+  return allowed.includes(planCluster) ? planCluster : (clusterMap[planCluster] ?? 'profit');
+}
+
+// Preserve AI-generated FAQ, internal links, and disclaimer by appending
+// them to the markdown content so the admin can edit before saving.
+function mergeDraftIntoMarkdown(draft: Record<string, unknown>): string {
+  let mergedContent = String(draft.content ?? '').trimEnd();
+  const faqItems = Array.isArray(draft.faq_items) ? (draft.faq_items as Array<{ q?: unknown; a?: unknown }>) : [];
+  const validFaq = faqItems
+    .map((f) => ({ q: String(f?.q ?? '').trim(), a: String(f?.a ?? '').trim() }))
+    .filter((f) => f.q && f.a);
+  if (validFaq.length && !/##\s+Frequently Asked Questions/i.test(mergedContent)) {
+    mergedContent += '\n\n## Frequently Asked Questions\n' +
+      validFaq.map((f) => `\n### ${f.q}\n\n${f.a}`).join('\n');
+  }
+  const links = Array.isArray(draft.suggested_internal_links)
+    ? (draft.suggested_internal_links as Array<{ label?: unknown; path?: unknown }>) : [];
+  const validLinks = links
+    .map((l) => ({ label: String(l?.label ?? '').trim(), path: String(l?.path ?? '').trim() }))
+    .filter((l) => l.label && l.path.startsWith('/'));
+  if (validLinks.length && !/##\s+Related Resources/i.test(mergedContent)) {
+    mergedContent += '\n\n## Related Resources\n\n' +
+      validLinks.map((l) => `- [${l.label}](${l.path})`).join('\n');
+  }
+  const disclaimer = String(draft.disclaimer ?? '').trim();
+  if (disclaimer && !/##\s+Disclaimer/i.test(mergedContent)) {
+    mergedContent += `\n\n## Disclaimer\n\n${disclaimer}`;
+  }
+  return mergedContent;
+}
+
 export default function ResourceArticlesAdmin() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -88,6 +123,9 @@ export default function ResourceArticlesAdmin() {
   const [justApproved, setJustApproved] = useState(false);
   const [justPublishedSlug, setJustPublishedSlug] = useState<string | null>(null);
   const handledPrefillRef = useRef<string | null>(null);
+  const handledCalendarGenerateRef = useRef<string | null>(null);
+  const [calendarGenerating, setCalendarGenerating] = useState<string | null>(null);
+  const [calendarGenerateError, setCalendarGenerateError] = useState<string | null>(null);
 
   // AI form
   const [aiTopic, setAiTopic] = useState('');
@@ -140,11 +178,7 @@ export default function ResourceArticlesAdmin() {
   };
 
   const buildPrefillFromPlan = useCallback((plan: PlannedArticle): Partial<Article> => {
-    const allowed = TOPIC_CLUSTERS as readonly string[];
-    const clusterMap: Record<string, string> = { spreadsheets: 'profit', quickbooks: 'bookkeeping' };
-    const cluster = allowed.includes(plan.topic_cluster)
-      ? plan.topic_cluster
-      : (clusterMap[plan.topic_cluster] ?? 'profit');
+    const cluster = resolveGeneratorCluster(plan.topic_cluster);
 
     const seoTitleFull = `${plan.title} | Haul Tracker Pro`;
     const seoTitle = seoTitleFull.length <= 60 ? seoTitleFull : plan.title.slice(0, 60);
@@ -213,13 +247,15 @@ export default function ResourceArticlesAdmin() {
     };
   }, [user?.id]);
 
-  // Calendar → Article Manager handoff. Reads ?new=1&calendarId=<id>,
-  // looks up the planned article, opens the editor prefilled (never saved).
+  // Calendar → Article Manager MANUAL handoff. Reads ?new=1&calendarId=<id>
+  // (without generate=1), looks up the planned article, opens the editor
+  // prefilled with the outline skeleton (never saved).
   useEffect(() => {
     if (!isAdmin) return;
     const isNew = searchParams.get('new') === '1';
     const calendarId = searchParams.get('calendarId');
-    if (!isNew || !calendarId) return;
+    const wantsGenerate = searchParams.get('generate') === '1';
+    if (!isNew || !calendarId || wantsGenerate) return;
     if (handledPrefillRef.current === calendarId) return;
 
     const plan = getPlannedArticleById(calendarId);
@@ -244,6 +280,113 @@ export default function ResourceArticlesAdmin() {
     next.delete('new'); next.delete('calendarId');
     setSearchParams(next, { replace: true });
   }, [isAdmin, searchParams, setSearchParams, buildPrefillFromPlan, rows]);
+
+  // Calendar → FULL AI DRAFT handoff. Reads ?new=1&calendarId=<id>&generate=1,
+  // invokes the existing edge function exactly once with the full calendar brief,
+  // and opens the editor with the complete AI article for human review.
+  // Never auto-saves, auto-approves, or auto-publishes.
+  useEffect(() => {
+    if (!isAdmin) return;
+    const isNew = searchParams.get('new') === '1';
+    const calendarId = searchParams.get('calendarId');
+    const wantsGenerate = searchParams.get('generate') === '1';
+    if (!isNew || !calendarId || !wantsGenerate) return;
+    // StrictMode / double-effect protection: mark handled BEFORE awaiting the
+    // network call so AI generation can never be charged twice.
+    if (handledCalendarGenerateRef.current === calendarId) return;
+    handledCalendarGenerateRef.current = calendarId;
+
+    const clearParams = () => {
+      const next = new URLSearchParams(searchParams);
+      next.delete('new'); next.delete('calendarId'); next.delete('generate');
+      setSearchParams(next, { replace: true });
+    };
+
+    const plan = getPlannedArticleById(calendarId);
+    if (!plan) {
+      toast.error('Calendar article not found. No AI article was created.');
+      clearParams();
+      return;
+    }
+
+    const cluster = resolveGeneratorCluster(plan.topic_cluster);
+    setCalendarGenerateError(null);
+    setCalendarGenerating(plan.title);
+    clearParams();
+
+    void (async () => {
+      const { data, error } = await supabase.functions.invoke('generate-resource-article-draft', {
+        body: {
+          topic: plan.title,
+          audience: plan.target_audience.join(', '),
+          topic_cluster: cluster,
+          angle: plan.content_angle,
+          target_keyword: plan.primary_keyword,
+          notes: `Search intent: ${plan.search_intent}. Recommended CTA: ${plan.recommended_cta}.`,
+          related_links: plan.suggested_internal_links.map((l) => l.path),
+          calendar_brief: {
+            title: plan.title,
+            slug: plan.slug,
+            primary_keyword: plan.primary_keyword,
+            secondary_keywords: plan.secondary_keywords,
+            target_audience: plan.target_audience,
+            search_intent: plan.search_intent,
+            content_angle: plan.content_angle,
+            outline_sections: plan.outline_sections,
+            suggested_faqs: plan.suggested_faqs,
+            suggested_internal_links: plan.suggested_internal_links,
+            recommended_cta: plan.recommended_cta,
+            disclaimer_required: plan.disclaimer_required,
+          },
+        },
+      });
+      setCalendarGenerating(null);
+
+      if (error) {
+        const msg = error.message || 'Full AI generation failed. No AI article was created.';
+        setCalendarGenerateError(msg);
+        toast.error('Full AI generation failed. No AI article was created.', {
+          description: 'You can retry, or use Open Manual Draft from the content calendar.',
+        });
+        return;
+      }
+
+      const d = (data as { draft?: Record<string, unknown>; ai_generation_prompt?: string }) ?? {};
+      const draft = (d.draft ?? {}) as Record<string, unknown>;
+      const mergedContent = mergeDraftIntoMarkdown(draft);
+      if (!String(draft.title ?? '').trim() || !mergedContent.trim()) {
+        setCalendarGenerateError('The AI response was incomplete. No AI article was created.');
+        toast.error('Full AI generation failed. No AI article was created.', {
+          description: 'The response was incomplete. Use Open Manual Draft as a fallback.',
+        });
+        return;
+      }
+
+      setEditing({
+        ...EMPTY,
+        title: String(draft.title ?? plan.title),
+        slug: slugify(String(draft.slug ?? plan.slug)),
+        seo_title: String(draft.seo_title ?? '').slice(0, 60),
+        meta_description: String(draft.meta_description ?? '').slice(0, 160),
+        excerpt: String(draft.excerpt ?? ''),
+        content: mergedContent,
+        topic_cluster: cluster,
+        author_name: 'Haul Tracker Pro',
+        generated_by_ai: true,
+        ai_generation_prompt: d.ai_generation_prompt ?? buildDraftPrompt(plan),
+        status: 'draft',
+        approval_status: 'pending_review',
+        created_by: user?.id,
+      });
+      setSafetyChecked(false);
+      setPrefillNotice({
+        title: plan.title,
+        duplicateSlug: rows.some((r) => r.slug === plan.slug),
+      });
+      setEditorOpen(true);
+      toast.success('Full AI draft generated. Review carefully before approving.');
+    })();
+  }, [isAdmin, searchParams, setSearchParams, rows, user?.id]);
 
 
   const canPublish = useMemo(() => {
@@ -367,30 +510,7 @@ export default function ResourceArticlesAdmin() {
     const d = (data as { draft?: Record<string, unknown>; ai_generation_prompt?: string }) ?? {};
     const draft = (d.draft ?? {}) as Record<string, unknown>;
 
-    // Preserve AI-generated FAQ, internal links, and disclaimer by appending
-    // them to the markdown content so the admin can edit before saving.
-    let mergedContent = String(draft.content ?? '').trimEnd();
-    const faqItems = Array.isArray(draft.faq_items) ? (draft.faq_items as Array<{ q?: unknown; a?: unknown }>) : [];
-    const validFaq = faqItems
-      .map((f) => ({ q: String(f?.q ?? '').trim(), a: String(f?.a ?? '').trim() }))
-      .filter((f) => f.q && f.a);
-    if (validFaq.length && !/##\s+Frequently Asked Questions/i.test(mergedContent)) {
-      mergedContent += '\n\n## Frequently Asked Questions\n' +
-        validFaq.map((f) => `\n### ${f.q}\n\n${f.a}`).join('\n');
-    }
-    const links = Array.isArray(draft.suggested_internal_links)
-      ? (draft.suggested_internal_links as Array<{ label?: unknown; path?: unknown }>) : [];
-    const validLinks = links
-      .map((l) => ({ label: String(l?.label ?? '').trim(), path: String(l?.path ?? '').trim() }))
-      .filter((l) => l.label && l.path.startsWith('/'));
-    if (validLinks.length && !/##\s+Related Resources/i.test(mergedContent)) {
-      mergedContent += '\n\n## Related Resources\n\n' +
-        validLinks.map((l) => `- [${l.label}](${l.path})`).join('\n');
-    }
-    const disclaimer = String(draft.disclaimer ?? '').trim();
-    if (disclaimer && !/##\s+Disclaimer/i.test(mergedContent)) {
-      mergedContent += `\n\n## Disclaimer\n\n${disclaimer}`;
-    }
+    const mergedContent = mergeDraftIntoMarkdown(draft);
 
     setEditing({
       ...EMPTY,
@@ -437,6 +557,22 @@ export default function ResourceArticlesAdmin() {
       </header>
 
       <main className="px-4 py-6 max-w-6xl mx-auto space-y-4">
+        {calendarGenerating && (
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>Generating full AI article… ({calendarGenerating}) The editor opens automatically when it is ready.</span>
+          </div>
+        )}
+
+        {calendarGenerateError && !calendarGenerating && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-1">
+            <div className="font-semibold text-destructive">Full AI generation failed — no AI article was created.</div>
+            <p className="text-muted-foreground">
+              {calendarGenerateError} Nothing was saved. Retry from the content calendar, or use <strong>Open Manual Draft</strong> for the outline fallback.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <Label>Filter:</Label>
           <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>

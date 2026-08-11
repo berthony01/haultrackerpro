@@ -830,6 +830,17 @@ export function buildDraftPrompt(a: PlannedArticle): string {
       : 'No specific legal/tax disclaimer required, but never imply guaranteed financial outcomes.',
   );
   lines.push('');
+  lines.push('## Writing requirements (mandatory)');
+  lines.push('- Write the COMPLETE, publish-ready article in polished prose. Do not return an outline, template, or writing instructions.');
+  lines.push('- Never output placeholder text such as "Draft this section", "add example here", "TODO", or bracketed placeholders.');
+  lines.push('- Professional, polished, trucking-specific writing aimed at working drivers and carriers.');
+  lines.push('- Include practical detail and worked illustrative examples where they genuinely help.');
+  lines.push('- Use the primary and secondary keywords naturally, without keyword stuffing.');
+  lines.push('- Follow the supplied outline and FAQs as guidance, and answer every FAQ completely.');
+  lines.push('- Use only the supplied internal links, and only where they fit naturally. Do not invent internal routes.');
+  lines.push('- Use the recommended CTA naturally at the end, not as a hard sell.');
+  lines.push('- Include the required disclaimer when the topic is tax, legal, financial, contract, or accounting related.');
+  lines.push('');
   lines.push('## Safety rules (mandatory)');
   lines.push('- Do not invent statistics, citations, quotes, studies, or sources.');
   lines.push('- Do not guarantee profit, savings, tax deductions, legal protection, or higher earnings.');
