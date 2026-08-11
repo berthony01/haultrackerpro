@@ -162,6 +162,8 @@ export function generateFeatureMarkdown(): string {
   let md = `# HaulTrackerPro — Feature Overview\n`;
   md += `Generated: ${now}\n\n`;
   md += `For drivers, recruiters, driver assistants, and back-office agencies. Driver Assistants and Agencies can use HaulTracker Pro as a side-hustle / agency workflow to manage approved driver clients. Access is always driver-approved and permission-based. HaulTracker Pro does not currently process payments between drivers and assistants or agencies, and does not guarantee income or clients.\n\n`;
+  md += `Settlement statements in HaulTracker Pro are recordkeeping and reconciliation records only. HaulTracker Pro does not process payroll, pay drivers, send ACH or direct deposit, calculate or remit employer payroll taxes, issue or file employer tax forms, determine worker classification, or determine whether a deduction is lawful.\n\n`;
+
   md += `---\n\n`;
 
   for (const cat of featureList) {
