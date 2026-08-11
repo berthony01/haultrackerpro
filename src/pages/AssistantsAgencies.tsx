@@ -210,6 +210,7 @@ export default function AssistantsAgencies() {
                   'Run a public marketplace where anyone can hire anyone',
                   'Grant assistant or agency access without explicit driver approval',
                   'Allow assistants to manage drivers who have not approved them',
+                  'Pay, hold, transfer, verify, or guarantee any settlement amount — settlement statements are recordkeeping only',
                 ].map((t) => (
                   <li key={t} className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 rounded-full shrink-0" style={{ background: AMBER }} /> {t}</li>
                 ))}
