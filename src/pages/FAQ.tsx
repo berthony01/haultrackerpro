@@ -594,12 +594,30 @@ const faqs: Faq[] = [
   {
     id: 'how-recruiters-post',
     question: 'How do recruiters post opportunities?',
-    answer: 'Recruiters apply for access, submit company details, and must be approved before posting. Approved recruiters can post unlimited standard opportunities. Paid plans add premium recruiting tools such as priority placement, reports, contract workflow tools, analytics, and referral tracking and analytics.',
+    answer: 'A recruiter completes the required recruiter profile fields and accepts the current posting terms. Once the profile is complete and the account is active, Recruiter Standard allows 1 active opportunity at a time with unlimited drafts. Paid recruiter plans raise the active-opportunity limit and add premium recruiting tools.',
   },
   {
     id: 'recruiter-plans',
     question: 'What are recruiter plans?',
-    answer: 'Starter ($19/month) unlocks enhanced applicant tracking and basic analytics. Growth ($49/month) adds priority placement, featured listing eligibility, recruiter reports, contract workflow tools, and pipeline analytics. Fleet ($149/month) adds top placement eligibility, advanced analytics, priority support, and future team/bulk tools. All plans include unlimited standard opportunity posting for verified recruiters.',
+    answer: 'Recruiter Standard is free and includes 1 active opportunity with unlimited drafts. Starter ($19/month) allows up to 5 active opportunities and adds applicant status history, a basic referral tracking view, and carrier settlement issuance. Growth ($49/month) allows up to 15 active opportunities and adds priority placement, featured listing eligibility, recruiter reports, the contract-management dashboard with AI-assisted risk review, and pipeline analytics. Fleet ($149/month) allows up to 25 active opportunities for existing or included Fleet access — new standalone Fleet checkout is unavailable. Drafts are unlimited on every plan.',
+  },
+  {
+    id: 'settlement-statements',
+    question: 'What are settlement statements in HaulTrackerPro?',
+    answer: 'A carrier or agency you have an accepted relationship with can issue you a finalized settlement statement listing pay, deductions, and other line items. Every driver plan — Free and Pro — can view finalized statements issued to them.',
+    keywords: 'settlement statement carrier agency pay',
+  },
+  {
+    id: 'settlement-reconciliation',
+    question: 'How does settlement reconciliation work?',
+    answer: 'Basic reconciliation — confirming or clearing the load match on a settlement line — is available on every driver plan. Driver Pro adds advanced reconciliation (refreshing and rejecting suggested load matches) and the ability to create a manual record for a settlement you received outside HaulTrackerPro. HaulTrackerPro also shows the net implied by the visible line items next to the reported net so a difference is visible.',
+    keywords: 'settlement reconciliation load match pro',
+  },
+  {
+    id: 'settlement-payments',
+    question: 'Does HaulTrackerPro pay or guarantee settlement amounts?',
+    answer: 'No. Settlement statements are recordkeeping only. HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount, and a settlement record is not proof that payment occurred. Payment happens outside the platform between you and the company that issued the statement.',
+    keywords: 'settlement payment guarantee recordkeeping',
   },
   {
     id: 'driver-refer-driver',
