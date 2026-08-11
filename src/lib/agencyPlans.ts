@@ -139,8 +139,10 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Up to 5 agency members',
       'Up to 25 active driver clients',
       'Up to 25 active service packages',
-      'Includes Recruiter Growth — 15 active opportunities for the agency owner',
-      'Prepare settlement statements for approved driver clients (recordkeeping only)',
+      'Includes Recruiter Growth — 15 active opportunities for the agency owner (recruiting entitlement only — it does not grant carrier-issued settlement authority)',
+      'Prepare settlement statements for delegated driver clients when the driver granted settlement-management permission (recordkeeping only)',
+      'Finalizing a prepared settlement additionally requires settlement-finalize permission',
+
       'Shared work queue and notifications',
       'Private agency request link',
       'Full agency audit log',
