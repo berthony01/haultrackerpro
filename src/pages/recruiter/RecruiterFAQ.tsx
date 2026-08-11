@@ -37,7 +37,7 @@ const faqs = [
   },
   {
     q: 'Can I issue settlement statements to drivers?',
-    a: 'Yes, on a paid recruiter/carrier plan. Once a driver accepts your carrier-to-driver relationship invitation, you can prepare a settlement statement with line items, finalize it, void it, or supersede it with a correction, and the driver can view and reconcile the finalized statement. This is recordkeeping only — HaulTrackerPro does not pay, hold, transfer, verify, or guarantee any settlement amount, and payment happens outside the platform.',
+    a: 'Yes, with an active STANDALONE paid recruiter subscription plus an active carrier↔driver relationship the driver has accepted. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlements. Once a driver accepts your carrier-to-driver relationship invitation, you can prepare a settlement statement with line items, finalize it, void it, or supersede it with a correction, and the driver can view and reconcile the finalized statement. This is recordkeeping only — HaulTrackerPro does not process payroll, send ACH or direct deposit, or pay, hold, transfer, verify, or guarantee any settlement amount, and payment happens outside the platform.',
   },
   {
     q: 'When and how do I get a driver\'s contact info?',
