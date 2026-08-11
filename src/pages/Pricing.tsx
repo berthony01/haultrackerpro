@@ -126,6 +126,8 @@ const proFeatures = [
   'Driver points, streaks & community leaderboard',
   'Parking log export (CSV + PDF) for paperwork',
   'Driver-to-driver referral submissions (recruiters pay any bonuses externally)',
+  'Advanced settlement reconciliation (refresh or reject suggested load matches)',
+  'Create manual records for settlements you received outside HaulTrackerPro',
 ];
 
 const PRO_KEY_BENEFIT_COUNT = 8;
@@ -165,7 +167,13 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Record approval / in-app signature', free: '✓', pro: '✓' },
   { feature: 'Plain-English Clause Rewrite', free: '—', pro: '✓ Included' },
   { feature: 'Contract history, downloads, version comparison, AI follow-ups', free: '—', pro: 'Coming soon — not included today' },
+  { feature: 'View finalized settlement statements issued to you', free: '✓', pro: '✓' },
+  { feature: 'Basic settlement reconciliation (confirm / clear load match)', free: '✓', pro: '✓' },
+  { feature: 'Advanced reconciliation (refresh / reject suggested matches)', free: '—', pro: '✓' },
+  { feature: 'Manual outside-settlement records', free: '—', pro: '✓' },
+  { feature: 'Settlement payment processing by HaulTrackerPro', free: 'Not offered — recordkeeping only', pro: 'Not offered — recordkeeping only' },
 ];
+
 
 const whyProPoints = [
   { icon: Shield, title: 'Protect Your Money Before It Slips', desc: 'Score a load before you take it. Get warned when a lane weakens, a broker pays slow, or your margin starts drifting — based on your own history.' },
