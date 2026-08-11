@@ -75,7 +75,18 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
       { icon: FileText, title: 'Audit Trail', description: 'Every contract upload, status change, AI run, decision, and signature is logged for moderation and dispute support.' },
     ],
   },
+  {
+    category: 'Settlement Statements (Paid Plans)',
+    features: [
+      { icon: Users, title: 'Carrier↔Driver Relationships', description: 'Invite a driver into a carrier-to-driver relationship. Once the driver accepts, you can prepare settlement statements for that driver.' },
+      { icon: FileText, title: 'Prepare, Finalize, Void & Correct', description: 'Build a settlement draft with line items — load pay, other earnings, reimbursements, deductions, withholdings — then finalize it for the driver, void it, or supersede it with a correction. Issuing carrier settlements requires a paid standalone recruiter/carrier plan; agency settlement preparation requires an active paid agency plan.' },
+      { icon: BarChart3, title: 'Line Total vs Reported Net', description: 'HaulTrackerPro shows the net implied by the visible line items next to the reported net on the statement header, so a difference is visible to both sides. This is a neutral comparison, not an audit.' },
+      { icon: ShieldCheck, title: 'Recordkeeping Only — No Money Movement', description: 'HaulTrackerPro does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount. Settlement statements are records; actual payment happens outside the platform between you and the driver.' },
+    ],
+  },
 ];
+
+
 
 export function generateRecruiterFeatureMarkdown(): string {
   const now = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });

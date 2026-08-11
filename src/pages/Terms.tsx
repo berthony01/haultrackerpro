@@ -72,12 +72,12 @@ export default function Terms() {
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">9. Opportunities Marketplace (Drivers)</h3>
-          <p className="text-muted-foreground">The Opportunities section displays trucking opportunities submitted by recruiters and carriers. All pay figures, weekly mileage, deductions, and Profit Intelligence breakdowns are <span className="font-semibold text-foreground">estimates based on recruiter-provided data</span> and are not guaranteed earnings or guaranteed jobs. When you request more information about an opportunity, your contact details (name, email, and phone if provided) are shared with that specific recruiter so they can respond. You may withdraw a request at any time, but a recruiter may have already received your contact information.</p>
+          <p className="text-muted-foreground">The Opportunities section displays trucking opportunities submitted by recruiters and carriers. All pay figures, weekly mileage, deductions, and Profit Intelligence breakdowns are <span className="font-semibold text-foreground">estimates based on recruiter-provided data</span> and are not guaranteed earnings or guaranteed jobs. When you apply to an opportunity, your application and the profile details you submitted are shared with that specific recruiter. Your private phone number and email address are disclosed to that recruiter only after you approve a separate contact request. You may withdraw a request at any time, but a recruiter may have already received information you previously approved.</p>
         </section>
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">10. Recruiter Accounts &amp; Opportunity Listings</h3>
-          <p className="text-muted-foreground">Recruiter accounts are subject to verification before opportunities can be posted. Submitted opportunities go through admin review and may be approved, rejected, flagged, or removed at HaulTrackerPro's sole discretion. Recruiters are solely responsible for the accuracy and legality of opportunity listings, hiring practices, and communications with drivers. Misleading pay claims, fake postings, or harassing behavior may result in suspension of recruiter access. Drivers' applications and contact information are made available only to the recruiter who posted the opportunity the driver requested information on.</p>
+          <p className="text-muted-foreground">Recruiter accounts are subject to verification before opportunities can be posted. Submitted opportunities go through admin review and may be approved, rejected, flagged, or removed at HaulTrackerPro's sole discretion. Recruiters are solely responsible for the accuracy and legality of opportunity listings, hiring practices, and communications with drivers. Misleading pay claims, fake postings, or harassing behavior may result in suspension of recruiter access. Driver applications are made available only to the recruiter who posted the opportunity the driver applied to, and a driver's private phone and email are released to that recruiter only after the driver approves a contact request.</p>
         </section>
 
         <section className="space-y-2">
@@ -182,6 +182,17 @@ export default function Terms() {
         <section className="space-y-2">
           <h3 className="text-base font-bold">29. Governing Law</h3>
           <p className="text-muted-foreground">These terms shall be governed by and construed in accordance with the laws of the United States, without regard to conflict of law provisions.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">Settlement Statements &amp; Reconciliation (Recordkeeping Only)</h3>
+          <p className="text-muted-foreground">HaulTrackerPro provides settlement statement and reconciliation <span className="font-semibold text-foreground">recordkeeping tools only</span>. A carrier or agency with an accepted relationship to a driver may prepare, finalize, void, or supersede a settlement statement, and a driver may view finalized statements issued to them and reconcile the lines against their own load records. Carrier settlement issuance requires a paid standalone recruiter/carrier plan; agency settlement preparation requires an active paid agency plan. Basic driver reconciliation is available on every driver plan; advanced reconciliation and manual outside-settlement records require Driver Pro.</p>
+          <p className="text-muted-foreground">HaulTrackerPro does <span className="font-semibold text-foreground">not</span> pay, hold, transfer, escrow, collect, verify, audit, or guarantee any settlement amount, and does not act as a paying agent, factoring company, payroll provider, or accountant. A finalized settlement record, a matched load, a reconciliation state, or a comparison between line totals and a reported net is not proof that any payment occurred, that any amount is correct, or that any deduction is lawful. Amounts, deductions, and disputes remain between the driver and the company that issued the statement. Users are responsible for the accuracy of the settlement data they enter or import.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">Assistant &amp; Agency Delegated Access</h3>
+          <p className="text-muted-foreground">Driver assistants and agencies may act on a driver's account only after the driver explicitly approves the delegation, and only within the permissions the driver granted — including any settlement permissions. Submitting an agency request does not by itself grant access. Drivers may revoke delegated access at any time, and delegated actions are recorded in an audit log. Payments for assistant or agency services are arranged outside HaulTrackerPro.</p>
         </section>
 
         <section className="space-y-2">

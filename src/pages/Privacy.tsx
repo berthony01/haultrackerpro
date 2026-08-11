@@ -65,7 +65,7 @@ export default function Privacy() {
         <section className="space-y-2">
           <h3 className="text-base font-bold">4. Data Sharing</h3>
           <p className="text-muted-foreground">We do NOT sell your data. We do not share your personal information with third parties except infrastructure providers necessary to operate the service (cloud hosting, database services, and Stripe for recruiter billing). Emails collected through free resource downloads (lead magnets) follow these same rules — they are never sold or shared.</p>
-          <p className="text-muted-foreground">When a driver requests more information on an opportunity, the driver's name, email, and phone number (if provided) are shared with the recruiter that posted that specific opportunity so they can respond. This contact snapshot is taken at the moment of the request and is visible only to that recruiter and HaulTrackerPro administrators for moderation purposes.</p>
+          <p className="text-muted-foreground">When a driver applies to an opportunity, the driver's application and submitted profile details are shared with the recruiter that posted that specific opportunity. The driver's private phone number and email address are disclosed to that recruiter only after the driver approves a separate contact request. This information is visible only to that recruiter and to HaulTrackerPro administrators for moderation purposes.</p>
         </section>
 
         <section className="space-y-2">
@@ -197,6 +197,22 @@ export default function Privacy() {
         <section className="space-y-2">
           <h3 className="text-base font-bold">20. Referral Payment &amp; Tax Safety</h3>
           <p className="text-muted-foreground">HaulTrackerPro does not process or guarantee referral payments. HaulTrackerPro does not collect bank account, debit card, or other payout information for referral bonus payouts, and does not issue tax forms (such as 1099s) for recruiter-paid external referral bonuses. Referral bonus arrangements, if any, are handled externally between recruiters and participating drivers according to the recruiter's own stated terms. A referral status indicating that a bonus has been <span className="font-semibold text-foreground">marked paid externally</span> reflects an update made by the recruiter and is not a confirmation by HaulTrackerPro that any payment actually occurred.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">Settlement Statement Data</h3>
+          <p className="text-muted-foreground">When a carrier or agency prepares a settlement statement for a driver, HaulTrackerPro stores the statement header (period, source, status, reported net), its line items (type, description, amount, and any linked load), carrier↔driver relationship records, reconciliation and load-match state, finalization, void and correction history, and related audit metadata.</p>
+          <p className="text-muted-foreground"><span className="font-semibold text-foreground">Who can see it:</span> the issuing carrier or agency and its authorized members, the recipient driver, any assistant or agency the driver has granted settlement permissions to, and HaulTrackerPro administrators where access is needed for support, security, moderation, or dispute review. Settlement records are used for recordkeeping and reconciliation only — HaulTrackerPro does not process, hold, or verify settlement payments and does not collect bank account or payout information for settlements.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">AI &amp; OCR Processing of Your Content</h3>
+          <p className="text-muted-foreground">Optional AI and OCR features — voice expense capture, receipt and rate-confirmation scanning, pasted load text, and AI summaries — send the content you submit to third-party AI or OCR processing services through HaulTrackerPro's processing layer so the requested output can be returned. Output may be incomplete or inaccurate and should be compared against the original document before you rely on it.</p>
+        </section>
+
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">Assistant &amp; Agency Access Data</h3>
+          <p className="text-muted-foreground">When a driver approves an assistant or agency delegation, HaulTrackerPro stores the delegation record, the specific permissions granted, work items and requests exchanged in the workspace, and an audit log of actions taken on the driver's account. Drivers can review this activity and revoke access at any time. Agency-owned workspace records may remain with the workspace after an individual membership ends.</p>
         </section>
 
         <section className="space-y-2">

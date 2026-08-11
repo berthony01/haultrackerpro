@@ -11,7 +11,7 @@ export default function Features() {
 
   return (
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
-      <SEOHead title="Features — Truck Driver Profit, Expense, RPM & Back-Office Agency Tools | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, profit, contracts, parking, and referrals — plus driver assistants and a back-office agency workflow for managing approved driver clients with permission-based access." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
+      <SEOHead title="Features — Truck Driver Profit, Expense, RPM & Back-Office Agency Tools | HaulTrackerPro" description="Track loads, fuel, expenses, real RPM, profit, contracts, parking, referrals, and settlement statements — plus driver assistants and a back-office agency workflow for managing approved driver clients with permission-based access." path="/features" jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'Features', path: '/features' }])} />
       <MarketingHeader />
 
 

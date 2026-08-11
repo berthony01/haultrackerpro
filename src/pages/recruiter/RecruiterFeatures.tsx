@@ -11,7 +11,7 @@ export default function RecruiterFeatures() {
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
         title="Recruiter Features — Trucking Recruiter Platform | HaulTrackerPro"
-        description="Verified trucking recruiter tools: unlimited standard opportunity posting after approval, applicant tracking, driver referral tracking and analytics, plus premium visibility and contract workflow tools on paid plans."
+        description="Trucking recruiter tools: structured opportunity posting (1 active free, up to 25 on paid plans), applicant tracking, driver referral tracking, contract workflow tools, and settlement statements on paid plans."
         path="/recruiter/features"
         jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }, { name: 'Recruiter Features', path: '/recruiter/features' }])}
       />
@@ -40,7 +40,7 @@ export default function RecruiterFeatures() {
               Recruiter <span style={{ color: 'hsl(25, 95%, 53%)' }}>Features</span>
             </h1>
             <p className="mt-3 text-base max-w-lg" style={{ color: 'hsl(220, 10%, 55%)' }}>
-              Everything HaulTrackerPro gives approved recruiters — from verification to billing.
+              Everything HaulTrackerPro gives active recruiters — from profile setup and posting to settlements and billing.
             </p>
           </div>
           <Button onClick={downloadRecruiterFeatureSheet} variant="outline" className="gap-2 rounded-xl font-bold shrink-0" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>

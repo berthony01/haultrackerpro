@@ -477,6 +477,81 @@ const ARTICLE_OPPORTUNITY: DocsArticle = {
 };
 
 // ---------------------------------------------------------------------------
+// Article 6 — Settlement statements & reconciliation
+// ---------------------------------------------------------------------------
+const ARTICLE_SETTLEMENTS: DocsArticle = {
+  slug: 'settlement-statements-reconciliation',
+  title: 'Settlement statements & reconciliation',
+  summary:
+    'How company-issued settlement statements, load matching, and driver reconciliation work today in HaulTrackerPro — and why they are recordkeeping only.',
+  category: 'drivers',
+  audiences: ['driver', 'recruiter', 'agency'],
+  reviewedForProductAccuracy: REVIEWED,
+  sections: [
+    {
+      heading: 'What a settlement statement is here',
+      paragraphs: [
+        'A settlement statement in HaulTrackerPro is a record of what a carrier or agency reported paying a driver for a period. It has a header (period, source, status, and a reported net amount) and line items such as load pay, other earnings, reimbursements, deductions, and withholdings.',
+        'A statement can only be issued to a driver the company has an accepted carrier-to-driver relationship with. The driver receives the finalized statement in their Settlements area.',
+      ],
+    },
+    {
+      heading: 'Who can issue or prepare one',
+      bullets: [
+        'A carrier or recruiter issuing settlements needs a paid standalone recruiter/carrier plan.',
+        'An agency preparing settlements for an approved driver client needs an active paid agency plan.',
+        'An assistant or agency member can only act on a driver-approved delegation, and only if the driver granted settlement permissions.',
+        'Drafts can be edited, finalized, voided, or superseded by a correction; the driver sees finalized statements.',
+      ],
+    },
+    {
+      heading: 'What drivers can do on each plan',
+      bullets: [
+        'Every driver plan, Free and Pro: view finalized statements issued to you, open the line items, and use basic reconciliation to confirm or clear the load match on a line.',
+        'Driver Pro: advanced reconciliation — refresh or reject suggested load matches — plus creating a manual record for a settlement you received outside HaulTrackerPro.',
+      ],
+      paragraphs: [
+        'Plan gating in the interface is presentation only. The server-side rules are the authority for what an account may actually do.',
+      ],
+    },
+    {
+      heading: 'Line totals vs the reported net',
+      paragraphs: [
+        'HaulTrackerPro shows the net implied by the visible line items next to the reported net on the statement header. Load pay, earnings, and reimbursements add; deductions and withholdings subtract.',
+        'This is a neutral comparison so a difference is visible instead of hidden. It is not an accusation, an audit, or a finding that anyone did anything wrong. A difference can also come from lines you cannot see, rounding, or data entry.',
+      ],
+      callouts: [
+        {
+          tone: 'info',
+          title: 'The comparison can decline to compute',
+          body: 'If a line has an unrecognized type or an invalid amount, the comparison is not shown rather than displaying a number that could be wrong.',
+        },
+      ],
+    },
+    {
+      heading: 'Recordkeeping only — no money movement',
+      paragraphs: [
+        'HaulTrackerPro does not pay, hold, transfer, escrow, collect, verify, audit, or guarantee any settlement amount, and is not a paying agent, factoring company, payroll provider, or accountant.',
+        'A finalized statement, a matched load, or a reconciliation state is not proof that payment occurred or that an amount or deduction is correct or lawful. Payment and any dispute happen outside the platform between the driver and the company that issued the statement.',
+      ],
+      callouts: [
+        {
+          tone: 'important',
+          title: 'Not financial, tax, or legal advice',
+          body: 'Settlement records and comparisons are informational. Confirm amounts against the original statement from the company and consult a qualified professional for financial, tax, or legal questions.',
+        },
+      ],
+    },
+  ],
+  relatedRoutes: [
+    { label: 'Pricing', route: '/pricing' },
+    { label: 'Terms of Service', route: '/terms' },
+    { label: 'Privacy Policy', route: '/privacy' },
+  ],
+};
+
+
+// ---------------------------------------------------------------------------
 // Deep-freeze construction
 // ---------------------------------------------------------------------------
 
@@ -516,6 +591,7 @@ const ARTICLES: readonly DocsArticle[] = Object.freeze(
     ARTICLE_ROLES,
     ARTICLE_AI,
     ARTICLE_OPPORTUNITY,
+    ARTICLE_SETTLEMENTS,
   ].map(freezeArticle),
 );
 

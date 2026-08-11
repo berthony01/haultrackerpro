@@ -28,6 +28,7 @@ import {
   ASSISTANT_AGENCY_PLANS,
   ALL_AGENCY_PLAN_KEYS,
   OUTSIDE_PAYMENTS_DISCLAIMER,
+  AGENCY_SETTLEMENT_RECORDKEEPING_DISCLAIMER,
 } from '@/lib/agencyPlans';
 
 // ---------------------------------------------------------------------------
@@ -100,6 +101,8 @@ const freeFeatures = [
   'CSV exports',
   'Paste Load Parser (5 per week)',
   'Custom week start day',
+  'View finalized settlement statements issued to you',
+  'Basic settlement reconciliation (confirm or clear a load match)',
 ];
 
 const proFeatures = [
@@ -124,6 +127,8 @@ const proFeatures = [
   'Driver points, streaks & community leaderboard',
   'Parking log export (CSV + PDF) for paperwork',
   'Driver-to-driver referral submissions (recruiters pay any bonuses externally)',
+  'Advanced settlement reconciliation (refresh or reject suggested load matches)',
+  'Create manual records for settlements you received outside HaulTrackerPro',
 ];
 
 const PRO_KEY_BENEFIT_COUNT = 8;
@@ -163,7 +168,13 @@ const comparisonRows: { feature: string; free: string; pro: string }[] = [
   { feature: 'Record approval / in-app signature', free: '✓', pro: '✓' },
   { feature: 'Plain-English Clause Rewrite', free: '—', pro: '✓ Included' },
   { feature: 'Contract history, downloads, version comparison, AI follow-ups', free: '—', pro: 'Coming soon — not included today' },
+  { feature: 'View finalized settlement statements issued to you', free: '✓', pro: '✓' },
+  { feature: 'Basic settlement reconciliation (confirm / clear load match)', free: '✓', pro: '✓' },
+  { feature: 'Advanced reconciliation (refresh / reject suggested matches)', free: '—', pro: '✓' },
+  { feature: 'Manual outside-settlement records', free: '—', pro: '✓' },
+  { feature: 'Settlement payment processing by HaulTrackerPro', free: 'Not offered — recordkeeping only', pro: 'Not offered — recordkeeping only' },
 ];
+
 
 const whyProPoints = [
   { icon: Shield, title: 'Protect Your Money Before It Slips', desc: 'Score a load before you take it. Get warned when a lane weakens, a broker pays slow, or your margin starts drifting — based on your own history.' },
@@ -183,6 +194,7 @@ const recruiterStandardBullets = [
   'Basic applicant and contact-request flow',
   'Opportunity management: edit, pause, and close listings',
   'Verified Recruiter badge shown only after separate badge approval',
+  'Carrier settlement issuance is not included — it requires a paid recruiter plan',
 ];
 
 const recruiterPaidPlans: Array<{
@@ -205,6 +217,7 @@ const recruiterPaidPlans: Array<{
       
       'Applicant status history',
       'Basic referral tracking view',
+      'Carrier↔driver relationship invitations and carrier settlement issuance (recordkeeping only)',
     ],
   },
   {
@@ -1329,6 +1342,11 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
             HaulTracker Pro does <b>not</b> currently process payments between drivers and
             assistants or agencies. Service agreements and payments happen outside the platform for now.
             HaulTracker Pro does not guarantee clients, customers, or income for assistants or agencies.
+          </p>
+          <p className="text-sm mt-2" style={{ color: 'hsl(220, 10%, 75%)' }}>
+            {AGENCY_SETTLEMENT_RECORDKEEPING_DISCLAIMER} Settlement statements prepared in an Agency
+            Workspace are records shared with an approved driver client — payment still happens
+            outside HaulTracker Pro.
           </p>
           <p className="sr-only">{OUTSIDE_PAYMENTS_DISCLAIMER}</p>
         </div>

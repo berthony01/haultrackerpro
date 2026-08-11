@@ -43,6 +43,7 @@ const REQUIRED_SLUGS = [
   'roles-access-relationships',
   'ai-ocr-calculation-limitations',
   'opportunity-recruiting-safety',
+  'settlement-statements-reconciliation',
 ] as const;
 
 const REQUIRED_ROUTES = REQUIRED_SLUGS.map((s) => `/docs/${s}`);

@@ -105,6 +105,7 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Up to 5 active driver clients',
       'Up to 3 active service packages',
       'Includes Recruiter Starter — 5 active opportunities for the agency owner',
+      'Prepare settlement statements for approved driver clients (recordkeeping only)',
       'Private agency request link',
       'Client requests, work queue, audit log',
       'Driver-approved delegation only',
@@ -133,6 +134,7 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Up to 25 active driver clients',
       'Up to 25 active service packages',
       'Includes Recruiter Growth — 15 active opportunities for the agency owner',
+      'Prepare settlement statements for approved driver clients (recordkeeping only)',
       'Shared work queue and notifications',
       'Private agency request link',
       'Full agency audit log',
@@ -161,6 +163,7 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
       'Up to 100 active driver clients',
       'Up to 100 active service packages',
       'Includes Recruiter Fleet — 25 active opportunities for the agency owner',
+      'Prepare settlement statements for approved driver clients (recordkeeping only)',
       'Shared work queue and notifications',
       'Private agency request link',
       'Full agency audit log',
@@ -318,3 +321,10 @@ export function checkAgencyLimit(
 
 export const OUTSIDE_PAYMENTS_DISCLAIMER =
   'HaulTracker Pro does not currently process payments between drivers and assistants or agencies. Service agreements and payments are handled outside the platform for now.';
+
+/**
+ * Phase 1U-A — public truth for agency settlement preparation. Preparing a
+ * settlement statement is a recordkeeping action only.
+ */
+export const AGENCY_SETTLEMENT_RECORDKEEPING_DISCLAIMER =
+  'Settlement preparation is recordkeeping only. HaulTracker Pro does not pay, hold, transfer, verify, or guarantee any settlement amount.';
