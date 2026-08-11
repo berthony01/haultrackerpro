@@ -85,13 +85,13 @@ describe('Phase 1U-A — B. Recruiter limit and settlement truth', () => {
 
   it('recruiter feature sheet documents settlement issuance as paid and recordkeeping only', () => {
     expect(RECRUITER_FEATURES).toContain('Settlement Statements (Paid Plans)');
-    expect(RECRUITER_FEATURES).toContain('paid standalone recruiter/carrier plan');
+    expect(RECRUITER_FEATURES).toContain('standalone paid recruiter/carrier entitlement');
     expect(RECRUITER_FEATURES).toContain('active paid agency plan');
     expect(RECRUITER_FEATURES).toContain('does not pay, hold, transfer, escrow, verify, or guarantee any settlement amount');
   });
 
   it('recruiter guide adds a settlement step gated to paid plans', () => {
-    expect(RECRUITER_GUIDE).toContain('Issue settlement statements on a paid plan');
+    expect(RECRUITER_GUIDE).toContain('Issue settlement statements on a standalone paid plan');
   });
 });
 
@@ -111,7 +111,7 @@ describe('Phase 1U-A — C. Contact disclosure requires driver approval', () => 
 
 describe('Phase 1U-A — D. Agency settlement preparation truth', () => {
   it('agency plans expose settlement preparation and a recordkeeping disclaimer', () => {
-    expect(AGENCY_PLANS).toContain('Prepare settlement statements for approved driver clients (recordkeeping only)');
+    expect(AGENCY_PLANS).toContain('Prepare settlement statements for delegated driver clients');
     expect(AGENCY_PLANS).toContain('AGENCY_SETTLEMENT_RECORDKEEPING_DISCLAIMER');
     expect(AGENCY_PLANS).toContain('does not pay, hold, transfer, verify, or guarantee any settlement amount');
   });
@@ -154,7 +154,7 @@ describe('Phase 1U-A — F. Settlement docs article', () => {
   });
 
   it('article states plan boundaries and the recordkeeping-only limitation', () => {
-    expect(DOCS_ARTICLES).toContain('paid standalone recruiter/carrier plan');
+    expect(DOCS_ARTICLES).toContain('standalone paid recruiter/carrier entitlement');
     expect(DOCS_ARTICLES).toContain('active paid agency plan');
     expect(DOCS_ARTICLES).toContain('does not pay, hold, transfer, escrow, collect, verify, audit, or guarantee any settlement amount');
     expect(DOCS_ARTICLES).toContain('Not financial, tax, or legal advice');
