@@ -28,7 +28,7 @@ export default function Privacy() {
         <h2 className="text-2xl font-black font-heading">HaulTrackerPro Privacy Policy</h2>
 
         <div className="rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 text-xs text-foreground/90">
-          <span className="font-semibold text-primary">Coverage note:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data.
+          <span className="font-semibold text-primary">Coverage note:</span> This policy now describes data collected from recruiter and carrier accounts, what drivers see, and how Stripe handles billing data. It also describes data from driver assistants, agencies and delegated access, settlement statements and reconciliation, and AI, OCR and automated extraction features.
         </div>
 
         <section className="space-y-2">
@@ -38,8 +38,12 @@ export default function Privacy() {
             <li>Email address and optional first name submitted via free resource downloads (e.g., the Free Trucker Starter Kit) — used only to deliver the requested resource and occasional related updates. You can unsubscribe at any time.</li>
             <li>Load data (pickup/dropoff locations, miles, rates, fees)</li>
             <li>Expense data (categories, amounts, dates)</li>
-            <li>Opportunity Preferences (preferences, experience, trailer types) — only used for matching opportunities and only visible to recruiters after you request information on their listing</li>
+            <li>Fuel and operational data (gallons, fuel purchases, odometer and mileage entries, and related operating records)</li>
+            <li>Opportunity Preferences (preferences, experience, trailer types) — used for matching opportunities and shared with a recruiter as part of an application or information request to that recruiter's listing. Your private phone number and email address are not shared merely because you applied or requested information; they are disclosed only after you approve a separate contact request.</li>
             <li>Recruiter / company profile data (company name, contact info, verification documents) for users with recruiter access</li>
+            <li>Driver assistant, agency, and delegation records (assistant and agency profiles, memberships, client requests, delegations, permission grants, work items, service packages, audit activity, and notifications)</li>
+            <li>Settlement and reconciliation records (statement headers, line items including deductions and withholdings, load matches, reconciliation results, and lifecycle and audit events)</li>
+            <li>AI, OCR, and automated extraction inputs (pasted load text, pasted opportunity text, uploaded rate confirmations, receipts and screenshots, clause or contract text, and other content you submit when you invoke extraction)</li>
             <li>Billing data — handled and stored by Stripe; we store only customer and subscription identifiers, never card numbers</li>
             <li>Usage data (app interactions for product improvement)</li>
           </ul>
