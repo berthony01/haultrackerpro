@@ -8,12 +8,17 @@ import { buildBreadcrumbSchema } from '@/lib/breadcrumbSchema';
 const faqs = [
   {
     q: 'How do I unlock standard recruiter posting?',
-    a: 'Add the recruiter workspace to your account and complete the required recruiter profile fields — company name, DOT and/or MC number, address, hiring states, equipment types, and a valid recruiter contact email — then accept the current posting terms. Once your account is active and not suspended, Recruiter Standard lets you keep 1 active opportunity at a time with unlimited drafts. No admin approval and no paid plan are required to post a standard opportunity.',
+    a: 'Add the recruiter workspace to your account and complete the canonical readiness fields — recruiter name, company name, a valid recruiter email, and company type — then accept the current posting terms. A DOT or MC number is required only when your company type is Carrier / Motor Carrier; third-party recruiters, staffing agencies, and independent recruiters do not need DOT or MC for standard posting. Once those fields are complete and your account is not suspended, Recruiter Standard lets you keep 1 active opportunity at a time with unlimited drafts. No admin approval, no verification gate, and no paid plan are required to post a standard opportunity.',
+  },
+  {
+    q: 'Can I paste an existing job post instead of typing the form?',
+    a: 'Yes. Paste an existing job post, recruiter pitch, or rate sheet into the opportunity paste tool and AI extracts the structured fields into the form. You review and edit every extracted field before submitting. The extractor itself does not save anything — nothing is saved as an opportunity until you submit the form.',
   },
   {
     q: 'How does Verified Recruiter badge review work?',
-    a: 'The Verified Recruiter badge is a separate trust-display process. HaulTrackerPro reviews eligible recruiter profiles for the badge shown on driver listings. Pending or rejected badge review affects the badge and trust display only — it does not by itself remove your ability to post standard opportunities once your profile is complete and active. You will see your badge review status and any reviewer notes in Recruiter Settings.',
+    a: 'The Verified Recruiter badge is a separate trust-display process and does not gate standard posting. HaulTrackerPro reviews eligible recruiter profiles for the badge shown on driver listings. Pending or rejected badge review affects the badge and trust display only — it does not by itself remove your ability to post standard opportunities once your profile is complete and active. You will see your badge review status and any reviewer notes in Recruiter Settings.',
   },
+
   {
     q: 'What can I post after setup is complete?',
     a: 'Structured opportunities — pay model (CPM, percentage, flat), deductions, deadhead pay, escrow, home time, equipment, sign-on bonuses, and benefits. Pay claims must be truthful and supportable. Opportunity moderation and review remain available to the platform; misleading or vague "up to $X" copy without supporting structure may be flagged or removed.',
