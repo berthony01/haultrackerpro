@@ -557,6 +557,22 @@ export default function ResourceArticlesAdmin() {
       </header>
 
       <main className="px-4 py-6 max-w-6xl mx-auto space-y-4">
+        {calendarGenerating && (
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 text-sm flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            <span>Generating full AI article… ({calendarGenerating}) The editor opens automatically when it is ready.</span>
+          </div>
+        )}
+
+        {calendarGenerateError && !calendarGenerating && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm space-y-1">
+            <div className="font-semibold text-destructive">Full AI generation failed — no AI article was created.</div>
+            <p className="text-muted-foreground">
+              {calendarGenerateError} Nothing was saved. Retry from the content calendar, or use <strong>Open Manual Draft</strong> for the outline fallback.
+            </p>
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           <Label>Filter:</Label>
           <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
