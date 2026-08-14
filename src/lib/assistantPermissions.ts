@@ -69,36 +69,39 @@ export function hasPerm(
 /**
  * Map a navigation page id (used by BottomNav / AppSidebar / Index router) to
  * the permission key required when an assistant is acting on behalf of a driver.
- * Returns null for pages allowed without any specific permission (e.g. 'more'),
- * or 'BLOCKED' for pages assistants must never reach.
+ *
+ * Phase DA-1: this is an ALLOWLIST. Only page ids explicitly enumerated below
+ * are reachable while acting as an assistant. Anything else — including any
+ * future page id — fails closed as 'BLOCKED'.
  */
 export type PageGate = AssistantPermissionKey | 'BLOCKED' | null;
 
+/** Pages that carry no protected workspace data. */
+const ASSISTANT_NEUTRAL_PAGES = new Set<string>(['more']);
+
+/** Exhaustive allowlist: page id -> required assistant permission. */
+const ASSISTANT_PAGE_ALLOWLIST: Record<string, AssistantPermissionKey> = {
+  dashboard: 'view_dashboard',
+  loads: 'manage_loads',
+  add: 'manage_loads',
+  expenses: 'manage_expenses',
+  add_expense: 'manage_expenses',
+  fuel: 'manage_fuel',
+  add_fuel: 'manage_fuel',
+  reports: 'view_reports',
+  monthly: 'view_reports',
+  settlements: 'settlements_view',
+};
+
 export function assistantPageGate(page: string): PageGate {
-  // Hard blocks — never available to assistants.
-  if (
-    page === 'settings' ||
-    page === 'recruiter-access' ||
-    page === 'opportunities' ||
-    page === 'opportunity-preferences' ||
-    page === 'contracts' ||
-    page.startsWith('recruiter-access:')
-  ) {
-    return 'BLOCKED';
-  }
-  switch (page) {
-    case 'dashboard': return 'view_dashboard';
-    case 'loads':
-    case 'add':
-      return 'manage_loads';
-    case 'expenses': return 'manage_expenses';
-    case 'fuel': return 'manage_fuel';
-    case 'reports': return 'view_reports';
-    case 'settlements': return 'settlements_view';
-    case 'more': return null;
-    default: return null;
-  }
+  if (ASSISTANT_NEUTRAL_PAGES.has(page)) return null;
+  const gate = ASSISTANT_PAGE_ALLOWLIST[page];
+  if (gate) return gate;
+  // Unknown / owner-only / recruiter / settings / contracts / alerts /
+  // scorecard / closeout / recurring expenses / upgrade → fail closed.
+  return 'BLOCKED';
 }
+
 
 /** First nav page an acting assistant can actually visit, given perms. */
 export function firstAllowedAssistantPage(

@@ -69,10 +69,14 @@ import { toast } from 'sonner';
 import { normalizeLegacyEditStops } from '@/lib/stopNormalization';
 import { supabase } from '@/integrations/supabase/client';
 import { useActingContext } from '@/hooks/useActingContext';
+import { useDriverReportSettings } from '@/hooks/useDriverReportSettings';
+
 import {
   isAssistantPageAllowed,
   firstAllowedAssistantPage,
+  hasPerm,
 } from '@/lib/assistantPermissions';
+
 import { trackPurchase, trackLoadLogged, trackExpenseLogged } from '@/lib/analytics';
 
 // Tiny inline fallback — avoids whole-app skeleton flicker for view swaps.
@@ -195,7 +199,26 @@ const Index = () => {
 
   // Pro gating — canonical subscription hook (Free vs Pro plans only)
   const subscription = useSubscription();
-  const isPro = subscription.isPro;
+  // Phase DA-1 — canonical DRIVER-WORKSPACE Pro entitlement.
+  // Self mode: the signed-in driver's own subscription.
+  // Acting-as-assistant mode: the MANAGED driver's server-resolved Pro flag.
+  // The assistant's personal Driver subscription must never unlock or lock
+  // the managed driver's Driver Pro features.
+  const isPro = isActingAsAssistant
+    ? actingDriver?.driver_is_pro === true
+    : subscription.isPro;
+  // Report export capability. Self drivers keep today's behavior; acting
+  // assistants must additionally hold export_reports for that exact driver.
+  const canExportReports = isActingAsAssistant
+    ? hasPerm(actingPermissions, 'export_reports')
+    : true;
+  // Phase DA-1 — while acting, reports must use the MANAGED driver's safe
+  // report settings (narrow RPC), never the assistant's own user_settings.
+  const { data: driverReportSettings } = useDriverReportSettings(
+    isActingAsAssistant ? actingDriver?.driver_user_id ?? null : null,
+  );
+
+
   const { profile: driverOppProfile } = useDriverOpportunityProfile();
   const hasCompletedDriverProfile = !!driverOppProfile?.profile_completed;
 
@@ -1169,8 +1192,11 @@ const Index = () => {
                 expenses={allExpensesQuery.expenses}
                 onNavigate={handleNavigate}
                 isPro={isPro}
+                settingsOverride={isActingAsAssistant ? driverReportSettings ?? null : null}
+                canExport={canExportReports}
               />
             )}
+
             {page === 'monthly' && (
               <MonthlySummary
                 loads={allLoadsQuery.loads}
