@@ -700,8 +700,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                 )}
                 {missingPayCount > 0 && (
                   <div
-                    className="cursor-pointer active:scale-95 transition-transform"
-                    onClick={() => onNavigate?.('loads', { filter: 'missing_pay' })}
+                    className={showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''}
+                    onClick={showPersonalWidgets ? () => onNavigate?.('loads', { filter: 'missing_pay' }) : undefined}
                   >
                     <StatCard
                       label="Pending Payment"
