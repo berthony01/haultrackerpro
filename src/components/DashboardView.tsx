@@ -737,8 +737,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </Button>
           )}
 
-          {/* View Reports */}
-          {onNavigate && (
+          {/* View Reports — hidden in assistant mode (view_reports already covered by nav) */}
+          {showPersonalWidgets && onNavigate && (
             <Button
               variant="outline"
               className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
