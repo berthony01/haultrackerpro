@@ -353,3 +353,157 @@ describe('DA-1 · webhook cleanup uses the exact canonical Driver Pro rule', () 
     expect(revoke).toMatch(/endDirectAssistantAccess\(supabase, entityKey\)/);
   });
 });
+
+// -------------------------------------------------------------------------
+// DA-1 dashboard-context sanitation — assistant mode must not mount widgets
+// bound to the SIGNED-IN user's own personal driver state.
+// -------------------------------------------------------------------------
+const tierUpSpy = vi.fn();
+const sentinel = (id: string) => ({ default: undefined, __sentinel: id });
+
+vi.mock('@/hooks/useTierUpDetector', () => ({ useTierUpDetector: () => tierUpSpy() }));
+vi.mock('@/hooks/useCostProfile', () => ({
+  useCostProfile: () => ({ profile: null }),
+  computeCostProfileCPM: () => ({ cpm: 0, warnings: [] }),
+  profileHasUsableData: () => false,
+}));
+vi.mock('@/components/DriverIntelligenceCard', () => ({
+  DriverIntelligenceCard: () => <div data-testid="w-driver-intelligence" />,
+}));
+vi.mock('@/components/DriverLeaderboardCard', () => ({
+  DriverLeaderboardCard: () => <div data-testid="w-leaderboard" />,
+}));
+vi.mock('@/components/HomeTimeDashboardCard', () => ({
+  HomeTimeDashboardCard: () => <div data-testid="w-home-time" />,
+}));
+vi.mock('@/components/WeeklyPulseCard', () => ({
+  WeeklyPulseCard: () => <div data-testid="w-weekly-pulse" />,
+}));
+vi.mock('@/components/PersonalIntelligenceBlocks', () => ({
+  PersonalIntelligenceBlocks: () => <div data-testid="w-personal-intel" />,
+}));
+vi.mock('@/components/ProTimeSavedCard', () => ({
+  ProTimeSavedCard: () => <div data-testid="w-time-saved" />,
+}));
+vi.mock('@/components/ProInsightCard', () => ({
+  ProInsightCard: () => <div data-testid="w-pro-insight" />,
+}));
+vi.mock('@/components/SmartAlertsCard', () => ({
+  SmartAlertsCard: () => <div data-testid="w-smart-alerts" />,
+}));
+vi.mock('@/components/TaxReminderBanner', () => ({
+  TaxReminderBanner: () => <div data-testid="w-tax-reminder" />,
+}));
+vi.mock('@/components/WeeklyFocusCard', () => ({
+  WeeklyFocusCard: () => <div data-testid="w-weekly-focus" />,
+}));
+vi.mock('@/components/SmartLoadAdvisor', () => ({
+  SmartLoadAdvisor: () => <div data-testid="w-load-advisor" />,
+}));
+vi.mock('@/components/ContributionMarginCard', () => ({
+  ContributionMarginCard: () => <div data-testid="w-contribution-margin" />,
+}));
+vi.mock('@/components/FuelAnalyticsCard', () => ({
+  FuelAnalyticsCard: () => <div data-testid="w-fuel-analytics" />,
+}));
+vi.mock('@/components/TaxEstimateCard', () => ({
+  TaxEstimateCard: () => <div data-testid="w-tax-estimate" />,
+}));
+vi.mock('@/components/premium/ProfitOverviewChart', () => ({
+  ProfitOverviewChart: () => <div data-testid="w-profit-overview" />,
+}));
+vi.mock('@/components/premium/ExpenseDonut', () => ({
+  ExpenseDonut: () => <div data-testid="w-expense-donut" />,
+}));
+vi.mock('@/components/premium/DriverScoreGauge', () => ({
+  DriverScoreGauge: () => <div data-testid="w-score-gauge" />,
+}));
+vi.mock('@/components/premium/RecentLoadsPanel', () => ({
+  RecentLoadsPanel: () => <div data-testid="w-recent-loads" />,
+}));
+vi.mock('@/components/premium/ProfitByLoadTable', () => ({
+  ProfitByLoadTable: () => <div data-testid="w-profit-by-load" />,
+}));
+vi.mock('@/components/premium/DashboardFooterCTA', () => ({
+  DashboardFooterCTA: () => <div data-testid="w-footer-cta" />,
+}));
+
+import { DashboardView } from '@/components/DashboardView';
+
+const PERSONAL_WIDGETS = [
+  'w-driver-intelligence',
+  'w-leaderboard',
+  'w-home-time',
+  'w-weekly-pulse',
+  'w-personal-intel',
+  'w-time-saved',
+  'w-pro-insight',
+  'w-smart-alerts',
+  'w-tax-reminder',
+  'w-footer-cta',
+];
+
+const CORE_WIDGETS = [
+  'dashboard-metrics',
+  'w-profit-overview',
+  'w-expense-donut',
+  'w-score-gauge',
+  'w-recent-loads',
+  'w-profit-by-load',
+  'w-contribution-margin',
+  'w-fuel-analytics',
+  'w-tax-estimate',
+  'w-weekly-focus',
+  'w-load-advisor',
+];
+
+const dashboardProps: any = {
+  loads: [LOAD],
+  expenses: [],
+  fuelLogs: [],
+  isLoading: false,
+  onNavigate: () => {},
+  smartAlerts: { alerts: [], dismissAlert: { mutate: () => {} } },
+  isPro: true,
+};
+
+describe('DA-1 · dashboard assistant-context sanitation', () => {
+  it('Index passes isAssistantView={isActingAsAssistant} to DashboardView', () => {
+    const INDEX = read('src/pages/Index.tsx');
+    const block = INDEX.slice(INDEX.indexOf('<DashboardView'));
+    const jsx = block.slice(0, block.indexOf('/>'));
+    expect(jsx).toMatch(/isAssistantView=\{isActingAsAssistant\}/);
+  });
+
+  it('self mode renders every personal widget/control and the action zone', () => {
+    tierUpSpy.mockClear();
+    render(<DashboardView {...dashboardProps} />);
+    for (const id of PERSONAL_WIDGETS) expect(screen.queryByTestId(id)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Finalize Weekly Summary/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Parking$/i })).toBeTruthy();
+  });
+
+  it('runs useTierUpDetector in self mode only', () => {
+    tierUpSpy.mockClear();
+    render(<DashboardView {...dashboardProps} />);
+    expect(tierUpSpy).toHaveBeenCalled();
+
+    tierUpSpy.mockClear();
+    render(<DashboardView {...dashboardProps} isAssistantView />);
+    expect(tierUpSpy).not.toHaveBeenCalled();
+  });
+
+  it('assistant mode mounts none of the signed-in-user personal widgets/controls', () => {
+    render(<DashboardView {...dashboardProps} isAssistantView />);
+    for (const id of PERSONAL_WIDGETS) expect(screen.queryByTestId(id)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Finalize Weekly Summary/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Parking$/i })).toBeNull();
+  });
+
+  it('assistant mode keeps the managed-driver KPI/chart surfaces', () => {
+    render(<DashboardView {...dashboardProps} isAssistantView />);
+    for (const id of CORE_WIDGETS) expect(screen.queryByTestId(id)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /This Week/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /View Reports/i })).toBeTruthy();
+  });
+});
