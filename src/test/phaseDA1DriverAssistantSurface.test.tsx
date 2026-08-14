@@ -458,7 +458,7 @@ const CORE_WIDGETS = [
 ];
 
 const dashboardProps: any = {
-  loads: [LOAD],
+  loads: [{ ...LOAD, updated_at: '2026-01-06T00:00:00.000Z' }],
   expenses: [],
   fuelLogs: [],
   isLoading: false,
