@@ -1102,8 +1102,10 @@ const Index = () => {
                   onNavigate={handleNavigate}
                   smartAlerts={smartAlerts}
                   isPro={isPro}
+                  settingsOverride={isActingAsAssistant ? driverReportSettings ?? null : null}
                   showRecommendedOpportunity={!isActingAsAssistant && effectiveRole === 'driver' && driverWorkspaceAllowed}
                 />
+
               </>
             )}
             {page === 'closeout' && (
