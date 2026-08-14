@@ -495,7 +495,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                 tier={scorecard.tier}
                 percentileLabel={scorecard.totalScore >= 80 ? 'Top 14% of drivers' : scorecard.totalScore >= 60 ? 'Top 35% of drivers' : 'Keep going!'}
               />
-              <RecentLoadsPanel loads={filteredLoads} onViewAll={onNavigate ? () => onNavigate('loads') : undefined} />
+              <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
             </div>
           </div>
 
