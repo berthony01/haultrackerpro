@@ -529,14 +529,17 @@ describe('DA-1 · dashboard assistant-context sanitation', () => {
 
   it('assistant mode keeps Projected Net / Pending Payment metrics visible but non-clickable', () => {
     const SRC = read('src/components/DashboardView.tsx');
-    // Every clickable settings/loads wrapper is gated by showPersonalWidgets.
-    const settingsWrappers = SRC.match(/onClick=\{showPersonalWidgets \? \(\) => onNavigate\?\.\\('settings'\\) : undefined\}/g) || [];
-    expect(settingsWrappers.length).toBe(3);
-    const pendingWrapper = SRC.match(/onClick=\{showPersonalWidgets \? \(\) => onNavigate\?\.\\('loads', \{ filter: 'missing_pay' \}\) : undefined\}/);
-    expect(pendingWrapper).toBeTruthy();
-    // The cursor-pointer class is also gated in assistant mode.
-    const gatedClasses = SRC.match(/className=\{showPersonalWidgets \? 'cursor-pointer active:scale-95 transition-transform' : ''\}/g) || [];
-    expect(gatedClasses.length).toBe(4);
+    // All three Projected-Net settings wrappers are gated by showPersonalWidgets.
+    const settingsCount = SRC.split("() => onNavigate?.('settings')").length - 1;
+    expect(settingsCount).toBe(3);
+    // Each of those + the Pending Payment wrapper shares the gated cursor class.
+    const gatedClass = "showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''";
+    expect(SRC.split(gatedClass).length - 1).toBe(4);
+    // The Pending Payment loads shortcut is also gated.
+    expect(SRC).toMatch(/showPersonalWidgets \? \(\) => onNavigate\?\.\('loads', \{ filter: 'missing_pay' \}\) : undefined/);
+    // No ungated settings/loads shortcut remains.
+    expect(SRC).not.toMatch(/\bonClick=\{\(\) => onNavigate\?\.\('settings'\)\}/);
+    expect(SRC).not.toMatch(/\bonClick=\{\(\) => onNavigate\?\.\('loads', \{ filter: 'missing_pay' \}\)\}/);
   });
 
   it('assistant mode hides the empty-state "Log Your First Load" button', () => {
