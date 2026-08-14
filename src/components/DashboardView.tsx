@@ -724,7 +724,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           <TaxEstimateCard loads={activeLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
 
           {/* Finalize Weekly Summary Button */}
-          {(showCloseoutButton || true) && onNavigate && (
+          {showPersonalWidgets && (showCloseoutButton || true) && onNavigate && (
             <Button
               variant="outline"
               className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
