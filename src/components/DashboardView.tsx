@@ -76,6 +76,13 @@ interface DashboardViewProps {
    *  the ProfitByLoadTable. Default false so existing standalone consumers
    *  of DashboardView don't unexpectedly mount opportunity data hooks. */
   showRecommendedOpportunity?: boolean;
+  /**
+   * Phase DA-1 — true when a direct Driver Assistant is acting for a managed
+   * driver. Suppresses widgets/controls bound to the SIGNED-IN user's own
+   * personal driver state (home time, leaderboard, personal intelligence,
+   * tier-up, reminders, closeout, add/action controls).
+   */
+  isAssistantView?: boolean;
 
 }
 
@@ -195,13 +202,25 @@ export function getCancelledFootnote(n: number): string | null {
 }
 
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false }: DashboardViewProps) {
+/**
+ * Phase DA-1 — `useTierUpDetector` reads/writes the SIGNED-IN user's own
+ * gamification state. It must never run while an assistant is viewing a
+ * managed driver's dashboard, so it lives in a self-only child component
+ * that is simply not mounted in assistant mode (hooks stay unconditional).
+ */
+export function SelfTierUpDetector() {
+  useTierUpDetector();
+  return null;
+}
+
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false }: DashboardViewProps) {
   const { settings: ownSettings } = useUserSettings();
   // Phase DA-1 — managed-driver safe settings win whenever provided.
   const settings: any = settingsOverride ?? ownSettings;
 
   const { profile: costProfile } = useCostProfile();
-  useTierUpDetector();
+  const showPersonalWidgets = !isAssistantView;
+
   
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
@@ -400,6 +419,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
 
+      {/* Phase DA-1 — self-only tier-up detection (signed-in user's own state) */}
+      {showPersonalWidgets && <SelfTierUpDetector />}
+
       {/* Date Range Filter — moved above premium hero so it scopes the new charts */}
       <div className="space-y-2">
         <div className="flex flex-wrap gap-1.5">
@@ -483,12 +505,12 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={onNavigate ? () => onNavigate('loads') : undefined} />
 
-          <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />
+          {showPersonalWidgets && <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />}
         </>
       )}
 
       {/* === ZONE 1 · ACTION ZONE === */}
-      {!isLoading && onNavigate && (
+      {!isLoading && showPersonalWidgets && onNavigate && (
         <div className="grid grid-cols-4 gap-2">
           <Button
             variant="outline"
@@ -526,10 +548,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* Driver Intelligence */}
-      {!isLoading && <DriverIntelligenceCard isPro={isPro} />}
+      {!isLoading && showPersonalWidgets && <DriverIntelligenceCard isPro={isPro} />}
 
       {/* === ZONE 2 · COMPETITION === */}
-      {!isLoading && (
+      {!isLoading && showPersonalWidgets && (
         <DriverLeaderboardCard
           limit={5}
           onCustomize={onNavigate ? () => {
@@ -540,8 +562,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* === ZONE 3 · ALERTS === */}
-      {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
-      {!isLoading && smartAlerts && (
+      {!isLoading && showPersonalWidgets && <TaxReminderBanner settings={settings} isPro={isPro} />}
+      {!isLoading && showPersonalWidgets && smartAlerts && (
         <SmartAlertsCard
           alerts={smartAlerts.alerts}
           onDismiss={(key) => smartAlerts.dismissAlert.mutate(key)}
@@ -553,9 +575,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       {!isLoading && <WeeklyFocusCard loads={loads} />}
 
       {/* === ZONE 4 · QUICK SHORTCUTS === */}
-      {!isLoading && (
+      {!isLoading && showPersonalWidgets && (
         <HomeTimeDashboardCard isPro={isPro} onNavigate={onNavigate} />
       )}
+
 
       {/* Loading skeletons */}
       {isLoading ? (
@@ -704,7 +727,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           <TaxEstimateCard loads={activeLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
 
           {/* Finalize Weekly Summary Button */}
-          {(showCloseoutButton || true) && onNavigate && (
+          {showPersonalWidgets && (showCloseoutButton || true) && onNavigate && (
             <Button
               variant="outline"
               className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
@@ -727,25 +750,27 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* === ZONE 6 · INSIGHTS (AI + trends) === */}
           {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
-          <WeeklyPulseCard isPro={isPro} />
+          {showPersonalWidgets && <WeeklyPulseCard isPro={isPro} />}
 
           {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
-          <PersonalIntelligenceBlocks isPro={isPro} />
+          {showPersonalWidgets && <PersonalIntelligenceBlocks isPro={isPro} />}
 
           {/* Smart Load Advisor — promoted */}
           <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} />
 
           {/* Personalized Pro Insight — free users only */}
-          <ProInsightCard
-            loads={loads}
-            expenses={expenses}
-            isPro={isPro}
-
-            onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
-          />
+          {showPersonalWidgets && (
+            <ProInsightCard
+              loads={loads}
+              expenses={expenses}
+              isPro={isPro}
+              onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
+            />
+          )}
 
           {/* Pro Time Saved */}
-          <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />
+          {showPersonalWidgets && <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />}
+
 
           {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
 

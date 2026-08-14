@@ -1103,6 +1103,7 @@ const Index = () => {
                   smartAlerts={smartAlerts}
                   isPro={isPro}
                   settingsOverride={isActingAsAssistant ? driverReportSettings ?? null : null}
+                  isAssistantView={isActingAsAssistant}
                   showRecommendedOpportunity={!isActingAsAssistant && effectiveRole === 'driver' && driverWorkspaceAllowed}
                 />
 
