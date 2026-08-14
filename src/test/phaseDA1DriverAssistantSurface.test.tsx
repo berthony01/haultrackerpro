@@ -220,3 +220,33 @@ describe('DA-1 · Driver Pro pricing truth', () => {
     expect(assistantCopy).not.toMatch(/invite (more|additional|other) assistants/i);
   });
 });
+
+describe('DA-1 · webhook cleanup uses the exact canonical Driver Pro rule', () => {
+  const SRC = () => read('supabase/functions/stripe-webhook/index.ts');
+
+  it('derives driverProActive from status === "active" on a pro plan only', () => {
+    expect(SRC()).toMatch(
+      /const driverProActive\s*=\s*status === "active" &&\s*\n?\s*\(price\.planKey === "pro_monthly" \|\| price\.planKey === "pro_yearly"\)/,
+    );
+  });
+
+  it('gates the driver-branch cleanup call on !driverProActive, not the legacy isActive variable', () => {
+    const src = SRC();
+    const branch = src.slice(src.indexOf('if (context === "driver")'), src.indexOf('if (context === "recruiter")'));
+    expect(branch).toMatch(/if \(!driverProActive\) \{[\s\S]*?endDirectAssistantAccess\(supabase, entityKey\)/);
+    // The cleanup must never sit inside an `else` of the broader isActive check.
+    expect(branch).not.toMatch(/\} else \{[\s\S]*?endDirectAssistantAccess/);
+  });
+
+  it('keeps the legacy isActive billing-state meaning unchanged', () => {
+    expect(SRC()).toMatch(
+      /const isActive = status === "active" \|\| status === "trialing" \|\| status === "past_due";/,
+    );
+  });
+
+  it('still ends direct assistant access on terminal revoke', () => {
+    const src = SRC();
+    const revoke = src.slice(src.indexOf('async function applyRevoke'));
+    expect(revoke).toMatch(/endDirectAssistantAccess\(supabase, entityKey\)/);
+  });
+});
