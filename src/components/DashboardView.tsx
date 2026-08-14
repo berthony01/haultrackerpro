@@ -76,6 +76,13 @@ interface DashboardViewProps {
    *  the ProfitByLoadTable. Default false so existing standalone consumers
    *  of DashboardView don't unexpectedly mount opportunity data hooks. */
   showRecommendedOpportunity?: boolean;
+  /**
+   * Phase DA-1 — true when a direct Driver Assistant is acting for a managed
+   * driver. Suppresses widgets/controls bound to the SIGNED-IN user's own
+   * personal driver state (home time, leaderboard, personal intelligence,
+   * tier-up, reminders, closeout, add/action controls).
+   */
+  isAssistantView?: boolean;
 
 }
 
