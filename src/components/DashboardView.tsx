@@ -507,7 +507,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* === ZONE 1 · ACTION ZONE === */}
-      {!isLoading && onNavigate && (
+      {!isLoading && showPersonalWidgets && onNavigate && (
         <div className="grid grid-cols-4 gap-2">
           <Button
             variant="outline"
