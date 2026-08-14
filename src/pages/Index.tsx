@@ -193,9 +193,21 @@ const Index = () => {
   const allFuelLogsQuery = useFuelLogs();
   const loadStopsHook = useLoadStops();
 
+  // Phase DA-1 — while acting, reports AND dashboard context must use the
+  // MANAGED driver's safe settings (narrow RPC), never the assistant's own
+  // user_settings. Single hook instance, declared before any consumer.
+  const { data: driverReportSettings } = useDriverReportSettings(
+    isActingAsAssistant ? actingDriver?.driver_user_id ?? null : null,
+  );
+  // Effective week start: self mode uses own settings, acting mode uses the
+  // managed driver's safe report settings.
+  const effectiveWeekStartDay = isActingAsAssistant
+    ? driverReportSettings?.week_start_day ?? undefined
+    : settings?.week_start_day;
+
   // Smart Alerts & Scorecard
-  const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
-  const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses, settings?.week_start_day);
+  const smartAlerts = useSmartAlerts(allLoadsQuery.loads, allExpensesQuery.expenses, effectiveWeekStartDay);
+  const scorecard = useDriverScorecard(allLoadsQuery.loads, allExpensesQuery.expenses, effectiveWeekStartDay);
 
   // Pro gating — canonical subscription hook (Free vs Pro plans only)
   const subscription = useSubscription();
@@ -212,11 +224,7 @@ const Index = () => {
   const canExportReports = isActingAsAssistant
     ? hasPerm(actingPermissions, 'export_reports')
     : true;
-  // Phase DA-1 — while acting, reports must use the MANAGED driver's safe
-  // report settings (narrow RPC), never the assistant's own user_settings.
-  const { data: driverReportSettings } = useDriverReportSettings(
-    isActingAsAssistant ? actingDriver?.driver_user_id ?? null : null,
-  );
+
 
 
   const { profile: driverOppProfile } = useDriverOpportunityProfile();
