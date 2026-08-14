@@ -195,13 +195,25 @@ export function getCancelledFootnote(n: number): string | null {
 }
 
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false }: DashboardViewProps) {
+/**
+ * Phase DA-1 — `useTierUpDetector` reads/writes the SIGNED-IN user's own
+ * gamification state. It must never run while an assistant is viewing a
+ * managed driver's dashboard, so it lives in a self-only child component
+ * that is simply not mounted in assistant mode (hooks stay unconditional).
+ */
+export function SelfTierUpDetector() {
+  useTierUpDetector();
+  return null;
+}
+
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false }: DashboardViewProps) {
   const { settings: ownSettings } = useUserSettings();
   // Phase DA-1 — managed-driver safe settings win whenever provided.
   const settings: any = settingsOverride ?? ownSettings;
 
   const { profile: costProfile } = useCostProfile();
-  useTierUpDetector();
+  const showPersonalWidgets = !isAssistantView;
+
   
   const weekStartsOn = weekStartDayToNumber(settings?.week_start_day);
   const [activePreset, setActivePreset] = useState<PresetKey>('this_week');
