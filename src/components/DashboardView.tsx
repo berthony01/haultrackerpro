@@ -545,10 +545,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* Driver Intelligence */}
-      {!isLoading && <DriverIntelligenceCard isPro={isPro} />}
+      {!isLoading && showPersonalWidgets && <DriverIntelligenceCard isPro={isPro} />}
 
       {/* === ZONE 2 · COMPETITION === */}
-      {!isLoading && (
+      {!isLoading && showPersonalWidgets && (
         <DriverLeaderboardCard
           limit={5}
           onCustomize={onNavigate ? () => {
@@ -559,8 +559,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       )}
 
       {/* === ZONE 3 · ALERTS === */}
-      {!isLoading && <TaxReminderBanner settings={settings} isPro={isPro} />}
-      {!isLoading && smartAlerts && (
+      {!isLoading && showPersonalWidgets && <TaxReminderBanner settings={settings} isPro={isPro} />}
+      {!isLoading && showPersonalWidgets && smartAlerts && (
         <SmartAlertsCard
           alerts={smartAlerts.alerts}
           onDismiss={(key) => smartAlerts.dismissAlert.mutate(key)}
@@ -572,9 +572,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       {!isLoading && <WeeklyFocusCard loads={loads} />}
 
       {/* === ZONE 4 · QUICK SHORTCUTS === */}
-      {!isLoading && (
+      {!isLoading && showPersonalWidgets && (
         <HomeTimeDashboardCard isPro={isPro} onNavigate={onNavigate} />
       )}
+
 
       {/* Loading skeletons */}
       {isLoading ? (
