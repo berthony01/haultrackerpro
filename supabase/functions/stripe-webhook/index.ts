@@ -430,6 +430,11 @@ async function applyEntitlement(
   if (context === "driver") {
     // Only grant/keep Pro on non-terminal statuses.
     const planKey = isActive ? price.planKey : "free";
+    // Phase DA-1 — canonical Driver Pro rule (matches driver_has_active_pro /
+    // useSubscription): status must be exactly "active" on a pro plan. This is
+    // intentionally narrower than the legacy `isActive` billing-state variable.
+    const driverProActive = status === "active" &&
+      (price.planKey === "pro_monthly" || price.planKey === "pro_yearly");
     const { error } = await supabase.from("subscriptions").upsert(
       {
         user_id: entityKey,
@@ -456,9 +461,10 @@ async function applyEntitlement(
         stripe_subscription_id: subId,
         subscription_expires_at: periodEnd,
       }).eq("user_id", entityKey);
-    } else {
-      // Phase DA-1 — driver lost active Pro: end DIRECT assistant access.
-      // Agency-delegated assistant rows are untouched by this function.
+    }
+    if (!driverProActive) {
+      // Phase DA-1 — driver does not hold canonical active Pro: end DIRECT
+      // assistant access. Agency-delegated assistant rows are untouched.
       await endDirectAssistantAccess(supabase, entityKey);
     }
     logStep("Driver entitlement applied", { plan_key: planKey, status });

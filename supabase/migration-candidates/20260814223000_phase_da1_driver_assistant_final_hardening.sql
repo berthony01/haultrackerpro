@@ -38,8 +38,10 @@ AS $function$
     );
 $function$;
 
+-- Internal authorization helper: least privilege. SECURITY DEFINER callers
+-- (assistant_has_permission, get_my_managed_drivers) execute it as owner, so
+-- no direct EXECUTE grant to `authenticated` is required.
 REVOKE ALL ON FUNCTION public.driver_has_active_pro(uuid) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.driver_has_active_pro(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.driver_has_active_pro(uuid) TO service_role;
 
 -- ---------------------------------------------------------------------
@@ -135,10 +137,12 @@ BEGIN
     RETURNING da.*
   LOOP
     _count := _count + 1;
+    -- assistant_audit_log.assistant_user_id is NOT NULL in production; a
+    -- pending invite has no assistant yet, so fall back to the driver.
     INSERT INTO public.assistant_audit_log
       (delegate_id, driver_user_id, assistant_user_id, action, entity_type, entity_id, metadata)
     VALUES
-      (_row.id, _row.driver_user_id, _row.assistant_user_id, 'assistant_revoked',
+      (_row.id, _row.driver_user_id, COALESCE(_row.assistant_user_id, _row.driver_user_id), 'assistant_revoked',
        'driver_assistants', _row.id,
        jsonb_build_object('reason', 'driver_pro_ended', 'source', 'phase_da1'));
   END LOOP;
