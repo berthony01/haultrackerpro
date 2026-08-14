@@ -107,10 +107,13 @@ export function MonthlySummary({
 }
 
 function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, monthEnd, settingsOverride = null, canExport = true, isPro = true }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[]; monthStart: Date; monthEnd: Date; settingsOverride?: Partial<Record<string, any>> | null; canExport?: boolean; isPro?: boolean }) {
-
   const { fuelLogs } = useFuelLogs();
-  const { settings } = useUserSettings();
+  const { settings: ownSettings } = useUserSettings();
   const { user } = useAuth();
+  // Managed-driver settings win whenever provided (assistant acting mode).
+  const settings: any = settingsOverride ?? ownSettings;
+  const exportsAllowed = canExport && isPro;
+
   const stats = useMemo(() => {
     const nonCancelled = loads.filter(l => l.status !== 'cancelled');
     const estimated = sumExpectedPay(nonCancelled);
