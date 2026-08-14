@@ -195,8 +195,11 @@ export function getCancelledFootnote(n: number): string | null {
 }
 
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, showRecommendedOpportunity = false }: DashboardViewProps) {
-  const { settings } = useUserSettings();
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false }: DashboardViewProps) {
+  const { settings: ownSettings } = useUserSettings();
+  // Phase DA-1 — managed-driver safe settings win whenever provided.
+  const settings: any = settingsOverride ?? ownSettings;
+
   const { profile: costProfile } = useCostProfile();
   useTierUpDetector();
   
