@@ -419,6 +419,11 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <p className="text-sm text-muted-foreground">Your hauling overview</p>
       </div>
 
+      {/* Phase DA-1 — self-only tier-up detection (signed-in user's own state) */}
+      {showPersonalWidgets && <SelfTierUpDetector />}
+      <div className="hidden" aria-hidden="true">
+      </div>
+
       {/* Date Range Filter — moved above premium hero so it scopes the new charts */}
       <div className="space-y-2">
         <div className="flex flex-wrap gap-1.5">
