@@ -234,29 +234,40 @@ function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, mon
           </div>
         )}
 
-        {/* Export Buttons */}
+        {/* Export Buttons — Phase DA-1: require explicit export permission AND
+            the effective (managed) driver's Pro entitlement. */}
         <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5 text-xs rounded-xl"
-            onClick={() => exportToCSV(loads, `month-${label.replace(/\s/g, '-')}`, allStops)}
+            disabled={!exportsAllowed}
+            data-testid="monthly-export-csv"
+            className="flex-1 gap-1.5 text-xs rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => {
+              if (!canExport) { toast.error('You do not have permission to export reports for this driver.'); return; }
+              if (!isPro) { toast.error('CSV exports are a Pro feature. Upgrade to unlock.'); return; }
+              exportToCSV(loads, `month-${label.replace(/\s/g, '-')}`, allStops);
+            }}
           >
             <FileSpreadsheet className="h-3.5 w-3.5" /> CSV
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5 text-xs rounded-xl"
+            disabled={!exportsAllowed}
+            data-testid="monthly-export-pdf"
+            className="flex-1 gap-1.5 text-xs rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => {
+              if (!canExport) { toast.error('You do not have permission to export reports for this driver.'); return; }
+              if (!isPro) { toast.error('PDF reports are a Pro feature. Upgrade to unlock.'); return; }
               try {
                 const from = format(monthStart, 'yyyy-MM-dd');
                 const to = format(monthEnd, 'yyyy-MM-dd');
                 const preparedFor =
                   settings?.company_name ||
-                  (user?.user_metadata as any)?.display_name ||
-                  user?.email ||
-                  'HaulTrackerPro Driver';
+                  (settingsOverride
+                    ? 'HaulTrackerPro Driver'
+                    : (user?.user_metadata as any)?.display_name || user?.email || 'HaulTrackerPro Driver');
                 const agg = aggregateReport({
                   loads,
                   expenses,
@@ -277,6 +288,7 @@ function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, mon
             <Download className="h-3.5 w-3.5" /> PDF
           </Button>
         </div>
+
       </CardContent>
     </Card>
   );
