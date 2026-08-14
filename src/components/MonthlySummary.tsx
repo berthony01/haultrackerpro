@@ -26,9 +26,29 @@ interface MonthlySummaryProps {
   loads: Load[];
   expenses?: Expense[];
   onBack: () => void;
+  /**
+   * Phase DA-1 — report settings of the account the monthly report belongs to.
+   * When an assistant is acting for a driver this MUST be the managed driver's
+   * safe report settings, never the signed-in assistant's own settings.
+   */
+  settingsOverride?: Partial<Record<string, any>> | null;
+  /**
+   * Phase DA-1 — explicit export capability. Assistants without
+   * `export_reports` may view the monthly summary but never download it.
+   */
+  canExport?: boolean;
+  /** Phase DA-1 — effective (managed) driver Pro entitlement. */
+  isPro?: boolean;
 }
 
-export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryProps) {
+export function MonthlySummary({
+  loads,
+  expenses = [],
+  onBack,
+  settingsOverride = null,
+  canExport = true,
+  isPro = true,
+}: MonthlySummaryProps) {
   const { stops } = useLoadStops();
   const months = useMemo(() => {
     const now = new Date();
@@ -58,14 +78,36 @@ export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryP
         </div>
       </div>
 
+      {!canExport && (
+        <div
+          data-testid="monthly-export-not-permitted"
+          className="rounded-xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground"
+        >
+          You can view this monthly summary, but you do not have permission to export it.
+        </div>
+      )}
+
       {months.map(month => (
-        <MonthCard key={month.label} label={month.label} loads={month.loads} expenses={month.expenses} allLoads={loads} allStops={stops} monthStart={month.start} monthEnd={month.end} />
+        <MonthCard
+          key={month.label}
+          label={month.label}
+          loads={month.loads}
+          expenses={month.expenses}
+          allLoads={loads}
+          allStops={stops}
+          monthStart={month.start}
+          monthEnd={month.end}
+          settingsOverride={settingsOverride}
+          canExport={canExport}
+          isPro={isPro}
+        />
       ))}
     </div>
   );
 }
 
-function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, monthEnd }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[]; monthStart: Date; monthEnd: Date }) {
+function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, monthEnd, settingsOverride = null, canExport = true, isPro = true }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[]; monthStart: Date; monthEnd: Date; settingsOverride?: Partial<Record<string, any>> | null; canExport?: boolean; isPro?: boolean }) {
+
   const { fuelLogs } = useFuelLogs();
   const { settings } = useUserSettings();
   const { user } = useAuth();
