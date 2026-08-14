@@ -232,7 +232,7 @@ describe('DA-1 · webhook cleanup uses the exact canonical Driver Pro rule', () 
 
   it('gates the driver-branch cleanup call on !driverProActive, not the legacy isActive variable', () => {
     const src = SRC();
-    const branch = src.slice(src.indexOf('if (context === "driver")'), src.indexOf('if (context === "recruiter")'));
+    const branch = src.slice(src.indexOf('const driverProActive'), src.indexOf('if (context === "recruiter")'));
     expect(branch).toMatch(/if \(!driverProActive\) \{[\s\S]*?endDirectAssistantAccess\(supabase, entityKey\)/);
     // The cleanup must never sit inside an `else` of the broader isActive check.
     expect(branch).not.toMatch(/\} else \{[\s\S]*?endDirectAssistantAccess/);
