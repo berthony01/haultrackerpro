@@ -665,8 +665,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   )
                 ) : missingMiles ? (
                   <div
-                    className="cursor-pointer active:scale-95 transition-transform"
-                    onClick={() => onNavigate?.('settings')}
+                    className={showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''}
+                    onClick={showPersonalWidgets ? () => onNavigate?.('settings') : undefined}
                   >
                     <StatCard
                       label="Projected Net"
