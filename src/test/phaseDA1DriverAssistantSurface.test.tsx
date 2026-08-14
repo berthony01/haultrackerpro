@@ -359,7 +359,6 @@ describe('DA-1 · webhook cleanup uses the exact canonical Driver Pro rule', () 
 // bound to the SIGNED-IN user's own personal driver state.
 // -------------------------------------------------------------------------
 const tierUpSpy = vi.fn();
-const sentinel = (id: string) => ({ default: undefined, __sentinel: id });
 
 vi.mock('@/hooks/useTierUpDetector', () => ({ useTierUpDetector: () => tierUpSpy() }));
 vi.mock('@/hooks/useCostProfile', () => ({
