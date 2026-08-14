@@ -84,7 +84,7 @@ CREATE TABLE public.assistant_audit_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   delegate_id uuid,
   driver_user_id uuid,
-  assistant_user_id uuid,
+  assistant_user_id uuid NOT NULL,
   action text NOT NULL,
   entity_type text,
   entity_id uuid,

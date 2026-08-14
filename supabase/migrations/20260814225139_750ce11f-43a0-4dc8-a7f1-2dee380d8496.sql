@@ -1,22 +1,7 @@
 -- =====================================================================
 -- Phase DA-1 — Driver <-> Driver Assistant relationship final hardening
---
--- Atomic, dedicated to DA-1. Four concerns only:
---   1. canonical Driver Pro entitlement helper
---   2. assistant_has_permission fails closed for DIRECT assistants when the
---      driver no longer holds active Driver Pro (agency-delegated rows keep
---      their existing behavior, unchanged)
---   3. get_my_managed_drivers exposes driver_is_pro and stops returning
---      non-Pro DIRECT relationships as actionable managed drivers
---   4. plan-loss cleanup of DIRECT assistant rows + narrow report-settings
---      read RPC for authorized assistants
---
--- No agency behavior, no recruiter behavior, no billing amounts touched.
 -- =====================================================================
 
--- ---------------------------------------------------------------------
--- 1. Canonical Driver Pro entitlement
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.driver_has_active_pro(_driver uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -38,15 +23,9 @@ AS $function$
     );
 $function$;
 
--- Internal authorization helper: least privilege. SECURITY DEFINER callers
--- (assistant_has_permission, get_my_managed_drivers) execute it as owner, so
--- no direct EXECUTE grant to `authenticated` is required.
 REVOKE ALL ON FUNCTION public.driver_has_active_pro(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.driver_has_active_pro(uuid) TO service_role;
 
--- ---------------------------------------------------------------------
--- 2. Fail-closed authorization for DIRECT assistants
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.assistant_has_permission(_assistant uuid, _driver uuid, _perm text)
 RETURNS boolean
 LANGUAGE sql
@@ -61,17 +40,12 @@ AS $function$
       AND da.status            = 'active'
       AND COALESCE((da.permissions ->> _perm)::boolean, false) = true
       AND (
-        -- Agency-delegated relationships keep their existing authorization.
         da.agency_delegation_id IS NOT NULL
-        -- Direct relationships require the DRIVER's active Pro entitlement.
         OR public.driver_has_active_pro(da.driver_user_id)
       )
   );
 $function$;
 
--- ---------------------------------------------------------------------
--- 3. Managed-driver list: expose driver_is_pro, hide stale direct rows
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_my_managed_drivers()
 RETURNS SETOF jsonb
 LANGUAGE plpgsql
@@ -107,9 +81,6 @@ BEGIN
 END;
 $function$;
 
--- ---------------------------------------------------------------------
--- 4a. Plan-loss cleanup — DIRECT assistant rows only
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.revoke_direct_assistants_on_driver_pro_end(_driver_user_id uuid)
 RETURNS integer
 LANGUAGE plpgsql
@@ -137,8 +108,8 @@ BEGIN
     RETURNING da.*
   LOOP
     _count := _count + 1;
-    -- assistant_audit_log.assistant_user_id is NOT NULL in production; a
-    -- pending invite has no assistant yet, so fall back to the driver.
+    -- assistant_audit_log.assistant_user_id is NOT NULL; a pending invite has
+    -- no assistant yet, so fall back to the driver.
     INSERT INTO public.assistant_audit_log
       (delegate_id, driver_user_id, assistant_user_id, action, entity_type, entity_id, metadata)
     VALUES
@@ -154,9 +125,6 @@ $function$;
 REVOKE ALL ON FUNCTION public.revoke_direct_assistants_on_driver_pro_end(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.revoke_direct_assistants_on_driver_pro_end(uuid) TO service_role;
 
--- ---------------------------------------------------------------------
--- 4b. Narrow report-settings read for driver-or-authorized-assistant
--- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.get_driver_report_settings(_driver_user_id uuid)
 RETURNS TABLE (
   company_name text,

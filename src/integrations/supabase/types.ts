@@ -4743,6 +4743,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      driver_has_active_pro: { Args: { _driver: string }; Returns: boolean }
       driver_respond_to_work_item: {
         Args: { _id: string; _response: string }
         Returns: string
@@ -4839,6 +4840,22 @@ export type Database = {
       get_application_contract_summary: {
         Args: { _application_id: string }
         Returns: Json
+      }
+      get_driver_report_settings: {
+        Args: { _driver_user_id: string }
+        Returns: {
+          buffer_percent: number
+          company_name: string
+          company_start_date: string
+          currency: string
+          federal_tax_percent: number
+          include_se_tax: boolean
+          se_tax_percent: number
+          state_tax_percent: number
+          tax_base_type: string
+          tax_estimator_enabled: boolean
+          week_start_day: string
+        }[]
       }
       get_effective_agency_limits: {
         Args: { _agency_id: string }
@@ -5511,6 +5528,10 @@ export type Database = {
       }
       revoke_agency_member: { Args: { _member_id: string }; Returns: undefined }
       revoke_assistant: { Args: { _id: string }; Returns: undefined }
+      revoke_direct_assistants_on_driver_pro_end: {
+        Args: { _driver_user_id: string }
+        Returns: number
+      }
       set_agency_client_request_status: {
         Args: {
           _assigned_member_user_id?: string
