@@ -747,25 +747,30 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* === ZONE 6 · INSIGHTS (AI + trends) === */}
           {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
-          <WeeklyPulseCard isPro={isPro} />
+          {showPersonalWidgets && <WeeklyPulseCard isPro={isPro} />}
 
           {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
-          <PersonalIntelligenceBlocks isPro={isPro} />
+          {showPersonalWidgets && <PersonalIntelligenceBlocks isPro={isPro} />}
 
           {/* Smart Load Advisor — promoted */}
           <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} />
 
           {/* Personalized Pro Insight — free users only */}
-          <ProInsightCard
-            loads={loads}
-            expenses={expenses}
-            isPro={isPro}
-
-            onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
-          />
+          {showPersonalWidgets && (
+            <ProInsightCard
+              loads={loads}
+              expenses={expenses}
+              isPro={isPro}
+              onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
+            />
+          )}
 
           {/* Pro Time Saved */}
-          <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />
+          {showPersonalWidgets && <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />}
+
+          {/* Phase DA-1 — self-only tier-up detection (signed-in user's own state) */}
+          {showPersonalWidgets && <SelfTierUpDetector />}
+
 
           {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
 
