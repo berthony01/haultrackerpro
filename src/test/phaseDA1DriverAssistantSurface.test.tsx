@@ -120,6 +120,108 @@ describe('DA-1 · export_reports controls report exports', () => {
 });
 
 // -------------------------------------------------------------------------
+// DA-1 acceptance — Monthly Summary drill-down honours the same gates.
+// -------------------------------------------------------------------------
+import { MonthlySummary } from '@/components/MonthlySummary';
+
+const today = new Date();
+const iso = (d: Date) => d.toISOString().slice(0, 10);
+const MONTH_LOAD: any = {
+  ...LOAD,
+  id: 'm1',
+  load_date: iso(today),
+  pickup_date: iso(today),
+  dropoff_date: iso(today),
+};
+
+const monthlyButtons = () => ({
+  csv: screen.getAllByTestId('monthly-export-csv') as HTMLButtonElement[],
+  pdf: screen.getAllByTestId('monthly-export-pdf') as HTMLButtonElement[],
+});
+
+describe('DA-1 · Monthly Summary export gating', () => {
+  it('disables monthly CSV and PDF when canExport is false', () => {
+    render(<MonthlySummary loads={[MONTH_LOAD]} expenses={[]} onBack={() => {}} isPro canExport={false} />);
+    const { csv, pdf } = monthlyButtons();
+    expect(csv.length).toBeGreaterThan(0);
+    for (const b of csv) expect(b.disabled).toBe(true);
+    for (const b of pdf) expect(b.disabled).toBe(true);
+    expect(screen.getByTestId('monthly-export-not-permitted')).toBeTruthy();
+  });
+
+  it('disables monthly CSV and PDF when the managed driver is not Pro', () => {
+    render(<MonthlySummary loads={[MONTH_LOAD]} expenses={[]} onBack={() => {}} isPro={false} canExport />);
+    const { csv, pdf } = monthlyButtons();
+    for (const b of csv) expect(b.disabled).toBe(true);
+    for (const b of pdf) expect(b.disabled).toBe(true);
+  });
+
+  it('enables monthly exports only when export permission AND driver Pro are both true', () => {
+    render(<MonthlySummary loads={[MONTH_LOAD]} expenses={[]} onBack={() => {}} isPro canExport />);
+    const { csv, pdf } = monthlyButtons();
+    expect(csv.some((b) => !b.disabled)).toBe(true);
+    expect(pdf.some((b) => !b.disabled)).toBe(true);
+  });
+
+  it('never falls back to the assistant identity when a settings override is supplied', () => {
+    const SRC = read('src/components/MonthlySummary.tsx');
+    expect(SRC).toMatch(/const settings: any = settingsOverride \?\? ownSettings;/);
+    expect(SRC).toMatch(
+      /settings\?\.company_name \|\|\s*\n?\s*\(settingsOverride\s*\n?\s*\? 'HaulTrackerPro Driver'/,
+    );
+    render(
+      <MonthlySummary
+        loads={[MONTH_LOAD]}
+        expenses={[]}
+        onBack={() => {}}
+        isPro
+        canExport
+        settingsOverride={{ company_name: 'MANAGED DRIVER LLC', week_start_day: 'monday' }}
+      />,
+    );
+    expect(document.body.textContent).not.toContain('ASSISTANT OWN CO');
+  });
+});
+
+// -------------------------------------------------------------------------
+// DA-1 acceptance — Index wires managed-driver context into monthly + dashboard.
+// -------------------------------------------------------------------------
+describe('DA-1 · Index passes managed-driver context to monthly + dashboard', () => {
+  const INDEX = read('src/pages/Index.tsx');
+
+  it('passes isPro, canExport and the managed driver settings to MonthlySummary', () => {
+    const block = INDEX.slice(INDEX.indexOf('<MonthlySummary'));
+    const jsx = block.slice(0, block.indexOf('/>'));
+    expect(jsx).toMatch(/isPro=\{isPro\}/);
+    expect(jsx).toMatch(/canExport=\{canExportReports\}/);
+    expect(jsx).toMatch(/settingsOverride=\{isActingAsAssistant \? driverReportSettings \?\? null : null\}/);
+  });
+
+  it('passes the managed driver settings override to DashboardView', () => {
+    const block = INDEX.slice(INDEX.indexOf('<DashboardView'));
+    const jsx = block.slice(0, block.indexOf('/>'));
+    expect(jsx).toMatch(/settingsOverride=\{isActingAsAssistant \? driverReportSettings \?\? null : null\}/);
+  });
+
+  it('derives the effective week start from the managed driver while acting, own settings when self', () => {
+    expect(INDEX).toMatch(
+      /const effectiveWeekStartDay = isActingAsAssistant\s*\n?\s*\? driverReportSettings\?\.week_start_day \?\? undefined\s*\n?\s*: settings\?\.week_start_day;/,
+    );
+    expect(INDEX).toMatch(/useSmartAlerts\([^)]*effectiveWeekStartDay\)/);
+    expect(INDEX).toMatch(/useDriverScorecard\([^)]*effectiveWeekStartDay\)/);
+    // No second RPC hook instance.
+    expect(INDEX.match(/useDriverReportSettings\(/g)?.length).toBe(1);
+  });
+
+  it('resolves DashboardView settings from the override before own settings', () => {
+    const SRC = read('src/components/DashboardView.tsx');
+    expect(SRC).toMatch(/const \{ settings: ownSettings \} = useUserSettings\(\);/);
+    expect(SRC).toMatch(/const settings: any = settingsOverride \?\? ownSettings;/);
+  });
+});
+
+
+// -------------------------------------------------------------------------
 // 9 + 10 — assistant navigation allowlist fails closed.
 // -------------------------------------------------------------------------
 describe('DA-1 · assistant navigation fails closed', () => {

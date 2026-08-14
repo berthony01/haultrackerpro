@@ -65,11 +65,18 @@ interface DashboardViewProps {
   onNavigate?: (page: string, options?: { filter?: string }) => void;
   smartAlerts?: { alerts: any[]; dismissAlert: { mutate: (key: string) => void } };
   isPro?: boolean;
+  /**
+   * Phase DA-1 — safe settings of the account the dashboard belongs to. When an
+   * assistant is acting for a driver this MUST be the managed driver's narrow
+   * report settings, never the signed-in assistant's own settings.
+   */
+  settingsOverride?: Partial<Record<string, any>> | null;
   /** Phase 1N-B — when true (and onNavigate is present), render the driver
    *  "Recommended Opportunity" card between the primary dashboard grid and
    *  the ProfitByLoadTable. Default false so existing standalone consumers
    *  of DashboardView don't unexpectedly mount opportunity data hooks. */
   showRecommendedOpportunity?: boolean;
+
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
@@ -188,8 +195,11 @@ export function getCancelledFootnote(n: number): string | null {
 }
 
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, showRecommendedOpportunity = false }: DashboardViewProps) {
-  const { settings } = useUserSettings();
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false }: DashboardViewProps) {
+  const { settings: ownSettings } = useUserSettings();
+  // Phase DA-1 — managed-driver safe settings win whenever provided.
+  const settings: any = settingsOverride ?? ownSettings;
+
   const { profile: costProfile } = useCostProfile();
   useTierUpDetector();
   

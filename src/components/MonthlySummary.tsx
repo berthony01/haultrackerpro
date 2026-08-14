@@ -26,9 +26,29 @@ interface MonthlySummaryProps {
   loads: Load[];
   expenses?: Expense[];
   onBack: () => void;
+  /**
+   * Phase DA-1 — report settings of the account the monthly report belongs to.
+   * When an assistant is acting for a driver this MUST be the managed driver's
+   * safe report settings, never the signed-in assistant's own settings.
+   */
+  settingsOverride?: Partial<Record<string, any>> | null;
+  /**
+   * Phase DA-1 — explicit export capability. Assistants without
+   * `export_reports` may view the monthly summary but never download it.
+   */
+  canExport?: boolean;
+  /** Phase DA-1 — effective (managed) driver Pro entitlement. */
+  isPro?: boolean;
 }
 
-export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryProps) {
+export function MonthlySummary({
+  loads,
+  expenses = [],
+  onBack,
+  settingsOverride = null,
+  canExport = true,
+  isPro = true,
+}: MonthlySummaryProps) {
   const { stops } = useLoadStops();
   const months = useMemo(() => {
     const now = new Date();
@@ -58,17 +78,42 @@ export function MonthlySummary({ loads, expenses = [], onBack }: MonthlySummaryP
         </div>
       </div>
 
+      {!canExport && (
+        <div
+          data-testid="monthly-export-not-permitted"
+          className="rounded-xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground"
+        >
+          You can view this monthly summary, but you do not have permission to export it.
+        </div>
+      )}
+
       {months.map(month => (
-        <MonthCard key={month.label} label={month.label} loads={month.loads} expenses={month.expenses} allLoads={loads} allStops={stops} monthStart={month.start} monthEnd={month.end} />
+        <MonthCard
+          key={month.label}
+          label={month.label}
+          loads={month.loads}
+          expenses={month.expenses}
+          allLoads={loads}
+          allStops={stops}
+          monthStart={month.start}
+          monthEnd={month.end}
+          settingsOverride={settingsOverride}
+          canExport={canExport}
+          isPro={isPro}
+        />
       ))}
     </div>
   );
 }
 
-function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, monthEnd }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[]; monthStart: Date; monthEnd: Date }) {
+function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, monthEnd, settingsOverride = null, canExport = true, isPro = true }: { label: string; loads: Load[]; expenses?: Expense[]; allLoads: Load[]; allStops?: import('@/hooks/useLoadStops').LoadStop[]; monthStart: Date; monthEnd: Date; settingsOverride?: Partial<Record<string, any>> | null; canExport?: boolean; isPro?: boolean }) {
   const { fuelLogs } = useFuelLogs();
-  const { settings } = useUserSettings();
+  const { settings: ownSettings } = useUserSettings();
   const { user } = useAuth();
+  // Managed-driver settings win whenever provided (assistant acting mode).
+  const settings: any = settingsOverride ?? ownSettings;
+  const exportsAllowed = canExport && isPro;
+
   const stats = useMemo(() => {
     const nonCancelled = loads.filter(l => l.status !== 'cancelled');
     const estimated = sumExpectedPay(nonCancelled);
@@ -189,29 +234,40 @@ function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, mon
           </div>
         )}
 
-        {/* Export Buttons */}
+        {/* Export Buttons — Phase DA-1: require explicit export permission AND
+            the effective (managed) driver's Pro entitlement. */}
         <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5 text-xs rounded-xl"
-            onClick={() => exportToCSV(loads, `month-${label.replace(/\s/g, '-')}`, allStops)}
+            disabled={!exportsAllowed}
+            data-testid="monthly-export-csv"
+            className="flex-1 gap-1.5 text-xs rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => {
+              if (!canExport) { toast.error('You do not have permission to export reports for this driver.'); return; }
+              if (!isPro) { toast.error('CSV exports are a Pro feature. Upgrade to unlock.'); return; }
+              exportToCSV(loads, `month-${label.replace(/\s/g, '-')}`, allStops);
+            }}
           >
             <FileSpreadsheet className="h-3.5 w-3.5" /> CSV
           </Button>
           <Button
             variant="outline"
             size="sm"
-            className="flex-1 gap-1.5 text-xs rounded-xl"
+            disabled={!exportsAllowed}
+            data-testid="monthly-export-pdf"
+            className="flex-1 gap-1.5 text-xs rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() => {
+              if (!canExport) { toast.error('You do not have permission to export reports for this driver.'); return; }
+              if (!isPro) { toast.error('PDF reports are a Pro feature. Upgrade to unlock.'); return; }
               try {
                 const from = format(monthStart, 'yyyy-MM-dd');
                 const to = format(monthEnd, 'yyyy-MM-dd');
                 const preparedFor =
                   settings?.company_name ||
-                  (user?.user_metadata as any)?.display_name ||
-                  user?.email ||
-                  'HaulTrackerPro Driver';
+                  (settingsOverride
+                    ? 'HaulTrackerPro Driver'
+                    : (user?.user_metadata as any)?.display_name || user?.email || 'HaulTrackerPro Driver');
                 const agg = aggregateReport({
                   loads,
                   expenses,
@@ -232,6 +288,7 @@ function MonthCard({ label, loads, expenses = [], allStops = [], monthStart, mon
             <Download className="h-3.5 w-3.5" /> PDF
           </Button>
         </div>
+
       </CardContent>
     </Card>
   );
