@@ -807,7 +807,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   You haven't logged any loads for this date range.<br />
                   Start tracking to see your earnings here.
                 </p>
-                {onNavigate && (
+                {showPersonalWidgets && onNavigate && (
                   <Button className="gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
                     <Plus className="h-4 w-4" /> Log Your First Load
                   </Button>
