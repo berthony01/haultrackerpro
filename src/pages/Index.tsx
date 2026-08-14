@@ -1212,7 +1212,11 @@ const Index = () => {
                 loads={allLoadsQuery.loads}
                 expenses={allExpensesQuery.expenses}
                 onBack={() => setPage('reports')}
+                isPro={isPro}
+                canExport={canExportReports}
+                settingsOverride={isActingAsAssistant ? driverReportSettings ?? null : null}
               />
+
             )}
             {page === 'alerts' && (
               <AlertsView
