@@ -495,7 +495,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                 tier={scorecard.tier}
                 percentileLabel={scorecard.totalScore >= 80 ? 'Top 14% of drivers' : scorecard.totalScore >= 60 ? 'Top 35% of drivers' : 'Keep going!'}
               />
-              <RecentLoadsPanel loads={filteredLoads} onViewAll={onNavigate ? () => onNavigate('loads') : undefined} />
+              <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
             </div>
           </div>
 
@@ -503,7 +503,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             <RecommendedOpportunityCard onNavigate={onNavigate} />
           )}
 
-          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={onNavigate ? () => onNavigate('loads') : undefined} />
+          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
 
           {showPersonalWidgets && <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />}
         </>
@@ -643,8 +643,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                 {projectedNet != null ? (
                   missingMiles ? (
                     <div
-                      className="cursor-pointer active:scale-95 transition-transform"
-                      onClick={() => onNavigate?.('settings')}
+                      className={showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''}
+                      onClick={showPersonalWidgets ? () => onNavigate?.('settings') : undefined}
                     >
                       <StatCard
                         label="Projected Net"
@@ -665,8 +665,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   )
                 ) : missingMiles ? (
                   <div
-                    className="cursor-pointer active:scale-95 transition-transform"
-                    onClick={() => onNavigate?.('settings')}
+                    className={showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''}
+                    onClick={showPersonalWidgets ? () => onNavigate?.('settings') : undefined}
                   >
                     <StatCard
                       label="Projected Net"
@@ -678,8 +678,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   </div>
                 ) : (
                   <div
-                    className="cursor-pointer active:scale-95 transition-transform"
-                    onClick={() => onNavigate?.('settings')}
+                    className={showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''}
+                    onClick={showPersonalWidgets ? () => onNavigate?.('settings') : undefined}
                   >
                     <StatCard
                       label="Projected Net"
@@ -700,8 +700,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                 )}
                 {missingPayCount > 0 && (
                   <div
-                    className="cursor-pointer active:scale-95 transition-transform"
-                    onClick={() => onNavigate?.('loads', { filter: 'missing_pay' })}
+                    className={showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''}
+                    onClick={showPersonalWidgets ? () => onNavigate?.('loads', { filter: 'missing_pay' }) : undefined}
                   >
                     <StatCard
                       label="Pending Payment"
@@ -721,7 +721,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
 
           {/* Fuel Analytics */}
-          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={activeLoads} isPro={isPro} onNavigate={onNavigate} />
+          <FuelAnalyticsCard fuelLogs={fuelLogs} loads={activeLoads} isPro={isPro} onNavigate={showPersonalWidgets ? onNavigate : undefined} />
 
           {/* Tax Estimate */}
           <TaxEstimateCard loads={activeLoads} expenses={filteredExpenses} settings={settings} isPro={isPro} />
@@ -737,8 +737,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </Button>
           )}
 
-          {/* View Reports */}
-          {onNavigate && (
+          {/* View Reports — hidden in assistant mode (view_reports already covered by nav) */}
+          {showPersonalWidgets && onNavigate && (
             <Button
               variant="outline"
               className="w-full h-12 gap-2 rounded-xl border-primary/30 text-primary font-bold active:scale-95 transition-all duration-200"
@@ -807,7 +807,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   You haven't logged any loads for this date range.<br />
                   Start tracking to see your earnings here.
                 </p>
-                {onNavigate && (
+                {showPersonalWidgets && onNavigate && (
                   <Button className="gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
                     <Plus className="h-4 w-4" /> Log Your First Load
                   </Button>

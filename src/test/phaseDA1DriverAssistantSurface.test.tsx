@@ -403,7 +403,7 @@ vi.mock('@/components/ContributionMarginCard', () => ({
   ContributionMarginCard: () => <div data-testid="w-contribution-margin" />,
 }));
 vi.mock('@/components/FuelAnalyticsCard', () => ({
-  FuelAnalyticsCard: () => <div data-testid="w-fuel-analytics" />,
+  FuelAnalyticsCard: ({ onNavigate }: any) => <div data-testid="w-fuel-analytics" data-has-navigate={onNavigate ? 'true' : 'false'} />,
 }));
 vi.mock('@/components/TaxEstimateCard', () => ({
   TaxEstimateCard: () => <div data-testid="w-tax-estimate" />,
@@ -418,10 +418,10 @@ vi.mock('@/components/premium/DriverScoreGauge', () => ({
   DriverScoreGauge: () => <div data-testid="w-score-gauge" />,
 }));
 vi.mock('@/components/premium/RecentLoadsPanel', () => ({
-  RecentLoadsPanel: () => <div data-testid="w-recent-loads" />,
+  RecentLoadsPanel: ({ onViewAll }: any) => <div data-testid="w-recent-loads" data-has-view-all={onViewAll ? 'true' : 'false'} />,
 }));
 vi.mock('@/components/premium/ProfitByLoadTable', () => ({
-  ProfitByLoadTable: () => <div data-testid="w-profit-by-load" />,
+  ProfitByLoadTable: ({ onViewAll }: any) => <div data-testid="w-profit-by-load" data-has-view-all={onViewAll ? 'true' : 'false'} />,
 }));
 vi.mock('@/components/premium/DashboardFooterCTA', () => ({
   DashboardFooterCTA: () => <div data-testid="w-footer-cta" />,
@@ -503,6 +503,52 @@ describe('DA-1 · dashboard assistant-context sanitation', () => {
     render(<DashboardView {...dashboardProps} isAssistantView />);
     for (const id of CORE_WIDGETS) expect(screen.queryByTestId(id)).toBeTruthy();
     expect(screen.queryByRole('button', { name: /This Week/i })).toBeTruthy();
+    // View Reports button is hidden in assistant mode (view_reports covered by nav).
+    expect(screen.queryByRole('button', { name: /View Reports/i })).toBeNull();
+  });
+
+  it('assistant mode keeps RecentLoads/ProfitByLoad/FuelAnalytics read-only (no nav shortcuts)', () => {
+    render(<DashboardView {...dashboardProps} isAssistantView />);
+    // Components still render.
+    expect(screen.queryByTestId('w-recent-loads')).toBeTruthy();
+    expect(screen.queryByTestId('w-profit-by-load')).toBeTruthy();
+    expect(screen.queryByTestId('w-fuel-analytics')).toBeTruthy();
+    // But no navigation shortcuts are wired.
+    expect(screen.queryByTestId('w-recent-loads')?.getAttribute('data-has-view-all')).toBe('false');
+    expect(screen.queryByTestId('w-profit-by-load')?.getAttribute('data-has-view-all')).toBe('false');
+    expect(screen.queryByTestId('w-fuel-analytics')?.getAttribute('data-has-navigate')).toBe('false');
+  });
+
+  it('self mode wires the navigation shortcuts into those read-only components', () => {
+    render(<DashboardView {...dashboardProps} />);
+    expect(screen.queryByTestId('w-recent-loads')?.getAttribute('data-has-view-all')).toBe('true');
+    expect(screen.queryByTestId('w-profit-by-load')?.getAttribute('data-has-view-all')).toBe('true');
+    expect(screen.queryByTestId('w-fuel-analytics')?.getAttribute('data-has-navigate')).toBe('true');
     expect(screen.queryByRole('button', { name: /View Reports/i })).toBeTruthy();
+  });
+
+  it('assistant mode keeps Projected Net / Pending Payment metrics visible but non-clickable', () => {
+    const SRC = read('src/components/DashboardView.tsx');
+    // All three Projected-Net settings wrappers are gated by showPersonalWidgets.
+    const settingsCount = SRC.split("() => onNavigate?.('settings')").length - 1;
+    expect(settingsCount).toBe(3);
+    // Each of those + the Pending Payment wrapper shares the gated cursor class.
+    const gatedClass = "showPersonalWidgets ? 'cursor-pointer active:scale-95 transition-transform' : ''";
+    expect(SRC.split(gatedClass).length - 1).toBe(4);
+    // The Pending Payment loads shortcut is also gated.
+    expect(SRC).toMatch(/showPersonalWidgets \? \(\) => onNavigate\?\.\('loads', \{ filter: 'missing_pay' \}\) : undefined/);
+    // No ungated settings/loads shortcut remains.
+    expect(SRC).not.toMatch(/\bonClick=\{\(\) => onNavigate\?\.\('settings'\)\}/);
+    expect(SRC).not.toMatch(/\bonClick=\{\(\) => onNavigate\?\.\('loads', \{ filter: 'missing_pay' \}\)\}/);
+  });
+
+  it('assistant mode hides the empty-state "Log Your First Load" button', () => {
+    const emptyProps: any = { ...dashboardProps, loads: [], fuelLogs: [] };
+    render(<DashboardView {...emptyProps} isAssistantView />);
+    expect(screen.queryByRole('button', { name: /Log Your First Load/i })).toBeNull();
+    // Self mode still shows it.
+    const { unmount } = render(<DashboardView {...emptyProps} />);
+    expect(screen.queryByRole('button', { name: /Log Your First Load/i })).toBeTruthy();
+    unmount();
   });
 });
