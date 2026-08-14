@@ -456,10 +456,15 @@ async function applyEntitlement(
         stripe_subscription_id: subId,
         subscription_expires_at: periodEnd,
       }).eq("user_id", entityKey);
+    } else {
+      // Phase DA-1 — driver lost active Pro: end DIRECT assistant access.
+      // Agency-delegated assistant rows are untouched by this function.
+      await endDirectAssistantAccess(supabase, entityKey);
     }
     logStep("Driver entitlement applied", { plan_key: planKey, status });
     return;
   }
+
 
   if (context === "recruiter") {
     const plan = isActive ? price.planKey : "none";
@@ -538,7 +543,36 @@ async function applyEntitlement(
   logStep("Agency entitlement applied", { plan_key: price.planKey, status: mapAgency });
 }
 
+/**
+ * Phase DA-1 — when a DRIVER loses active Pro entitlement, their DIRECT
+ * driver-assistant relationships must end, not merely be hidden. Delegates to
+ * the dedicated DB function, which revokes pending + active DIRECT rows only
+ * (agency_delegation_id IS NULL), clears invite token hashes, and writes an
+ * audit entry with reason `driver_pro_ended`. Agency-delegated assistant rows
+ * are never touched. Failures are logged, never thrown: the fail-closed
+ * server-side authorization helper remains the final protection.
+ */
+async function endDirectAssistantAccess(supabase: any, driverUserId: string): Promise<void> {
+  if (!driverUserId) return;
+  try {
+    const { data, error } = await supabase.rpc(
+      "revoke_direct_assistants_on_driver_pro_end",
+      { _driver_user_id: driverUserId },
+    );
+    if (error) {
+      logStep("Direct assistant cleanup failed", { message: error.message });
+      return;
+    }
+    logStep("Direct assistant cleanup applied", { revoked: data ?? 0 });
+  } catch (err) {
+    logStep("Direct assistant cleanup threw", {
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 async function applyRevoke(
+
   supabase: any,
   context: BillingContext,
   entityKey: string,
@@ -569,9 +603,12 @@ async function applyRevoke(
       stripe_subscription_id: null,
       subscription_expires_at: null,
     }).eq("user_id", entityKey).eq("stripe_subscription_id", subId);
+    // Phase DA-1 — driver Pro ended: end DIRECT assistant access.
+    await endDirectAssistantAccess(supabase, entityKey);
     logStep("Driver entitlement revoked", { status });
     return;
   }
+
   if (context === "recruiter") {
     await supabase.from("recruiter_billing_profiles").update({
       plan: "none",

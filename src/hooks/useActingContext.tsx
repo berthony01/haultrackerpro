@@ -20,7 +20,14 @@ export interface ManagedDriver {
   permissions: AssistantPermissions;
   accepted_at: string | null;
   last_active_at: string | null;
+  /**
+   * Phase DA-1 — the MANAGED DRIVER's canonical Driver Pro entitlement, as
+   * resolved server-side. Driver-workspace Pro gates while acting as an
+   * assistant must use this, never the assistant's own subscription.
+   */
+  driver_is_pro: boolean;
 }
+
 
 interface ActingContextValue {
   /** The driver the assistant is currently acting for, if any. */
@@ -71,7 +78,10 @@ export function ActingContextProvider({ children }: { children: ReactNode }) {
       return ((data ?? []) as ManagedDriver[]).map((d) => ({
         ...d,
         permissions: (d.permissions ?? {}) as AssistantPermissions,
+        // Fail closed: absent/malformed server value is treated as non-Pro.
+        driver_is_pro: d.driver_is_pro === true,
       }));
+
     },
     enabled: !!user,
     staleTime: 60_000,

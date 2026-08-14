@@ -106,6 +106,8 @@ const freeFeatures = [
 ];
 
 const proFeatures = [
+  'Invite 1 trusted Driver Assistant to help manage your loads, expenses, fuel logs, reports, and limited settings — with permissions you control',
+
   'Score loads before you take them (RPM, margin, deadhead, broker)',
   'See your best & worst lanes and broker reliability automatically',
   'Get warned when a lane weakens, a broker pays slow, or margin slips',
@@ -136,7 +138,9 @@ const proKeyBenefits = proFeatures.slice(0, PRO_KEY_BENEFIT_COUNT);
 const proAdditionalBenefits = proFeatures.slice(PRO_KEY_BENEFIT_COUNT);
 
 const comparisonRows: { feature: string; free: string; pro: string }[] = [
+  { feature: 'Direct Driver Assistant access', free: '—', pro: '1 assistant · permission-controlled' },
   { feature: 'Load & expense logging', free: 'Unlimited', pro: 'Unlimited' },
+
   { feature: 'Net profit per load', free: '✓', pro: '✓' },
   { feature: 'Est. vs actual pay', free: '✓', pro: '✓' },
   { feature: 'Multi-stop loads', free: '✓', pro: '✓' },

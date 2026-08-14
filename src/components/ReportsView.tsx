@@ -24,7 +24,19 @@ interface ReportsViewProps {
   expenses?: Expense[];
   onNavigate?: (page: string) => void;
   isPro?: boolean;
+  /**
+   * Phase DA-1 — report settings of the account the report belongs to. When an
+   * assistant is acting for a driver this MUST be the managed driver's safe
+   * report settings, never the signed-in assistant's own settings.
+   */
+  settingsOverride?: Partial<Record<string, any>> | null;
+  /**
+   * Phase DA-1 — explicit export capability. Assistants without
+   * `export_reports` may view but never download PDF / CSV / weekly CSV.
+   */
+  canExport?: boolean;
 }
+
 
 interface ExportRowProps {
   icon: React.ReactNode;
@@ -61,10 +73,21 @@ function ExportRow({ icon, title, subtitle, onClick, disabled, locked }: ExportR
   );
 }
 
-export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }: ReportsViewProps) {
+export function ReportsView({
+  loads,
+  expenses = [],
+  onNavigate,
+  isPro = false,
+  settingsOverride = null,
+  canExport = true,
+}: ReportsViewProps) {
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const { stops } = useLoadStops();
-  const { settings } = useUserSettings();
+  const { settings: ownSettings } = useUserSettings();
+  // Managed-driver settings win whenever provided (assistant acting mode).
+  const settings: any = settingsOverride ?? ownSettings;
+  const exportsAllowed = canExport && isPro;
+
 
   const companyMeta = {
     companyName: settings?.company_name ?? undefined,
@@ -120,14 +143,20 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
       fuelLogs,
       settings: settings ?? null,
       range,
-      preparedFor: settings?.company_name || (user?.user_metadata as any)?.display_name || user?.email || 'HaulTrackerPro Driver',
+      preparedFor:
+        settings?.company_name ||
+        (settingsOverride
+          ? 'HaulTrackerPro Driver'
+          : (user?.user_metadata as any)?.display_name || user?.email || 'HaulTrackerPro Driver'),
     });
-  }, [dateRange.from, dateRange.to, loads, expenses, fuelLogs, settings, user]);
+  }, [dateRange.from, dateRange.to, loads, expenses, fuelLogs, settings, settingsOverride, user]);
 
   const handleDownload = (kind: 'pdf' | 'csv') => {
+    if (!canExport) { toast.error('You do not have permission to export reports for this driver.'); return; }
     if (!isPro) { toast.error(`${kind.toUpperCase()} reports are a Pro feature. Upgrade to unlock.`); return; }
     if (!aggregation) { toast.error('Select a date range first.'); return; }
     if (aggregation.isEmpty) { toast.error('No data found in the selected date range.'); return; }
+
     try {
       const base = `haultrackerpro-${reportType.replace(/_/g, '-')}-${aggregation.range.from}-to-${aggregation.range.to}`;
       if (kind === 'pdf') downloadPdfBlob(`${base}.pdf`, buildReportPdf(reportType, aggregation));
@@ -170,7 +199,16 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
           </div>
         </div>
 
-        {!isPro && (
+        {!canExport && (
+          <div
+            data-testid="reports-export-not-permitted"
+            className="rounded-xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground"
+          >
+            You can view these reports, but you do not have permission to export them.
+          </div>
+        )}
+
+        {canExport && !isPro && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 flex items-start gap-3">
             <Lock className="h-4 w-4 text-primary mt-0.5 shrink-0" />
             <div className="flex-1 min-w-0">
@@ -200,15 +238,16 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
         )}
 
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" className="h-11 rounded-xl gap-2 font-bold" onClick={() => handleDownload('pdf')} disabled={!isPro || !aggregation || aggregation.isEmpty}>
-            {!isPro && <Lock className="h-3.5 w-3.5" />}
+          <Button variant="outline" className="h-11 rounded-xl gap-2 font-bold" onClick={() => handleDownload('pdf')} disabled={!exportsAllowed || !aggregation || aggregation.isEmpty}>
+            {!exportsAllowed && <Lock className="h-3.5 w-3.5" />}
             <FileDown className="h-4 w-4" /> Download PDF
           </Button>
-          <Button variant="outline" className="h-11 rounded-xl gap-2 font-bold" onClick={() => handleDownload('csv')} disabled={!isPro || !aggregation || aggregation.isEmpty}>
-            {!isPro && <Lock className="h-3.5 w-3.5" />}
+          <Button variant="outline" className="h-11 rounded-xl gap-2 font-bold" onClick={() => handleDownload('csv')} disabled={!exportsAllowed || !aggregation || aggregation.isEmpty}>
+            {!exportsAllowed && <Lock className="h-3.5 w-3.5" />}
             <FileSpreadsheet className="h-4 w-4" /> Export CSV
           </Button>
         </div>
+
 
         <p className="text-[10px] text-muted-foreground/70">{TAX_DISCLAIMER}</p>
       </div>
@@ -392,13 +431,15 @@ export function ReportsView({ loads, expenses = [], onNavigate, isPro = false }:
                     <p className="text-sm font-mono font-bold text-foreground mt-0.5 whitespace-nowrap">{formatCurrency(s.avgRatePerMile)}</p>
                   </div>
                 </div>
-                <Button variant="ghost" size="sm" className="mt-3 w-full text-xs h-8 rounded-lg border border-border/60 hover:border-primary/30 hover:text-primary" onClick={() => {
+                <Button variant="ghost" size="sm" disabled={!canExport} data-testid="export-week-csv" className="mt-3 w-full text-xs h-8 rounded-lg border border-border/60 hover:border-primary/30 hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => {
+                  if (!canExport) { toast.error('You do not have permission to export reports for this driver.'); return; }
                   const weekLoads = loads.filter(l => {
                     const d = new Date(getEffectiveDate(l));
                     return d >= new Date(s.startDate) && d <= new Date(s.endDate);
                   });
                   exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`, stops, companyMeta);
                 }}>
+
                   <Download className="h-3 w-3 mr-1" /> Export Week
                 </Button>
               </div>
