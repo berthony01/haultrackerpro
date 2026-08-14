@@ -403,7 +403,7 @@ vi.mock('@/components/ContributionMarginCard', () => ({
   ContributionMarginCard: () => <div data-testid="w-contribution-margin" />,
 }));
 vi.mock('@/components/FuelAnalyticsCard', () => ({
-  FuelAnalyticsCard: () => <div data-testid="w-fuel-analytics" />,
+  FuelAnalyticsCard: ({ onNavigate }: any) => <div data-testid="w-fuel-analytics" data-has-navigate={onNavigate ? 'true' : 'false'} />,
 }));
 vi.mock('@/components/TaxEstimateCard', () => ({
   TaxEstimateCard: () => <div data-testid="w-tax-estimate" />,
