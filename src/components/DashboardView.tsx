@@ -503,7 +503,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             <RecommendedOpportunityCard onNavigate={onNavigate} />
           )}
 
-          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={onNavigate ? () => onNavigate('loads') : undefined} />
+          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
 
           {showPersonalWidgets && <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />}
         </>
