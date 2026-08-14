@@ -768,9 +768,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           {/* Pro Time Saved */}
           {showPersonalWidgets && <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />}
 
-          {/* Phase DA-1 — self-only tier-up detection (signed-in user's own state) */}
-          {showPersonalWidgets && <SelfTierUpDetector />}
-
 
           {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
 
