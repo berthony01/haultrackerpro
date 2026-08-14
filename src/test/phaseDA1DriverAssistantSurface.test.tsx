@@ -418,10 +418,10 @@ vi.mock('@/components/premium/DriverScoreGauge', () => ({
   DriverScoreGauge: () => <div data-testid="w-score-gauge" />,
 }));
 vi.mock('@/components/premium/RecentLoadsPanel', () => ({
-  RecentLoadsPanel: () => <div data-testid="w-recent-loads" />,
+  RecentLoadsPanel: ({ onViewAll }: any) => <div data-testid="w-recent-loads" data-has-view-all={onViewAll ? 'true' : 'false'} />,
 }));
 vi.mock('@/components/premium/ProfitByLoadTable', () => ({
-  ProfitByLoadTable: () => <div data-testid="w-profit-by-load" />,
+  ProfitByLoadTable: ({ onViewAll }: any) => <div data-testid="w-profit-by-load" data-has-view-all={onViewAll ? 'true' : 'false'} />,
 }));
 vi.mock('@/components/premium/DashboardFooterCTA', () => ({
   DashboardFooterCTA: () => <div data-testid="w-footer-cta" />,
