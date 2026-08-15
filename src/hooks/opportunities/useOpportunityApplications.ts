@@ -335,12 +335,16 @@ export function useRecruiterStaffApplications(args: {
       if (!user) throw new Error('Not authenticated');
       if (!recruiterId) throw new Error('Not authorized');
       if (!canManageStatus) throw new Error('Not authorized');
-      const { error } = await supabase
-        .from('opportunity_applications')
-        .update({ status })
-        .eq('id', id)
-        .eq('recruiter_id', recruiterId);
+      const { data, error } = await (supabase as any).rpc(
+        'update_recruiter_application_status',
+        {
+          _recruiter_id: recruiterId,
+          _application_id: id,
+          _status: status,
+        },
+      );
       if (error) throw error;
+      if (data !== true) throw new Error('Application not found');
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['recruiter_staff_applications'] });
@@ -357,4 +361,3 @@ export function useRecruiterStaffApplications(args: {
     updateApplicationStatus,
   };
 }
-
