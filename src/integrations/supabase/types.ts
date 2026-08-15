@@ -3482,6 +3482,119 @@ export type Database = {
           },
         ]
       }
+      recruiter_member_audit_log: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          invite_email: string | null
+          member_id: string | null
+          metadata: Json
+          recruiter_id: string
+          target_user_id: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          invite_email?: string | null
+          member_id?: string | null
+          metadata?: Json
+          recruiter_id: string
+          target_user_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          invite_email?: string | null
+          member_id?: string | null
+          metadata?: Json
+          recruiter_id?: string
+          target_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_member_audit_log_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruiter_member_audit_log_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recruiter_members: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          id: string
+          invite_email: string
+          invite_expires_at: string | null
+          invite_token_hash: string | null
+          invited_at: string
+          invited_by_user_id: string | null
+          member_user_id: string | null
+          recruiter_id: string
+          revoked_at: string | null
+          revoked_by_user_id: string | null
+          role: Database["public"]["Enums"]["recruiter_member_role"]
+          status: Database["public"]["Enums"]["recruiter_member_status"]
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invite_email: string
+          invite_expires_at?: string | null
+          invite_token_hash?: string | null
+          invited_at?: string
+          invited_by_user_id?: string | null
+          member_user_id?: string | null
+          recruiter_id: string
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          role?: Database["public"]["Enums"]["recruiter_member_role"]
+          status?: Database["public"]["Enums"]["recruiter_member_status"]
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          id?: string
+          invite_email?: string
+          invite_expires_at?: string | null
+          invite_token_hash?: string | null
+          invited_at?: string
+          invited_by_user_id?: string | null
+          member_user_id?: string | null
+          recruiter_id?: string
+          revoked_at?: string | null
+          revoked_by_user_id?: string | null
+          role?: Database["public"]["Enums"]["recruiter_member_role"]
+          status?: Database["public"]["Enums"]["recruiter_member_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruiter_members_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruiter_outreach_status: {
         Row: {
           admin_note: string | null
@@ -4353,6 +4466,10 @@ export type Database = {
         }
       }
       accept_assistant_invite: { Args: { _token: string }; Returns: Json }
+      accept_recruiter_member_invite: {
+        Args: { _token: string }
+        Returns: Json
+      }
       accept_recruiter_posting_terms: {
         Args: { _version: string }
         Returns: string
@@ -4918,6 +5035,19 @@ export type Database = {
         }
       }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
+      get_my_recruiter_workspaces: {
+        Args: never
+        Returns: {
+          company_name: string
+          member_role: Database["public"]["Enums"]["recruiter_member_role"]
+          member_since: string
+          member_status: Database["public"]["Enums"]["recruiter_member_status"]
+          membership_id: string
+          owner_user_id: string
+          recruiter_id: string
+          recruiter_name: string
+        }[]
+      }
       get_my_user_capabilities: {
         Args: never
         Returns: {
@@ -4986,6 +5116,14 @@ export type Database = {
         Args: { _email: string; _permissions: Json }
         Returns: Json
       }
+      invite_recruiter_member: {
+        Args: {
+          _email: string
+          _recruiter_id: string
+          _role?: Database["public"]["Enums"]["recruiter_member_role"]
+        }
+        Returns: Json
+      }
       is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_agency_member: {
         Args: { _agency_id: string; _uid: string }
@@ -5006,6 +5144,14 @@ export type Database = {
       is_current_user_recruiter: { Args: never; Returns: boolean }
       is_recruiter_owner: {
         Args: { _recruiter_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_recruiter_workspace_member: {
+        Args: { _recruiter_id: string; _uid: string }
+        Returns: boolean
+      }
+      is_recruiter_workspace_owner: {
+        Args: { _recruiter_id: string }
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
@@ -5388,6 +5534,21 @@ export type Database = {
         Args: { _recruiter_id: string }
         Returns: Json[]
       }
+      list_recruiter_members: {
+        Args: { _recruiter_id: string }
+        Returns: {
+          accepted_at: string
+          invite_email: string
+          invite_expires_at: string
+          invited_at: string
+          member_role: Database["public"]["Enums"]["recruiter_member_role"]
+          member_status: Database["public"]["Enums"]["recruiter_member_status"]
+          member_user_id: string
+          membership_id: string
+          recruiter_id: string
+          revoked_at: string
+        }[]
+      }
       log_assistant_action: {
         Args: {
           _action: string
@@ -5532,6 +5693,7 @@ export type Database = {
         Args: { _driver_user_id: string }
         Returns: number
       }
+      revoke_recruiter_member: { Args: { _member_id: string }; Returns: Json }
       set_agency_client_request_status: {
         Args: {
           _assigned_member_user_id?: string
@@ -6428,6 +6590,11 @@ export type Database = {
         | "signed"
         | "expired"
         | "archived"
+      recruiter_member_role:
+        | "recruiter_owner"
+        | "recruiter_admin"
+        | "recruiter_staff"
+      recruiter_member_status: "pending" | "active" | "revoked"
       user_capability_status: "setup" | "active" | "suspended" | "revoked"
       user_capability_type: "driver" | "recruiter"
     }
@@ -6605,6 +6772,12 @@ export const Constants = {
         "expired",
         "archived",
       ],
+      recruiter_member_role: [
+        "recruiter_owner",
+        "recruiter_admin",
+        "recruiter_staff",
+      ],
+      recruiter_member_status: ["pending", "active", "revoked"],
       user_capability_status: ["setup", "active", "suspended", "revoked"],
       user_capability_type: ["driver", "recruiter"],
     },
