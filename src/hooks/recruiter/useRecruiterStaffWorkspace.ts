@@ -6,8 +6,7 @@
  * localStorage holds a user-scoped PREFERENCE only; every selection is
  * revalidated against the current server rows through the pure resolver.
  */
-import { useCallback, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
@@ -55,20 +54,46 @@ export function useRecruiterStaffWorkspace(): UseRecruiterStaffWorkspaceResult {
   // change can never leak the previous user's workspace context.
   const [selection, setSelection] = useState<{ userId: string; recruiterId: string } | null>(null);
 
-  const query = useQuery({
-    queryKey: ['recruiter-staff-workspaces', userId],
-    enabled: !!userId,
-    staleTime: 30_000,
-    queryFn: async (): Promise<unknown> => {
-      const { data, error } = await (supabase as any).rpc(
-        'get_my_recruiter_staff_workspaces',
-      );
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Self-contained fetch (no react-query dependency) so this hook can be
+  // consumed by `useViewMode` anywhere in the shell. Every response is
+  // bound to the user id it was requested for.
+  const [query, setQuery] = useState<{
+    userId: string | null;
+    data: unknown;
+    error: unknown;
+    loading: boolean;
+  }>({ userId: null, data: null, error: null, loading: false });
+  const requestRef = useRef(0);
 
-  const isLoading = authLoading || (!!userId && query.isLoading);
+  useEffect(() => {
+    if (!userId) {
+      setQuery({ userId: null, data: null, error: null, loading: false });
+      return;
+    }
+    const generation = ++requestRef.current;
+    setQuery({ userId, data: null, error: null, loading: true });
+    void (async () => {
+      try {
+        const { data, error } = await (supabase as any).rpc(
+          'get_my_recruiter_staff_workspaces',
+        );
+        if (requestRef.current !== generation) return;
+        if (error) {
+          setQuery({ userId, data: null, error, loading: false });
+          return;
+        }
+        setQuery({ userId, data, error: null, loading: false });
+      } catch (e) {
+        if (requestRef.current !== generation) return;
+        setQuery({ userId, data: null, error: e, loading: false });
+      }
+    })();
+  }, [userId]);
+
+  // Never expose another user's payload.
+  const payload = query.userId === userId ? query.data : null;
+
+  const isLoading = authLoading || (!!userId && (query.loading || query.userId !== userId));
 
   const resolution = useMemo(() => {
     if (!userId) return null;
@@ -76,8 +101,8 @@ export function useRecruiterStaffWorkspace(): UseRecruiterStaffWorkspaceResult {
     if (query.error) return null;
     const inMemory = selection && selection.userId === userId ? selection.recruiterId : null;
     const stored = inMemory ?? readStored(userId);
-    return resolveRecruiterStaffWorkspace(query.data, stored);
-  }, [userId, isLoading, query.error, query.data, selection]);
+    return resolveRecruiterStaffWorkspace(payload, stored);
+  }, [userId, isLoading, query.error, payload, selection]);
 
   // Reconcile stored preference against the CURRENT validated rows.
   // This is housekeeping only; access is decided synchronously above.
