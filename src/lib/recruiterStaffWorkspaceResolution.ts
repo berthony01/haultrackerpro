@@ -79,11 +79,8 @@ export type ParseResult =
   | { ok: true; workspaces: RecruiterStaffWorkspace[] }
   | { ok: false; reason: string };
 
-/** Strict, fail-closed payload parser. */
+/** Strict, fail-closed payload parser. Only a real array is valid. */
 export function parseRecruiterStaffWorkspaces(payload: unknown): ParseResult {
-  if (payload === null || payload === undefined) {
-    return { ok: true, workspaces: [] };
-  }
   if (!Array.isArray(payload)) {
     return { ok: false, reason: 'malformed_payload' };
   }
