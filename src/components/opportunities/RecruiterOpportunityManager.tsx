@@ -461,3 +461,190 @@ function Gate({
     </div>
   );
 }
+
+/* -------------------------------------------------------------------------
+ * Phase RC-1D — RECRUITER STAFF opportunity manager.
+ *
+ * Separate component so the staff path NEVER mounts useRecruiterProfile,
+ * useRecruiterBilling, useUserRole, referrals, readiness, or Agency hooks.
+ * Client permission booleans are UX only; the database is authoritative.
+ * ---------------------------------------------------------------------- */
+
+export interface RecruiterStaffOpportunityManagerProps {
+  recruiterId: string;
+  companyName: string | null;
+  permissions: RecruiterStaffOpportunityPermissions;
+  onBack: () => void;
+}
+
+export function RecruiterStaffOpportunityManager({
+  recruiterId,
+  companyName,
+  permissions,
+  onBack,
+}: RecruiterStaffOpportunityManagerProps) {
+  const store = useRecruiterStaffOpportunities({ recruiterId, permissions });
+  const [view, setView] = useState<'list' | 'form'>('list');
+  const [editing, setEditing] = useState<Opportunity | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Opportunity | null>(null);
+
+  const deletionPending = store.deleteOpportunity.isPending;
+  const busy =
+    store.setStatus.isPending ||
+    store.updateOpportunity.isPending ||
+    deletionPending;
+
+  // Defensive: view permission is required to render anything operational.
+  if (!permissions.canViewOpportunities) {
+    return (
+      <Gate
+        onBack={onBack}
+        title="Opportunities unavailable"
+        body="You do not have permission to view opportunities in this workspace."
+        Icon={ShieldCheck}
+      />
+    );
+  }
+
+  if (view === 'form') {
+    return (
+      <RecruiterOpportunityForm
+        initial={editing}
+        onBack={() => { setView('list'); setEditing(null); }}
+        onSaved={() => { setView('list'); setEditing(null); void store.refetch(); }}
+        staffController={{
+          recruiterId,
+          companyName,
+          isPending:
+            store.createOpportunity.isPending || store.updateOpportunity.isPending,
+          permissions: {
+            canCreate: permissions.canCreateOpportunities,
+            canEdit: permissions.canEditOpportunities,
+            canChangeStatus: permissions.canChangeOpportunityStatus,
+          },
+          create: (payload, handlers) => store.createOpportunity.mutate(payload, handlers),
+          update: (id, payload, handlers) =>
+            store.updateOpportunity.mutate({ id, data: payload }, handlers),
+        }}
+      />
+    );
+  }
+
+  const handleStatus = (id: string, status: 'active' | 'paused' | 'closed') => {
+    store.setStatus.mutate(
+      { id, status },
+      {
+        onSuccess: () => toast.success(`Opportunity ${status}`),
+        onError: (e: Error) => toast.error(e.message),
+      },
+    );
+  };
+
+  const confirmDelete = (event: MouseEvent) => {
+    event.preventDefault();
+    if (!pendingDelete) return;
+    store.deleteOpportunity.mutate(pendingDelete.id, {
+      onSuccess: () => {
+        toast.success('Opportunity deleted permanently');
+        setPendingDelete(null);
+      },
+      onError: (e: Error) => toast.error(e.message),
+    });
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in" data-testid="recruiter-staff-opportunity-manager">
+      <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+        <div className="flex items-start gap-4">
+          <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
+            <Briefcase className="h-6 w-6 text-primary-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
+              Manage Opportunities
+            </h1>
+            <p className="text-sm text-muted-foreground break-words">
+              {companyName ?? 'Recruiter workspace'} · team access
+            </p>
+          </div>
+          {permissions.canCreateOpportunities && (
+            <Button
+              onClick={() => { setEditing(null); setView('form'); }}
+              className="shrink-0"
+              data-testid="staff-post-opportunity-cta"
+            >
+              <Plus className="h-4 w-4" /> Post Opportunity
+            </Button>
+          )}
+        </div>
+      </Card>
+
+      {store.isLoading ? (
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => <Skeleton key={i} className="h-32 w-full" />)}
+        </div>
+      ) : store.opportunities.length === 0 ? (
+        <Card className="p-10 border-dashed border-border/60 text-center">
+          <div className="mx-auto mb-3 inline-flex rounded-2xl bg-muted/40 p-3">
+            <Inbox className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <h3 className="text-base font-bold text-foreground mb-1">No opportunities yet</h3>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {store.opportunities.map((o) => (
+            <OpportunityRow
+              key={o.id}
+              o={o}
+              onEdit={() => { setEditing(o); setView('form'); }}
+              onPause={() => handleStatus(o.id, 'paused')}
+              onActivate={() => handleStatus(o.id, 'active')}
+              onClose={() => handleStatus(o.id, 'closed')}
+              onDelete={() => setPendingDelete(o)}
+              busy={busy}
+              canActivate={permissions.canChangeOpportunityStatus}
+              canEdit={permissions.canEditOpportunities}
+              canChangeStatus={permissions.canChangeOpportunityStatus}
+              canDeletePermission={permissions.canDeleteOpportunities}
+            />
+          ))}
+        </div>
+      )}
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !deletionPending) setPendingDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete opportunity permanently?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  {`You are about to permanently delete "${pendingDelete?.title ?? ''}" at ${pendingDelete?.company_name ?? ''}.`}
+                </p>
+                <p>This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletionPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="confirm-delete-opportunity"
+              disabled={deletionPending}
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
