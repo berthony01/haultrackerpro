@@ -68,14 +68,44 @@ describe("Phase RC-1A — owner bootstrap", () => {
     expect(lower).toContain("'owner_bootstrapped'");
   });
 
+  it("3a2. a preflight DO block raises when any recruiter owner email source is missing", () => {
+    const preflight = lowerExecutable.slice(
+      0,
+      lowerExecutable.indexOf("with bootstrapped as ("),
+    );
+    expect(preflight).toContain("rc-1a owner bootstrap preflight failed");
+    expect(preflight).toContain("raise exception");
+    expect(preflight).toContain("from public.recruiter_profiles rp");
+    expect(lowerExecutable).not.toContain("placeholder");
+  });
+
+  it("3a3. the backfill no longer silently filters out profiles without an email", () => {
+    const backfill = lowerExecutable.slice(
+      lowerExecutable.indexOf("with bootstrapped as ("),
+      lowerExecutable.indexOf("create or replace function public.rc1a_bootstrap"),
+    );
+    expect(backfill).not.toContain("coalesce(u.email::text, rp.recruiter_email) is not null");
+    expect(backfill).toContain("where not exists (");
+  });
+
   it("3b. installs an AFTER INSERT trigger on recruiter_profiles", () => {
     expect(lower).toContain("after insert on public.recruiter_profiles");
     expect(lower).toContain("execute function public.rc1a_bootstrap_recruiter_owner_membership()");
   });
 
+  it("3b2. the future-owner trigger raises instead of silently skipping a missing email", () => {
+    const fn = lowerExecutable.slice(
+      lowerExecutable.indexOf("create or replace function public.rc1a_bootstrap"),
+      lowerExecutable.indexOf("drop trigger if exists rc1a_recruiter_profiles_owner_membership"),
+    );
+    expect(fn).toContain("if _email is null or _email = '' then");
+    expect(fn).toMatch(/if _email is null or _email = '' then\s*\n\s*raise exception/);
+    expect(fn).not.toMatch(/if _email is null or _email = '' then\s*\n\s*return new;/);
+  });
+
   it("3c. trigger does not mutate recruiter_profiles fields", () => {
-    expect(lower).not.toMatch(/update\s+public\.recruiter_profiles/);
-    expect(lower).not.toMatch(/alter table\s+public\.recruiter_profiles/);
+    expect(lowerExecutable).not.toMatch(/update\s+public\.recruiter_profiles/);
+    expect(lowerExecutable).not.toMatch(/alter table\s+public\.recruiter_profiles/);
   });
 });
 
