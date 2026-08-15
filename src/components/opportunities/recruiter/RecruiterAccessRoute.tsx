@@ -26,6 +26,7 @@ import {
   type RecruiterSubview,
 } from '@/lib/workspaceAccess';
 import type { UserCapabilityStatus } from '@/lib/userCapabilities';
+import type { RecruiterStaffWorkspace } from '@/lib/recruiterStaffWorkspaceResolution';
 
 const RecruiterReportsPanel = lazy(() =>
   import('@/components/recruiter/RecruiterReportsPanel').then(m => ({ default: m.RecruiterReportsPanel }))
@@ -41,6 +42,59 @@ interface Props {
   recruiterOperationsAllowed?: boolean;
   workspaceLoading?: boolean;
   workspaceError?: unknown;
+  /** Phase RC-1C — shell status + staff entry context. */
+  recruiterWorkspaceStatus?: UserCapabilityStatus | null;
+  recruiterAccessKind?: 'capability' | 'staff' | null;
+  selectedStaffWorkspace?: RecruiterStaffWorkspace | null;
+  onChangeStaffWorkspace?: () => void;
+}
+
+/**
+ * Phase RC-1C — neutral STAFF workspace home.
+ *
+ * Safe entry context only. Mounts NO operational recruiter child and NO
+ * billing/profile/opportunity/application/contract/settlement hook.
+ */
+function StaffWorkspaceHome({
+  workspace,
+  onChangeStaffWorkspace,
+}: {
+  workspace: RecruiterStaffWorkspace;
+  onChangeStaffWorkspace?: () => void;
+}) {
+  const roleLabel =
+    workspace.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff';
+  return (
+    <div
+      data-testid="recruiter-staff-workspace-home"
+      className="mx-auto w-full max-w-2xl px-1 py-8"
+    >
+      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Recruiter Workspace
+      </p>
+      <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground break-words">
+        {workspace.companyName}
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground break-words">
+        {workspace.recruiterName} · {roleLabel}
+      </p>
+      <div className="mt-6 rounded-xl border border-border/60 bg-card/60 p-4">
+        <p className="text-sm text-foreground">Your workspace connection is active.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Recruiter tools are permission-controlled and are not enabled for team members yet.
+        </p>
+      </div>
+      {onChangeStaffWorkspace && (
+        <button
+          type="button"
+          onClick={onChangeStaffWorkspace}
+          className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-md border border-border/60 px-4 py-2 text-sm font-semibold text-foreground hover:border-primary/60"
+        >
+          Change recruiter workspace
+        </button>
+      )}
+    </div>
+  );
 }
 
 function NeutralPanel({ label }: { label: string }) {
