@@ -122,6 +122,21 @@ function StaffWorkspaceRoute({
     );
   }
 
+  if (staffView === 'referrals' && canOpenReferrals) {
+    return (
+      <RecruiterStaffReferralsPanel
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewReferrals={perms.canViewReferrals}
+        canManageReferralStatus={perms.canManageReferralStatus}
+        canManageReferralTerms={perms.canManageReferralTerms}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+
+
   return (
     <div
       data-testid="recruiter-staff-workspace-home"
