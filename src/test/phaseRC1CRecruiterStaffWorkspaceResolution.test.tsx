@@ -185,15 +185,24 @@ describe('RC-1C candidate migration', () => {
 // B) Parser fails closed
 // =======================================================================
 describe('parseRecruiterStaffWorkspaces', () => {
-  it('accepts null/empty payloads as zero workspaces', () => {
-    expect(parseRecruiterStaffWorkspaces(null)).toEqual({ ok: true, workspaces: [] });
+  it('accepts ONLY an empty array as zero workspaces', () => {
     expect(parseRecruiterStaffWorkspaces([])).toEqual({ ok: true, workspaces: [] });
+  });
+
+  it('treats null/undefined as malformed (never proof of zero workspaces)', () => {
+    expect(parseRecruiterStaffWorkspaces(null)).toEqual({ ok: false, reason: 'malformed_payload' });
+    expect(parseRecruiterStaffWorkspaces(undefined)).toEqual({
+      ok: false,
+      reason: 'malformed_payload',
+    });
   });
 
   it('rejects non-array payloads', () => {
     expect(parseRecruiterStaffWorkspaces({ recruiter_id: 'r1' }).ok).toBe(false);
     expect(parseRecruiterStaffWorkspaces('rows').ok).toBe(false);
+    expect(parseRecruiterStaffWorkspaces(0).ok).toBe(false);
   });
+
 
   it('rejects the WHOLE payload when any row is malformed (no silent drop)', () => {
     const res = parseRecruiterStaffWorkspaces([WS(1), { ...WS(2), member_role: 'recruiter_owner' }]);
