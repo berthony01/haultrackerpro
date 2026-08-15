@@ -298,10 +298,12 @@ describe("Phase RC-1A — RLS, grants, audit", () => {
 
   it("9d. revokes PUBLIC/anon execute and grants only authenticated execute", () => {
     expect(lower).toContain("revoke all on function public.rc1a_bootstrap_recruiter_owner_membership() from public, anon, authenticated");
+    expect(lower).toContain("revoke all on function public.is_recruiter_workspace_owner(uuid) from public, anon");
     const revokes = lower.match(/revoke all on function public\./g) ?? [];
-    expect(revokes.length).toBeGreaterThanOrEqual(7);
+    expect(revokes.length).toBeGreaterThanOrEqual(8);
     const grants = lower.match(/grant execute on function public\.[^;]*to authenticated/g) ?? [];
-    expect(grants.length).toBe(6);
+    expect(grants.length).toBe(7);
+    expect(lower).toContain("grant execute on function public.is_recruiter_workspace_owner(uuid) to authenticated");
     expect(lower).not.toMatch(/grant execute on function[^;]*to anon/);
   });
 
