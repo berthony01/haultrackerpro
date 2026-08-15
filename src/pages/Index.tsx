@@ -99,6 +99,13 @@ const Index = () => {
     recruiterOperationsAllowed,
     driverCapabilityStatus,
     recruiterCapabilityStatus,
+    // Phase RC-1C — shell/navigation status (capability OR validated staff
+    // overlay). Personal capability semantics stay on
+    // `recruiterCapabilityStatus` above.
+    recruiterWorkspaceStatus,
+    recruiterAccessKind,
+    selectedStaffWorkspace,
+    clearStaffWorkspaceSelection,
   } = useViewMode();
   const { isAdmin } = useAdmin();
   const isRecruiterView = effectiveRole === 'recruiter';
