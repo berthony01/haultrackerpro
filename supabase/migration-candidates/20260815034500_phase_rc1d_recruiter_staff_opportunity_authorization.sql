@@ -120,8 +120,20 @@ BEGIN
       AND rp.user_id = auth.uid()
   );
   IF _owns_recruiter_profile THEN
+    -- SECURITY: RC-1D broadened the recruiter UPDATE WITH CHECK to the
+    -- permission-aware helper, so an owner of A who is merely STAFF in B could
+    -- otherwise satisfy USING on A and WITH CHECK on B. Pre-RC-1D RLS required
+    -- the canonical owner gate on BOTH sides, so a destination reassignment
+    -- must still clear the UNCHANGED owner gate on NEW. The RC-1B permission
+    -- helper is deliberately NOT consulted here.
+    IF NEW.recruiter_id IS DISTINCT FROM OLD.recruiter_id
+       AND NOT public.current_user_can_manage_recruiter_opportunities(NEW.recruiter_id) THEN
+      RAISE EXCEPTION 'Not authorized to reassign this opportunity.'
+        USING ERRCODE = '42501';
+    END IF;
     RETURN NEW;
   END IF;
+
 
   -- Staff can never move a listing between workspaces.
   IF NEW.recruiter_id IS DISTINCT FROM OLD.recruiter_id THEN
