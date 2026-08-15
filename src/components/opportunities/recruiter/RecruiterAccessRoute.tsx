@@ -26,6 +26,8 @@ import {
 import { useRecruiterStaffPermissions } from '@/hooks/recruiter/useRecruiterStaffPermissions';
 import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboard';
 import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicationsDashboard';
+import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
+
 
 import {
   resolveRecruiterSubviewForStatus,
@@ -70,7 +72,9 @@ function StaffWorkspaceRoute({
   onChangeStaffWorkspace?: () => void;
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
-  const [staffView, setStaffView] = useState<'home' | 'opportunities' | 'applications'>('home');
+  const [staffView, setStaffView] = useState<
+    'home' | 'opportunities' | 'applications' | 'referrals'
+  >('home');
 
   const roleLabel =
     workspace.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff';
@@ -81,6 +85,12 @@ function StaffWorkspaceRoute({
   // Phase RC-1E — applications entry point, same fail-closed contract.
   const canOpenApplications =
     !perms.isLoading && !perms.error && perms.canViewApplications;
+  // Phase RC-1F — referrals entry point, same fail-closed contract.
+  const canOpenReferrals =
+    !perms.isLoading &&
+    !perms.error &&
+    (perms.canViewReferrals || perms.canManageReferralTerms);
+
 
   if (staffView === 'opportunities' && canOpenOpportunities) {
     return (
@@ -111,6 +121,21 @@ function StaffWorkspaceRoute({
       />
     );
   }
+
+  if (staffView === 'referrals' && canOpenReferrals) {
+    return (
+      <RecruiterStaffReferralsPanel
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewReferrals={perms.canViewReferrals}
+        canManageReferralStatus={perms.canManageReferralStatus}
+        canManageReferralTerms={perms.canManageReferralTerms}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+
 
   return (
     <div
@@ -152,6 +177,17 @@ function StaffWorkspaceRoute({
             Manage Applications
           </button>
         )}
+        {canOpenReferrals && (
+          <button
+            type="button"
+            onClick={() => setStaffView('referrals')}
+            data-testid="staff-open-referrals"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            Manage Referrals
+          </button>
+        )}
+
       </div>
       {onChangeStaffWorkspace && (
         <button

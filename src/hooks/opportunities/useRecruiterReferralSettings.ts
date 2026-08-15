@@ -8,6 +8,7 @@ import {
 
 
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 
 export type RecruiterReferralSettings = Tables<'recruiter_referral_settings'>;
@@ -212,5 +213,93 @@ export function useRecruiterReferralSettings(recruiterId?: string | null) {
     refetch: query.refetch,
     upsert,
     saveDecision,
+  };
+}
+
+/**
+ * Phase RC-1F — recruiter STAFF referral settings hook.
+ *
+ * Separate from the owner hook above (unchanged, including onboarding
+ * saveDecision). Reads go ONLY through
+ * `get_recruiter_referral_settings_for_workspace`, writes ONLY through
+ * `upsert_recruiter_referral_settings_for_workspace`. There is no direct
+ * `.from('recruiter_referral_settings')` access and NO delete mutation on
+ * this path — base-table RLS stays owner-only. Client booleans are UX only;
+ * PostgreSQL remains authoritative.
+ */
+export function useRecruiterStaffReferralSettings(args: {
+  recruiterId: string | null | undefined;
+  canViewReferrals: boolean;
+  canManageReferralTerms: boolean;
+}) {
+  const ambient = useContext(QueryClientContext);
+  const qc = ambient ?? getFallbackQueryClient();
+  const { user } = useAuth();
+
+  const recruiterId = args.recruiterId ?? null;
+  const canView = args.canViewReferrals === true;
+  const canManageTerms = args.canManageReferralTerms === true;
+  const canRead = canView || canManageTerms;
+
+  const query = useQuery(
+    {
+      queryKey: ['recruiter_staff_referral_settings', user?.id, recruiterId],
+      enabled: !!user && !!recruiterId && canRead,
+      queryFn: async (): Promise<RecruiterReferralSettings | null> => {
+        if (!user || !recruiterId || !canRead) return null;
+        const { data, error } = await (supabase as any).rpc(
+          'get_recruiter_referral_settings_for_workspace',
+          { _recruiter_id: recruiterId },
+        );
+        if (error) throw error;
+        return (data ?? null) as RecruiterReferralSettings | null;
+      },
+    },
+    qc,
+  );
+
+  const upsert = useMutation(
+    {
+      mutationFn: async (input: ReferralSettingsInput) => {
+        if (!user) throw new Error('Not authenticated');
+        if (!recruiterId) throw new Error('Missing recruiter workspace');
+        if (!canManageTerms) throw new Error('Not authorized');
+
+        validateDetails(input);
+
+        const { data, error } = await (supabase as any).rpc(
+          'upsert_recruiter_referral_settings_for_workspace',
+          {
+            _recruiter_id: recruiterId,
+            _referral_bonus_enabled: input.referral_bonus_enabled,
+            _bonus_amount: input.referral_bonus_enabled ? input.bonus_amount : null,
+            _payment_trigger: input.referral_bonus_enabled ? input.payment_trigger : null,
+            _waiting_period_days: input.referral_bonus_enabled
+              ? input.waiting_period_days
+              : null,
+            _bonus_terms: input.referral_bonus_enabled
+              ? (input.bonus_terms?.trim() || null)
+              : null,
+          },
+        );
+        if (error) throw error;
+        return data as RecruiterReferralSettings | null;
+      },
+      onSuccess: () => {
+        qc.invalidateQueries({
+          queryKey: ['recruiter_staff_referral_settings', user?.id, recruiterId],
+        });
+      },
+    },
+    qc,
+  );
+
+  return {
+    settings: canRead ? (query.data ?? null) : null,
+    isLoading: canRead ? query.isLoading : false,
+    isError: canRead ? query.isError : false,
+    error: query.error,
+    refetch: query.refetch,
+    upsert,
   };
 }
