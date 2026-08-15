@@ -26,6 +26,8 @@ import {
 import { useRecruiterStaffPermissions } from '@/hooks/recruiter/useRecruiterStaffPermissions';
 import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboard';
 import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicationsDashboard';
+import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
+
 
 import {
   resolveRecruiterSubviewForStatus,
