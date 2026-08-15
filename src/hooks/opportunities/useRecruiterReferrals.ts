@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import type { Tables } from '@/integrations/supabase/types';
 import type { ReferralStatus } from '@/lib/opportunities/referralStatus';
+
 
 export type RecruiterReferral = Tables<'driver_referrals'> & {
   opportunities?: {
