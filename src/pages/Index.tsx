@@ -322,15 +322,15 @@ const Index = () => {
 
     if (isRecruiterAccessParam && pageParam) {
       const requestedSub = parseRecruiterSubviewFromPage(pageParam) ?? 'hub';
-      if (recruiterHubAllowed && recruiterCapabilityStatus &&
-          recruiterCapabilityStatus !== 'revoked') {
+      if (recruiterHubAllowed && recruiterWorkspaceStatus &&
+          recruiterWorkspaceStatus !== 'revoked') {
         // Authorized: switch view mode + resolve safe subview via policy.
         setViewMode('recruiter');
         const decision = resolveDashboardNavigation({
           requestedPage: 'recruiter-access',
           requestedRecruiterSubview: requestedSub,
           effectiveWorkspace: 'recruiter',
-          recruiterCapabilityStatus,
+          recruiterWorkspaceStatus,
           recruiterHubAllowed,
           recruiterOperationsAllowed,
         });
@@ -352,8 +352,8 @@ const Index = () => {
         // Recruiter opportunities hint. Route through B2A entry when
         // driver is active but no recruiter capability. Never mount
         // recruiter dashboard directly here.
-        if (recruiterHubAllowed && recruiterCapabilityStatus &&
-            recruiterCapabilityStatus !== 'revoked') {
+        if (recruiterHubAllowed && recruiterWorkspaceStatus &&
+            recruiterWorkspaceStatus !== 'revoked') {
           setViewMode('recruiter');
           setRecruiterView('hub');
           setPage('recruiter-access');
@@ -390,7 +390,7 @@ const Index = () => {
     effectiveRole,
     recruiterHubAllowed,
     recruiterOperationsAllowed,
-    recruiterCapabilityStatus,
+    recruiterWorkspaceStatus,
     driverWorkspaceAllowed,
     driverCapabilityStatus,
   ]);
@@ -690,7 +690,7 @@ const Index = () => {
       requestedPage: page,
       requestedRecruiterSubview: recruiterView,
       effectiveWorkspace: effectiveRole,
-      recruiterCapabilityStatus,
+      recruiterWorkspaceStatus,
       recruiterHubAllowed,
       recruiterOperationsAllowed,
     });
@@ -703,7 +703,7 @@ const Index = () => {
   }, [
     workspaceLoading,
     effectiveRole,
-    recruiterCapabilityStatus,
+    recruiterWorkspaceStatus,
     recruiterHubAllowed,
     recruiterOperationsAllowed,
     page,
@@ -766,7 +766,7 @@ const Index = () => {
       requestedPage: p,
       requestedRecruiterSubview: requestedSub ?? recruiterView,
       effectiveWorkspace: effectiveRole,
-      recruiterCapabilityStatus,
+      recruiterWorkspaceStatus,
       recruiterHubAllowed,
       recruiterOperationsAllowed,
     });
@@ -833,14 +833,14 @@ const Index = () => {
       requestedPage: page,
       requestedRecruiterSubview: recruiterView,
       effectiveWorkspace: effectiveRole,
-      recruiterCapabilityStatus,
+      recruiterWorkspaceStatus,
       recruiterHubAllowed,
       recruiterOperationsAllowed,
     });
   }, [
     workspaceLoading,
     effectiveRole,
-    recruiterCapabilityStatus,
+    recruiterWorkspaceStatus,
     recruiterHubAllowed,
     recruiterOperationsAllowed,
     page,
@@ -927,7 +927,7 @@ const Index = () => {
         onNavigate={handleNavigate}
         role={effectiveRole ?? 'driver'}
         workspaceLoading={workspaceShellBlocked}
-        recruiterCapabilityStatus={recruiterCapabilityStatus}
+        recruiterWorkspaceStatus={recruiterWorkspaceStatus}
         recruiterOperationsAllowed={recruiterOperationsAllowed}
         assistantPermissions={isActingAsAssistant ? actingPermissions : null}
       />
@@ -1295,7 +1295,7 @@ const Index = () => {
           onNavigate={handleNavigate}
           role={effectiveRole ?? 'driver'}
           workspaceLoading={workspaceShellBlocked}
-          recruiterCapabilityStatus={recruiterCapabilityStatus}
+          recruiterWorkspaceStatus={recruiterWorkspaceStatus}
           recruiterOperationsAllowed={recruiterOperationsAllowed}
           assistantPermissions={isActingAsAssistant ? actingPermissions : null}
         />
