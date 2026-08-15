@@ -555,11 +555,7 @@ ON public.recruiter_member_audit_log
 FOR SELECT
 TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-     WHERE rp.id = recruiter_member_audit_log.recruiter_id
-       AND rp.user_id = auth.uid()
-  )
+  public.is_recruiter_workspace_owner(recruiter_member_audit_log.recruiter_id)
 );
 
 -- Function privileges: fail closed, then grant only the intended surface.
