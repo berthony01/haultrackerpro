@@ -310,10 +310,7 @@ BEGIN
   END IF;
 
   -- RC-1A: canonical recruiter owner only.
-  IF NOT EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-     WHERE rp.id = _recruiter_id AND rp.user_id = _uid
-  ) THEN
+  IF NOT public.is_recruiter_workspace_owner(_recruiter_id) THEN
     RAISE EXCEPTION 'Not authorized' USING ERRCODE = '42501';
   END IF;
 
