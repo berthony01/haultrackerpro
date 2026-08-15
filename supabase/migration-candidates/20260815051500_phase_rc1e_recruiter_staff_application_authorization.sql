@@ -44,11 +44,8 @@ AS $function$
       'applications_request_contact'::public.recruiter_workspace_permission
     )
     AND (
-      -- Owner path: unchanged owner-only gate, used exactly as-is.
       public.current_user_can_manage_recruiter_opportunities(_recruiter_id)
       OR (
-        -- Staff path: workspace must be posting-ready AND the caller must
-        -- hold the explicit RC-1B permission on an active membership.
         public.recruiter_profile_can_manage_opportunities(_recruiter_id)
         AND public.current_user_has_recruiter_permission(_recruiter_id, _permission)
       )
@@ -60,10 +57,8 @@ REVOKE ALL ON FUNCTION public.current_user_can_recruiter_application_action(uuid
 GRANT EXECUTE ON FUNCTION public.current_user_can_recruiter_application_action(uuid, public.recruiter_workspace_permission) TO authenticated;
 
 -- RLS-safe application context. Direct recruiter SELECT on
--- opportunity_applications remains forbidden. This SECURITY DEFINER function
--- returns a recruiter_id only when the caller ALREADY passes the RC-1E action
--- helper for the requested application. Policies re-check the action helper
--- against the returned context as defense in depth.
+-- opportunity_applications remains forbidden. Returns a recruiter_id only
+-- when the caller already passes the requested RC-1E application action.
 CREATE OR REPLACE FUNCTION public.recruiter_application_authorized_context(
   _application_id uuid,
   _permission public.recruiter_workspace_permission
@@ -85,16 +80,50 @@ REVOKE ALL ON FUNCTION public.recruiter_application_authorized_context(uuid, pub
 REVOKE ALL ON FUNCTION public.recruiter_application_authorized_context(uuid, public.recruiter_workspace_permission) FROM anon;
 GRANT EXECUTE ON FUNCTION public.recruiter_application_authorized_context(uuid, public.recruiter_workspace_permission) TO authenticated;
 
+-- Staff status writes use a narrow SECURITY DEFINER RPC because direct UPDATE
+-- cannot target a row without a corresponding SELECT policy. We intentionally
+-- keep recruiter direct SELECT closed. This RPC authorizes the workspace and
+-- permission, changes only status, scopes by application + recruiter, and lets
+-- the existing immutable-field / legal-transition triggers remain authoritative.
+CREATE OR REPLACE FUNCTION public.update_recruiter_application_status(
+  _recruiter_id uuid,
+  _application_id uuid,
+  _status text
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+DECLARE
+  _updated integer := 0;
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+
+  IF NOT public.current_user_can_recruiter_application_action(
+    _recruiter_id, 'applications_manage_status'::public.recruiter_workspace_permission
+  ) THEN
+    RAISE EXCEPTION 'Not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  UPDATE public.opportunity_applications
+  SET status = _status
+  WHERE id = _application_id
+    AND recruiter_id = _recruiter_id;
+
+  GET DIAGNOSTICS _updated = ROW_COUNT;
+  RETURN _updated = 1;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.update_recruiter_application_status(uuid, uuid, text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.update_recruiter_application_status(uuid, uuid, text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.update_recruiter_application_status(uuid, uuid, text) TO authenticated;
+
 -- ---------------------------------------------------------------------------
 -- B) Safe application list — authorization + least-privilege contact masking
---
--- Payload, joins, ordering, and driver consent rules are reproduced verbatim
--- from the live definition. The ONLY changes:
---   * owner-only gate replaced with the application action helper
---     ('applications_view')
---   * phone/email snapshots additionally require the caller to pass
---     'applications_request_contact'. Owner behavior is unchanged because the
---     helper's owner path grants all three allowed application actions.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.list_recruiter_applications_safe(_recruiter_id uuid)
 RETURNS SETOF jsonb
@@ -213,13 +242,11 @@ BEGIN
     RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
   END IF;
   IF NOT (
-    -- Legacy owner branch, preserved EXACTLY (do not tighten).
     EXISTS (
       SELECT 1 FROM public.recruiter_profiles rp
       WHERE rp.id = _recruiter_id AND rp.user_id = _uid
         AND rp.status <> 'suspended' AND rp.verification_status <> 'suspended'
     )
-    -- RC-1E staff branch: posting-ready workspace + explicit view permission.
     OR (
       public.recruiter_profile_can_manage_opportunities(_recruiter_id)
       AND public.current_user_has_recruiter_permission(
@@ -239,35 +266,23 @@ END;
 $function$;
 
 -- ---------------------------------------------------------------------------
--- D) opportunity_applications RLS — recruiter UPDATE policy only
+-- D) opportunity_applications RLS
 --
--- Admin policies, driver SELECT, and the false driver INSERT policy are NOT
--- touched. No recruiter direct SELECT is added — recruiter/staff reads keep
--- going through the safe RPC. Existing update/snapshot/contract triggers are
--- NOT replaced; they still constrain UPDATE to legal status-only transitions.
+-- Direct recruiter UPDATE remains on the unchanged legacy owner gate. Staff
+-- status writes use update_recruiter_application_status(), avoiding any need
+-- to add a recruiter SELECT policy. Existing update/snapshot/contract triggers
+-- remain untouched and authoritative.
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Recruiter updates application status" ON public.opportunity_applications;
 CREATE POLICY "Recruiter updates application status"
   ON public.opportunity_applications
   FOR UPDATE
   TO authenticated
-  USING (
-    public.current_user_can_recruiter_application_action(
-      recruiter_id, 'applications_manage_status'::public.recruiter_workspace_permission
-    )
-  )
-  WITH CHECK (
-    public.current_user_can_recruiter_application_action(
-      recruiter_id, 'applications_manage_status'::public.recruiter_workspace_permission
-    )
-  );
+  USING (public.current_user_can_manage_recruiter_opportunities(recruiter_id))
+  WITH CHECK (public.current_user_can_manage_recruiter_opportunities(recruiter_id));
 
 -- ---------------------------------------------------------------------------
 -- E) application_events — recruiter view policy + actor classification
---
--- Admin and driver policies are untouched. The legacy owner branch is
--- preserved. The staff branch uses RLS-safe authorized context because direct
--- recruiter SELECT on opportunity_applications remains intentionally absent.
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Recruiter views events for own applications" ON public.application_events;
 CREATE POLICY "Recruiter views events for own applications"
@@ -296,8 +311,6 @@ CREATE POLICY "Recruiter views events for own applications"
     )
   );
 
--- Actor classification: an authorized staff status change is a real recruiter
--- action, not 'system'. Every other line is reproduced verbatim.
 CREATE OR REPLACE FUNCTION public.application_events_emit()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -326,8 +339,6 @@ BEGIN
           WHERE rp.id = NEW.recruiter_id AND rp.user_id = _actor
         ) INTO _is_recruiter;
 
-        -- RC-1E: authorized workspace staff acting under
-        -- applications_manage_status are recorded as recruiter actors.
         IF NOT _is_recruiter THEN
           _is_recruiter := public.current_user_can_recruiter_application_action(
             NEW.recruiter_id,
@@ -357,9 +368,6 @@ $function$;
 
 -- ---------------------------------------------------------------------------
 -- F) Contact request authorization
---
--- The driver response RPC, the contact-request event trigger, notification
--- triggers, and all driver authorization remain untouched.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.request_driver_contact(application_id uuid, recruiter_note text DEFAULT NULL::text)
 RETURNS uuid
@@ -389,13 +397,10 @@ BEGIN
   END IF;
 
   IF _rp.user_id = auth.uid() THEN
-    -- Preserve the legacy owner eligibility path and its exact error contract.
     IF NOT public.current_user_can_manage_recruiter_opportunities(_rp.id) THEN
       RAISE EXCEPTION 'Recruiter profile is not eligible for contact requests' USING ERRCODE = '42501';
     END IF;
   ELSE
-    -- RC-1E staff extension: only explicit applications_request_contact on an
-    -- active membership in a posting-ready workspace authorizes a non-owner.
     IF NOT public.current_user_can_recruiter_application_action(
       _app.recruiter_id, 'applications_request_contact'::public.recruiter_workspace_permission
     ) THEN
