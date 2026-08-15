@@ -213,14 +213,16 @@ describe('parseRecruiterStaffPermissions', () => {
  * H/I — hook contracts
  * ------------------------------------------------------------------ */
 describe('permission + data hook contracts', () => {
-  it('permission query key is scoped to user AND recruiter', () => {
-    expect(HOOK_SRC).toContain("queryKey: ['recruiter_staff_permissions', userId, recruiterId ?? null]");
+  it('permission resolution is scoped to user AND recruiter and fails closed on mismatch', () => {
+    expect(HOOK_SRC).toContain('resolved.userId === userId && resolved.recruiterId === id');
+    expect(HOOK_SRC).toContain('requestRef.current += 1;');
+    expect(HOOK_SRC).toContain('if (!userId || !id)');
   });
 
   it('permission hook fails closed on error/malformed payload', () => {
     expect(HOOK_SRC).toContain('emptyRecruiterStaffPermissions()');
     expect(HOOK_SRC).toContain('parseRecruiterStaffPermissions(resp.data)');
-    expect(HOOK_SRC).toContain('const granted = query.isSuccess && !!query.data;');
+    expect(HOOK_SRC).toContain('const granted = !!scoped && !scoped.error && !!scoped.permissions;');
   });
 
   it('permission hook reads only get_my_recruiter_permissions', () => {
