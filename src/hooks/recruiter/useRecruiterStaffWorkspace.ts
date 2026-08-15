@@ -15,6 +15,13 @@ import {
   type RecruiterStaffWorkspace,
 } from '@/lib/recruiterStaffWorkspaceResolution';
 
+/** Narrow local adapter for exactly this RPC (generated types untouched). */
+function rpcGetMyRecruiterStaffWorkspaces(): Promise<{ data: unknown; error: unknown }> {
+  return (supabase as unknown as {
+    rpc: (fn: string) => Promise<{ data: unknown; error: unknown }>;
+  }).rpc('get_my_recruiter_staff_workspaces');
+}
+
 function readStored(userId: string): string | null {
   try {
     const v = localStorage.getItem(recruiterStaffWorkspaceStorageKey(userId));
