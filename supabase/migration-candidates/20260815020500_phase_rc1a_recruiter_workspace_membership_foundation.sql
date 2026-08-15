@@ -154,7 +154,7 @@ BEGIN
     LEFT JOIN auth.users u ON u.id = NEW.user_id;
 
   IF _email IS NULL OR _email = '' THEN
-    RETURN NEW;
+    RAISE EXCEPTION 'Recruiter workspace owner membership requires an owner email' USING ERRCODE = '22023';
   END IF;
 
   INSERT INTO public.recruiter_members (
