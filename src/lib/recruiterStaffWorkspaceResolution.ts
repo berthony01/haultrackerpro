@@ -121,7 +121,7 @@ export function resolveRecruiterStaffWorkspace(
   storedRecruiterId?: string | null,
 ): RecruiterStaffWorkspaceResolution {
   const parsed = parseRecruiterStaffWorkspaces(payload);
-  if (!parsed.ok) {
+  if (parsed.ok === false) {
     return { kind: 'invalid', workspaces: [], selected: null, reason: parsed.reason };
   }
   const workspaces = parsed.workspaces;
