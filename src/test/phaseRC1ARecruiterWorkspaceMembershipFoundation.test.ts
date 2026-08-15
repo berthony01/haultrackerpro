@@ -269,7 +269,7 @@ describe("Phase RC-1A — read RPC contracts", () => {
   it("8c. every new function pins search_path", () => {
     const defs = sql.match(/CREATE OR REPLACE FUNCTION public\./g) ?? [];
     const pins = sql.match(/SET search_path = public/g) ?? [];
-    expect(defs.length).toBeGreaterThanOrEqual(7);
+    expect(defs.length).toBeGreaterThanOrEqual(8);
     expect(pins.length).toBe(defs.length);
   });
 });
