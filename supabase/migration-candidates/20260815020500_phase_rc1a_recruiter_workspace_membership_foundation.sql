@@ -190,7 +190,25 @@ FOR EACH ROW EXECUTE FUNCTION public.rc1a_bootstrap_recruiter_owner_membership()
 -- E. Security helpers / RPCs
 -- ---------------------------------------------------------------------------
 
--- Membership identity ONLY. Not operational permission.
+-- Canonical workspace OWNERSHIP identity only. No billing, suspension, or
+-- operational inspection. Identity comes exclusively from auth.uid().
+CREATE OR REPLACE FUNCTION public.is_recruiter_workspace_owner(_recruiter_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT auth.uid() IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.recruiter_profiles rp
+        WHERE rp.id = _recruiter_id
+          AND rp.user_id = auth.uid()
+     );
+$$;
+
+-- Membership identity ONLY. Not operational permission. Self-scoped: an
+-- authenticated caller can never probe another user's membership.
 CREATE OR REPLACE FUNCTION public.is_recruiter_workspace_member(_recruiter_id uuid, _uid uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -198,12 +216,14 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.recruiter_members m
-     WHERE m.recruiter_id = _recruiter_id
-       AND m.member_user_id = _uid
-       AND m.status = 'active'
-  );
+  SELECT auth.uid() IS NOT NULL
+     AND _uid = auth.uid()
+     AND EXISTS (
+       SELECT 1 FROM public.recruiter_members m
+        WHERE m.recruiter_id = _recruiter_id
+          AND m.member_user_id = _uid
+          AND m.status = 'active'
+     );
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_my_recruiter_workspaces()
