@@ -123,8 +123,8 @@ describe("RC-1B — permission vocabulary", () => {
   });
 
   it("2g. TS mirror is pure: no React/Supabase imports and no role presets", () => {
-    expect(tsSource).not.toMatch(/from\s+["']react/);
-    expect(tsSource).not.toMatch(/supabase/i);
+    expect(tsSource).not.toMatch(/^\s*import\s/m);
+    expect(tsSource).not.toMatch(/from\s+["'][^"']*(react|supabase)/i);
     expect(tsSource).not.toMatch(/recruiter_admin|recruiter_staff|ROLE_PRESET/);
   });
 });
