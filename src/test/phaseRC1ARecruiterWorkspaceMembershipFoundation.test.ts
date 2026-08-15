@@ -172,9 +172,10 @@ describe("Phase RC-1A — roles, statuses, uniqueness invariants", () => {
 });
 
 describe("Phase RC-1A — owner-only invite/revoke authority", () => {
-  it("6a. invite is restricted to the canonical recruiter owner", () => {
+  it("6a. invite is restricted to the canonical recruiter owner via the owner helper", () => {
     const fn = lower.slice(lower.indexOf("function public.invite_recruiter_member"));
-    expect(fn).toContain("where rp.id = _recruiter_id and rp.user_id = _uid");
+    expect(fn).toContain("if not public.is_recruiter_workspace_owner(_recruiter_id) then");
+    expect(fn).not.toContain("where rp.id = _recruiter_id and rp.user_id = _uid");
     expect(fn).toContain("'not authorized'");
     expect(fn).toContain("authentication required");
   });
@@ -184,9 +185,10 @@ describe("Phase RC-1A — owner-only invite/revoke authority", () => {
     expect(lower).toContain("cannot invite the workspace owner");
   });
 
-  it("6c. revoke is owner-only and can never revoke the owner membership", () => {
+  it("6c. revoke is owner-only via the helper and can never revoke the owner membership", () => {
     const fn = lower.slice(lower.indexOf("function public.revoke_recruiter_member"));
-    expect(fn).toContain("rp.user_id = _uid");
+    expect(fn).toContain("public.is_recruiter_workspace_owner(m.recruiter_id)");
+    expect(fn).not.toContain("join public.recruiter_profiles rp");
     expect(fn).toContain("m.role <> 'recruiter_owner'");
     expect(fn).toContain("m.status in ('pending', 'active')");
     expect(fn).toContain("status = 'revoked'");
