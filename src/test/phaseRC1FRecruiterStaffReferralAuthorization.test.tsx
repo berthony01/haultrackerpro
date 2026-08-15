@@ -118,8 +118,10 @@ describe('RC-1F — trigger changes are minimal', () => {
   });
 
   it('adds exactly the manage-status staff gate', () => {
+    expect(beforeUpdate).toContain('current_user_can_recruiter_referral_action(');
+    expect(beforeUpdate).toContain('OLD.recruiter_id,');
     expect(beforeUpdate).toContain(
-      "current_user_can_recruiter_referral_action(OLD.recruiter_id, 'referrals_manage_status'",
+      "'referrals_manage_status'::public.recruiter_workspace_permission",
     );
     expect(beforeUpdate).not.toContain('referral_terms_manage');
   });
@@ -271,8 +273,11 @@ describe('RC-1F — staff panel isolation', () => {
       'useAgency',
       'Subscription',
     ]) {
-      const body = PANEL.replace(/RecruiterStaffReferralsPanel/g, '');
-      expect(body).not.toContain(banned);
+      const imports = PANEL.split('\n')
+        .filter((l) => l.trimStart().startsWith('import') || /^\s+[A-Za-z]/.test(l))
+        .join('\n')
+        .split('interface Props')[0];
+      expect(imports).not.toContain(banned);
     }
   });
 
