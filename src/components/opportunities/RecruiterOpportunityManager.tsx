@@ -37,7 +37,9 @@ import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterR
 import { RecruiterReadinessDialog } from './RecruiterReadinessDialog';
 import {
   useRecruiterOpportunities,
+  useRecruiterStaffOpportunities,
   type Opportunity,
+  type RecruiterStaffOpportunityPermissions,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
