@@ -334,35 +334,36 @@ describe("Phase RC-1A — prohibited scope", () => {
 
   it("11. does not create, replace, alter, or drop existing recruiter operational functions", () => {
     for (const fn of FORBIDDEN_FUNCTIONS) {
-      expect(lower).not.toContain(fn);
+      expect(lowerExecutable).not.toContain(fn);
     }
   });
 
-  it("12a. contains no Stripe/billing/subscription changes", () => {
+  it("12a. contains no Stripe/billing/subscription changes (executable SQL only)", () => {
     for (const token of ["stripe", "subscriptions", "checkout", "price_id", "entitlement"]) {
-      expect(lower).not.toContain(token);
+      expect(lowerExecutable).not.toContain(token);
     }
   });
 
   it("12b. touches no agency, assistant, settlement, opportunity, or application objects", () => {
     for (const token of [
       "public.agency_",
+      "agency_members",
       "driver_assistants",
       "assistant_has_permission",
       "driver_settlements",
       "public.opportunities",
       "opportunity_applications",
     ]) {
-      expect(lower).not.toContain(token);
+      expect(lowerExecutable).not.toContain(token);
     }
   });
 
   it("12c. only the two new tables are created and none are dropped", () => {
-    const created = lower.match(/create table if not exists public\.(\w+)/g) ?? [];
+    const created = lowerExecutable.match(/create table if not exists public\.(\w+)/g) ?? [];
     expect(created.sort()).toEqual([
       "create table if not exists public.recruiter_member_audit_log",
       "create table if not exists public.recruiter_members",
     ]);
-    expect(lower).not.toMatch(/drop table/);
+    expect(lowerExecutable).not.toMatch(/drop table/);
   });
 });
