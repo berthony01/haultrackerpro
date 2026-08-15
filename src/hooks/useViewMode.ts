@@ -2,10 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, type UserRole } from '@/hooks/useUserRole';
 import { useUserCapabilities } from '@/hooks/useUserCapabilities';
+import { useRecruiterStaffWorkspace } from '@/hooks/recruiter/useRecruiterStaffWorkspace';
 import {
   computeWorkspaceAccess,
-  isWorkspaceAllowed,
-  resolveInitialWorkspace,
   type WorkspaceRole,
 } from '@/lib/workspaceAccess';
 import type { UserCapabilitiesView, UserCapabilityRow } from '@/lib/userCapabilities';
@@ -78,12 +77,16 @@ export function useViewMode() {
   const { user, loading: authLoading } = useAuth();
   const capabilities = useUserCapabilities();
   const { role: preferredRole, isLoading: roleLoading } = useUserRole();
+  const staff = useRecruiterStaffWorkspace();
 
   const userId = user?.id ?? null;
   const rows = capabilities.rows as readonly UserCapabilityRow[] | undefined;
   const hasError = !!capabilities.error;
   const isLoading =
     authLoading || capabilities.isLoading || roleLoading;
+  // Staff discovery is tracked SEPARATELY: a slow/failing staff lookup must
+  // never gate an otherwise valid driver workspace.
+  const staffLoading = staff.isLoading;
 
   // Stable trusted view: a plain object holding only the validated rows.
   // Every downstream consumer re-derives access from these rows.
@@ -97,15 +100,56 @@ export function useViewMode() {
     [trustedView],
   );
 
+  // -------------------------------------------------------------------
+  // Phase RC-1C — STAFF workspace overlay.
+  //
+  // Additive organizational entry ONLY. It may grant recruiter HUB entry
+  // exclusively when the personal recruiter capability is ABSENT (null)
+  // and a validated staff workspace is selected. It NEVER bypasses a
+  // personal setup / active / suspended / revoked capability state, and
+  // NEVER grants recruiter operations.
+  // -------------------------------------------------------------------
+  const personalRecruiterStatus = decisions.recruiterCapabilityStatus;
+  const selectedStaffWorkspace = staff.selectedWorkspace;
+  const staffOverlayActive =
+    !!userId &&
+    !!trustedView &&
+    personalRecruiterStatus === null &&
+    !!selectedStaffWorkspace;
+
+  const recruiterHubAllowed = decisions.recruiterHubAllowed || staffOverlayActive;
+  // Operations remain capability-derived only. Staff is always false.
+  const recruiterOperationsAllowed = decisions.recruiterOperationsAllowed;
+
+  const recruiterAccessKind: 'capability' | 'staff' | null =
+    personalRecruiterStatus !== null
+      ? 'capability'
+      : staffOverlayActive
+        ? 'staff'
+        : null;
+
+  /** Shell/navigation status — NOT a personal capability claim. */
+  const recruiterWorkspaceStatus =
+    personalRecruiterStatus ?? (staffOverlayActive ? ('active' as const) : null);
+
   // In-memory selection tracks explicit switches only. It is validated
-  // synchronously on every render against `trustedView` before being
-  // exposed as `effectiveRole`.
+  // synchronously on every render before being exposed as `effectiveRole`.
   const [selection, setSelection] = useState<WorkspaceRole | null>(null);
 
   // Legacy unscoped key must never be trusted; clear it once on mount.
   useEffect(() => {
     try { localStorage.removeItem(LEGACY_UNSCOPED_KEY); } catch {}
   }, []);
+
+  /** Combined hub authorization: capability rows OR validated staff overlay. */
+  const workspaceAllowed = useCallback(
+    (role: WorkspaceRole | null): boolean => {
+      if (role === 'driver') return decisions.driverWorkspaceAllowed;
+      if (role === 'recruiter') return recruiterHubAllowed;
+      return false;
+    },
+    [decisions.driverWorkspaceAllowed, recruiterHubAllowed],
+  );
 
   // -------------------------------------------------------------------
   // SYNCHRONOUS render-time access gate.
@@ -118,32 +162,43 @@ export function useViewMode() {
 
     // Transient one-shot workspace intent (explicit Driver/Recruiter
     // choice on /auth or /start) takes precedence over stored preference
-    // and preferredRole — but ONLY when the CURRENT validated capability
-    // rows allow it. A forged/stale intent grants nothing.
+    // and preferredRole — but ONLY when the CURRENT validated access
+    // allows it. A forged/stale intent grants nothing.
     const intent = readWorkspaceIntent();
-    if (intent && isWorkspaceAllowed(trustedView, intent)) {
+    if (intent && workspaceAllowed(intent)) {
       return intent;
     }
 
-    // Honor an explicit in-memory selection only if it is still allowed
-    // by the CURRENT validated rows (not last render's rows).
-    if (selection && isWorkspaceAllowed(trustedView, selection)) {
+    // Honor an explicit in-memory selection only if it is still allowed.
+    if (selection && workspaceAllowed(selection)) {
       return selection;
     }
 
     // Otherwise resolve from scoped stored preference + preferred role
-    // hint. `resolveInitialWorkspace` fails closed and never synthesizes
-    // driver when no capability exists.
+    // hint, then fall back. Fails closed — never synthesizes driver.
     const stored = readStored(scopedKey(userId));
-    return resolveInitialWorkspace(trustedView, {
-      preferredRole: (preferredRole as WorkspaceRole | null) ?? null,
-      storedPreference: stored,
-    }).workspace;
-  }, [isLoading, userId, trustedView, selection, preferredRole]);
+    if (stored && workspaceAllowed(stored)) return stored;
+    const preferred =
+      preferredRole === 'driver' || preferredRole === 'recruiter'
+        ? (preferredRole as WorkspaceRole)
+        : null;
+    if (preferred && workspaceAllowed(preferred)) return preferred;
+    if (decisions.driverWorkspaceAllowed) return 'driver';
+    if (recruiterHubAllowed) return 'recruiter';
+    return null;
+  }, [
+    isLoading,
+    userId,
+    trustedView,
+    selection,
+    preferredRole,
+    workspaceAllowed,
+    decisions.driverWorkspaceAllowed,
+    recruiterHubAllowed,
+  ]);
 
   // Reconciliation effect: persist/clear scoped storage and normalize
-  // in-memory selection to the currently effective role. This runs
-  // AFTER render and is never the access guard.
+  // in-memory selection. Runs AFTER render; never the access guard.
   useEffect(() => {
     if (isLoading) return;
     if (!userId) {
@@ -156,13 +211,10 @@ export function useViewMode() {
     }
     const key = scopedKey(userId);
 
-    // Consume the transient workspace intent exactly once, after
-    // capabilities have resolved. Allowed → persist + normalize.
-    // Rejected → discard silently and fall through to existing behavior.
     const intent = readWorkspaceIntent();
     if (intent) {
       clearWorkspaceIntent();
-      if (isWorkspaceAllowed(trustedView, intent)) {
+      if (workspaceAllowed(intent)) {
         writeStored(key, intent);
         if (selection !== intent) setSelection(intent);
         return;
@@ -170,39 +222,53 @@ export function useViewMode() {
     }
 
     const stored = readStored(key);
-    if (stored && !isWorkspaceAllowed(trustedView, stored)) {
+    if (stored && !workspaceAllowed(stored)) {
       clearStored(key);
     }
     // Drop any stale selection that is no longer allowed.
-    if (selection && !isWorkspaceAllowed(trustedView, selection)) {
+    if (selection && !workspaceAllowed(selection)) {
       setSelection(null);
     }
-  }, [isLoading, userId, trustedView, selection]);
+  }, [isLoading, userId, trustedView, selection, workspaceAllowed]);
 
 
   const setViewMode = useCallback(
     (next: WorkspaceRole) => {
       if (!userId) return;
       if (!trustedView) return;
-      if (!isWorkspaceAllowed(trustedView, next)) return;
+      if (!workspaceAllowed(next)) return;
       setSelection(next);
       writeStored(scopedKey(userId), next);
     },
-    [userId, trustedView],
+    [userId, trustedView, workspaceAllowed],
   );
 
   return {
     effectiveRole,
     viewMode: effectiveRole,
     setViewMode,
-    canSwitch: decisions.switcherAvailable,
+    canSwitch: decisions.driverWorkspaceAllowed && recruiterHubAllowed,
     isLoading,
     error: capabilities.error ?? null,
     driverWorkspaceAllowed: decisions.driverWorkspaceAllowed,
-    recruiterHubAllowed: decisions.recruiterHubAllowed,
-    recruiterOperationsAllowed: decisions.recruiterOperationsAllowed,
+    recruiterHubAllowed,
+    recruiterOperationsAllowed,
     driverCapabilityStatus: decisions.driverCapabilityStatus,
-    recruiterCapabilityStatus: decisions.recruiterCapabilityStatus,
+    /** Personal recruiter capability status (owner/capability semantics). */
+    recruiterCapabilityStatus: personalRecruiterStatus,
+    /** Shell/navigation recruiter status (capability OR staff overlay). */
+    recruiterWorkspaceStatus,
+    recruiterAccessKind,
+    // ---- RC-1C staff workspace entry context ----
+    staffWorkspaces: staff.workspaces,
+    selectedStaffWorkspace: staffOverlayActive ? selectedStaffWorkspace : null,
+    staffSelectionRequired: personalRecruiterStatus === null && staff.requiresSelection,
+    /** Separate from `error`: staff discovery failure must never block driver use. */
+    staffWorkspaceError: staff.error,
+    /** Separate from `isLoading`: staff discovery settle state. */
+    staffLoading,
+    selectStaffWorkspace: staff.selectWorkspace,
+    clearStaffWorkspaceSelection: staff.clearSelection,
   };
 }
 

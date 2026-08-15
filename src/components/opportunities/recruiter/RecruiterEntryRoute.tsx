@@ -96,7 +96,16 @@ export default function RecruiterEntryRoute() {
   const recruiterStatus = view.recruiterCapabilityStatus;
   const driverStatus = view.driverCapabilityStatus;
   const capsError = caps.error;
-  const isLoading = authLoading || caps.isLoading;
+  // Phase RC-1C — staff workspace entry context comes from useViewMode
+  // ONLY. This route must never instantiate a second staff hook.
+  const staffWorkspaces = view.staffWorkspaces ?? [];
+  const selectedStaffWorkspace = view.selectedStaffWorkspace ?? null;
+  const staffSelectionRequired = view.staffSelectionRequired ?? false;
+  const staffWorkspaceError = view.staffWorkspaceError ?? null;
+  const selectStaffWorkspace = view.selectStaffWorkspace ?? (() => {});
+  // Staff discovery must be SETTLED before any activation decision.
+  const isLoading =
+    authLoading || caps.isLoading || view.isLoading || !!view.staffLoading;
 
   // Synchronously track the current user id. Every render updates the
   // ref so async completions can compare against the most recent id.
@@ -184,8 +193,18 @@ export default function RecruiterEntryRoute() {
     }
   }, [userId, beginRecruiterSetup, refetch]);
 
+  // Phase RC-1C — a staff membership is an organizational entry path and
+  // must SUPPRESS personal recruiter capability creation entirely.
+  const staffPathBlocksActivation =
+    recruiterStatus === null &&
+    (!!staffWorkspaceError ||
+      staffSelectionRequired ||
+      !!selectedStaffWorkspace ||
+      staffWorkspaces.length > 0);
+
   // Auto-invoke activation only when validated rows prove:
-  //   driver.status === 'active' AND recruiter capability absent.
+  //   driver.status === 'active' AND recruiter capability absent
+  //   AND staff discovery completed successfully with ZERO workspaces.
   // Fail-closed on loading, missing user, capability error, or any
   // other capability shape. Uses the current-user-visible error only.
   const shouldAutoActivate =
@@ -194,6 +213,7 @@ export default function RecruiterEntryRoute() {
     !!userId &&
     driverStatus === 'active' &&
     recruiterStatus === null &&
+    !staffPathBlocksActivation &&
     rpcError === null;
 
   useEffect(() => {
@@ -222,7 +242,10 @@ export default function RecruiterEntryRoute() {
       ? '/dashboard?page=recruiter-access:onboarding'
       : recruiterStatus === 'active' || recruiterStatus === 'suspended'
         ? '/dashboard?page=recruiter-access'
-        : null;
+        // RC-1C: staff entry — hub only, never onboarding, never setup RPC.
+        : recruiterStatus === null && selectedStaffWorkspace
+          ? '/dashboard?page=recruiter-access'
+          : null;
 
   const mayEnterRecruiter =
     !isLoading &&
@@ -273,7 +296,8 @@ export default function RecruiterEntryRoute() {
     );
   }
 
-  // Recruiter capability present in an eligible state.
+  // Recruiter capability present in an eligible state, OR a validated
+  // RC-1C staff workspace selection is ready to enter.
   if (recruiterDestination !== null) {
     // If hub is not currently authorized, fail closed on this route
     // (no mode change, no navigation). Render neutral preparation UI.
@@ -281,6 +305,51 @@ export default function RecruiterEntryRoute() {
   }
 
   // recruiterStatus === null past this point.
+
+  // RC-1C: staff discovery failed → fail closed. NEVER auto-create a
+  // personal recruiter capability as a fallback.
+  if (staffWorkspaceError) {
+    return (
+      <BlockedPanel
+        title="Recruiter access unavailable"
+        message="We couldn't verify your recruiter workspace access. Please try again shortly."
+      />
+    );
+  }
+
+  // RC-1C: 2+ eligible staff workspaces → require an explicit choice.
+  // Neutral chooser: company name + role label only.
+  if (staffSelectionRequired && staffWorkspaces.length > 1) {
+    return (
+      <div
+        data-testid="recruiter-staff-workspace-chooser"
+        className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col justify-center p-6"
+      >
+        <h1 className="text-xl font-semibold">Choose a recruiter workspace</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          You're a member of more than one workspace. Select the one you want to open.
+        </p>
+        <ul className="mt-4 space-y-2">
+          {staffWorkspaces.map(w => (
+            <li key={w.membershipId}>
+              <button
+                type="button"
+                onClick={() => selectStaffWorkspace(w.recruiterId)}
+                className="w-full rounded-lg border border-border/60 bg-card/60 px-4 py-3 text-left hover:border-primary/60"
+              >
+                <span className="block text-sm font-semibold text-foreground">{w.companyName}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {w.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff'}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <BackToDriverButton />
+      </div>
+    );
+  }
+
   if (driverStatus !== 'active') {
     return (
       <BlockedPanel

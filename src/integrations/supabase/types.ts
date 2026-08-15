@@ -3544,6 +3544,7 @@ export type Database = {
           invited_at: string
           invited_by_user_id: string | null
           member_user_id: string | null
+          permissions: Json
           recruiter_id: string
           revoked_at: string | null
           revoked_by_user_id: string | null
@@ -3561,6 +3562,7 @@ export type Database = {
           invited_at?: string
           invited_by_user_id?: string | null
           member_user_id?: string | null
+          permissions?: Json
           recruiter_id: string
           revoked_at?: string | null
           revoked_by_user_id?: string | null
@@ -3578,6 +3580,7 @@ export type Database = {
           invited_at?: string
           invited_by_user_id?: string | null
           member_user_id?: string | null
+          permissions?: Json
           recruiter_id?: string
           revoked_at?: string | null
           revoked_by_user_id?: string | null
@@ -4824,6 +4827,13 @@ export type Database = {
         Args: { _recruiter_id: string }
         Returns: boolean
       }
+      current_user_has_recruiter_permission: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -5033,6 +5043,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      get_my_recruiter_permissions: {
+        Args: { _recruiter_id: string }
+        Returns: Json
       }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
       get_my_recruiter_workspaces: {
@@ -5726,6 +5740,10 @@ export type Database = {
       set_agency_slug: {
         Args: { _agency_id: string; _slug: string }
         Returns: string
+      }
+      set_recruiter_member_permissions: {
+        Args: { _member_id: string; _permissions: Json }
+        Returns: Json
       }
       settlement_accept_my_carrier_relationship: {
         Args: { _relationship_id: string }
@@ -6595,6 +6613,28 @@ export type Database = {
         | "recruiter_admin"
         | "recruiter_staff"
       recruiter_member_status: "pending" | "active" | "revoked"
+      recruiter_workspace_permission:
+        | "opportunities_view"
+        | "opportunities_create"
+        | "opportunities_edit"
+        | "opportunities_change_status"
+        | "opportunities_delete"
+        | "applications_view"
+        | "applications_manage_status"
+        | "applications_request_contact"
+        | "applications_manage_notes"
+        | "contracts_view"
+        | "contracts_manage"
+        | "referrals_view"
+        | "referrals_manage_status"
+        | "referral_terms_manage"
+        | "reports_view"
+        | "reports_export"
+        | "settlements_view"
+        | "settlements_prepare"
+        | "settlements_finalize"
+        | "team_view"
+        | "team_manage"
       user_capability_status: "setup" | "active" | "suspended" | "revoked"
       user_capability_type: "driver" | "recruiter"
     }
@@ -6778,6 +6818,29 @@ export const Constants = {
         "recruiter_staff",
       ],
       recruiter_member_status: ["pending", "active", "revoked"],
+      recruiter_workspace_permission: [
+        "opportunities_view",
+        "opportunities_create",
+        "opportunities_edit",
+        "opportunities_change_status",
+        "opportunities_delete",
+        "applications_view",
+        "applications_manage_status",
+        "applications_request_contact",
+        "applications_manage_notes",
+        "contracts_view",
+        "contracts_manage",
+        "referrals_view",
+        "referrals_manage_status",
+        "referral_terms_manage",
+        "reports_view",
+        "reports_export",
+        "settlements_view",
+        "settlements_prepare",
+        "settlements_finalize",
+        "team_view",
+        "team_manage",
+      ],
       user_capability_status: ["setup", "active", "suspended", "revoked"],
       user_capability_type: ["driver", "recruiter"],
     },
