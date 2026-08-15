@@ -185,15 +185,24 @@ describe('RC-1C candidate migration', () => {
 // B) Parser fails closed
 // =======================================================================
 describe('parseRecruiterStaffWorkspaces', () => {
-  it('accepts null/empty payloads as zero workspaces', () => {
-    expect(parseRecruiterStaffWorkspaces(null)).toEqual({ ok: true, workspaces: [] });
+  it('accepts ONLY an empty array as zero workspaces', () => {
     expect(parseRecruiterStaffWorkspaces([])).toEqual({ ok: true, workspaces: [] });
+  });
+
+  it('treats null/undefined as malformed (never proof of zero workspaces)', () => {
+    expect(parseRecruiterStaffWorkspaces(null)).toEqual({ ok: false, reason: 'malformed_payload' });
+    expect(parseRecruiterStaffWorkspaces(undefined)).toEqual({
+      ok: false,
+      reason: 'malformed_payload',
+    });
   });
 
   it('rejects non-array payloads', () => {
     expect(parseRecruiterStaffWorkspaces({ recruiter_id: 'r1' }).ok).toBe(false);
     expect(parseRecruiterStaffWorkspaces('rows').ok).toBe(false);
+    expect(parseRecruiterStaffWorkspaces(0).ok).toBe(false);
   });
+
 
   it('rejects the WHOLE payload when any row is malformed (no silent drop)', () => {
     const res = parseRecruiterStaffWorkspaces([WS(1), { ...WS(2), member_role: 'recruiter_owner' }]);
@@ -251,6 +260,54 @@ describe('resolveRecruiterStaffWorkspace', () => {
     expect(r.kind).toBe('invalid');
     expect(r.selected).toBeNull();
     expect(r.workspaces).toEqual([]);
+  });
+
+  it('null/undefined payloads resolve invalid, never none', () => {
+    for (const p of [null, undefined]) {
+      const r = resolveRecruiterStaffWorkspace(p, 'r1');
+      expect(r.kind).toBe('invalid');
+      expect(r.selected).toBeNull();
+      expect(r.workspaces).toEqual([]);
+    }
+  });
+});
+
+// =======================================================================
+// C2) Hook lifecycle source contract (correction 2 + 3)
+// =======================================================================
+describe('useRecruiterStaffWorkspace lifecycle contract', () => {
+  const hookSrc = fs.readFileSync(
+    path.join(process.cwd(), 'src/hooks/recruiter/useRecruiterStaffWorkspace.ts'),
+    'utf8',
+  );
+
+  it('clears a stale stored preference from an effect, not during render', () => {
+    // The only clearStored call driven by resolution must live inside a
+    // useEffect body.
+    const effectBlocks = hookSrc.split('useEffect(');
+    const housekeeping = effectBlocks.filter(b => b.includes('clearStored(userId)')).pop();
+    expect(housekeeping).toBeTruthy();
+    expect(housekeeping).toContain('shouldClearStored');
+    // No render-time conditional mutation remains.
+    expect(hookSrc).not.toContain("if (userId && resolution && 'shouldClearStoredSelection' in resolution)");
+  });
+
+  it('invalidates the in-flight generation before the no-user branch', () => {
+    const fetchEffect = hookSrc.slice(hookSrc.indexOf('useEffect(() => {'));
+    const bumpIdx = fetchEffect.indexOf('++requestRef.current');
+    const noUserIdx = fetchEffect.indexOf('if (!userId)');
+    expect(bumpIdx).toBeGreaterThan(-1);
+    expect(noUserIdx).toBeGreaterThan(-1);
+    expect(bumpIdx).toBeLessThan(noUserIdx);
+  });
+
+  it('keeps the user-bound payload guard', () => {
+    expect(hookSrc).toContain('query.userId === userId ? query.data : null');
+  });
+
+  it('rejects selecting a recruiter id outside current validated rows', () => {
+    expect(hookSrc).toContain('const match = workspaces.find(w => w.recruiterId === recruiterId);');
+    expect(hookSrc).toContain('if (!match) return;');
   });
 });
 

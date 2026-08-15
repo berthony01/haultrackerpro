@@ -15,6 +15,13 @@ import {
   type RecruiterStaffWorkspace,
 } from '@/lib/recruiterStaffWorkspaceResolution';
 
+/** Narrow local adapter for exactly this RPC (generated types untouched). */
+function rpcGetMyRecruiterStaffWorkspaces(): Promise<{ data: unknown; error: unknown }> {
+  return (supabase as unknown as {
+    rpc: (fn: string) => Promise<{ data: unknown; error: unknown }>;
+  }).rpc('get_my_recruiter_staff_workspaces');
+}
+
 function readStored(userId: string): string | null {
   try {
     const v = localStorage.getItem(recruiterStaffWorkspaceStorageKey(userId));
@@ -66,17 +73,17 @@ export function useRecruiterStaffWorkspace(): UseRecruiterStaffWorkspaceResult {
   const requestRef = useRef(0);
 
   useEffect(() => {
+    // Invalidate any in-flight request FIRST, on every run (including the
+    // logout / no-user path) so a stale response can never commit state.
+    const generation = ++requestRef.current;
     if (!userId) {
       setQuery({ userId: null, data: null, error: null, loading: false });
       return;
     }
-    const generation = ++requestRef.current;
     setQuery({ userId, data: null, error: null, loading: true });
     void (async () => {
       try {
-        const { data, error } = await (supabase as any).rpc(
-          'get_my_recruiter_staff_workspaces',
-        );
+        const { data, error } = await rpcGetMyRecruiterStaffWorkspaces();
         if (requestRef.current !== generation) return;
         if (error) {
           setQuery({ userId, data: null, error, loading: false });
@@ -105,12 +112,17 @@ export function useRecruiterStaffWorkspace(): UseRecruiterStaffWorkspaceResult {
   }, [userId, isLoading, query.error, payload, selection]);
 
   // Reconcile stored preference against the CURRENT validated rows.
-  // This is housekeeping only; access is decided synchronously above.
-  if (userId && resolution && 'shouldClearStoredSelection' in resolution) {
-    if (resolution.shouldClearStoredSelection) {
-      clearStored(userId);
-    }
-  }
+  // Housekeeping ONLY, and never during render; access is decided
+  // synchronously by the resolver above.
+  const shouldClearStored =
+    !!resolution && 'shouldClearStoredSelection' in resolution
+      ? resolution.shouldClearStoredSelection
+      : false;
+  useEffect(() => {
+    if (!userId) return;
+    if (!shouldClearStored) return;
+    clearStored(userId);
+  }, [userId, shouldClearStored]);
 
   const workspaces: RecruiterStaffWorkspace[] = useMemo(() => {
     if (!resolution || resolution.kind === 'invalid') return [];
