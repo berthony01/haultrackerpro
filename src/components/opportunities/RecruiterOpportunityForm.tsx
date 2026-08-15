@@ -336,18 +336,110 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
 
 /* ---------------- form ---------------- */
 
-export function RecruiterOpportunityForm({
+/**
+ * Phase RC-1D — internal controller consumed by the shared authoring core.
+ * The core mounts NO owner hook; owner behavior is supplied by
+ * `OwnerBoundRecruiterOpportunityForm`, staff behavior by the staff manager.
+ */
+interface OpportunityFormController {
+  mode: 'owner' | 'staff';
+  isPending: boolean;
+  defaultCompanyName: string | null;
+  create: (
+    payload: OpportunityInsert,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+  update: (
+    id: string,
+    payload: OpportunityUpdate,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+  /** Owner: readiness defense-in-depth. Staff: always true (server authoritative). */
+  confirmPublishReady: () => Promise<boolean>;
+  staffPermissions?: { canCreate: boolean; canEdit: boolean; canChangeStatus: boolean };
+}
+
+/**
+ * Exported wrapper — intentionally hook-free so the staff path never mounts
+ * owner recruiter-profile / readiness / billing logic.
+ */
+export function RecruiterOpportunityForm(props: Props) {
+  const staff = props.staffController ?? null;
+  if (staff) {
+    const controller: OpportunityFormController = {
+      mode: 'staff',
+      isPending: staff.isPending,
+      defaultCompanyName: staff.companyName,
+      create: staff.create,
+      update: staff.update,
+      confirmPublishReady: () => Promise.resolve(true),
+      staffPermissions: staff.permissions,
+    };
+    return <RecruiterOpportunityFormCore {...props} controller={controller} />;
+  }
+  return <OwnerBoundRecruiterOpportunityForm {...props} />;
+}
+
+function OwnerBoundRecruiterOpportunityForm(props: Props) {
+  const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
+  const { profile, refetchProfile } = useRecruiterProfile();
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const resolverRef = useRef<((v: boolean) => void) | null>(null);
+
+  const settle = (v: boolean) => {
+    const resolve = resolverRef.current;
+    resolverRef.current = null;
+    resolve?.(v);
+  };
+
+  const controller: OpportunityFormController = {
+    mode: 'owner',
+    isPending: createOpportunity.isPending || updateOpportunity.isPending,
+    defaultCompanyName: profile?.company_name ?? null,
+    create: (payload, handlers) => createOpportunity.mutate(payload, handlers),
+    update: (id, payload, handlers) =>
+      updateOpportunity.mutate({ id, data: payload }, handlers),
+    // Phase 1P-A1 — publish defense-in-depth: refetch the recruiter profile
+    // immediately before the mutation and abort into the readiness dialog if
+    // the caller no longer satisfies posting requirements.
+    confirmPublishReady: async () => {
+      const fresh = await refetchProfile();
+      const rr = resolveRecruiterReadiness(fresh);
+      if (rr.ready) return true;
+      return new Promise<boolean>((resolve) => {
+        resolverRef.current = resolve;
+        setReadinessOpen(true);
+      });
+    },
+  };
+
+  return (
+    <>
+      <RecruiterOpportunityFormCore {...props} controller={controller} />
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={(v) => {
+          setReadinessOpen(v);
+          if (!v) settle(false);
+        }}
+        profile={profile}
+        onReady={() => settle(true)}
+        actionLabel="Publish"
+      />
+    </>
+  );
+}
+
+function RecruiterOpportunityFormCore({
   initial,
   activeOpportunityLimit,
   isAtActiveOpportunityLimit,
   activeOpportunityLimitMessage,
   onBack,
   onSaved,
-}: Props) {
-  const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
-  const { profile, refetchProfile } = useRecruiterProfile();
-  const [readinessOpen, setReadinessOpen] = useState(false);
-  const pendingPublishRef = useRef(false);
+  controller,
+}: Props & { controller: OpportunityFormController }) {
+
 
   // Phase 1R-E1 — publishing a listing that is not already active consumes
   // one slot against the canonical active-opportunity ceiling.
