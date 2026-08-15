@@ -644,21 +644,8 @@ function RecruiterOpportunityFormCore({
         onExtracted={handleExtracted}
       />
 
-      <RecruiterReadinessDialog
-        open={readinessOpen}
-        onOpenChange={(v) => {
-          setReadinessOpen(v);
-          if (!v) pendingPublishRef.current = false;
-        }}
-        profile={profile}
-        onReady={() => {
-          if (pendingPublishRef.current) {
-            pendingPublishRef.current = false;
-            void save('publish');
-          }
-        }}
-        actionLabel="Publish"
-      />
+      {/* Owner readiness dialog is rendered by OwnerBoundRecruiterOpportunityForm. */}
+
 
 
 
