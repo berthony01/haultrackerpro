@@ -47,9 +47,14 @@ export interface RecruiterStaffPermissionsState {
   canRequestApplicationContact: boolean;
   /**
    * Phase RC-1E — parsed RC-1B boolean exposed for future UI ONLY.
-   * DORMANT: no RC-1E surface consumes it operationally.
+   * DORMANT: no RC-1E or RC-1F surface consumes it operationally.
    */
   canManageApplicationNotes: boolean;
+  /** Phase RC-1F — referral authorization booleans (UX only). */
+  canViewReferrals: boolean;
+  canManageReferralStatus: boolean;
+  canManageReferralTerms: boolean;
+
   isLoading: boolean;
   error: unknown;
   refetch: () => void;
