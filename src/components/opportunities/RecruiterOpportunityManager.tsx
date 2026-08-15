@@ -389,10 +389,13 @@ function OpportunityRow({
           </p>
         </div>
         <div className="flex flex-wrap gap-2 lg:flex-col lg:w-44">
-          <Button size="sm" variant="outline" onClick={onEdit} disabled={busy}>
-            <Pencil className="h-4 w-4" /> Edit
-          </Button>
-          {o.status === 'active' ? (
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={onEdit} disabled={busy}
+              data-testid={`edit-opportunity-${o.id}`}>
+              <Pencil className="h-4 w-4" /> Edit
+            </Button>
+          )}
+          {canChangeStatus && (o.status === 'active' ? (
             <Button size="sm" variant="outline" onClick={onPause} disabled={busy}>
               <PauseCircle className="h-4 w-4" /> Pause
             </Button>
@@ -404,12 +407,13 @@ function OpportunityRow({
             <Button size="sm" variant="outline" onClick={onActivate} disabled={busy || !canActivate}>
               <PlayCircle className="h-4 w-4" /> Activate
             </Button>
-          )}
-          {o.status !== 'closed' && (
+          ))}
+          {canChangeStatus && o.status !== 'closed' && (
             <Button size="sm" variant="outline" onClick={onClose} disabled={busy}>
               <XCircle className="h-4 w-4" /> Close
             </Button>
           )}
+
           {canDelete && (
             <Button
               size="sm"
