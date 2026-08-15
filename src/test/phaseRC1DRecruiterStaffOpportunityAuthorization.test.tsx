@@ -126,6 +126,43 @@ describe('RC-1D migration contract', () => {
     expect(SQL).toContain('_status_changed AND NOT public.current_user_can_recruiter_opportunity_action(');
   });
 
+  it('keys UPDATE owner passthrough to OLD.recruiter_id, never NEW (cross-workspace reassignment bypass)', () => {
+    const fn = SQL.slice(
+      SQL.indexOf('CREATE OR REPLACE FUNCTION public.opportunities_staff_action_guard()'),
+    );
+    const body = fn.slice(0, fn.indexOf('$function$;') + 11);
+
+    const insertOwnerCheck = body.indexOf('rp.id = NEW.recruiter_id');
+    const updateOwnerCheck = body.indexOf('rp.id = OLD.recruiter_id');
+    const immutability = body.indexOf('NEW.recruiter_id IS DISTINCT FROM OLD.recruiter_id');
+
+    // INSERT ownership is on NEW; UPDATE ownership is on OLD.
+    expect(insertOwnerCheck).toBeGreaterThan(-1);
+    expect(updateOwnerCheck).toBeGreaterThan(-1);
+    // The NEW-keyed ownership test lives inside the INSERT branch only.
+    expect(insertOwnerCheck).toBeGreaterThan(body.indexOf("IF TG_OP = 'INSERT' THEN"));
+    expect(insertOwnerCheck).toBeLessThan(updateOwnerCheck);
+    // Immutability is evaluated AFTER the OLD-keyed owner passthrough and there
+    // is no NEW-keyed ownership test anywhere after it.
+    expect(immutability).toBeGreaterThan(updateOwnerCheck);
+    expect(body.indexOf('rp.id = NEW.recruiter_id', immutability)).toBe(-1);
+    expect(body.slice(updateOwnerCheck).indexOf('rp.id = NEW.recruiter_id')).toBe(-1);
+  });
+
+  it('rejects recruiter_id change for any caller who does not own the OLD workspace', () => {
+    const fn = SQL.slice(
+      SQL.indexOf('CREATE OR REPLACE FUNCTION public.opportunities_staff_action_guard()'),
+    );
+    const body = fn.slice(0, fn.indexOf('$function$;') + 11);
+    const immutability = body.indexOf('NEW.recruiter_id IS DISTINCT FROM OLD.recruiter_id');
+    const editCheck = body.indexOf('_content_changed AND NOT public.current_user_can_recruiter_opportunity_action(');
+    const statusCheck = body.indexOf('_status_changed AND NOT public.current_user_can_recruiter_opportunity_action(');
+    // Immutability precedes every staff action evaluation.
+    expect(immutability).toBeLessThan(editCheck);
+    expect(immutability).toBeLessThan(statusCheck);
+    expect(body.slice(immutability)).toContain("Not authorized to reassign this opportunity.");
+  });
+
   it('modifies only the three recruiter policies and adds no recruiter DELETE policy', () => {
     expect(SQL).toContain('DROP POLICY IF EXISTS "Recruiter views own opportunities"');
     expect(SQL).toContain('DROP POLICY IF EXISTS "Recruiter inserts own opportunities"');
@@ -315,6 +352,31 @@ function renderStaffRoute() {
     </MemoryRouter>,
   );
 }
+
+describe('staff update mutation status guard (RC-1D correction)', () => {
+  it('requires status permission only for an actual status change, resolved from the loaded list', () => {
+    const block = OPP_HOOK_SRC.slice(
+      OPP_HOOK_SRC.indexOf('const updateOpportunity = useMutation({', OPP_HOOK_SRC.indexOf('useRecruiterStaffOpportunities')),
+    );
+    const body = block.slice(0, block.indexOf('const setStatus'));
+    expect(body).toContain('require(permissions.canEditOpportunities);');
+    expect(body).toContain('if (data.status !== undefined)');
+    expect(body).toContain("const current = (listQuery.data ?? []).find((o) => o.id === oppId);");
+    // Fail closed when the current row cannot be proven.
+    expect(body).toContain('if (!current || current.status !== data.status)');
+    expect(body).toContain('require(permissions.canChangeOpportunityStatus);');
+  });
+
+  it('leaves setStatus status-permission-only and create rules unchanged', () => {
+    const staff = OPP_HOOK_SRC.slice(OPP_HOOK_SRC.indexOf('useRecruiterStaffOpportunities'));
+    const setStatusBody = staff.slice(staff.indexOf('const setStatus'), staff.indexOf('const deleteOpportunity'));
+    expect(setStatusBody).toContain('require(permissions.canChangeOpportunityStatus);');
+    expect(setStatusBody).not.toContain('canEditOpportunities');
+    const createBody = staff.slice(staff.indexOf('const createOpportunity'), staff.indexOf('const updateOpportunity'));
+    expect(createBody).toContain('require(permissions.canCreateOpportunities);');
+    expect(createBody).toContain("if (data.status === 'active') require(permissions.canChangeOpportunityStatus);");
+  });
+});
 
 describe('staff route gating', () => {
   beforeEach(() => {
