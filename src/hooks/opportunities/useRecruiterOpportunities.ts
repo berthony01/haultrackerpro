@@ -176,3 +176,146 @@ export function useRecruiterOpportunities() {
     deleteOpportunity,
   };
 }
+
+/* -------------------------------------------------------------------------
+ * Phase RC-1D — recruiter STAFF opportunity store.
+ *
+ * Deliberately separate from the owner hook above: it never mounts
+ * `useRecruiterProfile`, billing, referrals, or readiness. Client permission
+ * checks only avoid useless calls; the database RLS + staff action guard are
+ * authoritative.
+ * ---------------------------------------------------------------------- */
+
+export interface RecruiterStaffOpportunityPermissions {
+  canViewOpportunities: boolean;
+  canCreateOpportunities: boolean;
+  canEditOpportunities: boolean;
+  canChangeOpportunityStatus: boolean;
+  canDeleteOpportunities: boolean;
+}
+
+const STAFF_DENIED = 'You do not have permission to perform this action in this workspace.';
+
+export function useRecruiterStaffOpportunities({
+  recruiterId,
+  permissions,
+}: {
+  recruiterId: string | null | undefined;
+  permissions: RecruiterStaffOpportunityPermissions;
+}) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const id = recruiterId ?? null;
+
+  const listQuery = useQuery({
+    queryKey: ['recruiter_staff_opportunities', user?.id ?? null, id],
+    queryFn: async () => {
+      if (!id) return [] as Opportunity[];
+      const { data, error } = await supabase
+        .from('opportunities')
+        .select('*')
+        .eq('recruiter_id', id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !!user && !!id && permissions.canViewOpportunities === true,
+  });
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['recruiter_staff_opportunities'] });
+    qc.invalidateQueries({ queryKey: ['opportunities'] });
+  };
+
+  const require = (allowed: boolean) => {
+    if (!allowed || !id) throw new Error(STAFF_DENIED);
+  };
+
+  const createOpportunity = useMutation({
+    mutationFn: async (data: OpportunityInsert) => {
+      require(permissions.canCreateOpportunities);
+      if (data.status === 'active') require(permissions.canChangeOpportunityStatus);
+      const { error } = await supabase
+        .from('opportunities')
+        .insert({ ...data, recruiter_id: id! });
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const updateOpportunity = useMutation({
+    mutationFn: async ({ id: oppId, data }: { id: string; data: OpportunityUpdate }) => {
+      require(permissions.canEditOpportunities);
+      const { error } = await supabase
+        .from('opportunities')
+        .update(data)
+        .eq('id', oppId)
+        .eq('recruiter_id', id!);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const setStatus = useMutation({
+    mutationFn: async ({
+      id: oppId,
+      status,
+    }: { id: string; status: 'active' | 'paused' | 'closed' | 'draft' }) => {
+      require(permissions.canChangeOpportunityStatus);
+      const { error } = await supabase
+        .from('opportunities')
+        .update({ status })
+        .eq('id', oppId)
+        .eq('recruiter_id', id!);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+  });
+
+  const deleteOpportunity = useMutation({
+    mutationFn: async (oppId: string): Promise<DeleteRecruiterOpportunityResult> => {
+      require(permissions.canDeleteOpportunities);
+      let resp: { data: unknown; error: unknown };
+      try {
+        resp = await callDeleteRecruiterOpportunity(
+          'delete_recruiter_opportunity',
+          { p_opportunity_id: oppId },
+        );
+      } catch {
+        throw new Error(GENERIC_DELETE_ERROR);
+      }
+      if (resp.error) throw new Error(GENERIC_DELETE_ERROR);
+      const parsed = parseDeleteResult(resp.data);
+      if (!parsed) throw new Error(GENERIC_DELETE_ERROR);
+      switch (parsed.result_code) {
+        case 'deleted':
+          return parsed;
+        case 'status_blocked':
+          throw new Error('Close this opportunity before deleting it permanently.');
+        case 'related_records':
+          throw new Error(
+            'This opportunity cannot be deleted because it has connected applications, referrals, offers, contracts, or reports. Keep it closed to preserve those records.',
+          );
+        case 'not_found':
+          throw new Error(
+            'This opportunity could not be found or you do not have permission to delete it.',
+          );
+      }
+    },
+    onSuccess: invalidate,
+  });
+
+  return {
+    opportunities: listQuery.data ?? [],
+    isLoading: listQuery.isLoading,
+    isError: listQuery.isError,
+    error: listQuery.error,
+    refetch: listQuery.refetch,
+    recruiterId: id,
+    createOpportunity,
+    updateOpportunity,
+    setStatus,
+    deleteOpportunity,
+  };
+}
+
