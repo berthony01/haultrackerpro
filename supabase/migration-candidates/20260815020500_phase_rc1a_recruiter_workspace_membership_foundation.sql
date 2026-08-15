@@ -485,9 +485,8 @@ BEGIN
 
   SELECT m.* INTO _row
     FROM public.recruiter_members m
-    JOIN public.recruiter_profiles rp ON rp.id = m.recruiter_id
    WHERE m.id = _member_id
-     AND rp.user_id = _uid
+     AND public.is_recruiter_workspace_owner(m.recruiter_id)
      AND m.role <> 'recruiter_owner'
      AND m.status IN ('pending', 'active')
    FOR UPDATE OF m;
