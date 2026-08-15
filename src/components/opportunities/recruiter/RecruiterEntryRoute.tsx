@@ -241,7 +241,10 @@ export default function RecruiterEntryRoute() {
       ? '/dashboard?page=recruiter-access:onboarding'
       : recruiterStatus === 'active' || recruiterStatus === 'suspended'
         ? '/dashboard?page=recruiter-access'
-        : null;
+        // RC-1C: staff entry — hub only, never onboarding, never setup RPC.
+        : recruiterStatus === null && selectedStaffWorkspace
+          ? '/dashboard?page=recruiter-access'
+          : null;
 
   const mayEnterRecruiter =
     !isLoading &&
