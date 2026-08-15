@@ -285,9 +285,9 @@ describe('useRecruiterStaffWorkspace lifecycle contract', () => {
     // The only clearStored call driven by resolution must live inside a
     // useEffect body.
     const effectBlocks = hookSrc.split('useEffect(');
-    const housekeeping = effectBlocks.find(b => b.includes('shouldClearStored'));
+    const housekeeping = effectBlocks.filter(b => b.includes('clearStored(userId)')).pop();
     expect(housekeeping).toBeTruthy();
-    expect(housekeeping).toContain('clearStored(userId)');
+    expect(housekeeping).toContain('shouldClearStored');
     // No render-time conditional mutation remains.
     expect(hookSrc).not.toContain("if (userId && resolution && 'shouldClearStoredSelection' in resolution)");
   });
