@@ -330,7 +330,7 @@ const Index = () => {
           requestedPage: 'recruiter-access',
           requestedRecruiterSubview: requestedSub,
           effectiveWorkspace: 'recruiter',
-          recruiterWorkspaceStatus,
+          recruiterCapabilityStatus: recruiterWorkspaceStatus,
           recruiterHubAllowed,
           recruiterOperationsAllowed,
         });
@@ -690,7 +690,7 @@ const Index = () => {
       requestedPage: page,
       requestedRecruiterSubview: recruiterView,
       effectiveWorkspace: effectiveRole,
-      recruiterWorkspaceStatus,
+      recruiterCapabilityStatus: recruiterWorkspaceStatus,
       recruiterHubAllowed,
       recruiterOperationsAllowed,
     });
@@ -766,7 +766,7 @@ const Index = () => {
       requestedPage: p,
       requestedRecruiterSubview: requestedSub ?? recruiterView,
       effectiveWorkspace: effectiveRole,
-      recruiterWorkspaceStatus,
+      recruiterCapabilityStatus: recruiterWorkspaceStatus,
       recruiterHubAllowed,
       recruiterOperationsAllowed,
     });
@@ -833,7 +833,7 @@ const Index = () => {
       requestedPage: page,
       requestedRecruiterSubview: recruiterView,
       effectiveWorkspace: effectiveRole,
-      recruiterWorkspaceStatus,
+      recruiterCapabilityStatus: recruiterWorkspaceStatus,
       recruiterHubAllowed,
       recruiterOperationsAllowed,
     });
@@ -927,7 +927,7 @@ const Index = () => {
         onNavigate={handleNavigate}
         role={effectiveRole ?? 'driver'}
         workspaceLoading={workspaceShellBlocked}
-        recruiterWorkspaceStatus={recruiterWorkspaceStatus}
+        recruiterCapabilityStatus={recruiterWorkspaceStatus}
         recruiterOperationsAllowed={recruiterOperationsAllowed}
         assistantPermissions={isActingAsAssistant ? actingPermissions : null}
       />
@@ -1295,7 +1295,7 @@ const Index = () => {
           onNavigate={handleNavigate}
           role={effectiveRole ?? 'driver'}
           workspaceLoading={workspaceShellBlocked}
-          recruiterWorkspaceStatus={recruiterWorkspaceStatus}
+          recruiterCapabilityStatus={recruiterWorkspaceStatus}
           recruiterOperationsAllowed={recruiterOperationsAllowed}
           assistantPermissions={isActingAsAssistant ? actingPermissions : null}
         />
