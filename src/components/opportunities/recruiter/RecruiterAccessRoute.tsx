@@ -72,7 +72,9 @@ function StaffWorkspaceRoute({
   onChangeStaffWorkspace?: () => void;
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
-  const [staffView, setStaffView] = useState<'home' | 'opportunities' | 'applications'>('home');
+  const [staffView, setStaffView] = useState<
+    'home' | 'opportunities' | 'applications' | 'referrals'
+  >('home');
 
   const roleLabel =
     workspace.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff';
@@ -83,6 +85,12 @@ function StaffWorkspaceRoute({
   // Phase RC-1E — applications entry point, same fail-closed contract.
   const canOpenApplications =
     !perms.isLoading && !perms.error && perms.canViewApplications;
+  // Phase RC-1F — referrals entry point, same fail-closed contract.
+  const canOpenReferrals =
+    !perms.isLoading &&
+    !perms.error &&
+    (perms.canViewReferrals || perms.canManageReferralTerms);
+
 
   if (staffView === 'opportunities' && canOpenOpportunities) {
     return (
