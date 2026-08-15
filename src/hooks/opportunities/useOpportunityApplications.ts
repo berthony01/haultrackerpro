@@ -286,3 +286,75 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     recordDriverResponse,
   };
 }
+
+/**
+ * Phase RC-1E — recruiter STAFF application data hook.
+ *
+ * Completely separate from the owner/driver hook above (which is unchanged).
+ * Mounts NO recruiter profile, billing, subscription, contract, referral,
+ * report, settlement, or personal driver query.
+ *
+ * Reads go ONLY through `list_recruiter_applications_safe(_recruiter_id)`;
+ * the database masks contact snapshots for staff lacking
+ * `applications_request_contact`. Client booleans are UX only — PostgreSQL
+ * remains authoritative for every operation.
+ */
+export interface RecruiterStaffApplicationPermissions {
+  canViewApplications: boolean;
+  canManageApplicationStatus: boolean;
+}
+
+export function useRecruiterStaffApplications(args: {
+  recruiterId: string | null | undefined;
+  permissions: RecruiterStaffApplicationPermissions;
+}) {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  const recruiterId = args.recruiterId ?? null;
+  const canView = args.permissions.canViewApplications === true;
+  const canManageStatus = args.permissions.canManageApplicationStatus === true;
+
+  const listQuery = useQuery({
+    // Scoped by authenticated user AND workspace so no payload can leak
+    // across accounts or workspaces through the cache.
+    queryKey: ['recruiter_staff_applications', user?.id, recruiterId],
+    queryFn: async () => {
+      if (!user || !recruiterId || !canView) return [] as any[];
+      const { data, error } = await (supabase as any).rpc(
+        'list_recruiter_applications_safe',
+        { _recruiter_id: recruiterId },
+      );
+      if (error) throw error;
+      return (data ?? []) as any[];
+    },
+    enabled: !!user && !!recruiterId && canView,
+  });
+
+  const updateApplicationStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: RecruiterApplicationStatus }) => {
+      if (!user) throw new Error('Not authenticated');
+      if (!recruiterId) throw new Error('Not authorized');
+      if (!canManageStatus) throw new Error('Not authorized');
+      const { error } = await supabase
+        .from('opportunity_applications')
+        .update({ status })
+        .eq('id', id)
+        .eq('recruiter_id', recruiterId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['recruiter_staff_applications'] });
+      qc.invalidateQueries({ queryKey: ['opportunity_applications'] });
+      qc.invalidateQueries({ queryKey: ['application_events'] });
+    },
+  });
+
+  return {
+    applications: canView ? (listQuery.data ?? []) : [],
+    isLoading: canView ? listQuery.isLoading : false,
+    isError: canView ? listQuery.isError : false,
+    refetch: listQuery.refetch,
+    updateApplicationStatus,
+  };
+}
+
