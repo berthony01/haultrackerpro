@@ -339,6 +339,7 @@ SET search_path TO 'public'
 AS $function$
 DECLARE
   _app public.opportunity_applications;
+  _rp public.recruiter_profiles;
   _note text;
   _id uuid;
 BEGIN
@@ -352,10 +353,24 @@ BEGIN
     RAISE EXCEPTION 'Application not found' USING ERRCODE = 'P0002';
   END IF;
 
-  IF NOT public.current_user_can_recruiter_application_action(
-    _app.recruiter_id, 'applications_request_contact'::public.recruiter_workspace_permission
-  ) THEN
-    RAISE EXCEPTION 'Recruiter profile is not eligible for contact requests' USING ERRCODE = '42501';
+  SELECT * INTO _rp FROM public.recruiter_profiles rp WHERE rp.id = _app.recruiter_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  IF _rp.user_id = auth.uid() THEN
+    -- Preserve the legacy owner eligibility path and its exact error contract.
+    IF NOT public.current_user_can_manage_recruiter_opportunities(_rp.id) THEN
+      RAISE EXCEPTION 'Recruiter profile is not eligible for contact requests' USING ERRCODE = '42501';
+    END IF;
+  ELSE
+    -- RC-1E staff extension: only explicit applications_request_contact on an
+    -- active membership in a posting-ready workspace authorizes a non-owner.
+    IF NOT public.current_user_can_recruiter_application_action(
+      _app.recruiter_id, 'applications_request_contact'::public.recruiter_workspace_permission
+    ) THEN
+      RAISE EXCEPTION 'Not authorized' USING ERRCODE = '42501';
+    END IF;
   END IF;
 
   IF _app.status IN ('hired','rejected','withdrawn') THEN
