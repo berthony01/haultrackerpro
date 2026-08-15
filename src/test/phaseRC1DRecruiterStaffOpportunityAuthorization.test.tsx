@@ -249,6 +249,16 @@ describe('parseRecruiterStaffPermissions', () => {
 /* ------------------------------------------------------------------ *
  * H/I — hook contracts
  * ------------------------------------------------------------------ */
+describe('parseRecruiterStaffPermissions plain-object strictness', () => {
+  it('accepts plain and null-prototype objects but rejects class instances', () => {
+    const full = Object.fromEntries(RECRUITER_STAFF_PERMISSION_KEYS.map((k) => [k, false]));
+    expect(parseRecruiterStaffPermissions({ ...full })).not.toBeNull();
+    expect(parseRecruiterStaffPermissions(Object.assign(Object.create(null), full))).not.toBeNull();
+    class Exotic {}
+    expect(parseRecruiterStaffPermissions(Object.assign(new Exotic(), full))).toBeNull();
+  });
+});
+
 describe('permission + data hook contracts', () => {
   it('permission resolution is scoped to user AND recruiter and fails closed on mismatch', () => {
     expect(HOOK_SRC).toContain('resolved.userId === userId && resolved.recruiterId === id');

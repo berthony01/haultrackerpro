@@ -104,6 +104,12 @@ export function parseRecruiterStaffPermissions(
   if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
     return null;
   }
+  // Plain object only: Supabase JSON payloads carry Object.prototype (or a null
+  // prototype); class instances / exotic objects are rejected fail-closed.
+  const proto = Object.getPrototypeOf(payload);
+  if (proto !== Object.prototype && proto !== null) {
+    return null;
+  }
   const raw = payload as Record<string, unknown>;
   const keys = Object.keys(raw);
   if (keys.length !== RECRUITER_STAFF_PERMISSION_KEYS.length) return null;
