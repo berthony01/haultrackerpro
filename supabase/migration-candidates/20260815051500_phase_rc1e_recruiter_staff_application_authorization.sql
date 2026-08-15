@@ -59,6 +59,32 @@ REVOKE ALL ON FUNCTION public.current_user_can_recruiter_application_action(uuid
 REVOKE ALL ON FUNCTION public.current_user_can_recruiter_application_action(uuid, public.recruiter_workspace_permission) FROM anon;
 GRANT EXECUTE ON FUNCTION public.current_user_can_recruiter_application_action(uuid, public.recruiter_workspace_permission) TO authenticated;
 
+-- RLS-safe application context. Direct recruiter SELECT on
+-- opportunity_applications remains forbidden. This SECURITY DEFINER function
+-- returns a recruiter_id only when the caller ALREADY passes the RC-1E action
+-- helper for the requested application. Policies re-check the action helper
+-- against the returned context as defense in depth.
+CREATE OR REPLACE FUNCTION public.recruiter_application_authorized_context(
+  _application_id uuid,
+  _permission public.recruiter_workspace_permission
+)
+RETURNS TABLE(recruiter_id uuid)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $function$
+  SELECT oa.recruiter_id
+  FROM public.opportunity_applications oa
+  WHERE oa.id = _application_id
+    AND auth.uid() IS NOT NULL
+    AND public.current_user_can_recruiter_application_action(oa.recruiter_id, _permission);
+$function$;
+
+REVOKE ALL ON FUNCTION public.recruiter_application_authorized_context(uuid, public.recruiter_workspace_permission) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.recruiter_application_authorized_context(uuid, public.recruiter_workspace_permission) FROM anon;
+GRANT EXECUTE ON FUNCTION public.recruiter_application_authorized_context(uuid, public.recruiter_workspace_permission) TO authenticated;
+
 -- ---------------------------------------------------------------------------
 -- B) Safe application list — authorization + least-privilege contact masking
 --
@@ -239,7 +265,9 @@ CREATE POLICY "Recruiter updates application status"
 -- ---------------------------------------------------------------------------
 -- E) application_events — recruiter view policy + actor classification
 --
--- Admin and driver policies are untouched.
+-- Admin and driver policies are untouched. The legacy owner branch is
+-- preserved. The staff branch uses RLS-safe authorized context because direct
+-- recruiter SELECT on opportunity_applications remains intentionally absent.
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Recruiter views events for own applications" ON public.application_events;
 CREATE POLICY "Recruiter views events for own applications"
@@ -258,11 +286,13 @@ CREATE POLICY "Recruiter views events for own applications"
     )
     OR EXISTS (
       SELECT 1
-      FROM public.opportunity_applications oa
-      WHERE oa.id = application_events.application_id
-        AND public.current_user_can_recruiter_application_action(
-          oa.recruiter_id, 'applications_view'::public.recruiter_workspace_permission
-        )
+      FROM public.recruiter_application_authorized_context(
+        application_events.application_id,
+        'applications_view'::public.recruiter_workspace_permission
+      ) oa
+      WHERE public.current_user_can_recruiter_application_action(
+        oa.recruiter_id, 'applications_view'::public.recruiter_workspace_permission
+      )
     )
   );
 
@@ -405,10 +435,12 @@ CREATE POLICY "rcr_recruiter_select"
   USING (
     EXISTS (
       SELECT 1
-      FROM public.opportunity_applications oa
-      WHERE oa.id = recruiter_contact_requests.application_id
-        AND public.current_user_can_recruiter_application_action(
-          oa.recruiter_id, 'applications_view'::public.recruiter_workspace_permission
-        )
+      FROM public.recruiter_application_authorized_context(
+        recruiter_contact_requests.application_id,
+        'applications_view'::public.recruiter_workspace_permission
+      ) oa
+      WHERE public.current_user_can_recruiter_application_action(
+        oa.recruiter_id, 'applications_view'::public.recruiter_workspace_permission
+      )
     )
   );
