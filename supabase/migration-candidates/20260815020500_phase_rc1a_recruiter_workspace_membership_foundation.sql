@@ -276,10 +276,7 @@ AS $$
    WHERE m.recruiter_id = _recruiter_id
      AND auth.uid() IS NOT NULL
      AND (
-       EXISTS (
-         SELECT 1 FROM public.recruiter_profiles rp
-          WHERE rp.id = _recruiter_id AND rp.user_id = auth.uid()
-       )
+       public.is_recruiter_workspace_owner(_recruiter_id)
        OR (
          m.member_user_id = auth.uid()
          AND m.status = 'active'
