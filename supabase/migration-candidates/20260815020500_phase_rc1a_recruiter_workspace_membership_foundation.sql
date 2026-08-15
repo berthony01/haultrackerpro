@@ -568,6 +568,7 @@ REVOKE ALL ON FUNCTION public.invite_recruiter_member(uuid, text, public.recruit
 REVOKE ALL ON FUNCTION public.accept_recruiter_member_invite(text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.revoke_recruiter_member(uuid) FROM PUBLIC, anon;
 
+GRANT EXECUTE ON FUNCTION public.is_recruiter_workspace_owner(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_recruiter_workspace_member(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_my_recruiter_workspaces() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.list_recruiter_members(uuid) TO authenticated;
