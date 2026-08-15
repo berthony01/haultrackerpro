@@ -41,10 +41,20 @@ export interface RecruiterStaffPermissionsState {
   canEditOpportunities: boolean;
   canChangeOpportunityStatus: boolean;
   canDeleteOpportunities: boolean;
+  /** Phase RC-1E — application authorization booleans (UX only). */
+  canViewApplications: boolean;
+  canManageApplicationStatus: boolean;
+  canRequestApplicationContact: boolean;
+  /**
+   * Phase RC-1E — parsed RC-1B boolean exposed for future UI ONLY.
+   * DORMANT: no RC-1E surface consumes it operationally.
+   */
+  canManageApplicationNotes: boolean;
   isLoading: boolean;
   error: unknown;
   refetch: () => void;
 }
+
 
 interface Resolved {
   /** Scope guard: the exact (user, recruiter) pair the payload belongs to. */
