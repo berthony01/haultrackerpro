@@ -177,6 +177,17 @@ function StaffWorkspaceRoute({
             Manage Applications
           </button>
         )}
+        {canOpenReferrals && (
+          <button
+            type="button"
+            onClick={() => setStaffView('referrals')}
+            data-testid="staff-open-referrals"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            Manage Referrals
+          </button>
+        )}
+
       </div>
       {onChangeStaffWorkspace && (
         <button
