@@ -98,14 +98,14 @@ export default function RecruiterEntryRoute() {
   const capsError = caps.error;
   // Phase RC-1C — staff workspace entry context comes from useViewMode
   // ONLY. This route must never instantiate a second staff hook.
-  const staffWorkspaces = view.staffWorkspaces;
-  const selectedStaffWorkspace = view.selectedStaffWorkspace;
-  const staffSelectionRequired = view.staffSelectionRequired;
-  const staffWorkspaceError = view.staffWorkspaceError;
-  const selectStaffWorkspace = view.selectStaffWorkspace;
+  const staffWorkspaces = view.staffWorkspaces ?? [];
+  const selectedStaffWorkspace = view.selectedStaffWorkspace ?? null;
+  const staffSelectionRequired = view.staffSelectionRequired ?? false;
+  const staffWorkspaceError = view.staffWorkspaceError ?? null;
+  const selectStaffWorkspace = view.selectStaffWorkspace ?? (() => {});
   // Staff discovery must be SETTLED before any activation decision.
   const isLoading =
-    authLoading || caps.isLoading || view.isLoading || view.staffLoading;
+    authLoading || caps.isLoading || view.isLoading || !!view.staffLoading;
 
   // Synchronously track the current user id. Every render updates the
   // ref so async completions can compare against the most recent id.
