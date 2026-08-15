@@ -3,7 +3,7 @@
 -- Scope: membership identity + lifecycle ONLY. This migration grants NO recruiter
 -- operational authority (opportunities, applications, reports, referrals, contracts,
 -- billing, profile, settings, routing). Those remain owner-only and untouched.
--- Does NOT reuse or modify agency_members or any Agency/Driver-Assistant object.
+-- Does NOT reuse or modify any Agency or Driver-Assistant object.
 
 BEGIN;
 
