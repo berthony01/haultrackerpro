@@ -1053,16 +1053,25 @@ function RecruiterOpportunityFormCore({
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button variant="outline" onClick={() => save('draft')}
-                disabled={pending || !readiness.canSaveDraft}>
+                data-testid="save-draft-opportunity"
+                disabled={pending || !readiness.canSaveDraft || !staffCanSaveDraft}>
                 <Save className="h-4 w-4" /> Save Draft
               </Button>
               <Button onClick={() => save('publish')}
                 data-testid="publish-opportunity"
-                disabled={pending || !readiness.canPublish || atActiveLimit}>
+                disabled={pending || !readiness.canPublish || atActiveLimit || !staffCanPublish}>
                 <Send className="h-4 w-4" /> Publish Opportunity
 
               </Button>
             </div>
+            {staffPerms && (!staffCanSaveDraft || !staffCanPublish) && (
+              <p
+                className="mt-3 text-xs text-muted-foreground sm:text-right"
+                data-testid="staff-permission-message"
+              >
+                {STAFF_PERMISSION_MESSAGE}
+              </p>
+            )}
             {atActiveLimit && (
               <p
                 className="mt-3 text-xs text-destructive sm:text-right"
@@ -1071,6 +1080,7 @@ function RecruiterOpportunityFormCore({
                 {activeLimitMessage}
               </p>
             )}
+
 
           </Card>
         </div>
