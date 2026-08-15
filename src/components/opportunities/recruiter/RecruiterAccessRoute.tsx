@@ -118,6 +118,9 @@ export function RecruiterAccessRoute({
   recruiterOperationsAllowed = false,
   workspaceLoading = false,
   workspaceError = null,
+  recruiterAccessKind = null,
+  selectedStaffWorkspace = null,
+  onChangeStaffWorkspace,
 }: Props) {
   const navigate = useNavigate();
 
