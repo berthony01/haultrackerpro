@@ -560,6 +560,7 @@ USING (
 
 -- Function privileges: fail closed, then grant only the intended surface.
 REVOKE ALL ON FUNCTION public.rc1a_bootstrap_recruiter_owner_membership() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.is_recruiter_workspace_owner(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.is_recruiter_workspace_member(uuid, uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.get_my_recruiter_workspaces() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.list_recruiter_members(uuid) FROM PUBLIC, anon;
