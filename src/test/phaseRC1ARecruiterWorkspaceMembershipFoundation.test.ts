@@ -4,14 +4,12 @@
  * The migration is NOT applied live; this suite proves the authored contract.
  */
 import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 
-const SQL_PATH = fileURLToPath(
-  new URL(
-    "../../supabase/migration-candidates/20260815020500_phase_rc1a_recruiter_workspace_membership_foundation.sql",
-    import.meta.url,
-  ),
+const SQL_PATH = path.resolve(
+  process.cwd(),
+  "supabase/migration-candidates/20260815020500_phase_rc1a_recruiter_workspace_membership_foundation.sql",
 );
 
 const sql = readFileSync(SQL_PATH, "utf8");
