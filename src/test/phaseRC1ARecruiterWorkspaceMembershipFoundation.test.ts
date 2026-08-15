@@ -222,21 +222,49 @@ describe("Phase RC-1A — read RPC contracts", () => {
       lower.indexOf("function public.list_recruiter_members"),
       lower.indexOf("function public.invite_recruiter_member"),
     );
-    expect(fn).toContain("from public.recruiter_profiles rp");
-    expect(fn).toContain("rp.user_id = auth.uid()");
+    expect(fn).toContain("public.is_recruiter_workspace_owner(_recruiter_id)");
+    expect(fn).not.toContain("from public.recruiter_profiles rp");
     expect(fn).toContain("m.member_user_id = auth.uid()");
     expect(fn).toContain("m.status = 'active'");
     expect(fn).not.toContain("invite_token_hash");
   });
 
-  it("8b. is_recruiter_workspace_member is active-membership identity only", () => {
+  it("8a2. is_recruiter_workspace_owner derives identity only from auth.uid()", () => {
+    const fn = lower.slice(
+      lower.indexOf("function public.is_recruiter_workspace_owner"),
+      lower.indexOf("function public.is_recruiter_workspace_member"),
+    );
+    expect(fn).toContain("(_recruiter_id uuid)");
+    expect(fn).toContain("security definer");
+    expect(fn).toContain("set search_path = public");
+    expect(fn).toContain("stable");
+    expect(fn).toContain("auth.uid() is not null");
+    expect(fn).toContain("rp.user_id = auth.uid()");
+    expect(fn).not.toContain("_uid");
+    for (const forbidden of ["status", "billing", "stripe", "suspend", "opportunit"]) {
+      expect(fn).not.toContain(forbidden);
+    }
+  });
+
+  it("8a3. both owner RLS policies use the owner helper, not inline recruiter_profiles lookups", () => {
+    const policies = lower.slice(lower.indexOf("alter table public.recruiter_members enable row level security"));
+    expect(policies).toContain("using (\n  public.is_recruiter_workspace_owner(recruiter_members.recruiter_id)\n)");
+    expect(policies).toContain("using (\n  public.is_recruiter_workspace_owner(recruiter_member_audit_log.recruiter_id)\n)");
+    expect(policies).not.toContain("select 1 from public.recruiter_profiles rp");
+  });
+
+  it("8b. is_recruiter_workspace_member is self-scoped active-membership identity only", () => {
     const fn = lower.slice(
       lower.indexOf("function public.is_recruiter_workspace_member"),
       lower.indexOf("function public.get_my_recruiter_workspaces"),
     );
+    expect(fn).toContain("auth.uid() is not null");
+    expect(fn).toContain("_uid = auth.uid()");
     expect(fn).toContain("m.status = 'active'");
     expect(fn).toContain("security definer");
+    expect(fn).not.toContain("service_role");
   });
+
 
   it("8c. every new function pins search_path", () => {
     const defs = sql.match(/CREATE OR REPLACE FUNCTION public\./g) ?? [];
