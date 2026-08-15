@@ -4827,6 +4827,13 @@ export type Database = {
         Args: { _recruiter_id: string }
         Returns: boolean
       }
+      current_user_can_recruiter_application_action: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
       current_user_can_recruiter_opportunity_action: {
         Args: {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
@@ -5659,6 +5666,15 @@ export type Database = {
       record_driver_application_response: {
         Args: { application_id: string; note?: string; response_type: string }
         Returns: string
+      }
+      recruiter_application_authorized_context: {
+        Args: {
+          _application_id: string
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+        }
+        Returns: {
+          recruiter_id: string
+        }[]
       }
       recruiter_has_priority_plan: {
         Args: { _recruiter_id: string }
@@ -6535,6 +6551,14 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_recruiter_application_status: {
+        Args: {
+          _application_id: string
+          _recruiter_id: string
+          _status: string
+        }
+        Returns: boolean
       }
       upsert_my_professional_profile: {
         Args: {
