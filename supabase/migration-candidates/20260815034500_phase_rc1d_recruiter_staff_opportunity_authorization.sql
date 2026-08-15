@@ -75,20 +75,26 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Canonical owner of the recruiter profile passes through untouched so that
-  -- every pre-existing owner behavior, message, and downstream guard order is
-  -- preserved byte-for-byte.
-  _owns_recruiter_profile := EXISTS (
-    SELECT 1
-    FROM public.recruiter_profiles rp
-    WHERE rp.id = NEW.recruiter_id
-      AND rp.user_id = auth.uid()
-  );
-  IF _owns_recruiter_profile THEN
-    RETURN NEW;
-  END IF;
-
+  -- Canonical owner passthrough preserves every pre-existing owner behavior,
+  -- message, and downstream guard order byte-for-byte.
+  --
+  -- SECURITY: on UPDATE the owner test is keyed to the EXISTING workspace
+  -- (OLD.recruiter_id), never NEW. Keying it to NEW would let a caller who is
+  -- only staff in workspace A but personally owns workspace B reassign an
+  -- A-owned listing into B and be treated as an owner (RLS USING authorizes A,
+  -- WITH CHECK authorizes B). Ownership of NEW is therefore never an owner
+  -- bypass, and non-owners of OLD hit workspace immutability first.
   IF TG_OP = 'INSERT' THEN
+    _owns_recruiter_profile := EXISTS (
+      SELECT 1
+      FROM public.recruiter_profiles rp
+      WHERE rp.id = NEW.recruiter_id
+        AND rp.user_id = auth.uid()
+    );
+    IF _owns_recruiter_profile THEN
+      RETURN NEW;
+    END IF;
+
     IF NOT public.current_user_can_recruiter_opportunity_action(
       NEW.recruiter_id, 'opportunities_create'::public.recruiter_workspace_permission
     ) THEN
@@ -107,11 +113,22 @@ BEGIN
   END IF;
 
   -- UPDATE ------------------------------------------------------------------
+  _owns_recruiter_profile := EXISTS (
+    SELECT 1
+    FROM public.recruiter_profiles rp
+    WHERE rp.id = OLD.recruiter_id
+      AND rp.user_id = auth.uid()
+  );
+  IF _owns_recruiter_profile THEN
+    RETURN NEW;
+  END IF;
+
   -- Staff can never move a listing between workspaces.
   IF NEW.recruiter_id IS DISTINCT FROM OLD.recruiter_id THEN
     RAISE EXCEPTION 'Not authorized to reassign this opportunity.'
       USING ERRCODE = '42501';
   END IF;
+
 
   _status_changed := (NEW.status IS DISTINCT FROM OLD.status);
 
