@@ -15,6 +15,16 @@ const SQL_PATH = path.resolve(
 const sql = readFileSync(SQL_PATH, "utf8");
 const lower = sql.toLowerCase();
 
+/**
+ * Executable SQL only: `--` line comments stripped. Prohibited-scope assertions
+ * run against THIS string so narrative comments can never create a false
+ * positive (or false confidence) about what the migration actually does.
+ */
+const lowerExecutable = lower
+  .split("\n")
+  .map((line) => line.replace(/--.*$/, ""))
+  .join("\n");
+
 describe("Phase RC-1A — candidate migration envelope", () => {
   it("1. is marked as a candidate and is transactional", () => {
     expect(sql.split("\n")[0].trim()).toBe("-- CANDIDATE MIGRATION — NOT APPLIED LIVE.");
@@ -58,14 +68,44 @@ describe("Phase RC-1A — owner bootstrap", () => {
     expect(lower).toContain("'owner_bootstrapped'");
   });
 
+  it("3a2. a preflight DO block raises when any recruiter owner email source is missing", () => {
+    const preflight = lowerExecutable.slice(
+      0,
+      lowerExecutable.indexOf("with bootstrapped as ("),
+    );
+    expect(preflight).toContain("rc-1a owner bootstrap preflight failed");
+    expect(preflight).toContain("raise exception");
+    expect(preflight).toContain("from public.recruiter_profiles rp");
+    expect(lowerExecutable).not.toContain("placeholder");
+  });
+
+  it("3a3. the backfill no longer silently filters out profiles without an email", () => {
+    const backfill = lowerExecutable.slice(
+      lowerExecutable.indexOf("with bootstrapped as ("),
+      lowerExecutable.indexOf("create or replace function public.rc1a_bootstrap"),
+    );
+    expect(backfill).not.toContain("coalesce(u.email::text, rp.recruiter_email) is not null");
+    expect(backfill).toContain("where not exists (");
+  });
+
   it("3b. installs an AFTER INSERT trigger on recruiter_profiles", () => {
     expect(lower).toContain("after insert on public.recruiter_profiles");
     expect(lower).toContain("execute function public.rc1a_bootstrap_recruiter_owner_membership()");
   });
 
+  it("3b2. the future-owner trigger raises instead of silently skipping a missing email", () => {
+    const fn = lowerExecutable.slice(
+      lowerExecutable.indexOf("create or replace function public.rc1a_bootstrap"),
+      lowerExecutable.indexOf("drop trigger if exists rc1a_recruiter_profiles_owner_membership"),
+    );
+    expect(fn).toContain("if _email is null or _email = '' then");
+    expect(fn).toMatch(/if _email is null or _email = '' then\s*\n\s*raise exception/);
+    expect(fn).not.toMatch(/if _email is null or _email = '' then\s*\n\s*return new;/);
+  });
+
   it("3c. trigger does not mutate recruiter_profiles fields", () => {
-    expect(lower).not.toMatch(/update\s+public\.recruiter_profiles/);
-    expect(lower).not.toMatch(/alter table\s+public\.recruiter_profiles/);
+    expect(lowerExecutable).not.toMatch(/update\s+public\.recruiter_profiles/);
+    expect(lowerExecutable).not.toMatch(/alter table\s+public\.recruiter_profiles/);
   });
 });
 
@@ -132,9 +172,10 @@ describe("Phase RC-1A — roles, statuses, uniqueness invariants", () => {
 });
 
 describe("Phase RC-1A — owner-only invite/revoke authority", () => {
-  it("6a. invite is restricted to the canonical recruiter owner", () => {
+  it("6a. invite is restricted to the canonical recruiter owner via the owner helper", () => {
     const fn = lower.slice(lower.indexOf("function public.invite_recruiter_member"));
-    expect(fn).toContain("where rp.id = _recruiter_id and rp.user_id = _uid");
+    expect(fn).toContain("if not public.is_recruiter_workspace_owner(_recruiter_id) then");
+    expect(fn).not.toContain("where rp.id = _recruiter_id and rp.user_id = _uid");
     expect(fn).toContain("'not authorized'");
     expect(fn).toContain("authentication required");
   });
@@ -144,9 +185,10 @@ describe("Phase RC-1A — owner-only invite/revoke authority", () => {
     expect(lower).toContain("cannot invite the workspace owner");
   });
 
-  it("6c. revoke is owner-only and can never revoke the owner membership", () => {
+  it("6c. revoke is owner-only via the helper and can never revoke the owner membership", () => {
     const fn = lower.slice(lower.indexOf("function public.revoke_recruiter_member"));
-    expect(fn).toContain("rp.user_id = _uid");
+    expect(fn).toContain("public.is_recruiter_workspace_owner(m.recruiter_id)");
+    expect(fn).not.toContain("join public.recruiter_profiles rp");
     expect(fn).toContain("m.role <> 'recruiter_owner'");
     expect(fn).toContain("m.status in ('pending', 'active')");
     expect(fn).toContain("status = 'revoked'");
@@ -180,26 +222,54 @@ describe("Phase RC-1A — read RPC contracts", () => {
       lower.indexOf("function public.list_recruiter_members"),
       lower.indexOf("function public.invite_recruiter_member"),
     );
-    expect(fn).toContain("from public.recruiter_profiles rp");
-    expect(fn).toContain("rp.user_id = auth.uid()");
+    expect(fn).toContain("public.is_recruiter_workspace_owner(_recruiter_id)");
+    expect(fn).not.toContain("from public.recruiter_profiles rp");
     expect(fn).toContain("m.member_user_id = auth.uid()");
     expect(fn).toContain("m.status = 'active'");
     expect(fn).not.toContain("invite_token_hash");
   });
 
-  it("8b. is_recruiter_workspace_member is active-membership identity only", () => {
+  it("8a2. is_recruiter_workspace_owner derives identity only from auth.uid()", () => {
+    const fn = lower.slice(
+      lower.indexOf("function public.is_recruiter_workspace_owner"),
+      lower.indexOf("function public.is_recruiter_workspace_member"),
+    );
+    expect(fn).toContain("(_recruiter_id uuid)");
+    expect(fn).toContain("security definer");
+    expect(fn).toContain("set search_path = public");
+    expect(fn).toContain("stable");
+    expect(fn).toContain("auth.uid() is not null");
+    expect(fn).toContain("rp.user_id = auth.uid()");
+    expect(fn).not.toContain("_uid");
+    for (const forbidden of ["status", "billing", "stripe", "suspend", "opportunit"]) {
+      expect(fn).not.toContain(forbidden);
+    }
+  });
+
+  it("8a3. both owner RLS policies use the owner helper, not inline recruiter_profiles lookups", () => {
+    const policies = lower.slice(lower.indexOf("alter table public.recruiter_members enable row level security"));
+    expect(policies).toContain("using (\n  public.is_recruiter_workspace_owner(recruiter_members.recruiter_id)\n)");
+    expect(policies).toContain("using (\n  public.is_recruiter_workspace_owner(recruiter_member_audit_log.recruiter_id)\n)");
+    expect(policies).not.toContain("select 1 from public.recruiter_profiles rp");
+  });
+
+  it("8b. is_recruiter_workspace_member is self-scoped active-membership identity only", () => {
     const fn = lower.slice(
       lower.indexOf("function public.is_recruiter_workspace_member"),
       lower.indexOf("function public.get_my_recruiter_workspaces"),
     );
+    expect(fn).toContain("auth.uid() is not null");
+    expect(fn).toContain("_uid = auth.uid()");
     expect(fn).toContain("m.status = 'active'");
     expect(fn).toContain("security definer");
+    expect(fn).not.toContain("service_role");
   });
+
 
   it("8c. every new function pins search_path", () => {
     const defs = sql.match(/CREATE OR REPLACE FUNCTION public\./g) ?? [];
     const pins = sql.match(/SET search_path = public/g) ?? [];
-    expect(defs.length).toBeGreaterThanOrEqual(7);
+    expect(defs.length).toBeGreaterThanOrEqual(8);
     expect(pins.length).toBe(defs.length);
   });
 });
@@ -228,10 +298,12 @@ describe("Phase RC-1A — RLS, grants, audit", () => {
 
   it("9d. revokes PUBLIC/anon execute and grants only authenticated execute", () => {
     expect(lower).toContain("revoke all on function public.rc1a_bootstrap_recruiter_owner_membership() from public, anon, authenticated");
+    expect(lower).toContain("revoke all on function public.is_recruiter_workspace_owner(uuid) from public, anon");
     const revokes = lower.match(/revoke all on function public\./g) ?? [];
-    expect(revokes.length).toBeGreaterThanOrEqual(7);
+    expect(revokes.length).toBeGreaterThanOrEqual(8);
     const grants = lower.match(/grant execute on function public\.[^;]*to authenticated/g) ?? [];
-    expect(grants.length).toBe(6);
+    expect(grants.length).toBe(7);
+    expect(lower).toContain("grant execute on function public.is_recruiter_workspace_owner(uuid) to authenticated");
     expect(lower).not.toMatch(/grant execute on function[^;]*to anon/);
   });
 
@@ -262,35 +334,36 @@ describe("Phase RC-1A — prohibited scope", () => {
 
   it("11. does not create, replace, alter, or drop existing recruiter operational functions", () => {
     for (const fn of FORBIDDEN_FUNCTIONS) {
-      expect(lower).not.toContain(fn);
+      expect(lowerExecutable).not.toContain(fn);
     }
   });
 
-  it("12a. contains no Stripe/billing/subscription changes", () => {
+  it("12a. contains no Stripe/billing/subscription changes (executable SQL only)", () => {
     for (const token of ["stripe", "subscriptions", "checkout", "price_id", "entitlement"]) {
-      expect(lower).not.toContain(token);
+      expect(lowerExecutable).not.toContain(token);
     }
   });
 
   it("12b. touches no agency, assistant, settlement, opportunity, or application objects", () => {
     for (const token of [
       "public.agency_",
+      "agency_members",
       "driver_assistants",
       "assistant_has_permission",
       "driver_settlements",
       "public.opportunities",
       "opportunity_applications",
     ]) {
-      expect(lower).not.toContain(token);
+      expect(lowerExecutable).not.toContain(token);
     }
   });
 
   it("12c. only the two new tables are created and none are dropped", () => {
-    const created = lower.match(/create table if not exists public\.(\w+)/g) ?? [];
+    const created = lowerExecutable.match(/create table if not exists public\.(\w+)/g) ?? [];
     expect(created.sort()).toEqual([
       "create table if not exists public.recruiter_member_audit_log",
       "create table if not exists public.recruiter_members",
     ]);
-    expect(lower).not.toMatch(/drop table/);
+    expect(lowerExecutable).not.toMatch(/drop table/);
   });
 });

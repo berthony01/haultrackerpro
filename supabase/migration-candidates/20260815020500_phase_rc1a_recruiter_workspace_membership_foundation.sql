@@ -89,6 +89,25 @@ CREATE INDEX IF NOT EXISTS recruiter_member_audit_log_recruiter_idx
 -- ---------------------------------------------------------------------------
 -- D. Owner membership bootstrap + future-owner trigger
 -- ---------------------------------------------------------------------------
+
+-- Fail closed: every recruiter workspace MUST be able to receive an owner
+-- membership. No placeholder emails are ever synthesized.
+DO $$
+DECLARE
+  _missing integer;
+BEGIN
+  SELECT count(*) INTO _missing
+    FROM public.recruiter_profiles rp
+    LEFT JOIN auth.users u ON u.id = rp.user_id
+   WHERE COALESCE(NULLIF(btrim(COALESCE(u.email::text, '')), ''),
+                  NULLIF(btrim(COALESCE(rp.recruiter_email, '')), '')) IS NULL;
+
+  IF _missing > 0 THEN
+    RAISE EXCEPTION 'RC-1A owner bootstrap preflight failed: % recruiter profile(s) have no owner email source', _missing
+      USING ERRCODE = '22023';
+  END IF;
+END $$;
+
 WITH bootstrapped AS (
   INSERT INTO public.recruiter_members (
     recruiter_id, member_user_id, invite_email, role, status, accepted_at,
@@ -104,8 +123,7 @@ WITH bootstrapped AS (
          NULL
     FROM public.recruiter_profiles rp
     LEFT JOIN auth.users u ON u.id = rp.user_id
-   WHERE COALESCE(u.email::text, rp.recruiter_email) IS NOT NULL
-     AND NOT EXISTS (
+   WHERE NOT EXISTS (
        SELECT 1 FROM public.recruiter_members m
         WHERE m.recruiter_id = rp.id
           AND m.role = 'recruiter_owner'
@@ -136,7 +154,7 @@ BEGIN
     LEFT JOIN auth.users u ON u.id = NEW.user_id;
 
   IF _email IS NULL OR _email = '' THEN
-    RETURN NEW;
+    RAISE EXCEPTION 'Recruiter workspace owner membership requires an owner email' USING ERRCODE = '22023';
   END IF;
 
   INSERT INTO public.recruiter_members (
@@ -172,7 +190,25 @@ FOR EACH ROW EXECUTE FUNCTION public.rc1a_bootstrap_recruiter_owner_membership()
 -- E. Security helpers / RPCs
 -- ---------------------------------------------------------------------------
 
--- Membership identity ONLY. Not operational permission.
+-- Canonical workspace OWNERSHIP identity only. No billing, suspension, or
+-- operational inspection. Identity comes exclusively from auth.uid().
+CREATE OR REPLACE FUNCTION public.is_recruiter_workspace_owner(_recruiter_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT auth.uid() IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.recruiter_profiles rp
+        WHERE rp.id = _recruiter_id
+          AND rp.user_id = auth.uid()
+     );
+$$;
+
+-- Membership identity ONLY. Not operational permission. Self-scoped: an
+-- authenticated caller can never probe another user's membership.
 CREATE OR REPLACE FUNCTION public.is_recruiter_workspace_member(_recruiter_id uuid, _uid uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -180,12 +216,14 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.recruiter_members m
-     WHERE m.recruiter_id = _recruiter_id
-       AND m.member_user_id = _uid
-       AND m.status = 'active'
-  );
+  SELECT auth.uid() IS NOT NULL
+     AND _uid = auth.uid()
+     AND EXISTS (
+       SELECT 1 FROM public.recruiter_members m
+        WHERE m.recruiter_id = _recruiter_id
+          AND m.member_user_id = _uid
+          AND m.status = 'active'
+     );
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_my_recruiter_workspaces()
@@ -238,10 +276,7 @@ AS $$
    WHERE m.recruiter_id = _recruiter_id
      AND auth.uid() IS NOT NULL
      AND (
-       EXISTS (
-         SELECT 1 FROM public.recruiter_profiles rp
-          WHERE rp.id = _recruiter_id AND rp.user_id = auth.uid()
-       )
+       public.is_recruiter_workspace_owner(_recruiter_id)
        OR (
          m.member_user_id = auth.uid()
          AND m.status = 'active'
@@ -275,10 +310,7 @@ BEGIN
   END IF;
 
   -- RC-1A: canonical recruiter owner only.
-  IF NOT EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-     WHERE rp.id = _recruiter_id AND rp.user_id = _uid
-  ) THEN
+  IF NOT public.is_recruiter_workspace_owner(_recruiter_id) THEN
     RAISE EXCEPTION 'Not authorized' USING ERRCODE = '42501';
   END IF;
 
@@ -453,9 +485,8 @@ BEGIN
 
   SELECT m.* INTO _row
     FROM public.recruiter_members m
-    JOIN public.recruiter_profiles rp ON rp.id = m.recruiter_id
    WHERE m.id = _member_id
-     AND rp.user_id = _uid
+     AND public.is_recruiter_workspace_owner(m.recruiter_id)
      AND m.role <> 'recruiter_owner'
      AND m.status IN ('pending', 'active')
    FOR UPDATE OF m;
@@ -508,11 +539,7 @@ ON public.recruiter_members
 FOR SELECT
 TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-     WHERE rp.id = recruiter_members.recruiter_id
-       AND rp.user_id = auth.uid()
-  )
+  public.is_recruiter_workspace_owner(recruiter_members.recruiter_id)
 );
 
 DROP POLICY IF EXISTS "Active member reads own membership row" ON public.recruiter_members;
@@ -528,15 +555,12 @@ ON public.recruiter_member_audit_log
 FOR SELECT
 TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-     WHERE rp.id = recruiter_member_audit_log.recruiter_id
-       AND rp.user_id = auth.uid()
-  )
+  public.is_recruiter_workspace_owner(recruiter_member_audit_log.recruiter_id)
 );
 
 -- Function privileges: fail closed, then grant only the intended surface.
 REVOKE ALL ON FUNCTION public.rc1a_bootstrap_recruiter_owner_membership() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.is_recruiter_workspace_owner(uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.is_recruiter_workspace_member(uuid, uuid) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.get_my_recruiter_workspaces() FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.list_recruiter_members(uuid) FROM PUBLIC, anon;
@@ -544,6 +568,7 @@ REVOKE ALL ON FUNCTION public.invite_recruiter_member(uuid, text, public.recruit
 REVOKE ALL ON FUNCTION public.accept_recruiter_member_invite(text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.revoke_recruiter_member(uuid) FROM PUBLIC, anon;
 
+GRANT EXECUTE ON FUNCTION public.is_recruiter_workspace_owner(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_recruiter_workspace_member(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_my_recruiter_workspaces() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.list_recruiter_members(uuid) TO authenticated;
