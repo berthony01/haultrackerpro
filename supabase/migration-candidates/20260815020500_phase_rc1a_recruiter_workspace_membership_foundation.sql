@@ -89,6 +89,25 @@ CREATE INDEX IF NOT EXISTS recruiter_member_audit_log_recruiter_idx
 -- ---------------------------------------------------------------------------
 -- D. Owner membership bootstrap + future-owner trigger
 -- ---------------------------------------------------------------------------
+
+-- Fail closed: every recruiter workspace MUST be able to receive an owner
+-- membership. No placeholder emails are ever synthesized.
+DO $$
+DECLARE
+  _missing integer;
+BEGIN
+  SELECT count(*) INTO _missing
+    FROM public.recruiter_profiles rp
+    LEFT JOIN auth.users u ON u.id = rp.user_id
+   WHERE COALESCE(NULLIF(btrim(COALESCE(u.email::text, '')), ''),
+                  NULLIF(btrim(COALESCE(rp.recruiter_email, '')), '')) IS NULL;
+
+  IF _missing > 0 THEN
+    RAISE EXCEPTION 'RC-1A owner bootstrap preflight failed: % recruiter profile(s) have no owner email source', _missing
+      USING ERRCODE = '22023';
+  END IF;
+END $$;
+
 WITH bootstrapped AS (
   INSERT INTO public.recruiter_members (
     recruiter_id, member_user_id, invite_email, role, status, accepted_at,
