@@ -104,8 +104,7 @@ WITH bootstrapped AS (
          NULL
     FROM public.recruiter_profiles rp
     LEFT JOIN auth.users u ON u.id = rp.user_id
-   WHERE COALESCE(u.email::text, rp.recruiter_email) IS NOT NULL
-     AND NOT EXISTS (
+   WHERE NOT EXISTS (
        SELECT 1 FROM public.recruiter_members m
         WHERE m.recruiter_id = rp.id
           AND m.role = 'recruiter_owner'
