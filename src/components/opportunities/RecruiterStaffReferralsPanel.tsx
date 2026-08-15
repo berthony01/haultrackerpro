@@ -50,8 +50,8 @@ import {
   useRecruiterStaffReferrals,
   type RecruiterReferral,
 } from '@/hooks/opportunities/useRecruiterReferrals';
-import { useRecruiterStaffReferralSettings } from '@/hooks/opportunities/useRecruiterReferralSettings';
 import {
+  useRecruiterStaffReferralSettings,
   PAYMENT_TRIGGER_LABELS,
   type PaymentTrigger,
 } from '@/hooks/opportunities/useRecruiterReferralSettings';
