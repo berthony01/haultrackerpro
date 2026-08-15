@@ -176,6 +176,20 @@ export function RecruiterAccessRoute({
   if (!recruiterHubAllowed) {
     return <NeutralPanel label="Recruiter workspace unavailable." />;
   }
+
+  // Phase RC-1C — STAFF mode. Returns BEFORE any owner operational child
+  // can mount; every requested subview collapses to this neutral home.
+  if (recruiterAccessKind === 'staff') {
+    if (!selectedStaffWorkspace || recruiterCapabilityStatus) {
+      return <NeutralPanel label="Recruiter workspace unavailable." />;
+    }
+    return (
+      <StaffWorkspaceHome
+        workspace={selectedStaffWorkspace}
+        onChangeStaffWorkspace={onChangeStaffWorkspace}
+      />
+    );
+  }
   if (
     !recruiterCapabilityStatus ||
     recruiterCapabilityStatus === 'revoked'
