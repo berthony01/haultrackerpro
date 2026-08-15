@@ -539,11 +539,7 @@ ON public.recruiter_members
 FOR SELECT
 TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM public.recruiter_profiles rp
-     WHERE rp.id = recruiter_members.recruiter_id
-       AND rp.user_id = auth.uid()
-  )
+  public.is_recruiter_workspace_owner(recruiter_members.recruiter_id)
 );
 
 DROP POLICY IF EXISTS "Active member reads own membership row" ON public.recruiter_members;
