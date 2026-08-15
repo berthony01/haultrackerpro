@@ -104,7 +104,8 @@ export default function RecruiterEntryRoute() {
   const staffWorkspaceError = view.staffWorkspaceError;
   const selectStaffWorkspace = view.selectStaffWorkspace;
   // Staff discovery must be SETTLED before any activation decision.
-  const isLoading = authLoading || caps.isLoading || view.isLoading;
+  const isLoading =
+    authLoading || caps.isLoading || view.isLoading || view.staffLoading;
 
   // Synchronously track the current user id. Every render updates the
   // ref so async completions can compare against the most recent id.

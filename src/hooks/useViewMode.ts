@@ -83,7 +83,10 @@ export function useViewMode() {
   const rows = capabilities.rows as readonly UserCapabilityRow[] | undefined;
   const hasError = !!capabilities.error;
   const isLoading =
-    authLoading || capabilities.isLoading || roleLoading || staff.isLoading;
+    authLoading || capabilities.isLoading || roleLoading;
+  // Staff discovery is tracked SEPARATELY: a slow/failing staff lookup must
+  // never gate an otherwise valid driver workspace.
+  const staffLoading = staff.isLoading;
 
   // Stable trusted view: a plain object holding only the validated rows.
   // Every downstream consumer re-derives access from these rows.
@@ -262,6 +265,8 @@ export function useViewMode() {
     staffSelectionRequired: personalRecruiterStatus === null && staff.requiresSelection,
     /** Separate from `error`: staff discovery failure must never block driver use. */
     staffWorkspaceError: staff.error,
+    /** Separate from `isLoading`: staff discovery settle state. */
+    staffLoading,
     selectStaffWorkspace: staff.selectWorkspace,
     clearStaffWorkspaceSelection: staff.clearSelection,
   };
