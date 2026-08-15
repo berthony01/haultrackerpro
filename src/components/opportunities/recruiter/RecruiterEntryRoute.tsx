@@ -192,8 +192,18 @@ export default function RecruiterEntryRoute() {
     }
   }, [userId, beginRecruiterSetup, refetch]);
 
+  // Phase RC-1C — a staff membership is an organizational entry path and
+  // must SUPPRESS personal recruiter capability creation entirely.
+  const staffPathBlocksActivation =
+    recruiterStatus === null &&
+    (!!staffWorkspaceError ||
+      staffSelectionRequired ||
+      !!selectedStaffWorkspace ||
+      staffWorkspaces.length > 0);
+
   // Auto-invoke activation only when validated rows prove:
-  //   driver.status === 'active' AND recruiter capability absent.
+  //   driver.status === 'active' AND recruiter capability absent
+  //   AND staff discovery completed successfully with ZERO workspaces.
   // Fail-closed on loading, missing user, capability error, or any
   // other capability shape. Uses the current-user-visible error only.
   const shouldAutoActivate =
@@ -202,6 +212,7 @@ export default function RecruiterEntryRoute() {
     !!userId &&
     driverStatus === 'active' &&
     recruiterStatus === null &&
+    !staffPathBlocksActivation &&
     rpcError === null;
 
   useEffect(() => {
