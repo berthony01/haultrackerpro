@@ -120,7 +120,7 @@ export function useRecruiterStaffWorkspace(): UseRecruiterStaffWorkspaceResult {
   }, [query.error, resolution]);
 
   return {
-    workspaces: resolution && resolution.kind !== 'invalid' ? resolution.workspaces : [],
+    workspaces,
     selectedWorkspace: resolution?.kind === 'selected' ? resolution.selected : null,
     requiresSelection: resolution?.kind === 'selection_required',
     isLoading,
