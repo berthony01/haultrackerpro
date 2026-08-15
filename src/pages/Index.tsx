@@ -1270,6 +1270,13 @@ const Index = () => {
                 recruiterOperationsAllowed={recruiterOperationsAllowed}
                 workspaceLoading={workspaceLoading}
                 workspaceError={workspaceError}
+                recruiterWorkspaceStatus={recruiterWorkspaceStatus}
+                recruiterAccessKind={recruiterAccessKind}
+                selectedStaffWorkspace={selectedStaffWorkspace}
+                onChangeStaffWorkspace={() => {
+                  clearStaffWorkspaceSelection();
+                  navigate('/recruiter');
+                }}
               />
             )}
             {page === 'settings' && (isRecruiterView ? (
