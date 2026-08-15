@@ -65,7 +65,63 @@ interface Props {
   activeOpportunityLimitMessage?: string | null;
   onBack: () => void;
   onSaved: () => void;
+  /**
+   * Phase RC-1D — optional externally supplied STAFF controller. When present
+   * the exported wrapper renders the shared core directly and NO owner hook
+   * (recruiter profile, readiness self-heal, billing) is ever mounted.
+   */
+  staffController?: RecruiterOpportunityStaffController | null;
 }
+
+/** Phase RC-1D — staff authoring controller supplied by the staff manager. */
+export interface RecruiterOpportunityStaffController {
+  recruiterId: string;
+  companyName: string | null;
+  isPending: boolean;
+  permissions: {
+    canCreate: boolean;
+    canEdit: boolean;
+    canChangeStatus: boolean;
+  };
+  create: (
+    payload: OpportunityInsert,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+  update: (
+    id: string,
+    payload: OpportunityUpdate,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+}
+
+/**
+ * Phase RC-1D — pure staff permission matrix for a save attempt.
+ *
+ * New draft            => create
+ * New publish          => create + change_status
+ * Existing, no status  => edit
+ * Existing w/ status   => edit + change_status
+ */
+export function staffCanSubmitOpportunity(args: {
+  isExisting: boolean;
+  currentStatus: string | null;
+  mode: 'draft' | 'publish';
+  permissions: { canCreate: boolean; canEdit: boolean; canChangeStatus: boolean };
+}): boolean {
+  const { isExisting, currentStatus, mode, permissions } = args;
+  if (!isExisting) {
+    if (!permissions.canCreate) return false;
+    return mode === 'draft' ? true : permissions.canChangeStatus;
+  }
+  if (!permissions.canEdit) return false;
+  const targetStatus = mode === 'publish' ? 'active' : 'draft';
+  const statusChanges = currentStatus !== targetStatus;
+  return statusChanges ? permissions.canChangeStatus : true;
+}
+
+const STAFF_PERMISSION_MESSAGE =
+  'You do not have permission to perform this action in this workspace.';
+
 
 
 const EMPLOYMENT_OPTIONS: Array<{ value: CanonicalEmploymentModel; label: string }> = [
