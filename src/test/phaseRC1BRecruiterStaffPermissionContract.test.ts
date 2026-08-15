@@ -325,9 +325,20 @@ describe("RC-1B — prohibited scope", () => {
     "user_capabilities",
   ];
 
+  /**
+   * Permission-vocabulary literals (e.g. 'opportunities_view', 'contracts_view')
+   * are inert enum labels, not references to operational objects. Strip them
+   * (and the TS-mirror-free label text) before scanning, so the scan proves
+   * absence of real object references rather than tripping on the vocabulary.
+   */
+  const scopeSql = EXPECTED_KEYS.reduce(
+    (acc, key) => acc.split(key).join("«perm»"),
+    lowerExecutable,
+  );
+
   it("9. executable SQL references no operational/billing/agency object", () => {
     for (const token of forbidden) {
-      expect(lowerExecutable).not.toContain(token);
+      expect(scopeSql).not.toContain(token);
     }
   });
 
