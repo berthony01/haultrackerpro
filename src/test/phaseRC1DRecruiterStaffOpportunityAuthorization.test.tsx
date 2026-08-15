@@ -149,6 +149,30 @@ describe('RC-1D migration contract', () => {
     expect(body.slice(updateOwnerCheck).indexOf('rp.id = NEW.recruiter_id')).toBe(-1);
   });
 
+  it('owner-of-OLD reassignment must clear the unchanged canonical owner gate on NEW', () => {
+    const fn = SQL.slice(
+      SQL.indexOf('CREATE OR REPLACE FUNCTION public.opportunities_staff_action_guard()'),
+    );
+    const body = fn.slice(0, fn.indexOf('$function$;') + 11);
+    const update = body.slice(body.indexOf('rp.id = OLD.recruiter_id'));
+    const ownerBranch = update.slice(
+      update.indexOf('IF _owns_recruiter_profile THEN'),
+      update.indexOf('END IF;', update.indexOf('RETURN NEW;')),
+    );
+
+    // Case 1/2: inside owner-of-OLD branch, a changed destination requires the
+    // EXISTING owner gate on NEW before RETURN NEW.
+    expect(ownerBranch).toContain('NEW.recruiter_id IS DISTINCT FROM OLD.recruiter_id');
+    expect(ownerBranch).toContain(
+      'NOT public.current_user_can_manage_recruiter_opportunities(NEW.recruiter_id)',
+    );
+    expect(ownerBranch.indexOf('current_user_can_manage_recruiter_opportunities(NEW.recruiter_id)'))
+      .toBeLessThan(ownerBranch.indexOf('RETURN NEW;'));
+    expect(ownerBranch).toContain("Not authorized to reassign this opportunity.");
+    // The RC-1B permission helper must never approve an owner-path destination.
+    expect(ownerBranch).not.toContain('current_user_can_recruiter_opportunity_action');
+  });
+
   it('rejects recruiter_id change for any caller who does not own the OLD workspace', () => {
     const fn = SQL.slice(
       SQL.indexOf('CREATE OR REPLACE FUNCTION public.opportunities_staff_action_guard()'),
@@ -161,6 +185,13 @@ describe('RC-1D migration contract', () => {
     expect(immutability).toBeLessThan(editCheck);
     expect(immutability).toBeLessThan(statusCheck);
     expect(body.slice(immutability)).toContain("Not authorized to reassign this opportunity.");
+    // Case 3/4: the non-owner-of-OLD branch keeps UNCONDITIONAL immutability —
+    // no owner-gate or permission escape hatch on that comparison.
+    const nonOwner = body.slice(body.indexOf('-- Staff can never move a listing between workspaces.'));
+    const guardLine = nonOwner.slice(0, nonOwner.indexOf('END IF;'));
+    expect(guardLine).toContain('IF NEW.recruiter_id IS DISTINCT FROM OLD.recruiter_id THEN');
+    expect(guardLine).not.toContain('current_user_can_manage_recruiter_opportunities');
+    expect(guardLine).not.toContain('current_user_can_recruiter_opportunity_action');
   });
 
   it('modifies only the three recruiter policies and adds no recruiter DELETE policy', () => {
