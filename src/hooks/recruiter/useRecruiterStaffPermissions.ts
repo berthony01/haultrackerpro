@@ -145,6 +145,10 @@ export function useRecruiterStaffPermissions(
     canRequestApplicationContact:
       granted && permissions.applications_request_contact === true,
     canManageApplicationNotes: granted && permissions.applications_manage_notes === true,
+    canViewReferrals: granted && permissions.referrals_view === true,
+    canManageReferralStatus: granted && permissions.referrals_manage_status === true,
+    canManageReferralTerms: granted && permissions.referral_terms_manage === true,
+
 
     isLoading: !!userId && !!id && isLoading,
     error: scoped?.error ?? null,
