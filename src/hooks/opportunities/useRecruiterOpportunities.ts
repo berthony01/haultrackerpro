@@ -246,6 +246,17 @@ export function useRecruiterStaffOpportunities({
   const updateOpportunity = useMutation({
     mutationFn: async ({ id: oppId, data }: { id: string; data: OpportunityUpdate }) => {
       require(permissions.canEditOpportunities);
+      // Phase RC-1D correction: a status-bearing payload also requires status
+      // permission when it represents an ACTUAL status change. Same-status
+      // content saves (e.g. active -> active) remain edit-only, matching the
+      // staff form matrix. If the current status cannot be proven from the
+      // loaded workspace list, fail closed and demand status permission.
+      if (data.status !== undefined) {
+        const current = (listQuery.data ?? []).find((o) => o.id === oppId);
+        if (!current || current.status !== data.status) {
+          require(permissions.canChangeOpportunityStatus);
+        }
+      }
       const { error } = await supabase
         .from('opportunities')
         .update(data)
@@ -255,6 +266,7 @@ export function useRecruiterStaffOpportunities({
     },
     onSuccess: invalidate,
   });
+
 
   const setStatus = useMutation({
     mutationFn: async ({
