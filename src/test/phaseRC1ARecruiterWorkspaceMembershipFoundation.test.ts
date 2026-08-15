@@ -15,6 +15,16 @@ const SQL_PATH = path.resolve(
 const sql = readFileSync(SQL_PATH, "utf8");
 const lower = sql.toLowerCase();
 
+/**
+ * Executable SQL only: `--` line comments stripped. Prohibited-scope assertions
+ * run against THIS string so narrative comments can never create a false
+ * positive (or false confidence) about what the migration actually does.
+ */
+const lowerExecutable = lower
+  .split("\n")
+  .map((line) => line.replace(/--.*$/, ""))
+  .join("\n");
+
 describe("Phase RC-1A — candidate migration envelope", () => {
   it("1. is marked as a candidate and is transactional", () => {
     expect(sql.split("\n")[0].trim()).toBe("-- CANDIDATE MIGRATION — NOT APPLIED LIVE.");
