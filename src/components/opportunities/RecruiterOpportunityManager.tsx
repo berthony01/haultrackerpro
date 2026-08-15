@@ -325,6 +325,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
 
 function OpportunityRow({
   o, onEdit, onPause, onActivate, onClose, onDelete, busy, canActivate,
+  canEdit = true, canChangeStatus = true, canDeletePermission = true,
 }: {
   o: Opportunity;
   onEdit: () => void;
@@ -334,6 +335,10 @@ function OpportunityRow({
   onDelete: () => void;
   busy: boolean;
   canActivate: boolean;
+  /** Phase RC-1D — staff permission visibility. Owner path keeps defaults. */
+  canEdit?: boolean;
+  canChangeStatus?: boolean;
+  canDeletePermission?: boolean;
 }) {
   const statusVariant: Record<string, 'default' | 'outline' | 'secondary' | 'destructive'> = {
     active: 'default',
@@ -343,7 +348,9 @@ function OpportunityRow({
   };
 
   const publication = getOpportunityPublicationStatus(o);
-  const canDelete = o.status === 'draft' || o.status === 'closed';
+  const canDelete =
+    canDeletePermission && (o.status === 'draft' || o.status === 'closed');
+
 
   return (
     <Card className="p-5 border-border/60" data-testid={`opportunity-row-${o.id}`}>
