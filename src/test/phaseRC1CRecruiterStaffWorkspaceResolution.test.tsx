@@ -261,6 +261,54 @@ describe('resolveRecruiterStaffWorkspace', () => {
     expect(r.selected).toBeNull();
     expect(r.workspaces).toEqual([]);
   });
+
+  it('null/undefined payloads resolve invalid, never none', () => {
+    for (const p of [null, undefined]) {
+      const r = resolveRecruiterStaffWorkspace(p, 'r1');
+      expect(r.kind).toBe('invalid');
+      expect(r.selected).toBeNull();
+      expect(r.workspaces).toEqual([]);
+    }
+  });
+});
+
+// =======================================================================
+// C2) Hook lifecycle source contract (correction 2 + 3)
+// =======================================================================
+describe('useRecruiterStaffWorkspace lifecycle contract', () => {
+  const hookSrc = fs.readFileSync(
+    path.join(process.cwd(), 'src/hooks/recruiter/useRecruiterStaffWorkspace.ts'),
+    'utf8',
+  );
+
+  it('clears a stale stored preference from an effect, not during render', () => {
+    // The only clearStored call driven by resolution must live inside a
+    // useEffect body.
+    const effectBlocks = hookSrc.split('useEffect(');
+    const housekeeping = effectBlocks.find(b => b.includes('shouldClearStored'));
+    expect(housekeeping).toBeTruthy();
+    expect(housekeeping).toContain('clearStored(userId)');
+    // No render-time conditional mutation remains.
+    expect(hookSrc).not.toContain("if (userId && resolution && 'shouldClearStoredSelection' in resolution)");
+  });
+
+  it('invalidates the in-flight generation before the no-user branch', () => {
+    const fetchEffect = hookSrc.slice(hookSrc.indexOf('useEffect(() => {'));
+    const bumpIdx = fetchEffect.indexOf('++requestRef.current');
+    const noUserIdx = fetchEffect.indexOf('if (!userId)');
+    expect(bumpIdx).toBeGreaterThan(-1);
+    expect(noUserIdx).toBeGreaterThan(-1);
+    expect(bumpIdx).toBeLessThan(noUserIdx);
+  });
+
+  it('keeps the user-bound payload guard', () => {
+    expect(hookSrc).toContain('query.userId === userId ? query.data : null');
+  });
+
+  it('rejects selecting a recruiter id outside current validated rows', () => {
+    expect(hookSrc).toContain('const match = workspaces.find(w => w.recruiterId === recruiterId);');
+    expect(hookSrc).toContain('if (!match) return;');
+  });
 });
 
 // =======================================================================
