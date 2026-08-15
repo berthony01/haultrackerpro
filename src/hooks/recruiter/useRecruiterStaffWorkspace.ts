@@ -87,15 +87,20 @@ export function useRecruiterStaffWorkspace(): UseRecruiterStaffWorkspaceResult {
     }
   }
 
+  const workspaces: RecruiterStaffWorkspace[] = useMemo(() => {
+    if (!resolution || resolution.kind === 'invalid') return [];
+    return resolution.workspaces as RecruiterStaffWorkspace[];
+  }, [resolution]);
+
   const selectWorkspace = useCallback(
     (recruiterId: string) => {
-      if (!userId || !resolution) return;
-      const match = resolution.workspaces.find(w => w.recruiterId === recruiterId);
+      if (!userId) return;
+      const match = workspaces.find(w => w.recruiterId === recruiterId);
       if (!match) return; // never accept an id outside current validated rows
       writeStored(userId, match.recruiterId);
       setSelection({ userId, recruiterId: match.recruiterId });
     },
-    [userId, resolution],
+    [userId, workspaces],
   );
 
   const clearSelection = useCallback(() => {
