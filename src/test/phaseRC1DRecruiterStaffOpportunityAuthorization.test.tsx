@@ -221,7 +221,7 @@ describe('permission + data hook contracts', () => {
 
   it('permission hook fails closed on error/malformed payload', () => {
     expect(HOOK_SRC).toContain('emptyRecruiterStaffPermissions()');
-    expect(HOOK_SRC).toContain('parseRecruiterStaffPermissions(resp.data)');
+    expect(HOOK_SRC).toContain('parseRecruiterStaffPermissions(payload)');
     expect(HOOK_SRC).toContain('const granted = !!scoped && !scoped.error && !!scoped.permissions;');
   });
 
