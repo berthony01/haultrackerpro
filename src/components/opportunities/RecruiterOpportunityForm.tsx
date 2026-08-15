@@ -27,6 +27,8 @@ import { toast } from 'sonner';
 import {
   useRecruiterOpportunities,
   type Opportunity,
+  type OpportunityInsert,
+  type OpportunityUpdate,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
