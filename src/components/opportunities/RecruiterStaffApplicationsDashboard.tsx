@@ -3,9 +3,9 @@
  *
  * Staff-only pipeline UI driven exclusively by the RC-1E staff hooks and pure
  * existing matching / status / analytics utilities. It intentionally mounts
- * NONE of the owner surfaces: no useRecruiterProfile, no useRecruiterBilling,
- * no useContractReadinessMap, no ContractAttachment, no Agency / referral /
- * report / settlement hook, and no subscription or upgrade UI.
+ * NONE of the owner surfaces: no recruiter profile hook, no billing hook, no
+ * contract readiness or attachment surface, no Agency / referral / report /
+ * settlement hook, and no subscription or upgrade UI.
  *
  * Fail closed: without `canViewApplications` no operational content renders.
  * Status actions require `canManageApplicationStatus`; contact requests

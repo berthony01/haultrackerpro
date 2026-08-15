@@ -5,8 +5,8 @@
 -- recruiter workspace:
 --   applications_view, applications_manage_status, applications_request_contact
 --
--- applications_manage_notes is DELIBERATELY DORMANT in RC-1E: there is no
--- canonical application-notes table, RPC, or UI, so nothing here consumes it.
+-- The staff notes permission key is DELIBERATELY DORMANT in RC-1E: there is
+-- no canonical application-notes table, RPC, or UI, so nothing consumes it.
 --
 -- Security contract:
 --   * public.current_user_can_manage_recruiter_opportunities(uuid) is NOT
@@ -328,8 +328,8 @@ $function$;
 -- ---------------------------------------------------------------------------
 -- F) Contact request authorization
 --
--- respond_to_contact_request, rcr_emit_event, notification triggers, and all
--- driver authorization remain untouched.
+-- The driver response RPC, the contact-request event trigger, notification
+-- triggers, and all driver authorization remain untouched.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.request_driver_contact(application_id uuid, recruiter_note text DEFAULT NULL::text)
 RETURNS uuid
