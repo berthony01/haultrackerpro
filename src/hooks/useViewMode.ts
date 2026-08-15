@@ -2,10 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserRole, type UserRole } from '@/hooks/useUserRole';
 import { useUserCapabilities } from '@/hooks/useUserCapabilities';
+import { useRecruiterStaffWorkspace } from '@/hooks/recruiter/useRecruiterStaffWorkspace';
 import {
   computeWorkspaceAccess,
-  isWorkspaceAllowed,
-  resolveInitialWorkspace,
   type WorkspaceRole,
 } from '@/lib/workspaceAccess';
 import type { UserCapabilitiesView, UserCapabilityRow } from '@/lib/userCapabilities';
