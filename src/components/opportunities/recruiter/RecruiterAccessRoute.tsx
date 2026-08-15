@@ -19,7 +19,11 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { RecruiterAccessPage } from './RecruiterAccessPage';
 import { RecruiterOnboarding } from '../RecruiterOnboarding';
-import { RecruiterOpportunityManager } from '../RecruiterOpportunityManager';
+import {
+  RecruiterOpportunityManager,
+  RecruiterStaffOpportunityManager,
+} from '../RecruiterOpportunityManager';
+import { useRecruiterStaffPermissions } from '@/hooks/recruiter/useRecruiterStaffPermissions';
 import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboard';
 import {
   resolveRecruiterSubviewForStatus,
