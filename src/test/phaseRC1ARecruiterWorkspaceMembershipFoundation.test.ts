@@ -111,10 +111,29 @@ describe("Phase RC-1A — owner bootstrap", () => {
 
 describe("Phase RC-1A — invitation cryptography and lifecycle", () => {
   it("4a. issues a 24-byte random token stored only as a SHA-256 hex hash", () => {
-    expect(lower).toContain("encode(gen_random_bytes(24), 'hex')");
-    expect(lower).toContain("encode(digest(_raw_token, 'sha256'), 'hex')");
-    expect(lower).toContain("encode(digest(btrim(_token), 'sha256'), 'hex')");
+    expect(lower).toContain("encode(extensions.gen_random_bytes(24), 'hex')");
+    expect(lower).toContain("encode(extensions.digest(_raw_token, 'sha256'), 'hex')");
+    expect(lower).toContain("encode(extensions.digest(btrim(_token), 'sha256'), 'hex')");
     expect(lower).not.toContain("'invite_token_hash', ");
+  });
+
+  it("4a2. invite and accept function bodies contain no unqualified crypto calls", () => {
+    const inviteFn = lowerExecutable.slice(
+      lowerExecutable.indexOf("function public.invite_recruiter_member"),
+      lowerExecutable.indexOf("function public.accept_recruiter_member_invite"),
+    );
+    const acceptFn = lowerExecutable.slice(
+      lowerExecutable.indexOf("function public.accept_recruiter_member_invite"),
+      lowerExecutable.indexOf("function public.revoke_recruiter_member"),
+    );
+    const stripQualified = (s: string) =>
+      s
+        .replace(/extensions\.gen_random_bytes\(/g, "")
+        .replace(/extensions\.digest\(/g, "");
+    expect(stripQualified(inviteFn)).not.toMatch(/\bgen_random_bytes\(/);
+    expect(stripQualified(inviteFn)).not.toMatch(/\bdigest\(/);
+    expect(stripQualified(acceptFn)).not.toMatch(/\bgen_random_bytes\(/);
+    expect(stripQualified(acceptFn)).not.toMatch(/\bdigest\(/);
   });
 
   it("4b. expires invites exactly 7 days after issuance", () => {

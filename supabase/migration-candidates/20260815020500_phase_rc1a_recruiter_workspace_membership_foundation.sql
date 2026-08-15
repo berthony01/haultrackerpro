@@ -344,8 +344,8 @@ BEGIN
     RAISE EXCEPTION 'Already a member' USING ERRCODE = '22023';
   END IF;
 
-  _raw_token := encode(gen_random_bytes(24), 'hex');
-  _hash := encode(digest(_raw_token, 'sha256'), 'hex');
+  _raw_token := encode(extensions.gen_random_bytes(24), 'hex');
+  _hash := encode(extensions.digest(_raw_token, 'sha256'), 'hex');
   _expires := now() + interval '7 days';
 
   IF FOUND THEN
@@ -415,7 +415,7 @@ BEGIN
     RAISE EXCEPTION 'Invalid invitation' USING ERRCODE = '22023';
   END IF;
 
-  _hash := encode(digest(btrim(_token), 'sha256'), 'hex');
+  _hash := encode(extensions.digest(btrim(_token), 'sha256'), 'hex');
 
   SELECT * INTO _row
     FROM public.recruiter_members m
