@@ -483,19 +483,49 @@ function RecruiterOpportunityFormCore({
       hydratedRef.current = true;
       return;
     }
-    if (!initial && profile?.company_name) {
-      setState((cur) => cur.company_name ? cur : { ...cur, company_name: profile.company_name ?? '' });
+    if (!initial && controller.defaultCompanyName) {
+      setState((cur) =>
+        cur.company_name
+          ? cur
+          : { ...cur, company_name: controller.defaultCompanyName ?? '' },
+      );
     }
-  }, [initial, profile]);
+  }, [initial, controller.defaultCompanyName]);
 
   const set = <K extends keyof State>(k: K, v: State[K]) =>
     setState((s) => ({ ...s, [k]: v }));
 
   const readiness = useMemo(() => validateOpportunityReadiness(state), [state]);
-  const pending = createOpportunity.isPending || updateOpportunity.isPending;
+  const pending = controller.isPending;
 
+  // Phase RC-1D — staff permission matrix for each save target.
+  const staffPerms = controller.staffPermissions ?? null;
+  const staffCanSaveDraft =
+    !staffPerms ||
+    staffCanSubmitOpportunity({
+      isExisting: !!initial?.id,
+      currentStatus: initial?.status ?? null,
+      mode: 'draft',
+      permissions: staffPerms,
+    });
+  const staffCanPublish =
+    !staffPerms ||
+    staffCanSubmitOpportunity({
+      isExisting: !!initial?.id,
+      currentStatus: initial?.status ?? null,
+      mode: 'publish',
+      permissions: staffPerms,
+    });
 
   const save = async (mode: 'draft' | 'publish') => {
+    if (mode === 'draft' && !staffCanSaveDraft) {
+      toast.error(STAFF_PERMISSION_MESSAGE);
+      return;
+    }
+    if (mode === 'publish' && !staffCanPublish) {
+      toast.error(STAFF_PERMISSION_MESSAGE);
+      return;
+    }
     if (mode === 'draft' && !readiness.canSaveDraft) {
       const msg = readiness.blockingReasons[0] ?? 'Fix the highlighted issues before saving.';
       toast.error(msg);
@@ -511,19 +541,9 @@ function RecruiterOpportunityFormCore({
       return;
     }
 
-    // Phase 1P-A1 — publish defense-in-depth: refetch the recruiter
-    // profile immediately before the mutation and abort into the
-    // readiness dialog if the caller no longer satisfies posting
-    // requirements (e.g. suspended between page load and click, or
-    // legacy consent revoked out-of-band).
     if (mode === 'publish') {
-      const fresh = await refetchProfile();
-      const rr = resolveRecruiterReadiness(fresh);
-      if (!rr.ready) {
-        pendingPublishRef.current = true;
-        setReadinessOpen(true);
-        return;
-      }
+      const ready = await controller.confirmPublishReady();
+      if (!ready) return;
     }
     const payload = buildOpportunityPersistencePayload(state, mode);
     const onSuccess = () => {
@@ -539,11 +559,12 @@ function RecruiterOpportunityFormCore({
       toast.error(detail ? `${e.message} — ${detail}` : e.message);
     };
     if (initial?.id) {
-      updateOpportunity.mutate({ id: initial.id, data: payload }, { onSuccess, onError });
+      controller.update(initial.id, payload, { onSuccess, onError });
     } else {
-      createOpportunity.mutate(payload, { onSuccess, onError });
+      controller.create(payload, { onSuccess, onError });
     }
   };
+
 
 
   const handleExtracted = (data: ExtractedOpportunity) => {
