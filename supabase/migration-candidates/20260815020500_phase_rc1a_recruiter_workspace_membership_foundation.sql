@@ -337,8 +337,7 @@ BEGIN
       role, status, invited_by_user_id, invited_at
     ) VALUES (
       _recruiter_id, _norm::citext, _hash, _expires,
-      _role, 'active'::public.recruiter_member_status IS NOT NULL
-        AND FALSE OR 'pending'::public.recruiter_member_status,
+      _role, 'pending'::public.recruiter_member_status,
       _uid, now()
     )
     RETURNING * INTO _row;
