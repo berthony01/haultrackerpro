@@ -135,6 +135,12 @@ export function useRecruiterStaffPermissions(
     canEditOpportunities: granted && permissions.opportunities_edit === true,
     canChangeOpportunityStatus: granted && permissions.opportunities_change_status === true,
     canDeleteOpportunities: granted && permissions.opportunities_delete === true,
+    canViewApplications: granted && permissions.applications_view === true,
+    canManageApplicationStatus: granted && permissions.applications_manage_status === true,
+    canRequestApplicationContact:
+      granted && permissions.applications_request_contact === true,
+    canManageApplicationNotes: granted && permissions.applications_manage_notes === true,
+
     isLoading: !!userId && !!id && isLoading,
     error: scoped?.error ?? null,
     refetch,
