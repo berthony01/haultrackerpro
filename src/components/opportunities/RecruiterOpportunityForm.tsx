@@ -27,6 +27,8 @@ import { toast } from 'sonner';
 import {
   useRecruiterOpportunities,
   type Opportunity,
+  type OpportunityInsert,
+  type OpportunityUpdate,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
@@ -65,7 +67,63 @@ interface Props {
   activeOpportunityLimitMessage?: string | null;
   onBack: () => void;
   onSaved: () => void;
+  /**
+   * Phase RC-1D — optional externally supplied STAFF controller. When present
+   * the exported wrapper renders the shared core directly and NO owner hook
+   * (recruiter profile, readiness self-heal, billing) is ever mounted.
+   */
+  staffController?: RecruiterOpportunityStaffController | null;
 }
+
+/** Phase RC-1D — staff authoring controller supplied by the staff manager. */
+export interface RecruiterOpportunityStaffController {
+  recruiterId: string;
+  companyName: string | null;
+  isPending: boolean;
+  permissions: {
+    canCreate: boolean;
+    canEdit: boolean;
+    canChangeStatus: boolean;
+  };
+  create: (
+    payload: OpportunityInsert,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+  update: (
+    id: string,
+    payload: OpportunityUpdate,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+}
+
+/**
+ * Phase RC-1D — pure staff permission matrix for a save attempt.
+ *
+ * New draft            => create
+ * New publish          => create + change_status
+ * Existing, no status  => edit
+ * Existing w/ status   => edit + change_status
+ */
+export function staffCanSubmitOpportunity(args: {
+  isExisting: boolean;
+  currentStatus: string | null;
+  mode: 'draft' | 'publish';
+  permissions: { canCreate: boolean; canEdit: boolean; canChangeStatus: boolean };
+}): boolean {
+  const { isExisting, currentStatus, mode, permissions } = args;
+  if (!isExisting) {
+    if (!permissions.canCreate) return false;
+    return mode === 'draft' ? true : permissions.canChangeStatus;
+  }
+  if (!permissions.canEdit) return false;
+  const targetStatus = mode === 'publish' ? 'active' : 'draft';
+  const statusChanges = currentStatus !== targetStatus;
+  return statusChanges ? permissions.canChangeStatus : true;
+}
+
+const STAFF_PERMISSION_MESSAGE =
+  'You do not have permission to perform this action in this workspace.';
+
 
 
 const EMPLOYMENT_OPTIONS: Array<{ value: CanonicalEmploymentModel; label: string }> = [
@@ -278,18 +336,110 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
 
 /* ---------------- form ---------------- */
 
-export function RecruiterOpportunityForm({
+/**
+ * Phase RC-1D — internal controller consumed by the shared authoring core.
+ * The core mounts NO owner hook; owner behavior is supplied by
+ * `OwnerBoundRecruiterOpportunityForm`, staff behavior by the staff manager.
+ */
+interface OpportunityFormController {
+  mode: 'owner' | 'staff';
+  isPending: boolean;
+  defaultCompanyName: string | null;
+  create: (
+    payload: OpportunityInsert,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+  update: (
+    id: string,
+    payload: OpportunityUpdate,
+    handlers: { onSuccess: () => void; onError: (e: Error) => void },
+  ) => void;
+  /** Owner: readiness defense-in-depth. Staff: always true (server authoritative). */
+  confirmPublishReady: () => Promise<boolean>;
+  staffPermissions?: { canCreate: boolean; canEdit: boolean; canChangeStatus: boolean };
+}
+
+/**
+ * Exported wrapper — intentionally hook-free so the staff path never mounts
+ * owner recruiter-profile / readiness / billing logic.
+ */
+export function RecruiterOpportunityForm(props: Props) {
+  const staff = props.staffController ?? null;
+  if (staff) {
+    const controller: OpportunityFormController = {
+      mode: 'staff',
+      isPending: staff.isPending,
+      defaultCompanyName: staff.companyName,
+      create: staff.create,
+      update: staff.update,
+      confirmPublishReady: () => Promise.resolve(true),
+      staffPermissions: staff.permissions,
+    };
+    return <RecruiterOpportunityFormCore {...props} controller={controller} />;
+  }
+  return <OwnerBoundRecruiterOpportunityForm {...props} />;
+}
+
+function OwnerBoundRecruiterOpportunityForm(props: Props) {
+  const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
+  const { profile, refetchProfile } = useRecruiterProfile();
+  const [readinessOpen, setReadinessOpen] = useState(false);
+  const resolverRef = useRef<((v: boolean) => void) | null>(null);
+
+  const settle = (v: boolean) => {
+    const resolve = resolverRef.current;
+    resolverRef.current = null;
+    resolve?.(v);
+  };
+
+  const controller: OpportunityFormController = {
+    mode: 'owner',
+    isPending: createOpportunity.isPending || updateOpportunity.isPending,
+    defaultCompanyName: profile?.company_name ?? null,
+    create: (payload, handlers) => createOpportunity.mutate(payload, handlers),
+    update: (id, payload, handlers) =>
+      updateOpportunity.mutate({ id, data: payload }, handlers),
+    // Phase 1P-A1 — publish defense-in-depth: refetch the recruiter profile
+    // immediately before the mutation and abort into the readiness dialog if
+    // the caller no longer satisfies posting requirements.
+    confirmPublishReady: async () => {
+      const fresh = await refetchProfile();
+      const rr = resolveRecruiterReadiness(fresh);
+      if (rr.ready) return true;
+      return new Promise<boolean>((resolve) => {
+        resolverRef.current = resolve;
+        setReadinessOpen(true);
+      });
+    },
+  };
+
+  return (
+    <>
+      <RecruiterOpportunityFormCore {...props} controller={controller} />
+      <RecruiterReadinessDialog
+        open={readinessOpen}
+        onOpenChange={(v) => {
+          setReadinessOpen(v);
+          if (!v) settle(false);
+        }}
+        profile={profile}
+        onReady={() => settle(true)}
+        actionLabel="Publish"
+      />
+    </>
+  );
+}
+
+function RecruiterOpportunityFormCore({
   initial,
   activeOpportunityLimit,
   isAtActiveOpportunityLimit,
   activeOpportunityLimitMessage,
   onBack,
   onSaved,
-}: Props) {
-  const { createOpportunity, updateOpportunity } = useRecruiterOpportunities();
-  const { profile, refetchProfile } = useRecruiterProfile();
-  const [readinessOpen, setReadinessOpen] = useState(false);
-  const pendingPublishRef = useRef(false);
+  controller,
+}: Props & { controller: OpportunityFormController }) {
+
 
   // Phase 1R-E1 — publishing a listing that is not already active consumes
   // one slot against the canonical active-opportunity ceiling.
@@ -333,19 +483,49 @@ export function RecruiterOpportunityForm({
       hydratedRef.current = true;
       return;
     }
-    if (!initial && profile?.company_name) {
-      setState((cur) => cur.company_name ? cur : { ...cur, company_name: profile.company_name ?? '' });
+    if (!initial && controller.defaultCompanyName) {
+      setState((cur) =>
+        cur.company_name
+          ? cur
+          : { ...cur, company_name: controller.defaultCompanyName ?? '' },
+      );
     }
-  }, [initial, profile]);
+  }, [initial, controller.defaultCompanyName]);
 
   const set = <K extends keyof State>(k: K, v: State[K]) =>
     setState((s) => ({ ...s, [k]: v }));
 
   const readiness = useMemo(() => validateOpportunityReadiness(state), [state]);
-  const pending = createOpportunity.isPending || updateOpportunity.isPending;
+  const pending = controller.isPending;
 
+  // Phase RC-1D — staff permission matrix for each save target.
+  const staffPerms = controller.staffPermissions ?? null;
+  const staffCanSaveDraft =
+    !staffPerms ||
+    staffCanSubmitOpportunity({
+      isExisting: !!initial?.id,
+      currentStatus: initial?.status ?? null,
+      mode: 'draft',
+      permissions: staffPerms,
+    });
+  const staffCanPublish =
+    !staffPerms ||
+    staffCanSubmitOpportunity({
+      isExisting: !!initial?.id,
+      currentStatus: initial?.status ?? null,
+      mode: 'publish',
+      permissions: staffPerms,
+    });
 
   const save = async (mode: 'draft' | 'publish') => {
+    if (mode === 'draft' && !staffCanSaveDraft) {
+      toast.error(STAFF_PERMISSION_MESSAGE);
+      return;
+    }
+    if (mode === 'publish' && !staffCanPublish) {
+      toast.error(STAFF_PERMISSION_MESSAGE);
+      return;
+    }
     if (mode === 'draft' && !readiness.canSaveDraft) {
       const msg = readiness.blockingReasons[0] ?? 'Fix the highlighted issues before saving.';
       toast.error(msg);
@@ -361,19 +541,9 @@ export function RecruiterOpportunityForm({
       return;
     }
 
-    // Phase 1P-A1 — publish defense-in-depth: refetch the recruiter
-    // profile immediately before the mutation and abort into the
-    // readiness dialog if the caller no longer satisfies posting
-    // requirements (e.g. suspended between page load and click, or
-    // legacy consent revoked out-of-band).
     if (mode === 'publish') {
-      const fresh = await refetchProfile();
-      const rr = resolveRecruiterReadiness(fresh);
-      if (!rr.ready) {
-        pendingPublishRef.current = true;
-        setReadinessOpen(true);
-        return;
-      }
+      const ready = await controller.confirmPublishReady();
+      if (!ready) return;
     }
     const payload = buildOpportunityPersistencePayload(state, mode);
     const onSuccess = () => {
@@ -389,11 +559,12 @@ export function RecruiterOpportunityForm({
       toast.error(detail ? `${e.message} — ${detail}` : e.message);
     };
     if (initial?.id) {
-      updateOpportunity.mutate({ id: initial.id, data: payload }, { onSuccess, onError });
+      controller.update(initial.id, payload, { onSuccess, onError });
     } else {
-      createOpportunity.mutate(payload, { onSuccess, onError });
+      controller.create(payload, { onSuccess, onError });
     }
   };
+
 
 
   const handleExtracted = (data: ExtractedOpportunity) => {
@@ -473,21 +644,8 @@ export function RecruiterOpportunityForm({
         onExtracted={handleExtracted}
       />
 
-      <RecruiterReadinessDialog
-        open={readinessOpen}
-        onOpenChange={(v) => {
-          setReadinessOpen(v);
-          if (!v) pendingPublishRef.current = false;
-        }}
-        profile={profile}
-        onReady={() => {
-          if (pendingPublishRef.current) {
-            pendingPublishRef.current = false;
-            void save('publish');
-          }
-        }}
-        actionLabel="Publish"
-      />
+      {/* Owner readiness dialog is rendered by OwnerBoundRecruiterOpportunityForm. */}
+
 
 
 
@@ -895,16 +1053,25 @@ export function RecruiterOpportunityForm({
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
               <Button variant="outline" onClick={() => save('draft')}
-                disabled={pending || !readiness.canSaveDraft}>
+                data-testid="save-draft-opportunity"
+                disabled={pending || !readiness.canSaveDraft || !staffCanSaveDraft}>
                 <Save className="h-4 w-4" /> Save Draft
               </Button>
               <Button onClick={() => save('publish')}
                 data-testid="publish-opportunity"
-                disabled={pending || !readiness.canPublish || atActiveLimit}>
+                disabled={pending || !readiness.canPublish || atActiveLimit || !staffCanPublish}>
                 <Send className="h-4 w-4" /> Publish Opportunity
 
               </Button>
             </div>
+            {staffPerms && (!staffCanSaveDraft || !staffCanPublish) && (
+              <p
+                className="mt-3 text-xs text-muted-foreground sm:text-right"
+                data-testid="staff-permission-message"
+              >
+                {STAFF_PERMISSION_MESSAGE}
+              </p>
+            )}
             {atActiveLimit && (
               <p
                 className="mt-3 text-xs text-destructive sm:text-right"
@@ -913,6 +1080,7 @@ export function RecruiterOpportunityForm({
                 {activeLimitMessage}
               </p>
             )}
+
 
           </Card>
         </div>

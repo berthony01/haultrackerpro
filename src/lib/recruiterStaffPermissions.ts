@@ -85,3 +85,47 @@ export function hasRecruiterStaffPermission(
   if (!perms) return false;
   return perms[key] === true;
 }
+
+/**
+ * Phase RC-1D — strict parser for the RC-1B full permission map returned by
+ * `get_my_recruiter_permissions(_recruiter_id)`.
+ *
+ * Fail-closed contract:
+ *   * payload MUST be a plain object (not null, array, string, number…)
+ *   * EVERY key in RECRUITER_STAFF_PERMISSION_KEYS must be present and boolean
+ *   * unknown extra keys invalidate the payload
+ * There are no role presets and no defaults.
+ */
+export type ParsedRecruiterStaffPermissions = Record<RecruiterStaffPermissionKey, boolean>;
+
+export function parseRecruiterStaffPermissions(
+  payload: unknown,
+): ParsedRecruiterStaffPermissions | null {
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+  const raw = payload as Record<string, unknown>;
+  const keys = Object.keys(raw);
+  if (keys.length !== RECRUITER_STAFF_PERMISSION_KEYS.length) return null;
+  const out = {} as ParsedRecruiterStaffPermissions;
+  for (const key of RECRUITER_STAFF_PERMISSION_KEYS) {
+    const value = raw[key];
+    if (typeof value !== 'boolean') return null;
+    out[key] = value;
+  }
+  // Reject unknown extra keys (length check above plus explicit membership).
+  for (const key of keys) {
+    if (!(RECRUITER_STAFF_PERMISSION_KEYS as readonly string[]).includes(key)) {
+      return null;
+    }
+  }
+  return out;
+}
+
+/** Every permission denied. Used whenever resolution fails. */
+export function emptyRecruiterStaffPermissions(): ParsedRecruiterStaffPermissions {
+  const out = {} as ParsedRecruiterStaffPermissions;
+  for (const key of RECRUITER_STAFF_PERMISSION_KEYS) out[key] = false;
+  return out;
+}
+

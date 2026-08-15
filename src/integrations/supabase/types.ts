@@ -5049,6 +5049,17 @@ export type Database = {
         Returns: Json
       }
       get_my_recruiter_profile_safe: { Args: never; Returns: Json[] }
+      get_my_recruiter_staff_workspaces: {
+        Args: never
+        Returns: {
+          company_name: string
+          member_role: Database["public"]["Enums"]["recruiter_member_role"]
+          member_since: string
+          membership_id: string
+          recruiter_id: string
+          recruiter_name: string
+        }[]
+      }
       get_my_recruiter_workspaces: {
         Args: never
         Returns: {

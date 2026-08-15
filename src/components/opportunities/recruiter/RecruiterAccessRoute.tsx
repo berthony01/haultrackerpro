@@ -19,7 +19,11 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { RecruiterAccessPage } from './RecruiterAccessPage';
 import { RecruiterOnboarding } from '../RecruiterOnboarding';
-import { RecruiterOpportunityManager } from '../RecruiterOpportunityManager';
+import {
+  RecruiterOpportunityManager,
+  RecruiterStaffOpportunityManager,
+} from '../RecruiterOpportunityManager';
+import { useRecruiterStaffPermissions } from '@/hooks/recruiter/useRecruiterStaffPermissions';
 import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboard';
 import {
   resolveRecruiterSubviewForStatus,
@@ -50,20 +54,46 @@ interface Props {
 }
 
 /**
- * Phase RC-1C — neutral STAFF workspace home.
+ * Phase RC-1C / RC-1D — STAFF workspace home.
  *
- * Safe entry context only. Mounts NO operational recruiter child and NO
- * billing/profile/opportunity/application/contract/settlement hook.
+ * Safe entry context plus, in RC-1D, a single permission-gated entry point
+ * into the staff opportunity manager. Mounts NO owner recruiter child and NO
+ * billing/profile/application/contract/settlement hook.
  */
-function StaffWorkspaceHome({
+function StaffWorkspaceRoute({
   workspace,
   onChangeStaffWorkspace,
 }: {
   workspace: RecruiterStaffWorkspace;
   onChangeStaffWorkspace?: () => void;
 }) {
+  const perms = useRecruiterStaffPermissions(workspace.recruiterId);
+  const [staffView, setStaffView] = useState<'home' | 'opportunities'>('home');
+
   const roleLabel =
     workspace.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff';
+
+  // Fail closed: loading or error never mounts the manager.
+  const canOpenOpportunities =
+    !perms.isLoading && !perms.error && perms.canViewOpportunities;
+
+  if (staffView === 'opportunities' && canOpenOpportunities) {
+    return (
+      <RecruiterStaffOpportunityManager
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        permissions={{
+          canViewOpportunities: perms.canViewOpportunities,
+          canCreateOpportunities: perms.canCreateOpportunities,
+          canEditOpportunities: perms.canEditOpportunities,
+          canChangeOpportunityStatus: perms.canChangeOpportunityStatus,
+          canDeleteOpportunities: perms.canDeleteOpportunities,
+        }}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
   return (
     <div
       data-testid="recruiter-staff-workspace-home"
@@ -81,8 +111,19 @@ function StaffWorkspaceHome({
       <div className="mt-6 rounded-xl border border-border/60 bg-card/60 p-4">
         <p className="text-sm text-foreground">Your workspace connection is active.</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Recruiter tools are permission-controlled and are not enabled for team members yet.
+          Recruiter tools are permission-controlled. Only the areas your workspace owner
+          granted are available to you.
         </p>
+        {canOpenOpportunities && (
+          <button
+            type="button"
+            onClick={() => setStaffView('opportunities')}
+            data-testid="staff-open-opportunities"
+            className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Manage Opportunities
+          </button>
+        )}
       </div>
       {onChangeStaffWorkspace && (
         <button
@@ -96,6 +137,7 @@ function StaffWorkspaceHome({
     </div>
   );
 }
+
 
 function NeutralPanel({ label }: { label: string }) {
   return (
@@ -184,7 +226,7 @@ export function RecruiterAccessRoute({
       return <NeutralPanel label="Recruiter workspace unavailable." />;
     }
     return (
-      <StaffWorkspaceHome
+      <StaffWorkspaceRoute
         workspace={selectedStaffWorkspace}
         onChangeStaffWorkspace={onChangeStaffWorkspace}
       />
