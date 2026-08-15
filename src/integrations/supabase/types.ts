@@ -4827,6 +4827,13 @@ export type Database = {
         Args: { _recruiter_id: string }
         Returns: boolean
       }
+      current_user_can_recruiter_opportunity_action: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
       current_user_has_recruiter_permission: {
         Args: {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]

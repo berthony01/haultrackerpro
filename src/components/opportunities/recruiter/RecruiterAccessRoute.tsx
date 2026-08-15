@@ -25,6 +25,8 @@ import {
 } from '../RecruiterOpportunityManager';
 import { useRecruiterStaffPermissions } from '@/hooks/recruiter/useRecruiterStaffPermissions';
 import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboard';
+import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicationsDashboard';
+
 import {
   resolveRecruiterSubviewForStatus,
   type RecruiterSubview,
@@ -68,7 +70,7 @@ function StaffWorkspaceRoute({
   onChangeStaffWorkspace?: () => void;
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
-  const [staffView, setStaffView] = useState<'home' | 'opportunities'>('home');
+  const [staffView, setStaffView] = useState<'home' | 'opportunities' | 'applications'>('home');
 
   const roleLabel =
     workspace.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff';
@@ -76,6 +78,9 @@ function StaffWorkspaceRoute({
   // Fail closed: loading or error never mounts the manager.
   const canOpenOpportunities =
     !perms.isLoading && !perms.error && perms.canViewOpportunities;
+  // Phase RC-1E — applications entry point, same fail-closed contract.
+  const canOpenApplications =
+    !perms.isLoading && !perms.error && perms.canViewApplications;
 
   if (staffView === 'opportunities' && canOpenOpportunities) {
     return (
@@ -89,6 +94,19 @@ function StaffWorkspaceRoute({
           canChangeOpportunityStatus: perms.canChangeOpportunityStatus,
           canDeleteOpportunities: perms.canDeleteOpportunities,
         }}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+  if (staffView === 'applications' && canOpenApplications) {
+    return (
+      <RecruiterStaffApplicationsDashboard
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewApplications={perms.canViewApplications}
+        canManageApplicationStatus={perms.canManageApplicationStatus}
+        canRequestApplicationContact={perms.canRequestApplicationContact}
         onBack={() => setStaffView('home')}
       />
     );
@@ -124,6 +142,16 @@ function StaffWorkspaceRoute({
             Manage Opportunities
           </button>
         )}
+        {canOpenApplications && (
+          <button
+            type="button"
+            onClick={() => setStaffView('applications')}
+            data-testid="staff-open-applications"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            Manage Applications
+          </button>
+        )}
       </div>
       {onChangeStaffWorkspace && (
         <button
@@ -137,6 +165,7 @@ function StaffWorkspaceRoute({
     </div>
   );
 }
+
 
 
 function NeutralPanel({ label }: { label: string }) {
