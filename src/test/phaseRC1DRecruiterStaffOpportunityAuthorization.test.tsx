@@ -148,7 +148,7 @@ describe('RC-1D migration contract', () => {
     expect(SQL).toContain('effective_recruiter_active_opportunity_limit');
     expect(SQL).toContain('pg_advisory_xact_lock(_lock_namespace');
     expect(SQL).toContain("'active_opportunity_limit_reached'");
-    expect(SQL).toContain("'business_entitlement_conflict'");
+    expect(SQL).toContain('business_entitlement_conflict');
     // Publication behavior preserved.
     expect(SQL).toContain("NEW.admin_review_status := CASE WHEN _is_eligible THEN 'approved' ELSE 'pending' END;");
     expect(SQL).toContain('app.allow_featured_sync');
