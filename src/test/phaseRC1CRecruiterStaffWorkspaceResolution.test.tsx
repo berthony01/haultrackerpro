@@ -121,6 +121,11 @@ describe('RC-1C candidate migration', () => {
     'utf8',
   );
   const lower = sql.toLowerCase();
+  // Comment-stripped body: prose must never satisfy or break a proof.
+  const body = lower
+    .split('\n')
+    .filter(l => !l.trim().startsWith('--'))
+    .join('\n');
 
   it('defines exactly one new function: get_my_recruiter_staff_workspaces', () => {
     const fns = [...lower.matchAll(/create\s+or\s+replace\s+function\s+public\.([a-z0-9_]+)/g)]
@@ -138,8 +143,8 @@ describe('RC-1C candidate migration', () => {
     expect(lower).toContain("'recruiter_admin'");
     expect(lower).toContain("'recruiter_staff'");
     expect(lower).not.toMatch(/member_role\s*=\s*'recruiter_owner'/);
-    expect(lower).toMatch(/status\s*=\s*'active'/);
-    expect(lower).toMatch(/verification_status\s*(<>|!=)\s*'suspended'/);
+    expect(body).toMatch(/status\s*=\s*'active'/);
+    expect(body).toMatch(/verification_status[^;]*(<>|!=)\s*'suspended'/);
   });
 
   it('exposes safe context columns only', () => {
@@ -151,10 +156,10 @@ describe('RC-1C candidate migration', () => {
       'member_role',
       'member_since',
     ]) {
-      expect(lower).toContain(col);
+      expect(body).toContain(col);
     }
     for (const forbidden of ['stripe', 'billing', 'contact_email', 'dot_number', 'mc_number', 'permissions']) {
-      expect(lower).not.toContain(forbidden);
+      expect(body).not.toContain(forbidden);
     }
   });
 
@@ -165,14 +170,14 @@ describe('RC-1C candidate migration', () => {
   });
 
   it('touches no table, policy, grant, or existing operational function', () => {
-    expect(lower).not.toContain('create table');
-    expect(lower).not.toContain('alter table');
-    expect(lower).not.toContain('create policy');
-    expect(lower).not.toContain('drop policy');
-    expect(lower).not.toContain('current_user_can_manage_recruiter_opportunities');
-    expect(lower).not.toContain('insert into');
-    expect(lower).not.toContain('update public.');
-    expect(lower).not.toContain('delete from');
+    expect(body).not.toContain('create table');
+    expect(body).not.toContain('alter table');
+    expect(body).not.toContain('create policy');
+    expect(body).not.toContain('drop policy');
+    expect(body).not.toContain('current_user_can_manage_recruiter_opportunities');
+    expect(body).not.toContain('insert into');
+    expect(body).not.toContain('update public.');
+    expect(body).not.toContain('delete from');
   });
 });
 
@@ -265,8 +270,9 @@ describe('recruiterStaffWorkspaceStorageKey', () => {
 // E) useViewMode staff overlay
 // =======================================================================
 const capRow = (type: 'driver' | 'recruiter', status: string) => ({
-  capability_type: type,
+  capability: type,
   status,
+  activated_at: null,
 });
 
 function viewModeWith(rows: any[], staff: Partial<typeof staffState>) {
