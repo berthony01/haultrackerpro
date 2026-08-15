@@ -226,7 +226,7 @@ export function RecruiterAccessRoute({
       return <NeutralPanel label="Recruiter workspace unavailable." />;
     }
     return (
-      <StaffWorkspaceHome
+      <StaffWorkspaceRoute
         workspace={selectedStaffWorkspace}
         onChangeStaffWorkspace={onChangeStaffWorkspace}
       />
