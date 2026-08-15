@@ -10,8 +10,8 @@
  * Fail closed: without `canViewApplications` no operational content renders.
  * Status actions require `canManageApplicationStatus`; contact requests
  * require `canRequestApplicationContact`. Client booleans are UX only —
- * PostgreSQL remains authoritative. No notes UI (applications_manage_notes is
- * dormant in RC-1E).
+ * PostgreSQL remains authoritative. No notes UI — the staff notes permission
+ * key stays dormant in RC-1E.
  */
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
