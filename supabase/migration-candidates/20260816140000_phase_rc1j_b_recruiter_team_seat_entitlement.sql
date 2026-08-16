@@ -370,6 +370,8 @@ DECLARE
   _hash text;
   _recruiter_id uuid;
   _lock_id uuid;
+  _limit integer;
+  _occupied integer;
   _row public.recruiter_members%ROWTYPE;
 BEGIN
   IF _uid IS NULL THEN
