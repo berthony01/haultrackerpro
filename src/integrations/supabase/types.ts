@@ -5173,6 +5173,16 @@ export type Database = {
         Args: { _from: string; _recruiter_id: string; _to: string }
         Returns: Json
       }
+      get_recruiter_team_seat_status: {
+        Args: { _recruiter_id: string }
+        Returns: {
+          available_seats: number
+          can_invite: boolean
+          occupied_seats: number
+          seat_limit: number
+          within_limit: boolean
+        }[]
+      }
       get_weekly_driver_leaderboard: {
         Args: { _limit?: number }
         Returns: {
@@ -5204,6 +5214,15 @@ export type Database = {
           _email: string
           _recruiter_id: string
           _role?: Database["public"]["Enums"]["recruiter_member_role"]
+        }
+        Returns: Json
+      }
+      invite_recruiter_member_with_permissions: {
+        Args: {
+          _email: string
+          _permissions: Json
+          _recruiter_id: string
+          _role: Database["public"]["Enums"]["recruiter_member_role"]
         }
         Returns: Json
       }
