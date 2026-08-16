@@ -57,6 +57,10 @@ export interface RecruiterStaffPermissionsState {
   /** Phase RC-1G — contract authorization booleans (UX only). */
   canViewContracts: boolean;
   canManageContracts: boolean;
+  /** Phase RC-1H — reporting authorization booleans (UX only). */
+  canViewReports: boolean;
+  canExportReports: boolean;
+
 
 
   isLoading: boolean;
