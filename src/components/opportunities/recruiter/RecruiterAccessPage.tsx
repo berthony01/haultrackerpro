@@ -155,6 +155,10 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const [readinessOpen, setReadinessOpen] = useState(false);
   // Phase 1T-E1: carrier settlements mount on demand only.
   const [settlementsOpen, setSettlementsOpen] = useState(false);
+  // Phase RC-1J-D: owner Team panel mounts on demand only, same low-risk
+  // pattern as settlements. Never gated by client plan/capability logic —
+  // the server seat-status RPC is authoritative.
+  const [teamOpen, setTeamOpen] = useState(false);
   const readiness = resolveRecruiterReadiness(profile);
 
   const handlePost = () => {
