@@ -430,7 +430,7 @@ describe("AM-1A F — target / assigned member lifecycle", () => {
       const p = policyBody(policy);
       expect(p).toContain("auth.uid()");
       expect(p).toContain("public.is_agency_member(agency_id, auth.uid())");
-      expect(p).toContain("for select");
+      expect(p).toContain("for select\n  to authenticated\n  using (");
       expect(count(exec, `create policy ${policy}`)).toBe(1);
     }
     // No mutation policies are introduced anywhere.
