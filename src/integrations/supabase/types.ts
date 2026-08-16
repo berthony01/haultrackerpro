@@ -5768,6 +5768,18 @@ export type Database = {
           recruiter_id: string
         }[]
       }
+      recruiter_team_occupied_seats: {
+        Args: { _recruiter_id: string }
+        Returns: number
+      }
+      recruiter_team_seat_limit: {
+        Args: { _recruiter_id: string }
+        Returns: number
+      }
+      recruiter_team_workspace_within_limit: {
+        Args: { _recruiter_id: string }
+        Returns: boolean
+      }
       referral_status_rank: { Args: { _s: string }; Returns: number }
       release_business_checkout_claim: {
         Args: {
