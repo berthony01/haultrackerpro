@@ -293,7 +293,7 @@ CREATE POLICY driver_settlement_events_select_recruiter_staff
 --   settlement_update_draft_item         -> settlements_prepare
 --   settlement_delete_draft_item         -> settlements_prepare
 --   settlement_finalize_draft            -> settlements_finalize
---   settlement_void_settlement           -> settlements_finalize
+--   settlement_void_finalized            -> settlements_finalize
 --   settlement_create_correction_draft   -> settlements_prepare AND settlements_finalize
 
 -- ---- settlement_create_carrier_draft ----------------------------------------------------
