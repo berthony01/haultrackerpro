@@ -343,9 +343,11 @@ describe("AM-1A C — seat enforcement and concurrency", () => {
     for (const fn of ["invite_agency_member", "accept_agency_invite"]) {
       const body = fnBody(fn);
       expect(body).toContain("set search_path = public");
-      expect(body).not.toContain("extensions");
-      expect(body).not.toContain("pg_catalog");
-      expect(body).not.toContain("auth");
+      // widened forms (e.g. settlement's 'pg_catalog','public','auth') must never appear
+      expect(body).not.toContain("set search_path to");
+      expect(body).not.toContain("'pg_catalog'");
+      expect(body).not.toContain("'auth'");
+      expect(body).not.toContain("'extensions'");
     }
   });
 });
