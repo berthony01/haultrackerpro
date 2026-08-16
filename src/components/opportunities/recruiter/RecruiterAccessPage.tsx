@@ -511,6 +511,8 @@ function ToolsGrid({
   onApplications,
   settlementsOpen,
   onToggleSettlements,
+  teamOpen,
+  onToggleTeam,
 }: {
   canPost: boolean;
   newRequests: number;
@@ -519,6 +521,8 @@ function ToolsGrid({
   onApplications: () => void;
   settlementsOpen: boolean;
   onToggleSettlements: () => void;
+  teamOpen: boolean;
+  onToggleTeam: () => void;
 }) {
   return (
     <Card className="p-5 border-border/60">
