@@ -176,6 +176,10 @@ export function useRecruiterStaffPermissions(
     canViewSettlements: granted && permissions.settlements_view === true,
     canPrepareSettlements: granted && permissions.settlements_prepare === true,
     canFinalizeSettlements: granted && permissions.settlements_finalize === true,
+    canViewTeam: granted && permissions.team_view === true,
+    canManageTeam:
+      granted && permissions.team_view === true && permissions.team_manage === true,
+
 
 
 
