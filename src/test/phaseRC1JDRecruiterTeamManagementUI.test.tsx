@@ -257,12 +257,12 @@ describe('RC-1J-D — acceptance page', () => {
 describe('RC-1J-D — fail-closed render', () => {
   beforeEach(() => cleanup());
 
-  it('renders the neutral state and fetches nothing without team_view', () => {
+  it('renders the neutral state and fetches nothing without team_view', async () => {
     const rpc = vi.fn();
+    vi.resetModules();
     vi.doMock('@/integrations/supabase/client', () => ({ supabase: { rpc } }));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { RecruiterTeamPanel } = require('@/components/recruiter/RecruiterTeamPanel');
+    const { RecruiterTeamPanel } = await import('@/components/recruiter/RecruiterTeamPanel');
     render(
       <QueryClientProvider client={qc}>
         <RecruiterTeamPanel
