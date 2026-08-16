@@ -163,6 +163,19 @@ function StaffWorkspaceRoute({
     );
   }
 
+  if (staffView === 'reports' && canOpenReports) {
+    return (
+      <RecruiterStaffReportsPanel
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewReports={perms.canViewReports}
+        canExportReports={perms.canExportReports}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+
 
 
 
