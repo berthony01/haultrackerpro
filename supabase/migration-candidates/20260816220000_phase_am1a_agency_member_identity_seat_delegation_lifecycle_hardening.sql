@@ -374,6 +374,7 @@ DECLARE
   _row public.agency_members;
   _existing public.agency_members;
   _locked uuid;
+  _lim record;
   _limit integer;
   _used integer;
   _expiry timestamptz;
