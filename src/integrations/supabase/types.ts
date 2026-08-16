@@ -4841,6 +4841,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      current_user_can_recruiter_referral_action: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
       current_user_has_recruiter_permission: {
         Args: {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
@@ -5128,6 +5135,10 @@ export type Database = {
           topic_cluster: string
           updated_at: string
         }[]
+      }
+      get_recruiter_referral_settings_for_workspace: {
+        Args: { _recruiter_id: string }
+        Returns: Json
       }
       get_weekly_driver_leaderboard: {
         Args: { _limit?: number }
@@ -5588,6 +5599,10 @@ export type Database = {
           revoked_at: string
         }[]
       }
+      list_recruiter_referrals_safe: {
+        Args: { _recruiter_id: string }
+        Returns: Json[]
+      }
       log_assistant_action: {
         Args: {
           _action: string
@@ -5684,6 +5699,15 @@ export type Database = {
       recruiter_profile_can_manage_opportunities: {
         Args: { _recruiter_id: string }
         Returns: boolean
+      }
+      recruiter_referral_authorized_context: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _referral_id: string
+        }
+        Returns: {
+          recruiter_id: string
+        }[]
       }
       referral_status_rank: { Args: { _s: string }; Returns: number }
       release_business_checkout_claim: {
@@ -6560,6 +6584,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      update_recruiter_referral_status: {
+        Args: { _recruiter_id: string; _referral_id: string; _status: string }
+        Returns: boolean
+      }
       upsert_my_professional_profile: {
         Args: {
           p_availability?: string
@@ -6596,6 +6624,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      upsert_recruiter_referral_settings_for_workspace: {
+        Args: {
+          _bonus_amount: number
+          _bonus_terms: string
+          _payment_trigger: string
+          _recruiter_id: string
+          _referral_bonus_enabled: boolean
+          _waiting_period_days: number
+        }
+        Returns: Json
       }
       user_is_marketplace_blocked: {
         Args: { _scope: string; _user_id: string }
