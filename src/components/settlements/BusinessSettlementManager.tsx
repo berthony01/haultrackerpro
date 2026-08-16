@@ -543,8 +543,11 @@ export interface BusinessSettlementManagerProps {
   blockedReason?: string;
   /**
    * Phase RC-1I — OPTIONAL granular presentation gates for recruiter STAFF.
-   * Omitted (owner surfaces) => unchanged behaviour: both follow `canManage`.
-   * These narrow the UI only; PostgreSQL remains the sole authority.
+   * Omitted (owner / Agency surfaces) => unchanged behaviour: each falls back
+   * to `canManage`. A recruiter STAFF caller intentionally passes
+   * `canManage={false}` while a granular permission may still be true, so these
+   * are NEVER AND-ed with `canManage`. They narrow the UI only; PostgreSQL
+   * remains the sole authority.
    */
   canPrepare?: boolean;
   canFinalize?: boolean;
@@ -559,8 +562,10 @@ export function BusinessSettlementManager({
   canPrepare,
   canFinalize,
 }: BusinessSettlementManagerProps) {
-  const allowPrepare = canManage && (canPrepare ?? true);
-  const allowFinalize = canManage && (canFinalize ?? true);
+  const effectiveCanPrepare = canPrepare ?? canManage;
+  const effectiveCanFinalize = canFinalize ?? canManage;
+  const allowPrepare = effectiveCanPrepare;
+  const allowFinalize = effectiveCanFinalize;
   const settlementsQuery = useVisibleSettlements();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Narrow, short-lived hold of the EXACT row an accepted RPC just returned, so
