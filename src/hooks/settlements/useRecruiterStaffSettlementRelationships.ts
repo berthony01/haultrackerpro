@@ -96,7 +96,8 @@ export function parseRecruiterStaffSettlementRelationships(
     ) {
       return null;
     }
-    if (!(row.accepted_at === null || typeof row.accepted_at === 'string')) {
+    const acceptedAt = row.accepted_at;
+    if (!(acceptedAt === null || typeof acceptedAt === 'string')) {
       return null;
     }
 
@@ -105,7 +106,7 @@ export function parseRecruiterStaffSettlementRelationships(
       driverUserId: row.driver_user_id,
       driverName: row.driver_name,
       invitedAt: row.invited_at,
-      acceptedAt: row.accepted_at,
+      acceptedAt,
     });
   }
   return out;
