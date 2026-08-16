@@ -158,18 +158,19 @@ GRANT EXECUTE ON FUNCTION public.settlement_current_user_can_recruiter_staff_rel
 -- ---------------------------------------------------------------------------
 -- C) Staff relationship listing RPC (settlements_view only)
 -- ---------------------------------------------------------------------------
--- Minimal projection: relationship identity + status + timestamps. No driver
--- contact data, no financial data, no billing data.
-CREATE OR REPLACE FUNCTION public.list_recruiter_staff_settlement_relationships(
+-- Minimal projection: relationship id, driver id, a safe display name and the
+-- two lifecycle timestamps. NO status, NO recruiter_id, NO created_at, NO
+-- phone / email / address / contact preference / application notes / billing.
+DROP FUNCTION IF EXISTS public.list_recruiter_staff_settlement_relationships(uuid);
+CREATE FUNCTION public.list_recruiter_staff_settlement_relationships(
   _recruiter_id uuid
 )
 RETURNS TABLE (
-  id uuid,
-  recruiter_id uuid,
+  relationship_id uuid,
   driver_user_id uuid,
-  status text,
-  accepted_at timestamptz,
-  created_at timestamptz
+  driver_name text,
+  invited_at timestamptz,
+  accepted_at timestamptz
 )
 LANGUAGE plpgsql
 STABLE
@@ -184,16 +185,20 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT r.id,
-         r.recruiter_id,
+  SELECT r.id AS relationship_id,
          r.driver_user_id,
-         r.status,
-         r.accepted_at,
-         r.created_at
+         COALESCE(
+           NULLIF(btrim(COALESCE(dop.full_name, '')), ''),
+           'Connected driver'
+         )::text AS driver_name,
+         r.invited_at,
+         r.accepted_at
   FROM public.carrier_driver_relationships r
+  LEFT JOIN public.driver_opportunity_profiles dop
+    ON dop.user_id = r.driver_user_id
   WHERE r.recruiter_id = _recruiter_id
     AND r.status = 'active'
-  ORDER BY r.created_at ASC;
+  ORDER BY COALESCE(r.accepted_at, r.invited_at), r.id;
 END;
 $function$;
 
