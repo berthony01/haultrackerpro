@@ -27,6 +27,8 @@ import { useRecruiterStaffPermissions } from '@/hooks/recruiter/useRecruiterStaf
 import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboard';
 import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicationsDashboard';
 import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
+import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterStaffContractsView';
+
 
 
 import {
