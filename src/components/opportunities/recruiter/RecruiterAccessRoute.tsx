@@ -28,6 +28,8 @@ import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboar
 import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicationsDashboard';
 import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
 import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterStaffContractsView';
+import { RecruiterStaffReportsPanel } from '@/components/recruiter/RecruiterStaffReportsPanel';
+
 
 
 
@@ -75,8 +77,9 @@ function StaffWorkspaceRoute({
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
   const [staffView, setStaffView] = useState<
-    'home' | 'opportunities' | 'applications' | 'referrals' | 'contracts'
+    'home' | 'opportunities' | 'applications' | 'referrals' | 'contracts' | 'reports'
   >('home');
+
 
 
   const roleLabel =
@@ -97,6 +100,11 @@ function StaffWorkspaceRoute({
   // `contracts_manage` does NOT open the surface on its own.
   const canOpenContracts =
     !perms.isLoading && !perms.error && perms.canViewContracts;
+  // Phase RC-1H — reports entry point, same fail-closed contract.
+  // `reports_export` does NOT open the surface on its own.
+  const canOpenReports =
+    !perms.isLoading && !perms.error && perms.canViewReports;
+
 
 
 
@@ -154,6 +162,19 @@ function StaffWorkspaceRoute({
       />
     );
   }
+
+  if (staffView === 'reports' && canOpenReports) {
+    return (
+      <RecruiterStaffReportsPanel
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewReports={perms.canViewReports}
+        canExportReports={perms.canExportReports}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
 
 
 
@@ -217,6 +238,16 @@ function StaffWorkspaceRoute({
             className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
           >
             Manage Contracts
+          </button>
+        )}
+        {canOpenReports && (
+          <button
+            type="button"
+            onClick={() => setStaffView('reports')}
+            data-testid="staff-open-reports"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            Manage Reports
           </button>
         )}
 

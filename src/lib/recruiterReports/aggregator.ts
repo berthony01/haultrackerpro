@@ -20,7 +20,14 @@ export interface RecruiterReportHeader {
   planStatus: string;
   activeLimit: number;
   activeCount: number;
+  /**
+   * Phase RC-1H — optional privacy discriminator. Absent (or 'owner') keeps
+   * the existing owner report output byte-identical. 'staff' instructs the
+   * CSV/PDF renderers to omit every plan/billing/premium/upgrade line.
+   */
+  audience?: 'owner' | 'staff';
 }
+
 
 export interface AppRow {
   id: string;
