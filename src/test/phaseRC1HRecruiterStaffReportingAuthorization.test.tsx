@@ -263,40 +263,282 @@ describe('RC-1H — staff report hook', () => {
     expect(REPORT_HOOK).toContain('range?.to');
   });
 
-  it('normalizes payloads fail-closed', () => {
-    const range = { from: '2026-01-01', to: '2026-01-31', label: 'x' };
+  const range = { from: '2026-01-01', to: '2026-01-31', label: 'Jan 2026' };
+
+  const validHeader = () => ({
+    companyName: 'Acme Carriers',
+    recruiterName: 'Dana',
+    verificationStatus: 'verified',
+    audience: 'staff',
+    plan: 'workspace',
+    planStatus: 'authorized',
+    activeLimit: 0,
+    activeCount: 3,
+  });
+
+  const validRows = () => ({
+    opportunities: [
+      {
+        id: 'opp-1',
+        title: 'Regional OTR',
+        status: 'active',
+        view_count: 12,
+        published_at: '2026-01-02T00:00:00Z',
+      },
+    ],
+    applications: [
+      {
+        id: 'app-1',
+        opportunity_id: 'opp-1',
+        status: 'interview',
+        created_at: '2026-01-03T00:00:00Z',
+        updated_at: '2026-01-04T00:00:00Z',
+      },
+    ],
+    events: [
+      {
+        application_id: 'app-1',
+        event_type: 'status_change',
+        created_at: '2026-01-04T00:00:00Z',
+      },
+    ],
+    contactRequests: [
+      { id: 'cr-1', status: 'approved', created_at: '2026-01-05T00:00:00Z' },
+    ],
+    contracts: [
+      {
+        id: 'ct-1',
+        application_id: 'app-1',
+        status: 'approved',
+        updated_at: '2026-01-06T00:00:00Z',
+      },
+    ],
+  });
+
+  const validPayload = () => ({
+    header: validHeader(),
+    range: { from: '2026-01-01', to: '2026-01-31', label: '2026-01-01 to 2026-01-31' },
+    ...validRows(),
+  });
+
+  const COLLECTIONS = [
+    'opportunities',
+    'applications',
+    'events',
+    'contactRequests',
+    'contracts',
+  ] as const;
+
+  it('rejects non-plain-object payloads', () => {
     expect(normalizeRecruiterStaffReportPayload(null, range)).toBeNull();
+    expect(normalizeRecruiterStaffReportPayload(undefined, range)).toBeNull();
     expect(normalizeRecruiterStaffReportPayload('nope', range)).toBeNull();
+    expect(normalizeRecruiterStaffReportPayload(42, range)).toBeNull();
     expect(normalizeRecruiterStaffReportPayload([], range)).toBeNull();
     expect(normalizeRecruiterStaffReportPayload({ header: {} }, range)).toBeNull();
+    class Exotic {}
+    expect(
+      normalizeRecruiterStaffReportPayload(Object.assign(new Exotic(), validPayload()), range),
+    ).toBeNull();
+  });
 
-    const ok = normalizeRecruiterStaffReportPayload(
-      {
-        header: {
-          companyName: 'Acme Carriers',
-          recruiterName: 'Dana',
-          verificationStatus: 'verified',
-          audience: 'staff',
-          plan: 'fleet',
-          planStatus: 'active',
-          activeLimit: 99,
-          activeCount: 3,
+  it('rejects a payload missing any required collection', () => {
+    for (const key of COLLECTIONS) {
+      const p = validPayload() as Record<string, unknown>;
+      delete p[key];
+      expect(normalizeRecruiterStaffReportPayload(p, range)).toBeNull();
+    }
+    for (const key of ['header', 'range']) {
+      const p = validPayload() as Record<string, unknown>;
+      delete p[key];
+      expect(normalizeRecruiterStaffReportPayload(p, range)).toBeNull();
+    }
+  });
+
+  it('rejects a non-array collection', () => {
+    for (const key of COLLECTIONS) {
+      for (const bad of [null, {}, 'x', 5]) {
+        const p = { ...validPayload(), [key]: bad };
+        expect(normalizeRecruiterStaffReportPayload(p, range)).toBeNull();
+      }
+    }
+  });
+
+  it('rejects the WHOLE payload when one row is malformed — never filters', () => {
+    const malformed: Record<string, unknown[]> = {
+      opportunities: [
+        { id: '', title: 't', status: 's', view_count: 1, published_at: null },
+        { id: 'o', title: 5, status: 's', view_count: 1, published_at: null },
+        { id: 'o', title: 't', status: 's', view_count: 'many', published_at: null },
+        null,
+      ],
+      applications: [
+        { id: 'a', opportunity_id: '', status: 's', created_at: 'x', updated_at: 'y' },
+        { id: 'a', opportunity_id: 'o', status: 's', created_at: '', updated_at: 'y' },
+        { id: 'a', opportunity_id: 'o', status: 's', created_at: 'x', updated_at: null },
+      ],
+      events: [
+        { application_id: 'a', event_type: '', created_at: 'x' },
+        { application_id: 'a', event_type: 'e', created_at: 3 },
+      ],
+      contactRequests: [
+        { id: '', status: 's', created_at: 'x' },
+        { id: 'c', status: null, created_at: 'x' },
+      ],
+      contracts: [
+        { id: 'c', application_id: '', status: 's', updated_at: 'x' },
+        { id: 'c', application_id: 'a', status: 's', updated_at: '' },
+      ],
+    };
+    for (const key of COLLECTIONS) {
+      for (const badRow of malformed[key]) {
+        const base = validPayload() as Record<string, unknown>;
+        // Prepend a GOOD row so filtering (instead of rejecting) would still
+        // have produced a non-null result.
+        const good = (validRows() as Record<string, unknown[]>)[key][0];
+        const p = { ...base, [key]: [good, badRow] };
+        expect(normalizeRecruiterStaffReportPayload(p, range)).toBeNull();
+      }
+    }
+  });
+
+  it('rejects an unsafe or incomplete header', () => {
+    const bads: Record<string, unknown>[] = [
+      { audience: 'owner' },
+      { audience: undefined },
+      { plan: 'fleet' },
+      { plan: 'growth' },
+      { planStatus: 'active' },
+      { planStatus: 'trialing' },
+      { activeLimit: 99 },
+      { activeLimit: '0' },
+      { activeCount: -1 },
+      { activeCount: 'three' },
+      { activeCount: Number.NaN },
+      { companyName: '' },
+      { recruiterName: '' },
+      { verificationStatus: 7 },
+    ];
+    for (const patch of bads) {
+      const p = { ...validPayload(), header: { ...validHeader(), ...patch } };
+      expect(normalizeRecruiterStaffReportPayload(p, range)).toBeNull();
+    }
+    // Missing header key entirely.
+    const missing = validPayload();
+    delete (missing.header as Record<string, unknown>).audience;
+    expect(normalizeRecruiterStaffReportPayload(missing, range)).toBeNull();
+    // Header must be a plain object.
+    expect(
+      normalizeRecruiterStaffReportPayload({ ...validPayload(), header: [] }, range),
+    ).toBeNull();
+  });
+
+  it('rejects a server range that does not match the requested range', () => {
+    for (const bad of [
+      { from: '2025-12-01', to: '2026-01-31', label: 'x' },
+      { from: '2026-01-01', to: '2026-02-28', label: 'x' },
+      { from: '2026-01-01', to: '2026-01-31', label: 7 },
+      { from: '2026-01-01', label: 'x' },
+    ]) {
+      const p = { ...validPayload(), range: bad };
+      expect(normalizeRecruiterStaffReportPayload(p, range)).toBeNull();
+    }
+    expect(
+      normalizeRecruiterStaffReportPayload({ ...validPayload(), range: null }, range),
+    ).toBeNull();
+  });
+
+  it('rejects unknown keys at every level — future PII/billing fails closed', () => {
+    // Top level
+    expect(
+      normalizeRecruiterStaffReportPayload(
+        { ...validPayload(), stripe_customer_id: 'cus_123' },
+        range,
+      ),
+    ).toBeNull();
+    // Header
+    expect(
+      normalizeRecruiterStaffReportPayload(
+        {
+          ...validPayload(),
+          header: { ...validHeader(), driver_email_snapshot: 'a@b.com' },
         },
-        opportunities: [],
-        applications: [],
-        events: [],
-        contactRequests: [],
-        contracts: [],
-      },
-      range,
-    );
+        range,
+      ),
+    ).toBeNull();
+    // Range
+    expect(
+      normalizeRecruiterStaffReportPayload(
+        {
+          ...validPayload(),
+          range: {
+            from: '2026-01-01',
+            to: '2026-01-31',
+            label: 'x',
+            stripe_customer_id: 'cus_1',
+          },
+        },
+        range,
+      ),
+    ).toBeNull();
+    // Each row type
+    const extras: Record<string, Record<string, unknown>> = {
+      opportunities: { driver_email_snapshot: 'a@b.com' },
+      applications: { driver_user_id: 'u1' },
+      events: { driver_note: 'hi' },
+      contactRequests: { driver_phone: '555' },
+      contracts: { extracted_text: 'secret' },
+    };
+    for (const key of COLLECTIONS) {
+      const rows = validRows() as Record<string, Record<string, unknown>[]>;
+      const p = {
+        ...validPayload(),
+        [key]: [{ ...rows[key][0], ...extras[key] }],
+      };
+      expect(normalizeRecruiterStaffReportPayload(p, range)).toBeNull();
+    }
+  });
+
+  it('normalizes an exact staff-safe payload and retains the requested range', () => {
+    const ok = normalizeRecruiterStaffReportPayload(validPayload(), range);
     expect(ok).not.toBeNull();
-    // Server-provided plan/billing values are never trusted or surfaced.
+    expect(ok!.header.companyName).toBe('Acme Carriers');
+    expect(ok!.header.recruiterName).toBe('Dana');
+    expect(ok!.header.verificationStatus).toBe('verified');
     expect(ok!.header.plan).toBe('workspace');
     expect(ok!.header.planStatus).toBe('authorized');
     expect(ok!.header.activeLimit).toBe(0);
+    expect(ok!.header.activeCount).toBe(3);
     expect(ok!.header.audience).toBe('staff');
+    expect(ok!.range).toEqual(range);
+    expect(ok!.opportunities).toHaveLength(1);
+    expect(ok!.applications).toHaveLength(1);
+    expect(ok!.events).toHaveLength(1);
+    expect(ok!.contactRequests).toHaveLength(1);
+    expect(ok!.contracts).toHaveLength(1);
+    // Nullable server fields are accepted verbatim, not coerced.
+    const withNulls = validPayload();
+    (withNulls.opportunities[0] as Record<string, unknown>).view_count = null;
+    (withNulls.opportunities[0] as Record<string, unknown>).published_at = null;
+    const ok2 = normalizeRecruiterStaffReportPayload(withNulls, range);
+    expect(ok2).not.toBeNull();
+    expect(ok2!.opportunities[0].view_count).toBeNull();
+    expect(ok2!.opportunities[0].published_at).toBeNull();
   });
+
+  it('accepts empty collections', () => {
+    const empty = {
+      header: validHeader(),
+      range: { from: '2026-01-01', to: '2026-01-31', label: 'x' },
+      opportunities: [],
+      applications: [],
+      events: [],
+      contactRequests: [],
+      contracts: [],
+    };
+    expect(normalizeRecruiterStaffReportPayload(empty, range)).not.toBeNull();
+  });
+
 });
 
 describe('RC-1H — route wiring', () => {
