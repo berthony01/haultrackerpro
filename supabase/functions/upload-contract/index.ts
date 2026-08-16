@@ -91,11 +91,36 @@ serve(async (req) => {
     const rp = (appRow as any).recruiter_profiles;
     if (
       !rp ||
-      rp.user_id !== userId ||
       rp.status === "suspended" ||
       rp.verification_status === "suspended" ||
       rp.verification_status !== "approved"
     ) {
+      return json({ error: "Not authorized for this application" }, 403);
+    }
+
+    // Canonical recruiter-profile OWNER. Staff never become the contract owner.
+    const ownerUserId = rp.user_id as string;
+    const isOwner = ownerUserId === userId;
+
+    // Phase RC-1G — recruiter STAFF authorization. Never a role label: the
+    // database helper requires active membership + posting readiness + the
+    // explicit `contracts_manage` RC-1B boolean + standalone Growth/Fleet
+    // billing. Called through the USER client so auth.uid() is the real
+    // staff caller.
+    let isAuthorizedStaff = false;
+    if (!isOwner) {
+      const { data: staffOk, error: staffErr } = await userClient.rpc(
+        "current_user_can_recruiter_contract_action",
+        { _recruiter_id: appRow.recruiter_id, _permission: "contracts_manage" },
+      );
+      if (staffErr) {
+        console.error("[upload-contract] staff authz", staffErr);
+        return json({ error: "Could not verify contract access." }, 500);
+      }
+      isAuthorizedStaff = staffOk === true;
+    }
+
+    if (!isOwner && !isAuthorizedStaff) {
       return json({ error: "Not authorized for this application" }, 403);
     }
 
@@ -131,7 +156,10 @@ serve(async (req) => {
           application_id,
           opportunity_id: appRow.opportunity_id,
           recruiter_id: appRow.recruiter_id,
-          recruiter_user_id: userId,
+          // ALWAYS the canonical recruiter-profile owner, even for a
+          // staff-initiated upload. The staff caller is recorded only in the
+          // audit actor fields below.
+          recruiter_user_id: ownerUserId,
           driver_user_id: appRow.driver_user_id,
           status: "uploaded",
           title: titleInput,
@@ -141,6 +169,7 @@ serve(async (req) => {
       if (createErr || !created) { console.error("[upload-contract] contract create", createErr); return json({ error: "Could not create contract." }, 500); }
       contractId = created.id;
     }
+
 
     // 6. Determine next version number
     const { data: versionAgg, error: aggErr } = await admin
