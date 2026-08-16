@@ -77,8 +77,9 @@ function StaffWorkspaceRoute({
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
   const [staffView, setStaffView] = useState<
-    'home' | 'opportunities' | 'applications' | 'referrals' | 'contracts'
+    'home' | 'opportunities' | 'applications' | 'referrals' | 'contracts' | 'reports'
   >('home');
+
 
 
   const roleLabel =
@@ -99,6 +100,11 @@ function StaffWorkspaceRoute({
   // `contracts_manage` does NOT open the surface on its own.
   const canOpenContracts =
     !perms.isLoading && !perms.error && perms.canViewContracts;
+  // Phase RC-1H — reports entry point, same fail-closed contract.
+  // `reports_export` does NOT open the surface on its own.
+  const canOpenReports =
+    !perms.isLoading && !perms.error && perms.canViewReports;
+
 
 
 
