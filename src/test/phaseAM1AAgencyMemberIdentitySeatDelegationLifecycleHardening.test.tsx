@@ -75,7 +75,11 @@ describe("AM-1A — scope + envelope", () => {
     } catch {
       changed = [];
     }
+    // The platform auto-regenerates src/integrations/supabase/types.ts out-of-band;
+    // it is a generated artifact off-limits to AM-1A, not an AM-1A-authored change.
+    const KNOWN_AUTO_REGEN = ["src/integrations/supabase/types.ts"];
     for (const file of changed) {
+      if (KNOWN_AUTO_REGEN.includes(file)) continue;
       expect([SQL_REL, TEST_REL]).toContain(file);
     }
   });
@@ -282,7 +286,7 @@ describe("AM-1A C — seat enforcement and concurrency", () => {
     const body = fnBody("invite_agency_member");
     const activeGuard = body.indexOf("_existing.status = 'active'");
     expect(activeGuard).toBeGreaterThan(-1);
-    expect(activeGuard).toBeLessThan(body.indexOf("gen_random_bytes(24)"));
+    expect(activeGuard).toBeLessThan(body.indexOf("extensions.gen_random_bytes(24)"));
     expect(activeGuard).toBeLessThan(body.indexOf("insert into public.agency_members"));
   });
 
@@ -295,8 +299,8 @@ describe("AM-1A C — seat enforcement and concurrency", () => {
 
   it("stores only the SHA-256 hash and returns the raw token once", () => {
     const body = fnBody("invite_agency_member");
-    expect(body).toContain("encode(gen_random_bytes(24),'hex')");
-    expect(body).toContain("encode(digest(_t,'sha256'),'hex')");
+    expect(body).toContain("encode(extensions.gen_random_bytes(24),'hex')");
+    expect(body).toContain("encode(extensions.digest(_t,'sha256'),'hex')");
     expect(body).toContain("'invite_token',_t");
     expect(body).toContain("invite_token_hash");
   });
@@ -325,6 +329,30 @@ describe("AM-1A C — seat enforcement and concurrency", () => {
     expect(body).toContain("am2.member_user_id=_uid");
     expect(body).toContain("invite_token_hash=null, invite_expires_at=null");
     expect(count(body, "invite invalid or not addressed to your email")).toBeGreaterThanOrEqual(3);
+  });
+
+  it("schema-qualifies all three pgcrypto calls against the extensions schema", () => {
+    const invite = fnBody("invite_agency_member");
+    expect(invite).toContain("extensions.gen_random_bytes(24)");
+    expect(invite).toContain("extensions.digest(_t,'sha256')");
+    expect(invite).not.toContain("(gen_random_bytes(24)");
+    expect(invite).not.toContain("(digest(_t");
+
+    const accept = fnBody("accept_agency_invite");
+    expect(accept).toContain("extensions.digest(coalesce(_token,''),'sha256')");
+    expect(accept).not.toContain("(digest(coalesce(_token,'')");
+  });
+
+  it("invite/accept keep a fixed search_path = public and never widen it", () => {
+    for (const fn of ["invite_agency_member", "accept_agency_invite"]) {
+      const body = fnBody(fn);
+      expect(body).toContain("set search_path = public");
+      // widened forms (e.g. settlement's 'pg_catalog','public','auth') must never appear
+      expect(body).not.toContain("set search_path to");
+      expect(body).not.toContain("'pg_catalog'");
+      expect(body).not.toContain("'auth'");
+      expect(body).not.toContain("'extensions'");
+    }
   });
 });
 

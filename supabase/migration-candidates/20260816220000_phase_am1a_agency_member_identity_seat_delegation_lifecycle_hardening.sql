@@ -452,8 +452,8 @@ BEGIN
   END IF;
 
   -- 24-byte cryptographic token; only the SHA-256 hash is ever stored.
-  _t := encode(gen_random_bytes(24),'hex');
-  _h := encode(digest(_t,'sha256'),'hex');
+  _t := encode(extensions.gen_random_bytes(24),'hex');
+  _h := encode(extensions.digest(_t,'sha256'),'hex');
 
   INSERT INTO public.agency_members(agency_id,invite_email,invite_token_hash,role,status,invite_expires_at)
   VALUES (_agency_id,_en,_h,_role,'pending',_expiry)
@@ -476,7 +476,7 @@ SET search_path = public
 AS $$
 DECLARE
   _uid uuid := auth.uid();
-  _h text := encode(digest(coalesce(_token,''),'sha256'),'hex');
+  _h text := encode(extensions.digest(coalesce(_token,''),'sha256'),'hex');
   _em text;
   _agency_id uuid;
   _locked uuid;
