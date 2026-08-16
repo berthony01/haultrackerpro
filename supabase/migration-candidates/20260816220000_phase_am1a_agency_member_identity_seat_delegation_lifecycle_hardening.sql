@@ -431,14 +431,14 @@ BEGIN
       -- no seat, but must still fail if the workspace is already over limit.
       IF _limit IS NOT NULL AND _used > _limit THEN
         RAISE EXCEPTION 'Your % plan allows up to % agency members. Upgrade your agency plan to invite more.',
-          public._agency_plan_label((SELECT plan_key FROM public.get_effective_agency_limits(_agency_id))), _limit
+          public._agency_plan_label(_lim.plan_key), _limit
           USING ERRCODE='P0001';
       END IF;
     ELSE
       -- Expired pending invite freed its seat: refreshing consumes one again.
       IF _limit IS NOT NULL AND _used >= _limit THEN
         RAISE EXCEPTION 'Your % plan allows up to % agency members. Upgrade your agency plan to invite more.',
-          public._agency_plan_label((SELECT plan_key FROM public.get_effective_agency_limits(_agency_id))), _limit
+          public._agency_plan_label(_lim.plan_key), _limit
           USING ERRCODE='P0001';
       END IF;
     END IF;
@@ -446,7 +446,7 @@ BEGIN
     -- Brand-new or previously revoked email: must have an available seat.
     IF _limit IS NOT NULL AND _used >= _limit THEN
       RAISE EXCEPTION 'Your % plan allows up to % agency members. Upgrade your agency plan to invite more.',
-        public._agency_plan_label((SELECT plan_key FROM public.get_effective_agency_limits(_agency_id))), _limit
+        public._agency_plan_label(_lim.plan_key), _limit
         USING ERRCODE='P0001';
     END IF;
   END IF;
