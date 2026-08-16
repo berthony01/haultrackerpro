@@ -45,12 +45,14 @@ export function RecruiterStaffSettlementsPanel({
   const { relationships, isLoading, error, refetch } =
     useRecruiterStaffSettlementRelationships(recruiterId, enabled);
 
+  // Safe display name comes from the RPC projection only. A raw UUID is never
+  // used as a UI label.
   const driverOptions: readonly BusinessDriverOption[] = useMemo(
     () =>
       relationships.map((relationship) => ({
         driverUserId: relationship.driverUserId,
-        label: 'Connected driver',
-        relationshipId: relationship.id,
+        label: relationship.driverName,
+        relationshipId: relationship.relationshipId,
       })),
     [relationships],
   );
