@@ -438,7 +438,26 @@ BEGIN
   -- adds none. It must still fail when the workspace is currently OVER its
   -- allowed limit (e.g. downgrade or cancellation after the invitation).
   -- No other member is ever auto-revoked to make room.
-  IF NOT public.recruiter_team_workspace_within_limit(_row.recruiter_id) THEN
+  --
+  -- RC-1J-B CONCURRENCY CORRECTION: recount occupied seats with a DIRECT
+  -- statement inside this VOLATILE function AFTER both the workspace and
+  -- membership locks. A STABLE helper would reuse the pre-wait snapshot.
+  SELECT 1 + count(*)::integer INTO _occupied
+    FROM public.recruiter_members m
+   WHERE m.recruiter_id = _row.recruiter_id
+     AND m.role <> 'recruiter_owner'
+     AND (
+       m.status = 'active'
+       OR (
+         m.status = 'pending'
+         AND m.invite_expires_at IS NOT NULL
+         AND m.invite_expires_at > now()
+       )
+     );
+
+  _limit := public.recruiter_team_seat_limit(_row.recruiter_id);
+
+  IF _limit IS NULL OR _limit < 1 OR _occupied > _limit THEN
     RAISE EXCEPTION 'Team seat limit reached' USING ERRCODE = '22023';
   END IF;
 
