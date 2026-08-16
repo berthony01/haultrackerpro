@@ -282,7 +282,7 @@ describe("AM-1A C — seat enforcement and concurrency", () => {
     const body = fnBody("invite_agency_member");
     const activeGuard = body.indexOf("_existing.status = 'active'");
     expect(activeGuard).toBeGreaterThan(-1);
-    expect(activeGuard).toBeLessThan(body.indexOf("gen_random_bytes(24)"));
+    expect(activeGuard).toBeLessThan(body.indexOf("extensions.gen_random_bytes(24)"));
     expect(activeGuard).toBeLessThan(body.indexOf("insert into public.agency_members"));
   });
 
