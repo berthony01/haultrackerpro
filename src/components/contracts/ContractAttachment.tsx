@@ -16,7 +16,19 @@ interface Props {
   applicationId: string;
   /** 'recruiter' shows upload + replace; 'driver' shows view-only. */
   role: 'recruiter' | 'driver';
+  /**
+   * Phase RC-1G — recruiter-side MUTATION gate.
+   *
+   * Defaults to `true` so all existing owner recruiter call sites and all
+   * driver behavior are byte-for-byte unchanged. Recruiter STAFF mount this
+   * with the RC-1B `contracts_manage` boolean: `contracts_view` staff still
+   * see and open the document, but Attach/Upload New Version, Prepare AI
+   * Review, and Run AI Risk Review are withheld. UX only — PostgreSQL and the
+   * contract Edge Functions remain authoritative.
+   */
+  canManageRecruiterContract?: boolean;
 }
+
 
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_BYTES = 25 * 1024 * 1024;
