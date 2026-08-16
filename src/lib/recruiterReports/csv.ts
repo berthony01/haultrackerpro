@@ -12,6 +12,8 @@ const labelStatus = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, c => c.
 export function buildRecruiterReportCSV(type: RecruiterReportType, data: RecruiterReportData): string {
   const lines: string[] = [];
   const title = REPORT_TYPE_LABEL[type];
+  // Phase RC-1H — staff output never reveals plan/billing/entitlement state.
+  const isStaff = data.header.audience === 'staff';
 
   lines.push(row(`HaulTrackerPro — ${title}`));
   lines.push(row('Website', 'haultrackerpro.com'));
@@ -19,12 +21,15 @@ export function buildRecruiterReportCSV(type: RecruiterReportType, data: Recruit
   lines.push(row('Recruiter', data.header.recruiterName));
   lines.push(row('Date Range', `${data.range.from} to ${data.range.to}`));
   lines.push(row('Generated', data.generatedAt));
-  lines.push(row('Plan', labelStatus(data.header.plan)));
-  lines.push(row('Billing Status', labelStatus(data.header.planStatus)));
-  lines.push(row('Standard Posting', 'Unlimited after verification'));
-  lines.push(row('Premium Tools', data.header.plan === 'growth' || data.header.plan === 'fleet' ? 'Active' : 'Upgrade to Growth'));
-  lines.push(row('Priority Placement', data.header.plan === 'growth' || data.header.plan === 'fleet' ? 'Included' : 'Upgrade to Growth'));
+  if (!isStaff) {
+    lines.push(row('Plan', labelStatus(data.header.plan)));
+    lines.push(row('Billing Status', labelStatus(data.header.planStatus)));
+    lines.push(row('Standard Posting', 'Unlimited after verification'));
+    lines.push(row('Premium Tools', data.header.plan === 'growth' || data.header.plan === 'fleet' ? 'Active' : 'Upgrade to Growth'));
+    lines.push(row('Priority Placement', data.header.plan === 'growth' || data.header.plan === 'fleet' ? 'Included' : 'Upgrade to Growth'));
+  }
   lines.push(blank());
+
 
   lines.push(row('EXECUTIVE SUMMARY'));
   lines.push(row('Metric', 'Value'));

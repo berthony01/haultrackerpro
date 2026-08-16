@@ -35,6 +35,10 @@ function drawHeader(doc: JsPDFType, type: RecruiterReportType, data: RecruiterRe
   doc.text(`Recruiter: ${data.header.recruiterName}`, 14, y + 5);
   doc.text(`Date Range: ${data.range.from} to ${data.range.to}`, 14, y + 10);
   doc.text(`Generated: ${data.generatedAt}`, 14, y + 15);
+  // Phase RC-1H — staff output never reveals plan/billing/entitlement state.
+  if (data.header.audience === 'staff') {
+    return y + 23;
+  }
   const isPremium = data.header.plan === 'growth' || data.header.plan === 'fleet';
   doc.text(
     `Plan: ${labelStatus(data.header.plan)} (${labelStatus(data.header.planStatus)})`,
@@ -46,6 +50,7 @@ function drawHeader(doc: JsPDFType, type: RecruiterReportType, data: RecruiterRe
   );
   return y + 33;
 }
+
 
 function drawFooter(doc: JsPDFType) {
   const pageCount = doc.getNumberOfPages();
