@@ -1,11 +1,12 @@
 /**
  * Phase RC-1G — recruiter STAFF Contracts workspace.
  *
- * Isolated staff surface. Modeled visually on the owner `RecruiterContractsView`
- * but deliberately imports NONE of the owner surfaces: no `RecruiterContractsView`,
- * no `useRecruiterProfile`, no `useRecruiterBilling`, no checkout/upgrade UI, no
- * Agency UI, no reports, no settlements, no referrals, and no owner application
- * hooks. All list data comes from the RC-1G safe pipeline RPC.
+ * Isolated staff surface. Modeled visually on the owner contracts workspace
+ * but deliberately imports NONE of the owner surfaces: no owner contracts view,
+ * no recruiter profile hook, no recruiter billing hook, no billing/upgrade UI,
+ * no Agency UI, no reports, no settlements, no referrals, and no owner
+ * application hooks. All list data comes from the RC-1G safe pipeline RPC.
+
  *
  * `contracts_view` gates the whole surface (fail closed). `contracts_manage`
  * independently gates the recruiter mutation controls inside ContractAttachment.
