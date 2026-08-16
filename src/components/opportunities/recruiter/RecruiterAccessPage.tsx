@@ -350,6 +350,8 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               onApplications={onApplications}
               settlementsOpen={settlementsOpen}
               onToggleSettlements={() => setSettlementsOpen((v) => !v)}
+              teamOpen={teamOpen}
+              onToggleTeam={() => setTeamOpen((v) => !v)}
             />
 
             {settlementsOpen && (
@@ -360,6 +362,18 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                 className="scroll-mt-24 outline-none"
               >
                 <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+              </div>
+            )}
+
+            {teamOpen && profile?.id && (
+              <div data-testid="recruiter-team-anchor" className="scroll-mt-24">
+                <RecruiterTeamPanel
+                  recruiterId={profile.id}
+                  companyName={profile.company_name ?? 'Your workspace'}
+                  canViewTeam
+                  canManageTeam
+                  isOwnerActor
+                />
               </div>
             )}
 
