@@ -289,11 +289,32 @@ describe("RC-1J-B — invite seat enforcement", () => {
     expect(body).not.toContain("lock table");
   });
 
-  it("6e. counts seats only after the workspace lock is held (serialized)", () => {
-    const profileLock = body.indexOf("for update");
-    const seatCount = body.indexOf("public.recruiter_team_occupied_seats(_recruiter_id)");
-    expect(seatCount).toBeGreaterThan(profileLock);
+  it("6e. recounts seats with a DIRECT count AFTER both locks (no STABLE helper)", () => {
+    const profileLock = body.indexOf("from public.recruiter_profiles rp\n   where rp.id = _recruiter_id\n   for update");
+    const memberLock = body.indexOf("from public.recruiter_members m\n   where m.recruiter_id = _recruiter_id");
+    const directCount = body.indexOf("select 1 + count(*)::integer into _occupied");
+    expect(directCount).toBeGreaterThan(profileLock);
+    expect(directCount).toBeGreaterThan(memberLock);
+    // The STABLE helper would reuse the pre-wait snapshot: it must NOT be used
+    // for the post-lock capacity decision.
+    expect(body).not.toContain("recruiter_team_occupied_seats");
+    expect(body).not.toContain("recruiter_team_workspace_within_limit");
   });
+
+  it("6e2. the direct recount uses the canonical occupied predicate (owner=1)", () => {
+    const idx = body.indexOf("select 1 + count(*)::integer into _occupied");
+    expect(idx).toBeGreaterThan(-1);
+    const stmt = body.slice(idx, body.indexOf(";", idx));
+    expect(stmt).toContain("from public.recruiter_members m");
+    expect(stmt).toContain("m.recruiter_id = _recruiter_id");
+    expect(stmt).toContain("m.role <> 'recruiter_owner'");
+    expect(stmt).toContain("m.status = 'active'");
+    expect(stmt).toContain("m.status = 'pending'");
+    expect(stmt).toContain("m.invite_expires_at is not null");
+    expect(stmt).toContain("m.invite_expires_at > now()");
+    expect(stmt).not.toContain("'revoked'");
+  });
+
 
   it("6f. a NEW invite requires a free seat and raises a generic exception", () => {
     expect(body).toContain("_occupied >= _limit");
