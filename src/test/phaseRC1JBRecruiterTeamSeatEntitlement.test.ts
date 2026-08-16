@@ -266,6 +266,15 @@ describe("RC-1J-B — invite seat enforcement", () => {
     expect(body).toContain("already a member");
   });
 
+  it("6b2. preserves the EXACT existing RC-1A POSIX email validation", () => {
+    expect(body).toContain(
+      "if _norm='' or _norm !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' then",
+    );
+    // No alternate regex vocabulary was substituted.
+    expect(body).not.toContain("[^@\\s]");
+  });
+
+
   it("6c. preserves both audit events", () => {
     expect(body).toContain("'invite_created'");
     expect(body).toContain("'invite_refreshed'");
