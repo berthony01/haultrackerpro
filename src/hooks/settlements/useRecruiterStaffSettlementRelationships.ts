@@ -8,28 +8,34 @@
  * authorization of its own — PostgreSQL is the sole authority. Client state is
  * UX only.
  *
- * Fail closed: loading, error, or a malformed payload => empty relationship
- * list.
+ * Fail closed: the query is only enabled for an authenticated user + a
+ * recruiter workspace id + an explicit `canViewSettlements === true`. A
+ * malformed payload throws an unavailable state; rows are NEVER silently
+ * skipped or fabricated.
  *
- * ARCHITECTURE NOTE — intentional compatibility deviation (same as RC-1C
- * `useRecruiterStaffWorkspace` and RC-1D `useRecruiterStaffPermissions`): a
- * generation-guarded `useEffect` fetch is used instead of React Query because
- * the recruiter shell is mounted by existing consumers/tests without a
- * `QueryClientProvider`. Resolution is strictly scoped to the authenticated
- * user AND the recruiter workspace.
+ * Uses React Query. No `.from()` table read, no profile / billing / Agency /
+ * application / driver-profile hook, no storage of any kind.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 export interface RecruiterStaffSettlementRelationship {
-  id: string;
-  recruiterId: string;
+  relationshipId: string;
   driverUserId: string;
-  status: string;
+  driverName: string;
+  invitedAt: string;
   acceptedAt: string | null;
-  createdAt: string | null;
 }
+
+/** Exact — and only — row keys the safe RPC is allowed to return. */
+export const RECRUITER_STAFF_SETTLEMENT_RELATIONSHIP_ROW_KEYS = [
+  'relationship_id',
+  'driver_user_id',
+  'driver_name',
+  'invited_at',
+  'accepted_at',
+] as const;
 
 // Narrow local adapter — generated types are not edited here.
 type ListStaffRelationshipsRpc = (
@@ -51,40 +57,61 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
 
-function nullableString(value: unknown): string | null {
-  return typeof value === 'string' ? value : null;
-}
-
 /**
- * Strict, fail-closed row parser. A single malformed row invalidates the whole
+ * Strict, fail-closed row parser. Returns null for ANY deviation: a non-array
+ * payload, a non-plain-object row, a missing key, an unknown extra key, or a
+ * value of the wrong type. A single malformed row invalidates the whole
  * payload — rows are never silently filtered.
  */
 export function parseRecruiterStaffSettlementRelationships(
   payload: unknown,
-  recruiterId: string,
 ): RecruiterStaffSettlementRelationship[] | null {
   if (!Array.isArray(payload)) return null;
   const out: RecruiterStaffSettlementRelationship[] = [];
   for (const row of payload) {
     if (!isPlainObject(row)) return null;
+
+    const keys = Object.keys(row);
+    if (keys.length !== RECRUITER_STAFF_SETTLEMENT_RELATIONSHIP_ROW_KEYS.length) {
+      return null;
+    }
+    for (const key of keys) {
+      if (
+        !(RECRUITER_STAFF_SETTLEMENT_RELATIONSHIP_ROW_KEYS as readonly string[]).includes(
+          key,
+        )
+      ) {
+        return null;
+      }
+    }
+    for (const key of RECRUITER_STAFF_SETTLEMENT_RELATIONSHIP_ROW_KEYS) {
+      if (!Object.prototype.hasOwnProperty.call(row, key)) return null;
+    }
+
+    const relationshipId: unknown = row.relationship_id;
+    const driverUserId: unknown = row.driver_user_id;
+    const driverName: unknown = row.driver_name;
+    const invitedAt: unknown = row.invited_at;
+    const acceptedAt: unknown = row.accepted_at;
+
     if (
-      !isNonEmptyString(row.id) ||
-      !isNonEmptyString(row.recruiter_id) ||
-      !isNonEmptyString(row.driver_user_id) ||
-      !isNonEmptyString(row.status)
+      !isNonEmptyString(relationshipId) ||
+      !isNonEmptyString(driverUserId) ||
+      !isNonEmptyString(driverName) ||
+      !isNonEmptyString(invitedAt)
     ) {
       return null;
     }
-    // Defense in depth: the server already scopes by workspace.
-    if (row.recruiter_id !== recruiterId) return null;
-    if (row.status !== 'active') return null;
+    if (acceptedAt !== null && typeof acceptedAt !== 'string') {
+      return null;
+    }
+
     out.push({
-      id: row.id,
-      recruiterId: row.recruiter_id,
-      driverUserId: row.driver_user_id,
-      status: row.status,
-      acceptedAt: nullableString(row.accepted_at),
-      createdAt: nullableString(row.created_at),
+      relationshipId,
+      driverUserId,
+      driverName,
+      invitedAt,
+      acceptedAt: acceptedAt as string | null,
     });
   }
   return out;
@@ -97,86 +124,35 @@ export interface RecruiterStaffSettlementRelationshipsState {
   refetch: () => void;
 }
 
-interface Resolved {
-  userId: string;
-  recruiterId: string;
-  relationships: RecruiterStaffSettlementRelationship[] | null;
-  error: unknown;
-}
-
 export function useRecruiterStaffSettlementRelationships(
   recruiterId: string | null | undefined,
-  enabled: boolean,
+  canViewSettlements: boolean,
 ): RecruiterStaffSettlementRelationshipsState {
   const { user } = useAuth();
-  const userId = user?.id ?? null;
   const id = recruiterId ?? null;
-  const active = !!userId && !!id && enabled;
+  const enabled = !!user?.id && !!id && canViewSettlements === true;
 
-  const requestRef = useRef(0);
-  const [resolved, setResolved] = useState<Resolved | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(active);
-  const [reloadToken, setReloadToken] = useState(0);
-
-  useEffect(() => {
-    requestRef.current += 1;
-    const generation = requestRef.current;
-
-    if (!userId || !id || !enabled) {
-      setResolved(null);
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    let cancelled = false;
-
-    void (async () => {
-      let payload: unknown = null;
-      let error: unknown = null;
-      try {
-        const resp = await callListStaffRelationships(
-          'list_recruiter_staff_settlement_relationships',
-          { _recruiter_id: id },
-        );
-        if (resp.error) error = new Error('Unable to load settlement drivers.');
-        else payload = resp.data;
-      } catch {
-        error = new Error('Unable to load settlement drivers.');
-      }
-      if (cancelled || generation !== requestRef.current) return;
-
-      const parsed = error
-        ? null
-        : parseRecruiterStaffSettlementRelationships(payload, id);
-      setResolved({
-        userId,
-        recruiterId: id,
-        relationships: parsed,
-        error:
-          error ?? (parsed ? null : new Error('Unable to load settlement drivers.')),
-      });
-      setIsLoading(false);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userId, id, enabled, reloadToken]);
-
-  const refetch = useCallback(() => setReloadToken((t) => t + 1), []);
-
-  const scoped =
-    resolved && resolved.userId === userId && resolved.recruiterId === id
-      ? resolved
-      : null;
-  const relationships =
-    scoped && !scoped.error && scoped.relationships ? scoped.relationships : [];
+  const query = useQuery({
+    queryKey: ['recruiter_staff_settlement_relationships', user?.id, id],
+    enabled,
+    queryFn: async (): Promise<RecruiterStaffSettlementRelationship[]> => {
+      const resp = await callListStaffRelationships(
+        'list_recruiter_staff_settlement_relationships',
+        { _recruiter_id: id as string },
+      );
+      if (resp.error) throw new Error('Unable to load settlement drivers.');
+      const parsed = parseRecruiterStaffSettlementRelationships(resp.data);
+      if (!parsed) throw new Error('Unable to load settlement drivers.');
+      return parsed;
+    },
+  });
 
   return {
-    relationships,
-    isLoading: active && isLoading,
-    error: scoped?.error ?? null,
-    refetch,
+    relationships: query.data ?? [],
+    isLoading: enabled && query.isLoading,
+    error: query.error ?? null,
+    refetch: () => {
+      void query.refetch();
+    },
   };
 }

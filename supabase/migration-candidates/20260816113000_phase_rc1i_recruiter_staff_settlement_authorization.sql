@@ -14,12 +14,17 @@
 --     which remain unmodified.
 --   * STAFF requires ALL of:
 --       - non-owner caller, AND
---       - posting-ready / non-suspended workspace
---         (public.recruiter_profile_can_manage_opportunities), AND
---       - the explicit RC-1B boolean permission on an ACTIVE membership
---         (public.current_user_has_recruiter_permission), AND
+--       - recruiter profile status = 'active' (NOT posting-readiness /
+--         verification semantics), AND
+--       - VIEW-FOUNDATIONAL RC-1B booleans on an ACTIVE membership
+--         (public.current_user_has_recruiter_permission): settlements_view is
+--         always required; prepare/finalize additionally require their own
+--         explicit boolean. prepare or finalize ALONE authorizes nothing, AND
 --       - a STANDALONE recruiter/carrier billing row for that recruiter
---         workspace at plan growth|fleet with status active|trialing.
+--         workspace (rb.recruiter_id = rp.id AND rb.user_id = rp.user_id) at
+--         plan starter|growth|fleet with status active|trialing, AND
+--       - the LIVE owner Agency conflict must not hold for the canonical
+--         recruiter OWNER (rp.user_id).
 --     Role labels alone grant nothing.
 --   * Agency-included recruiter entitlement is deliberately NOT consulted and
 --     NOT extended to recruiter staff. No Agency table/function is touched.
@@ -36,7 +41,6 @@
 --
 -- FROZEN — NOT replaced or redefined by this migration:
 --   public.current_user_has_recruiter_permission(...),
---   public.recruiter_profile_can_manage_opportunities(...),
 --   public.is_recruiter_owner(...),
 --   public.settlement_current_user_can_manage_carrier(...),
 --   public.settlement_current_user_can_administer_carrier(...),
@@ -73,15 +77,40 @@ AS $function$
     )
     -- Canonical owner is excluded from the STAFF settlement path entirely.
     AND NOT public.is_recruiter_owner(auth.uid(), _recruiter_id)
-    -- Non-owner STAFF branch. No role shortcut anywhere.
-    AND public.recruiter_profile_can_manage_opportunities(_recruiter_id)
+    -- VIEW-FOUNDATIONAL: settlements_view is required for EVERY settlement
+    -- action. settlements_prepare / settlements_finalize alone grant nothing.
+    AND public.current_user_has_recruiter_permission(
+          _recruiter_id,
+          'settlements_view'::public.recruiter_workspace_permission)
     AND public.current_user_has_recruiter_permission(_recruiter_id, _permission)
+    -- STANDALONE recruiter/carrier billing, matching the LIVE owner rule.
     AND EXISTS (
       SELECT 1
-      FROM public.recruiter_billing_profiles b
-      WHERE b.recruiter_id = _recruiter_id
-        AND b.plan IN ('growth', 'fleet')
-        AND b.status IN ('active', 'trialing') -- trial-allowlist
+      FROM public.recruiter_profiles rp
+      JOIN public.recruiter_billing_profiles rb
+        ON rb.recruiter_id = rp.id
+       AND rb.user_id = rp.user_id
+      WHERE rp.id = _recruiter_id
+        AND rp.status = 'active'
+        AND rb.plan IN ('starter', 'growth', 'fleet')
+        AND rb.status IN ('active', 'trialing') -- trial-allowlist
+        -- LIVE owner Agency conflict, anchored to the canonical recruiter
+        -- OWNER (rp.user_id) — never the staff caller. Agency-included
+        -- recruiter benefit alone never qualifies a staff member.
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.agency_profiles ap
+          JOIN public.agency_members am
+            ON am.agency_id = ap.id
+           AND am.member_user_id = rp.user_id
+           AND am.role = 'agency_owner'
+           AND am.status = 'active'
+          JOIN public.agency_entitlements ae
+            ON ae.agency_id = ap.id
+           AND ae.plan_key IN ('agency_starter', 'agency_team', 'agency_growth')
+           AND ae.status IN ('active', 'trialing')
+          WHERE ap.owner_user_id = rp.user_id
+        )
     );
 $function$;
 
@@ -129,18 +158,19 @@ GRANT EXECUTE ON FUNCTION public.settlement_current_user_can_recruiter_staff_rel
 -- ---------------------------------------------------------------------------
 -- C) Staff relationship listing RPC (settlements_view only)
 -- ---------------------------------------------------------------------------
--- Minimal projection: relationship identity + status + timestamps. No driver
--- contact data, no financial data, no billing data.
-CREATE OR REPLACE FUNCTION public.list_recruiter_staff_settlement_relationships(
+-- Minimal projection: relationship id, driver id, a safe display name and the
+-- two lifecycle timestamps. NO status, NO recruiter_id, NO created_at, NO
+-- phone / email / address / contact preference / application notes / billing.
+DROP FUNCTION IF EXISTS public.list_recruiter_staff_settlement_relationships(uuid);
+CREATE FUNCTION public.list_recruiter_staff_settlement_relationships(
   _recruiter_id uuid
 )
 RETURNS TABLE (
-  id uuid,
-  recruiter_id uuid,
+  relationship_id uuid,
   driver_user_id uuid,
-  status text,
-  accepted_at timestamptz,
-  created_at timestamptz
+  driver_name text,
+  invited_at timestamptz,
+  accepted_at timestamptz
 )
 LANGUAGE plpgsql
 STABLE
@@ -155,16 +185,20 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT r.id,
-         r.recruiter_id,
+  SELECT r.id AS relationship_id,
          r.driver_user_id,
-         r.status,
-         r.accepted_at,
-         r.created_at
+         COALESCE(
+           NULLIF(btrim(COALESCE(dop.full_name, '')), ''),
+           'Connected driver'
+         )::text AS driver_name,
+         r.invited_at,
+         r.accepted_at
   FROM public.carrier_driver_relationships r
+  LEFT JOIN public.driver_opportunity_profiles dop
+    ON dop.user_id = r.driver_user_id
   WHERE r.recruiter_id = _recruiter_id
     AND r.status = 'active'
-  ORDER BY r.created_at ASC;
+  ORDER BY COALESCE(r.accepted_at, r.invited_at), r.id;
 END;
 $function$;
 
@@ -175,26 +209,16 @@ GRANT EXECUTE ON FUNCTION public.list_recruiter_staff_settlement_relationships(u
 -- ---------------------------------------------------------------------------
 -- D) Additive STAFF SELECT policies (carrier-issued statements only)
 -- ---------------------------------------------------------------------------
--- Every existing SELECT policy is left untouched; these are additional
--- permissive policies that only ever widen access to a non-owner staff member
--- holding settlements_view on the exact issuing workspace + active
--- relationship.
-DROP POLICY IF EXISTS carrier_driver_relationships_select_recruiter_staff
-  ON public.carrier_driver_relationships;
-CREATE POLICY carrier_driver_relationships_select_recruiter_staff
-  ON public.carrier_driver_relationships
-  FOR SELECT
-  TO authenticated
-  USING (
-    carrier_driver_relationships.status = 'active'
-    AND public.settlement_current_user_can_recruiter_staff_relationship_action(
-      carrier_driver_relationships.recruiter_id,
-      carrier_driver_relationships.id,
-      carrier_driver_relationships.driver_user_id,
-      'settlements_view'::public.recruiter_workspace_permission
-    )
-  );
-
+-- Every existing SELECT policy is left untouched; these are exactly THREE
+-- additional permissive SELECT-only policies that widen READ access to a
+-- non-owner staff member holding settlements_view on the exact issuing
+-- workspace. Historical statements stay readable, so the workspace helper —
+-- NOT the relationship helper — is used here; every MUTATION RPC still
+-- requires the exact ACTIVE carrier↔driver relationship triple.
+--
+-- RC-1I creates NO policy on public.carrier_driver_relationships and NO policy
+-- on public.driver_settlement_matches, and NO INSERT/UPDATE/DELETE/ALL policy
+-- anywhere. Only these three RC-1I policy names are ever dropped.
 DROP POLICY IF EXISTS driver_settlements_select_recruiter_staff
   ON public.driver_settlements;
 CREATE POLICY driver_settlements_select_recruiter_staff
@@ -204,11 +228,8 @@ CREATE POLICY driver_settlements_select_recruiter_staff
   USING (
     driver_settlements.source = 'carrier_issued'
     AND driver_settlements.carrier_recruiter_profile_id IS NOT NULL
-    AND driver_settlements.carrier_driver_relationship_id IS NOT NULL
-    AND public.settlement_current_user_can_recruiter_staff_relationship_action(
+    AND public.settlement_current_user_can_recruiter_staff_action(
       driver_settlements.carrier_recruiter_profile_id,
-      driver_settlements.carrier_driver_relationship_id,
-      driver_settlements.driver_user_id,
       'settlements_view'::public.recruiter_workspace_permission
     )
   );
@@ -226,35 +247,8 @@ CREATE POLICY driver_settlement_items_select_recruiter_staff
       WHERE ds.id = driver_settlement_items.settlement_id
         AND ds.source = 'carrier_issued'
         AND ds.carrier_recruiter_profile_id IS NOT NULL
-        AND ds.carrier_driver_relationship_id IS NOT NULL
-        AND public.settlement_current_user_can_recruiter_staff_relationship_action(
+        AND public.settlement_current_user_can_recruiter_staff_action(
           ds.carrier_recruiter_profile_id,
-          ds.carrier_driver_relationship_id,
-          ds.driver_user_id,
-          'settlements_view'::public.recruiter_workspace_permission
-        )
-    )
-  );
-
-DROP POLICY IF EXISTS driver_settlement_matches_select_recruiter_staff
-  ON public.driver_settlement_matches;
-CREATE POLICY driver_settlement_matches_select_recruiter_staff
-  ON public.driver_settlement_matches
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1
-      FROM public.driver_settlement_items si
-      JOIN public.driver_settlements ds ON ds.id = si.settlement_id
-      WHERE si.id = driver_settlement_matches.settlement_item_id
-        AND ds.source = 'carrier_issued'
-        AND ds.carrier_recruiter_profile_id IS NOT NULL
-        AND ds.carrier_driver_relationship_id IS NOT NULL
-        AND public.settlement_current_user_can_recruiter_staff_relationship_action(
-          ds.carrier_recruiter_profile_id,
-          ds.carrier_driver_relationship_id,
-          ds.driver_user_id,
           'settlements_view'::public.recruiter_workspace_permission
         )
     )
@@ -273,11 +267,8 @@ CREATE POLICY driver_settlement_events_select_recruiter_staff
       WHERE ds.id = driver_settlement_events.settlement_id
         AND ds.source = 'carrier_issued'
         AND ds.carrier_recruiter_profile_id IS NOT NULL
-        AND ds.carrier_driver_relationship_id IS NOT NULL
-        AND public.settlement_current_user_can_recruiter_staff_relationship_action(
+        AND public.settlement_current_user_can_recruiter_staff_action(
           ds.carrier_recruiter_profile_id,
-          ds.carrier_driver_relationship_id,
-          ds.driver_user_id,
           'settlements_view'::public.recruiter_workspace_permission
         )
     )
@@ -302,7 +293,7 @@ CREATE POLICY driver_settlement_events_select_recruiter_staff
 --   settlement_update_draft_item         -> settlements_prepare
 --   settlement_delete_draft_item         -> settlements_prepare
 --   settlement_finalize_draft            -> settlements_finalize
---   settlement_void_settlement           -> settlements_finalize
+--   settlement_void_finalized            -> settlements_finalize
 --   settlement_create_correction_draft   -> settlements_prepare AND settlements_finalize
 
 -- ---- settlement_create_carrier_draft ----------------------------------------------------
