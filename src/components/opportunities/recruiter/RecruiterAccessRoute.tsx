@@ -85,6 +85,7 @@ function StaffWorkspaceRoute({
     | 'contracts'
     | 'reports'
     | 'settlements'
+    | 'team'
   >('home');
 
 
