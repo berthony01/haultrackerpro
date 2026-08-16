@@ -209,26 +209,16 @@ GRANT EXECUTE ON FUNCTION public.list_recruiter_staff_settlement_relationships(u
 -- ---------------------------------------------------------------------------
 -- D) Additive STAFF SELECT policies (carrier-issued statements only)
 -- ---------------------------------------------------------------------------
--- Every existing SELECT policy is left untouched; these are additional
--- permissive policies that only ever widen access to a non-owner staff member
--- holding settlements_view on the exact issuing workspace + active
--- relationship.
-DROP POLICY IF EXISTS carrier_driver_relationships_select_recruiter_staff
-  ON public.carrier_driver_relationships;
-CREATE POLICY carrier_driver_relationships_select_recruiter_staff
-  ON public.carrier_driver_relationships
-  FOR SELECT
-  TO authenticated
-  USING (
-    carrier_driver_relationships.status = 'active'
-    AND public.settlement_current_user_can_recruiter_staff_relationship_action(
-      carrier_driver_relationships.recruiter_id,
-      carrier_driver_relationships.id,
-      carrier_driver_relationships.driver_user_id,
-      'settlements_view'::public.recruiter_workspace_permission
-    )
-  );
-
+-- Every existing SELECT policy is left untouched; these are exactly THREE
+-- additional permissive SELECT-only policies that widen READ access to a
+-- non-owner staff member holding settlements_view on the exact issuing
+-- workspace. Historical statements stay readable, so the workspace helper —
+-- NOT the relationship helper — is used here; every MUTATION RPC still
+-- requires the exact ACTIVE carrier↔driver relationship triple.
+--
+-- RC-1I creates NO policy on public.carrier_driver_relationships and NO policy
+-- on public.driver_settlement_matches, and NO INSERT/UPDATE/DELETE/ALL policy
+-- anywhere. Only these three RC-1I policy names are ever dropped.
 DROP POLICY IF EXISTS driver_settlements_select_recruiter_staff
   ON public.driver_settlements;
 CREATE POLICY driver_settlements_select_recruiter_staff
@@ -238,11 +228,8 @@ CREATE POLICY driver_settlements_select_recruiter_staff
   USING (
     driver_settlements.source = 'carrier_issued'
     AND driver_settlements.carrier_recruiter_profile_id IS NOT NULL
-    AND driver_settlements.carrier_driver_relationship_id IS NOT NULL
-    AND public.settlement_current_user_can_recruiter_staff_relationship_action(
+    AND public.settlement_current_user_can_recruiter_staff_action(
       driver_settlements.carrier_recruiter_profile_id,
-      driver_settlements.carrier_driver_relationship_id,
-      driver_settlements.driver_user_id,
       'settlements_view'::public.recruiter_workspace_permission
     )
   );
@@ -260,35 +247,8 @@ CREATE POLICY driver_settlement_items_select_recruiter_staff
       WHERE ds.id = driver_settlement_items.settlement_id
         AND ds.source = 'carrier_issued'
         AND ds.carrier_recruiter_profile_id IS NOT NULL
-        AND ds.carrier_driver_relationship_id IS NOT NULL
-        AND public.settlement_current_user_can_recruiter_staff_relationship_action(
+        AND public.settlement_current_user_can_recruiter_staff_action(
           ds.carrier_recruiter_profile_id,
-          ds.carrier_driver_relationship_id,
-          ds.driver_user_id,
-          'settlements_view'::public.recruiter_workspace_permission
-        )
-    )
-  );
-
-DROP POLICY IF EXISTS driver_settlement_matches_select_recruiter_staff
-  ON public.driver_settlement_matches;
-CREATE POLICY driver_settlement_matches_select_recruiter_staff
-  ON public.driver_settlement_matches
-  FOR SELECT
-  TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1
-      FROM public.driver_settlement_items si
-      JOIN public.driver_settlements ds ON ds.id = si.settlement_id
-      WHERE si.id = driver_settlement_matches.settlement_item_id
-        AND ds.source = 'carrier_issued'
-        AND ds.carrier_recruiter_profile_id IS NOT NULL
-        AND ds.carrier_driver_relationship_id IS NOT NULL
-        AND public.settlement_current_user_can_recruiter_staff_relationship_action(
-          ds.carrier_recruiter_profile_id,
-          ds.carrier_driver_relationship_id,
-          ds.driver_user_id,
           'settlements_view'::public.recruiter_workspace_permission
         )
     )
@@ -307,11 +267,8 @@ CREATE POLICY driver_settlement_events_select_recruiter_staff
       WHERE ds.id = driver_settlement_events.settlement_id
         AND ds.source = 'carrier_issued'
         AND ds.carrier_recruiter_profile_id IS NOT NULL
-        AND ds.carrier_driver_relationship_id IS NOT NULL
-        AND public.settlement_current_user_can_recruiter_staff_relationship_action(
+        AND public.settlement_current_user_can_recruiter_staff_action(
           ds.carrier_recruiter_profile_id,
-          ds.carrier_driver_relationship_id,
-          ds.driver_user_id,
           'settlements_view'::public.recruiter_workspace_permission
         )
     )
