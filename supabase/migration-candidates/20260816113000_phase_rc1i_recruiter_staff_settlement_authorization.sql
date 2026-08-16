@@ -41,7 +41,7 @@
 --
 -- FROZEN — NOT replaced or redefined by this migration:
 --   public.current_user_has_recruiter_permission(...),
---   public.recruiter_profile_can_manage_opportunities(...),
+--   public.is_recruiter_member_active(...),
 --   public.is_recruiter_owner(...),
 --   public.settlement_current_user_can_manage_carrier(...),
 --   public.settlement_current_user_can_administer_carrier(...),
