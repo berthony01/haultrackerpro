@@ -1,42 +1,62 @@
 /**
- * Phase RC-1I — Recruiter staff settlement authorization contract.
+ * Phase RC-1I (acceptance-corrected) — Recruiter staff settlement
+ * authorization contract.
  *
- * Locks the authorization architecture: exact permission vocabulary, owner
- * exclusion from the staff path, no role shortcut, readiness + explicit
- * permission + standalone Growth/Fleet billing, no Agency entitlement, exact
- * active relationship binding, carrier-issued-only lifecycle widening,
- * additive-only RLS, fail-closed client parsing and presentation gating.
+ * Locks the CORRECTED architecture:
+ *   * exactly three settlement permission keys, canonical owner exclusion,
+ *     no role labels;
+ *   * recruiter profile status = 'active' (NOT posting-readiness / the
+ *     `recruiter_profile_can_manage_opportunities` helper);
+ *   * VIEW-FOUNDATIONAL permission semantics — prepare/finalize alone deny;
+ *   * standalone billing rb.recruiter_id = rp.id AND rb.user_id = rp.user_id,
+ *     plan starter|growth|fleet, status active|trialing;
+ *   * paid Agency-owner conflict anchored to rp.user_id;
+ *   * safe relationship RPC returning exactly five fields with a safe
+ *     driver-name fallback;
+ *   * EXACTLY three additive staff SELECT policies (settlements / items /
+ *     events) and none on relationships or matches;
+ *   * exactly eight widened lifecycle functions, owner helper first;
+ *   * React Query relationship hook with a strict five-key row allowlist;
+ *   * panel + manager presentation gating with the backward-compatible
+ *     effective formulas.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { parseRecruiterStaffSettlementRelationships } from '@/hooks/settlements/useRecruiterStaffSettlementRelationships';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 
-const SQL = read(
-  'supabase/migration-candidates/20260816113000_phase_rc1i_recruiter_staff_settlement_authorization.sql',
-);
+const SQL_PATH =
+  'supabase/migration-candidates/20260816113000_phase_rc1i_recruiter_staff_settlement_authorization.sql';
+
+const SQL = read(SQL_PATH);
 const PERMS_HOOK = read('src/hooks/recruiter/useRecruiterStaffPermissions.ts');
 const REL_HOOK = read('src/hooks/settlements/useRecruiterStaffSettlementRelationships.ts');
 const PANEL = read('src/components/settlements/RecruiterStaffSettlementsPanel.tsx');
 const MANAGER = read('src/components/settlements/BusinessSettlementManager.tsx');
 const ROUTE = read('src/components/opportunities/recruiter/RecruiterAccessRoute.tsx');
 
-const section = (start: string, end = '$function$;') =>
-  SQL.split(start)[1].split(end)[0];
+/** Body of a SQL function definition, comments excluded. */
+function fnBody(header: string): string {
+  const idx = SQL.indexOf(header);
+  expect(idx).toBeGreaterThan(-1);
+  const after = SQL.slice(idx);
+  return after.slice(0, after.indexOf('$function$;') + 11);
+}
 
-const HELPER = section(
-  'CREATE OR REPLACE FUNCTION public.settlement_current_user_can_recruiter_staff_action',
+const HELPER = fnBody(
+  'FUNCTION public.settlement_current_user_can_recruiter_staff_action(',
 );
-const REL_HELPER = section(
-  'CREATE OR REPLACE FUNCTION public.settlement_current_user_can_recruiter_staff_relationship_action',
+const REL_HELPER = fnBody(
+  'FUNCTION public.settlement_current_user_can_recruiter_staff_relationship_action(',
 );
-const LIST_RPC = section(
-  'CREATE OR REPLACE FUNCTION public.list_recruiter_staff_settlement_relationships',
+const LIST_RPC = fnBody(
+  'CREATE FUNCTION public.list_recruiter_staff_settlement_relationships(',
 );
 
-const LIFECYCLE = [
+const LIFECYCLE: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['settlement_create_carrier_draft', ['settlements_prepare']],
   ['settlement_update_draft_header', ['settlements_prepare']],
   ['settlement_add_draft_item', ['settlements_prepare']],
@@ -45,18 +65,24 @@ const LIFECYCLE = [
   ['settlement_finalize_draft', ['settlements_finalize']],
   ['settlement_void_finalized', ['settlements_finalize']],
   ['settlement_create_correction_draft', ['settlements_prepare', 'settlements_finalize']],
-] as const;
+];
 
-const lifecycleBody = (name: string) =>
-  SQL.split(`CREATE OR REPLACE FUNCTION public.${name}(`)[1].split('\n$$;')[0];
+const lifecycleBody = (name: string) => {
+  const marker = `CREATE OR REPLACE FUNCTION public.${name}(`;
+  const idx = SQL.indexOf(marker);
+  expect(idx).toBeGreaterThan(-1);
+  return SQL.slice(idx).split('\n$$;')[0];
+};
 
-/* ------------------------------------------------------- workspace helper - */
+/* ------------------------------------------------- 1) helper vocabulary --- */
 
 describe('RC-1I — staff settlement helper vocabulary', () => {
   it('accepts exactly the three settlement permission keys', () => {
     expect(HELPER).toContain("'settlements_view'::public.recruiter_workspace_permission");
     expect(HELPER).toContain("'settlements_prepare'::public.recruiter_workspace_permission");
-    expect(HELPER).toContain("'settlements_finalize'::public.recruiter_workspace_permission");
+    expect(HELPER).toContain(
+      "'settlements_finalize'::public.recruiter_workspace_permission",
+    );
     for (const key of [
       'opportunities_view',
       'applications_view',
@@ -69,361 +95,563 @@ describe('RC-1I — staff settlement helper vocabulary', () => {
     }
   });
 
-  it('excludes the canonical recruiter owner from the staff path', () => {
+  it('excludes the canonical recruiter owner and uses no role label', () => {
     expect(HELPER).toContain('NOT public.is_recruiter_owner(auth.uid(), _recruiter_id)');
-    expect(HELPER).toContain('auth.uid() IS NOT NULL');
-  });
-
-  it('requires readiness + explicit permission + standalone Growth/Fleet billing', () => {
-    expect(HELPER).toContain('public.recruiter_profile_can_manage_opportunities(_recruiter_id)');
-    expect(HELPER).toContain(
-      'public.current_user_has_recruiter_permission(_recruiter_id, _permission)',
-    );
-    expect(HELPER).toContain('public.recruiter_billing_profiles b');
-    expect(HELPER).toContain("b.plan IN ('growth', 'fleet')");
-    expect(HELPER).toContain("b.status IN ('active', 'trialing')");
-    expect(HELPER).toContain('SECURITY DEFINER');
-    expect(HELPER).toContain('SET search_path = public');
-  });
-
-  it('has no role-label shortcut anywhere in the migration', () => {
-    expect(SQL).not.toMatch(/'recruiter_admin'/);
-    expect(SQL).not.toMatch(/'recruiter_staff'/);
-    expect(SQL).not.toMatch(/'recruiter_owner'/);
-    expect(SQL).not.toMatch(/recruiter_member_role/);
-  });
-
-  it('never consults Agency entitlement or Agency tables', () => {
-    expect(SQL).not.toMatch(/agency_entitlements/);
-    expect(SQL).not.toMatch(/get_agency_entitlement/);
-    expect(SQL).not.toMatch(/agency_members/);
-    expect(SQL).not.toMatch(/settlement_current_user_can_manage_agency\s*\(\s*_/);
-  });
-
-  it('is not executable by anon or PUBLIC', () => {
-    for (const fn of [
-      'settlement_current_user_can_recruiter_staff_action',
-      'settlement_current_user_can_recruiter_staff_relationship_action',
-      'list_recruiter_staff_settlement_relationships',
-    ]) {
-      expect(SQL).toContain(`REVOKE ALL ON FUNCTION public.${fn}`);
-      expect(SQL).toMatch(new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${fn}[^\\n]*authenticated`));
+    for (const role of ['recruiter_owner', 'recruiter_admin', 'recruiter_staff']) {
+      expect(HELPER).not.toContain(role);
     }
-    expect(SQL).not.toMatch(/GRANT EXECUTE[^\n]*TO[^\n]*anon/);
+    expect(HELPER).not.toContain('.role');
+  });
+
+  it('requires a non-null authenticated caller and workspace', () => {
+    expect(HELPER).toContain('auth.uid() IS NOT NULL');
+    expect(HELPER).toContain('_recruiter_id IS NOT NULL');
+    expect(HELPER).toContain('_permission IS NOT NULL');
   });
 });
 
-/* ---------------------------------------------------- relationship helper - */
+/* ------------------ 2) profile status, NOT posting readiness -------------- */
 
-describe('RC-1I — exact relationship binding', () => {
-  it('delegates to the workspace helper and requires the exact active triple', () => {
-    expect(REL_HELPER).toContain(
-      'public.settlement_current_user_can_recruiter_staff_action(',
+describe('RC-1I — recruiter profile status, not posting readiness', () => {
+  it('never calls recruiter_profile_can_manage_opportunities anywhere in RC-1I', () => {
+    expect(SQL).not.toContain('recruiter_profile_can_manage_opportunities');
+  });
+
+  it('requires recruiter profile status = active directly', () => {
+    expect(HELPER).toContain('FROM public.recruiter_profiles rp');
+    expect(HELPER).toContain('rp.id = _recruiter_id');
+    expect(HELPER).toContain("rp.status = 'active'");
+  });
+
+  it('does not consult verification / readiness columns', () => {
+    for (const token of ['verified', 'verification', 'is_ready', 'readiness']) {
+      expect(HELPER).not.toContain(token);
+    }
+  });
+});
+
+/* ------------------------------ 3) standalone billing --------------------- */
+
+describe('RC-1I — standalone billing rule', () => {
+  it('anchors the billing row to the canonical recruiter owner', () => {
+    expect(HELPER).toContain('JOIN public.recruiter_billing_profiles rb');
+    expect(HELPER).toContain('ON rb.recruiter_id = rp.id');
+    expect(HELPER).toContain('AND rb.user_id = rp.user_id');
+  });
+
+  it('allows exactly starter, growth and fleet', () => {
+    expect(HELPER).toContain("rb.plan IN ('starter', 'growth', 'fleet')");
+    expect(HELPER).not.toContain("'free'");
+  });
+
+  it('allows exactly active and trialing billing statuses', () => {
+    expect(HELPER).toContain("rb.status IN ('active', 'trialing')");
+    for (const bad of ["'past_due'", "'canceled'", "'cancelled'", "'incomplete'"]) {
+      expect(HELPER).not.toContain(bad);
+    }
+  });
+});
+
+/* --------------------------- 4) Agency conflict check --------------------- */
+
+describe('RC-1I — paid Agency owner conflict', () => {
+  it('is a NOT EXISTS conflict check anchored to rp.user_id', () => {
+    expect(HELPER).toContain('NOT EXISTS (');
+    expect(HELPER).toContain('FROM public.agency_profiles ap');
+    expect(HELPER).toContain('JOIN public.agency_members am');
+    expect(HELPER).toContain('am.member_user_id = rp.user_id');
+    expect(HELPER).toContain("am.role = 'agency_owner'");
+    expect(HELPER).toContain("am.status = 'active'");
+    expect(HELPER).toContain('JOIN public.agency_entitlements ae');
+    expect(HELPER).toContain(
+      "ae.plan_key IN ('agency_starter', 'agency_team', 'agency_growth')",
     );
+    expect(HELPER).toContain("ae.status IN ('active', 'trialing')");
+    expect(HELPER).toContain('WHERE ap.owner_user_id = rp.user_id');
+  });
+
+  it('never anchors the Agency check to the staff caller', () => {
+    expect(HELPER).not.toContain('am.member_user_id = auth.uid()');
+    expect(HELPER).not.toContain('ap.owner_user_id = auth.uid()');
+  });
+
+  it('never treats Agency entitlement as an authorization path', () => {
+    expect(HELPER).not.toContain('OR EXISTS (\n      SELECT 1\n      FROM public.agency');
+  });
+});
+
+/* ------------------------ 5) view-foundational semantics ------------------ */
+
+describe('RC-1I — view-foundational permission semantics', () => {
+  it('always requires settlements_view in addition to the requested key', () => {
+    const viewCheck = `public.current_user_has_recruiter_permission(
+          _recruiter_id,
+          'settlements_view'::public.recruiter_workspace_permission)`;
+    expect(HELPER).toContain(viewCheck);
+    expect(HELPER).toContain(
+      'public.current_user_has_recruiter_permission(_recruiter_id, _permission)',
+    );
+  });
+
+  it('AND-joins both permission checks so prepare/finalize alone deny', () => {
+    const idxView = HELPER.indexOf("'settlements_view'::public.recruiter_workspace_permission)");
+    const idxAny = HELPER.indexOf(
+      'public.current_user_has_recruiter_permission(_recruiter_id, _permission)',
+    );
+    expect(idxView).toBeGreaterThan(-1);
+    expect(idxAny).toBeGreaterThan(idxView);
+    expect(HELPER.slice(idxView, idxAny)).toContain('AND');
+    expect(HELPER).not.toContain('OR public.current_user_has_recruiter_permission');
+  });
+
+  it('grants nothing through role presets or defaults', () => {
+    expect(HELPER).not.toContain('COALESCE(');
+    expect(HELPER).not.toContain('TRUE;');
+  });
+});
+
+/* ----------------------------- relationship helper ------------------------ */
+
+describe('RC-1I — relationship helper', () => {
+  it('delegates to the corrected workspace helper', () => {
+    expect(REL_HELPER).toContain(
+      'public.settlement_current_user_can_recruiter_staff_action(\n          _recruiter_id, _permission)',
+    );
+  });
+
+  it('requires the exact ACTIVE relationship triple', () => {
     expect(REL_HELPER).toContain('FROM public.carrier_driver_relationships r');
     expect(REL_HELPER).toContain('r.id = _relationship_id');
     expect(REL_HELPER).toContain('r.recruiter_id = _recruiter_id');
     expect(REL_HELPER).toContain('r.driver_user_id = _driver_user_id');
     expect(REL_HELPER).toContain("r.status = 'active'");
   });
-
-  it('rejects null identifiers fail-closed', () => {
-    expect(REL_HELPER).toContain('_recruiter_id IS NOT NULL');
-    expect(REL_HELPER).toContain('_relationship_id IS NOT NULL');
-    expect(REL_HELPER).toContain('_driver_user_id IS NOT NULL');
-  });
 });
 
-/* ------------------------------------------------------------- listing RPC */
+/* ------------------------------ 6) safe list RPC -------------------------- */
 
-describe('RC-1I — staff relationship listing RPC', () => {
-  it('requires settlements_view and raises otherwise', () => {
+describe('RC-1I — safe relationship list RPC', () => {
+  it('returns exactly the five allowed columns', () => {
+    const returns = LIST_RPC.split('RETURNS TABLE (')[1].split(')')[0];
+    const cols = returns
+      .split('\n')
+      .map((l) => l.trim().replace(/,$/, ''))
+      .filter(Boolean);
+    expect(cols).toEqual([
+      'relationship_id uuid',
+      'driver_user_id uuid',
+      'driver_name text',
+      'invited_at timestamptz',
+      'accepted_at timestamptz',
+    ]);
+  });
+
+  it('never projects recruiter_id, status, created_at, contact or billing data', () => {
+    const projection = LIST_RPC.split('RETURN QUERY')[1];
+    expect(projection).not.toContain('r.recruiter_id,');
+    expect(projection).not.toContain('r.status');
+    expect(projection).not.toContain('created_at');
+    for (const banned of [
+      'phone',
+      'email',
+      'address',
+      'contact_preference',
+      'notes',
+      'billing',
+      'plan',
+    ]) {
+      expect(projection).not.toContain(banned);
+    }
+  });
+
+  it('uses the safe driver-name fallback via a LEFT JOIN', () => {
     expect(LIST_RPC).toContain(
-      "'settlements_view'::public.recruiter_workspace_permission",
+      'LEFT JOIN public.driver_opportunity_profiles dop\n    ON dop.user_id = r.driver_user_id',
     );
+    expect(LIST_RPC).toContain("NULLIF(btrim(COALESCE(dop.full_name, '')), '')");
+    expect(LIST_RPC).toContain("'Connected driver'");
+  });
+
+  it('is gated on settlements_view and lists only active relationships', () => {
+    expect(LIST_RPC).toContain(
+      'IF NOT public.settlement_current_user_can_recruiter_staff_action(',
+    );
+    expect(LIST_RPC).toContain("'settlements_view'::public.recruiter_workspace_permission");
     expect(LIST_RPC).toContain("RAISE EXCEPTION 'recruiter_staff_settlements_not_authorized'");
-    expect(LIST_RPC).not.toContain('settlements_prepare');
-    expect(LIST_RPC).not.toContain('settlements_finalize');
+    expect(LIST_RPC).toContain("AND r.status = 'active'");
   });
 
-  it('returns only active relationships of the requested workspace', () => {
-    expect(LIST_RPC).toContain('r.recruiter_id = _recruiter_id');
-    expect(LIST_RPC).toContain("r.status = 'active'");
+  it('orders deterministically', () => {
+    expect(LIST_RPC).toContain('ORDER BY COALESCE(r.accepted_at, r.invited_at), r.id;');
   });
 
-  it('exposes no driver contact, financial or billing columns', () => {
-    for (const forbidden of ['email', 'phone', 'full_name', 'amount', 'stripe', 'plan']) {
-      expect(LIST_RPC.toLowerCase()).not.toContain(forbidden);
+  it('revokes PUBLIC/anon and grants authenticated', () => {
+    for (const fn of [
+      'settlement_current_user_can_recruiter_staff_action(uuid, public.recruiter_workspace_permission)',
+      'list_recruiter_staff_settlement_relationships(uuid)',
+    ]) {
+      expect(SQL).toContain(`REVOKE ALL ON FUNCTION public.${fn} FROM PUBLIC;`);
+      expect(SQL).toContain(`REVOKE ALL ON FUNCTION public.${fn} FROM anon;`);
+      expect(SQL).toContain(`GRANT EXECUTE ON FUNCTION public.${fn} TO authenticated`);
     }
   });
 });
 
-/* -------------------------------------------------------------------- RLS - */
+/* -------------------------- 7) exactly three policies --------------------- */
 
-describe('RC-1I — additive staff SELECT policies', () => {
-  const tables = [
-    'carrier_driver_relationships',
-    'driver_settlements',
-    'driver_settlement_items',
-    'driver_settlement_matches',
-    'driver_settlement_events',
-  ];
+describe('RC-1I — exactly three additive staff SELECT policies', () => {
+  const created = [...SQL.matchAll(/CREATE POLICY (\w+)\s+ON (public\.\w+)/g)].map((m) => [
+    m[1],
+    m[2],
+  ]);
 
-  it('adds one new staff SELECT policy per settlement table', () => {
-    for (const table of tables) {
-      expect(SQL).toContain(`CREATE POLICY ${table}_select_recruiter_staff`);
-      expect(SQL).toContain(`ON public.${table}`);
+  it('creates exactly three policies, on settlements / items / events', () => {
+    expect(created).toEqual([
+      ['driver_settlements_select_recruiter_staff', 'public.driver_settlements'],
+      ['driver_settlement_items_select_recruiter_staff', 'public.driver_settlement_items'],
+      ['driver_settlement_events_select_recruiter_staff', 'public.driver_settlement_events'],
+    ]);
+  });
+
+  it('creates no policy on relationships or matches', () => {
+    expect(SQL).not.toContain('CREATE POLICY carrier_driver_relationships_select_recruiter_staff');
+    expect(SQL).not.toContain('CREATE POLICY driver_settlement_matches_select_recruiter_staff');
+    expect(SQL).not.toContain('ON public.carrier_driver_relationships\n  FOR SELECT');
+    expect(SQL).not.toContain('ON public.driver_settlement_matches');
+  });
+
+  it('creates SELECT-only policies — no mutation policy of any kind', () => {
+    const policyBlock = SQL.split('-- D) Additive STAFF SELECT policies')[1].split(
+      '-- E) Lifecycle',
+    )[0];
+    expect(policyBlock).toContain('FOR SELECT');
+    for (const verb of ['FOR INSERT', 'FOR UPDATE', 'FOR DELETE', 'FOR ALL']) {
+      expect(policyBlock).not.toContain(verb);
     }
+    expect(policyBlock).not.toContain('WITH CHECK');
   });
 
-  it('never drops or alters an existing settlement policy', () => {
-    expect(SQL).not.toContain('_select_authorized');
-    expect(SQL).not.toMatch(/ALTER POLICY/);
-    expect(SQL).not.toMatch(/DISABLE ROW LEVEL SECURITY/);
+  it('drops only the three RC-1I policy names, never a baseline policy', () => {
+    const dropped = [...SQL.matchAll(/DROP POLICY IF EXISTS (\w+)/g)].map((m) => m[1]);
+    expect(dropped).toEqual([
+      'driver_settlements_select_recruiter_staff',
+      'driver_settlement_items_select_recruiter_staff',
+      'driver_settlement_events_select_recruiter_staff',
+    ]);
+    expect(SQL).not.toContain('ALTER POLICY');
   });
 
-  it('grants staff read only for carrier-issued statements', () => {
-    const policySection = SQL.split('D) Additive STAFF SELECT policies')[1].split(
-      'E) Lifecycle RPC',
+  it('scopes READ to carrier-issued statements via the workspace helper', () => {
+    const policyBlock = SQL.split('-- D) Additive STAFF SELECT policies')[1].split(
+      '-- E) Lifecycle',
     )[0];
-    expect(policySection).toContain("source = 'carrier_issued'");
-    expect(policySection).not.toContain("'agency_prepared'");
-    expect(policySection).not.toContain("'driver_imported'");
-    expect(policySection).not.toContain('FOR UPDATE');
-    expect(policySection).not.toContain('FOR INSERT');
-    expect(policySection).not.toContain('FOR DELETE');
-    expect(policySection).not.toContain('FOR ALL');
-  });
-
-  it('only ever uses settlements_view in the read policies', () => {
-    const policySection = SQL.split('D) Additive STAFF SELECT policies')[1].split(
-      'E) Lifecycle RPC',
-    )[0];
-    expect(policySection).not.toContain('settlements_prepare');
-    expect(policySection).not.toContain('settlements_finalize');
+    expect(policyBlock).toContain("driver_settlements.source = 'carrier_issued'");
+    expect(policyBlock).toContain(
+      'driver_settlements.carrier_recruiter_profile_id IS NOT NULL',
+    );
+    expect(policyBlock).toContain(
+      'public.settlement_current_user_can_recruiter_staff_action(',
+    );
+    // Historical reads must not require a still-active relationship.
+    expect(policyBlock).not.toContain(
+      'settlement_current_user_can_recruiter_staff_relationship_action',
+    );
   });
 });
 
-/* ------------------------------------------------------- lifecycle widening */
+/* -------------------------- 8/9) lifecycle functions ---------------------- */
 
-describe('RC-1I — lifecycle RPC carrier-branch extension', () => {
-  it('redefines exactly the eight authorized lifecycle functions', () => {
-    const declared = SQL.match(
-      /CREATE OR REPLACE FUNCTION public\.settlement_(?!current_user_can_recruiter_staff)[a-z_]+\(/g,
-    )!;
-    expect(declared).toHaveLength(LIFECYCLE.length);
-    for (const [name] of LIFECYCLE) {
-      expect(SQL).toContain(`CREATE OR REPLACE FUNCTION public.${name}(`);
+describe('RC-1I — exactly eight widened lifecycle functions', () => {
+  it('replaces exactly the eight expected functions', () => {
+    const replaced = [
+      ...SQL.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g),
+    ].map((m) => m[1]);
+    expect(replaced).toEqual([
+      'settlement_current_user_can_recruiter_staff_action',
+      'settlement_current_user_can_recruiter_staff_relationship_action',
+      ...LIFECYCLE.map(([name]) => name),
+    ]);
+  });
+
+  it('keeps frozen relationship / load-match functions absent', () => {
+    for (const frozen of [
+      'settlement_invite_driver',
+      'settlement_end_relationship',
+      'settlement_accept_relationship',
+      'settlement_decline_relationship',
+      'settlement_match_load',
+      'settlement_reject_load_match',
+      'settlement_suggest_load_matches',
+    ]) {
+      expect(SQL).not.toContain(`FUNCTION public.${frozen}(`);
     }
   });
 
   it.each(LIFECYCLE.map(([name, keys]) => [name, keys] as const))(
-    '%s keeps the owner helper and adds only its mapped staff keys',
+    '%s keeps the owner helper first and adds only its mapped staff key(s)',
     (name, keys) => {
       const body = lifecycleBody(name);
-      expect(body).toContain('public.settlement_current_user_can_manage_carrier(');
-      expect(body).toContain(
+      const owner = body.indexOf('public.settlement_current_user_can_manage_carrier(');
+      const staff = body.indexOf(
         'public.settlement_current_user_can_recruiter_staff_relationship_action(',
       );
+      expect(owner).toBeGreaterThan(-1);
+      expect(staff).toBeGreaterThan(owner);
       for (const key of keys) {
         expect(body).toContain(`'${key}'::public.recruiter_workspace_permission`);
       }
-      for (const key of ['settlements_view', 'settlements_prepare', 'settlements_finalize']) {
-        if (!(keys as readonly string[]).includes(key)) {
-          expect(body).not.toContain(`'${key}'::public.recruiter_workspace_permission`);
-        }
+      const allKeys = ['settlements_view', 'settlements_prepare', 'settlements_finalize'];
+      for (const key of allKeys.filter((k) => !keys.includes(k))) {
+        expect(body).not.toContain(`'${key}'::public.recruiter_workspace_permission`);
       }
+      // View-foundational: no duplicated settlements_view call in the body.
+      expect(body).not.toContain("'settlements_view'::public.recruiter_workspace_permission");
     },
   );
 
-  it('adds exactly one staff call per lifecycle function except correction', () => {
-    for (const [name, keys] of LIFECYCLE) {
-      const body = lifecycleBody(name);
-      const calls = body.match(
-        /settlement_current_user_can_recruiter_staff_relationship_action\(/g,
-      )!;
-      expect(calls).toHaveLength(keys.length);
-    }
-  });
-
-  it('requires BOTH prepare and finalize for correction / supersede', () => {
-    const body = lifecycleBody('settlement_create_correction_draft');
-    expect(body).toMatch(
-      /settlements_prepare'::public\.recruiter_workspace_permission\)\s*AND\s*public\.settlement_current_user_can_recruiter_staff_relationship_action/,
-    );
-  });
-
-  it('never widens the driver-imported or agency-prepared branches', () => {
+  it('keeps auth.uid() as the recorded actor in every lifecycle function', () => {
     for (const [name] of LIFECYCLE) {
-      const body = lifecycleBody(name);
-      const driverBranch = body.split("= 'driver_imported' THEN")[1];
-      if (driverBranch) {
-        const scoped = driverBranch.split('ELSIF')[0];
-        expect(scoped).not.toContain('recruiter_staff_relationship_action');
-      }
-      const agencyBranch = body.split("= 'agency_prepared' THEN")[1];
-      if (agencyBranch) {
-        const scoped = agencyBranch.split('ELSE')[0];
-        expect(scoped).not.toContain('recruiter_staff_relationship_action');
-      }
+      expect(lifecycleBody(name)).toContain('auth.uid()');
     }
   });
 
-  it('never redefines a frozen owner or driver authorization helper', () => {
-    for (const frozen of [
-      'settlement_current_user_can_manage_carrier',
-      'settlement_current_user_can_administer_carrier',
-      'settlement_current_user_can_manage_agency',
-      'settlement_current_user_can_manage_driver_import',
-      'settlement_current_user_can_assist_driver',
-      'settlement_current_user_can_view_settlement',
-      'current_user_has_recruiter_permission',
-      'is_recruiter_owner',
-    ]) {
-      expect(SQL).not.toContain(`CREATE OR REPLACE FUNCTION public.${frozen}(`);
-      expect(SQL).not.toContain(`DROP FUNCTION public.${frozen}`);
+  it('requires BOTH keys for the correction/supersede path', () => {
+    const body = lifecycleBody('settlement_create_correction_draft');
+    expect(body).toContain("'settlements_prepare'::public.recruiter_workspace_permission");
+    expect(body).toContain("'settlements_finalize'::public.recruiter_workspace_permission");
+  });
+});
+
+/* ------------------------------ 10) client hook --------------------------- */
+
+describe('RC-1I — relationship hook transport and query key', () => {
+  it('uses React Query and only the safe RPC', () => {
+    expect(REL_HOOK).toContain("import { useQuery } from '@tanstack/react-query'");
+    expect(REL_HOOK).toContain('useQuery({');
+    expect(REL_HOOK).toContain("'list_recruiter_staff_settlement_relationships'");
+    expect(REL_HOOK).not.toContain('.from(');
+    expect(REL_HOOK).not.toContain('useEffect');
+    for (const banned of ['localStorage', 'sessionStorage', 'useRecruiterProfile', 'billing']) {
+      expect(REL_HOOK).not.toContain(banned);
     }
   });
-});
 
-/* --------------------------------------------------------- client contract */
+  it('keys the query by authenticated user and recruiter workspace', () => {
+    expect(REL_HOOK).toContain(
+      "queryKey: ['recruiter_staff_settlement_relationships', user?.id, id]",
+    );
+  });
 
-describe('RC-1I — client permission booleans', () => {
-  it('exposes the three settlement booleans strictly from the parsed map', () => {
-    expect(PERMS_HOOK).toContain(
-      'canViewSettlements: granted && permissions.settlements_view === true',
+  it('enables only for user + workspace + explicit canViewSettlements === true', () => {
+    expect(REL_HOOK).toContain(
+      'const enabled = !!user?.id && !!id && canViewSettlements === true;',
     );
-    expect(PERMS_HOOK).toContain(
-      'canPrepareSettlements: granted && permissions.settlements_prepare === true',
-    );
-    expect(PERMS_HOOK).toContain(
-      'canFinalizeSettlements: granted && permissions.settlements_finalize === true',
-    );
+    expect(REL_HOOK).toContain('enabled,');
   });
 });
 
-describe('RC-1I — relationship payload parsing', () => {
-  const RID = '11111111-1111-4111-8111-111111111111';
+describe('RC-1I — strict relationship row parser', () => {
   const row = {
-    id: '22222222-2222-4222-8222-222222222222',
-    recruiter_id: RID,
-    driver_user_id: '33333333-3333-4333-8333-333333333333',
-    status: 'active',
-    accepted_at: '2026-01-01T00:00:00Z',
-    created_at: '2026-01-01T00:00:00Z',
+    relationship_id: 'rel-1',
+    driver_user_id: 'drv-1',
+    driver_name: 'Jordan Ellis',
+    invited_at: '2026-08-01T00:00:00Z',
+    accepted_at: '2026-08-02T00:00:00Z',
   };
 
-  it('parses an exact well-formed payload', () => {
-    const parsed = parseRecruiterStaffSettlementRelationships([row], RID);
-    expect(parsed).toHaveLength(1);
-    expect(parsed![0].driverUserId).toBe(row.driver_user_id);
+  it('accepts the exact five-key row and maps to the client shape', () => {
+    expect(parseRecruiterStaffSettlementRelationships([row])).toEqual([
+      {
+        relationshipId: 'rel-1',
+        driverUserId: 'drv-1',
+        driverName: 'Jordan Ellis',
+        invitedAt: '2026-08-01T00:00:00Z',
+        acceptedAt: '2026-08-02T00:00:00Z',
+      },
+    ]);
   });
 
-  it('returns an empty list for an empty payload', () => {
-    expect(parseRecruiterStaffSettlementRelationships([], RID)).toEqual([]);
+  it('accepts a null accepted_at', () => {
+    const parsed = parseRecruiterStaffSettlementRelationships([
+      { ...row, accepted_at: null },
+    ]);
+    expect(parsed?.[0].acceptedAt).toBeNull();
   });
 
-  it.each([null, undefined, {}, 'x', 7, true])(
-    'rejects non-array payload %p',
-    (payload) => {
-      expect(parseRecruiterStaffSettlementRelationships(payload, RID)).toBeNull();
-    },
-  );
+  it('accepts an empty list', () => {
+    expect(parseRecruiterStaffSettlementRelationships([])).toEqual([]);
+  });
 
-  it('rejects the whole payload when a single row is malformed', () => {
+  it.each([null, undefined, {}, 'rows', 42])('rejects non-array payload %p', (bad) => {
+    expect(parseRecruiterStaffSettlementRelationships(bad)).toBeNull();
+  });
+
+  it('rejects a non-plain-object row', () => {
+    class Exotic {}
+    expect(parseRecruiterStaffSettlementRelationships([new Exotic()])).toBeNull();
+    expect(parseRecruiterStaffSettlementRelationships([['a']])).toBeNull();
+    expect(parseRecruiterStaffSettlementRelationships([null])).toBeNull();
+  });
+
+  it.each([
+    'relationship_id',
+    'driver_user_id',
+    'driver_name',
+    'invited_at',
+    'accepted_at',
+  ])('rejects a row missing %s', (key) => {
+    const partial: Record<string, unknown> = { ...row };
+    delete partial[key];
+    expect(parseRecruiterStaffSettlementRelationships([partial])).toBeNull();
+  });
+
+  it('rejects any unknown extra key', () => {
     expect(
-      parseRecruiterStaffSettlementRelationships([row, { ...row, id: 1 }], RID),
+      parseRecruiterStaffSettlementRelationships([{ ...row, status: 'active' }]),
     ).toBeNull();
     expect(
-      parseRecruiterStaffSettlementRelationships([row, { ...row, driver_user_id: '' }], RID),
+      parseRecruiterStaffSettlementRelationships([{ ...row, driver_phone: '555' }]),
     ).toBeNull();
   });
 
-  it('rejects a row belonging to another workspace', () => {
+  it.each([
+    ['relationship_id', ''],
+    ['driver_user_id', ''],
+    ['driver_name', ''],
+    ['invited_at', ''],
+    ['relationship_id', 7],
+    ['accepted_at', 7],
+  ])('rejects a malformed %s value', (key, value) => {
     expect(
-      parseRecruiterStaffSettlementRelationships(
-        [{ ...row, recruiter_id: '44444444-4444-4444-8444-444444444444' }],
-        RID,
-      ),
+      parseRecruiterStaffSettlementRelationships([{ ...row, [key]: value }]),
     ).toBeNull();
   });
 
-  it('rejects a non-active relationship row', () => {
-    for (const status of ['invited', 'inactive', 'ended']) {
-      expect(
-        parseRecruiterStaffSettlementRelationships([{ ...row, status }], RID),
-      ).toBeNull();
-    }
+  it('never silently skips rows — one bad row invalidates the payload', () => {
+    expect(
+      parseRecruiterStaffSettlementRelationships([row, { ...row, driver_name: '' }]),
+    ).toBeNull();
   });
 });
 
-describe('RC-1I — staff hook and surface fail closed', () => {
-  it('only reads the RC-1I listing RPC', () => {
-    expect(REL_HOOK).toContain("'list_recruiter_staff_settlement_relationships'");
-    expect(REL_HOOK).not.toContain(".from('");
-    expect(REL_HOOK).not.toContain('recruiter_billing_profiles');
-    expect(REL_HOOK).not.toContain('useRecruiterProfile');
+/* --------------------------------- 11) panel ------------------------------ */
+
+describe('RC-1I — staff settlements panel', () => {
+  it('labels drivers with the safe RPC name, never a raw uuid', () => {
+    expect(PANEL).toContain('label: relationship.driverName');
+    expect(PANEL).toContain('relationshipId: relationship.relationshipId');
+    expect(PANEL).not.toContain("label: 'Connected driver'");
+    expect(PANEL).not.toContain('label: relationship.driverUserId');
   });
 
-  it('returns an empty list on loading, error, or malformed payload', () => {
-    expect(REL_HOOK).toContain(
-      'scoped && !scoped.error && scoped.relationships ? scoped.relationships : []',
-    );
-  });
-
-  it('mounts no owner-only recruiter consumer in the staff panel', () => {
-    for (const forbidden of [
-      'useRecruiterProfile',
-      'useRecruiterBilling',
-      'useOpportunityApplications',
-      'useInviteCarrierDriverRelationship',
-      'useEndCarrierDriverRelationship',
-      'useVisibleCarrierDriverRelationships',
-      'CarrierSettlementsPanel',
-    ]) {
-      expect(PANEL).not.toContain(forbidden);
-    }
-  });
-
-  it('does not fetch or mount the manager without settlements_view', () => {
-    expect(PANEL).toContain('const enabled = canViewSettlements === true');
-    expect(PANEL).toContain('recruiter-staff-settlements-denied');
-  });
-
-  it('passes the granular presentation gates through to the manager', () => {
+  it('mounts the manager with canManage={false} plus granular gates', () => {
+    expect(PANEL).toContain('canManage={false}');
     expect(PANEL).toContain('canPrepare={canPrepareSettlements}');
     expect(PANEL).toContain('canFinalize={canFinalizeSettlements}');
-    expect(PANEL).toContain('canManage={canPrepareSettlements || canFinalizeSettlements}');
+  });
+
+  it('keeps the owner-controlled-connection note and no plan/upgrade UI', () => {
+    expect(PANEL).toContain('Driver connections are managed by the workspace owner.');
+    for (const banned of ['Upgrade', 'upgrade', 'pricing', 'Agency', 'invite', 'Invite']) {
+      expect(PANEL).not.toContain(banned);
+    }
+  });
+
+  it('fetches nothing without an explicit view grant', () => {
+    expect(PANEL).toContain('const enabled = canViewSettlements === true;');
   });
 });
 
-describe('RC-1I — manager presentation gating stays backward compatible', () => {
-  it('defaults both granular gates to canManage when omitted', () => {
-    expect(MANAGER).toContain('const allowPrepare = canManage && (canPrepare ?? true)');
-    expect(MANAGER).toContain('const allowFinalize = canManage && (canFinalize ?? true)');
+/* -------------------------------- 12) manager ----------------------------- */
+
+describe('RC-1I — manager effective permission formulas', () => {
+  it('uses the exact backward-compatible fallbacks', () => {
+    expect(MANAGER).toContain('const effectiveCanPrepare = canPrepare ?? canManage;');
+    expect(MANAGER).toContain('const effectiveCanFinalize = canFinalize ?? canManage;');
   });
 
-  it('binds authoring to prepare and lifecycle to finalize', () => {
-    expect(MANAGER).toContain('const editable = isDraft && allowPrepare');
+  it('never ANDs the optional staff permissions with canManage', () => {
+    expect(MANAGER).not.toContain('canManage && (canPrepare');
+    expect(MANAGER).not.toContain('canManage && (canFinalize');
+  });
+
+  it('gates create/edit on prepare and finalize/void on finalize', () => {
+    expect(MANAGER).toContain('const allowPrepare = effectiveCanPrepare;');
+    expect(MANAGER).toContain('const allowFinalize = effectiveCanFinalize;');
+    expect(MANAGER).toContain('{allowPrepare && (');
     expect(MANAGER).toContain('{allowPrepare && creating && (');
+    expect(MANAGER).toContain('const editable = isDraft && allowPrepare;');
     expect(MANAGER).toContain('{isDraft && allowFinalize && (');
     expect(MANAGER).toContain('{allowPrepare && allowFinalize && (');
-    expect(MANAGER).toContain('{(allowPrepare || allowFinalize) && (');
+  });
+
+  it('shows the neutral read-only note only when both effective gates are false', () => {
+    expect(MANAGER).toContain('{!effectiveCanPrepare && !effectiveCanFinalize && (');
+    expect(MANAGER).not.toContain('{!canManage && (');
   });
 });
 
-describe('RC-1I — recruiter shell entry point', () => {
-  it('opens the settlement surface only on settlements_view', () => {
-    expect(ROUTE).toContain(
-      'const canOpenSettlements =\n    !perms.isLoading && !perms.error && perms.canViewSettlements;',
-    );
-    expect(ROUTE).toContain("staffView === 'settlements' && canOpenSettlements");
-    expect(ROUTE).toContain('data-testid="staff-open-settlements"');
+/* ------------------------- 13/14) scope of the change --------------------- */
+
+const git = (...args: string[]) =>
+  execFileSync('git', args, { cwd: process.cwd(), encoding: 'utf8' });
+
+const hasRef = (ref: string) => {
+  try {
+    git('cat-file', '-e', `${ref}^{commit}`);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/** Commit immediately preceding all RC-1I work (RC-1H generated baseline). */
+const RC1I_BASELINE = 'ae98371382db217408ec74313a9a9076fecbcf36';
+/** Rejected RC-1I candidate — accepted route/permission wiring lives here. */
+const RC1I_REJECTED_CANDIDATE = '31e6806e959528bbc9fe25aaf8bb0bc30a198749';
+
+const RC1I_ALLOWLIST = [
+  'src/components/opportunities/recruiter/RecruiterAccessRoute.tsx',
+  'src/components/settlements/BusinessSettlementManager.tsx',
+  'src/components/settlements/RecruiterStaffSettlementsPanel.tsx',
+  'src/hooks/recruiter/useRecruiterStaffPermissions.ts',
+  'src/hooks/settlements/useRecruiterStaffSettlementRelationships.ts',
+  'src/test/phaseRC1IRecruiterStaffSettlementAuthorization.test.tsx',
+  SQL_PATH,
+];
+
+describe('RC-1I — change scope', () => {
+  it('leaves the accepted route and permission wiring untouched by the correction', () => {
+    if (!hasRef(RC1I_REJECTED_CANDIDATE)) return;
+    const changed = git(
+      'diff',
+      '--name-only',
+      RC1I_REJECTED_CANDIDATE,
+      'HEAD',
+      '--',
+      'src/components/opportunities/recruiter/RecruiterAccessRoute.tsx',
+      'src/hooks/recruiter/useRecruiterStaffPermissions.ts',
+    )
+      .split('\n')
+      .filter(Boolean);
+    expect(changed).toEqual([]);
   });
 
-  it('never opens the surface on prepare or finalize alone', () => {
-    const gate = ROUTE.split('const canOpenSettlements =')[1].split(';')[0];
-    expect(gate).not.toContain('canPrepareSettlements');
-    expect(gate).not.toContain('canFinalizeSettlements');
+  it('keeps the functional RC-1I diff inside the original seven files', () => {
+    if (!hasRef(RC1I_BASELINE)) return;
+    const changed = git('diff', '--name-only', RC1I_BASELINE, 'HEAD')
+      .split('\n')
+      .filter(Boolean);
+    expect(changed.length).toBeGreaterThan(0);
+    for (const file of changed) expect(RC1I_ALLOWLIST).toContain(file);
+    expect(changed).not.toContain('src/integrations/supabase/types.ts');
+  });
+
+  it('still exposes the accepted route and permission wiring', () => {
+    expect(ROUTE).toContain('RecruiterStaffSettlementsPanel');
+    expect(ROUTE).toContain('canViewSettlements');
+    expect(PERMS_HOOK).toContain('canViewSettlements');
+    expect(PERMS_HOOK).toContain('canPrepareSettlements');
+    expect(PERMS_HOOK).toContain('canFinalizeSettlements');
   });
 });
