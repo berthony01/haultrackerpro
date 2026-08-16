@@ -63,6 +63,7 @@ const RecruiterFeatures = lazy(() => import("./pages/recruiter/RecruiterFeatures
 const RecruiterGuide = lazy(() => import("./pages/recruiter/RecruiterGuide"));
 const RecruiterUpdates = lazy(() => import("./pages/recruiter/RecruiterUpdates"));
 const RecruiterEntryRoute = lazy(() => import("./components/opportunities/recruiter/RecruiterEntryRoute"));
+const RecruiterInviteAccept = lazy(() => import("./pages/RecruiterInviteAccept"));
 const About = lazy(() => import("./pages/About"));
 const CompareVsSpreadsheets = lazy(() => import("./pages/comparisons/HaulTrackerProVsSpreadsheets"));
 const CompareVsQuickBooks = lazy(() => import("./pages/comparisons/HaulTrackerProVsQuickBooks"));
