@@ -175,6 +175,11 @@ describe('RC-1H — safe payload projection', () => {
   });
 
   it('excludes every sensitive field', () => {
+    // Strip SQL comments — only executable projection text is asserted.
+    const body = BUILDER.split('\n')
+      .map(l => l.replace(/--.*$/, ''))
+      .join('\n')
+      .toLowerCase();
     for (const forbidden of [
       'stripe',
       'customer_id',
@@ -197,7 +202,7 @@ describe('RC-1H — safe payload projection', () => {
       'rpm',
       'tax',
     ]) {
-      expect(BUILDER.toLowerCase()).not.toContain(forbidden);
+      expect(body).not.toContain(forbidden);
     }
   });
 
@@ -315,6 +320,8 @@ describe('RC-1H — route wiring', () => {
 
 describe('RC-1H — staff panel isolation', () => {
   it('imports no owner / billing / Agency / operational surface', () => {
+    // Skip the leading doc comment; assert on executable source only.
+    const code = PANEL.slice(PANEL.indexOf('*/') + 2);
     for (const bad of [
       'useRecruiterReportData',
       'RecruiterReportsPanel',
@@ -326,7 +333,7 @@ describe('RC-1H — staff panel isolation', () => {
       'Upgrade to',
       'Crown',
     ]) {
-      expect(PANEL).not.toContain(bad);
+      expect(code).not.toContain(bad);
     }
   });
 
