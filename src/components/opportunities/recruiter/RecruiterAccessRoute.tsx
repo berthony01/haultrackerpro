@@ -30,6 +30,7 @@ import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
 import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterStaffContractsView';
 import { RecruiterStaffReportsPanel } from '@/components/recruiter/RecruiterStaffReportsPanel';
 import { RecruiterStaffSettlementsPanel } from '@/components/settlements/RecruiterStaffSettlementsPanel';
+import { RecruiterTeamPanel } from '@/components/recruiter/RecruiterTeamPanel';
 
 
 
@@ -85,6 +86,7 @@ function StaffWorkspaceRoute({
     | 'contracts'
     | 'reports'
     | 'settlements'
+    | 'team'
   >('home');
 
 
@@ -116,6 +118,10 @@ function StaffWorkspaceRoute({
   // on their own.
   const canOpenSettlements =
     !perms.isLoading && !perms.error && perms.canViewSettlements;
+  // Phase RC-1J-D — team entry point, same fail-closed contract.
+  // `team_manage` does NOT open the surface on its own.
+  const canOpenTeam =
+    !perms.isLoading && !perms.error && perms.canViewTeam;
 
 
 
@@ -200,6 +206,21 @@ function StaffWorkspaceRoute({
     );
   }
 
+  if (staffView === 'team' && canOpenTeam) {
+    return (
+      <RecruiterTeamPanel
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewTeam={perms.canViewTeam}
+        canManageTeam={perms.canManageTeam}
+        isOwnerActor={false}
+        actorPermissions={perms.permissions}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+
 
 
 
@@ -283,6 +304,16 @@ function StaffWorkspaceRoute({
             className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
           >
             Manage Settlements
+          </button>
+        )}
+        {canOpenTeam && (
+          <button
+            type="button"
+            onClick={() => setStaffView('team')}
+            data-testid="staff-open-team"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            {perms.canManageTeam ? 'Manage Team' : 'View Team'}
           </button>
         )}
 

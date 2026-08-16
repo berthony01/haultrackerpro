@@ -43,6 +43,8 @@ import {
 import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
 import { RecruiterReadinessDialog } from '../RecruiterReadinessDialog';
 import { CarrierSettlementsPanel } from '@/components/settlements/CarrierSettlementsPanel';
+// Phase RC-1J-D — owner Team panel, mounted on demand only.
+import { RecruiterTeamPanel } from '@/components/recruiter/RecruiterTeamPanel';
 
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
@@ -153,6 +155,10 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const [readinessOpen, setReadinessOpen] = useState(false);
   // Phase 1T-E1: carrier settlements mount on demand only.
   const [settlementsOpen, setSettlementsOpen] = useState(false);
+  // Phase RC-1J-D: owner Team panel mounts on demand only, same low-risk
+  // pattern as settlements. Never gated by client plan/capability logic —
+  // the server seat-status RPC is authoritative.
+  const [teamOpen, setTeamOpen] = useState(false);
   const readiness = resolveRecruiterReadiness(profile);
 
   const handlePost = () => {
@@ -344,6 +350,8 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               onApplications={onApplications}
               settlementsOpen={settlementsOpen}
               onToggleSettlements={() => setSettlementsOpen((v) => !v)}
+              teamOpen={teamOpen}
+              onToggleTeam={() => setTeamOpen((v) => !v)}
             />
 
             {settlementsOpen && (
@@ -354,6 +362,18 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                 className="scroll-mt-24 outline-none"
               >
                 <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
+              </div>
+            )}
+
+            {teamOpen && profile?.id && (
+              <div data-testid="recruiter-team-anchor" className="scroll-mt-24">
+                <RecruiterTeamPanel
+                  recruiterId={profile.id}
+                  companyName={profile.company_name ?? 'Your workspace'}
+                  canViewTeam
+                  canManageTeam
+                  isOwnerActor
+                />
               </div>
             )}
 
@@ -491,6 +511,8 @@ function ToolsGrid({
   onApplications,
   settlementsOpen,
   onToggleSettlements,
+  teamOpen,
+  onToggleTeam,
 }: {
   canPost: boolean;
   newRequests: number;
@@ -499,6 +521,8 @@ function ToolsGrid({
   onApplications: () => void;
   settlementsOpen: boolean;
   onToggleSettlements: () => void;
+  teamOpen: boolean;
+  onToggleTeam: () => void;
 }) {
   return (
     <Card className="p-5 border-border/60">
@@ -545,6 +569,14 @@ function ToolsGrid({
           cta={settlementsOpen ? 'Hide Settlements' : 'Open Settlements'}
           onClick={onToggleSettlements}
         />
+        <ToolCard
+          icon={Users}
+          title="Recruiter Team"
+          body="Invite teammates and control exactly what each of them can do in this workspace."
+          cta={teamOpen ? 'Hide Team' : 'Manage Team'}
+          onClick={onToggleTeam}
+        />
+
         <ToolCard
           icon={BarChart3}
           title="Recruiting Analytics"
