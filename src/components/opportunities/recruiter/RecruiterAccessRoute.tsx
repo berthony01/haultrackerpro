@@ -143,6 +143,20 @@ function StaffWorkspaceRoute({
     );
   }
 
+  if (staffView === 'contracts' && canOpenContracts) {
+    return (
+      <RecruiterStaffContractsView
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewContracts={perms.canViewContracts}
+        canManageContracts={perms.canManageContracts}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+
+
 
 
   return (
