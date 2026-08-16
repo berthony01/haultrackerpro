@@ -88,25 +88,30 @@ export function parseRecruiterStaffSettlementRelationships(
       if (!Object.prototype.hasOwnProperty.call(row, key)) return null;
     }
 
+    const relationshipId: unknown = row.relationship_id;
+    const driverUserId: unknown = row.driver_user_id;
+    const driverName: unknown = row.driver_name;
+    const invitedAt: unknown = row.invited_at;
+    const acceptedAt: unknown = row.accepted_at;
+
     if (
-      !isNonEmptyString(row.relationship_id) ||
-      !isNonEmptyString(row.driver_user_id) ||
-      !isNonEmptyString(row.driver_name) ||
-      !isNonEmptyString(row.invited_at)
+      !isNonEmptyString(relationshipId) ||
+      !isNonEmptyString(driverUserId) ||
+      !isNonEmptyString(driverName) ||
+      !isNonEmptyString(invitedAt)
     ) {
       return null;
     }
-    const acceptedAt = row.accepted_at;
-    if (!(acceptedAt === null || typeof acceptedAt === 'string')) {
+    if (acceptedAt !== null && typeof acceptedAt !== 'string') {
       return null;
     }
 
     out.push({
-      relationshipId: row.relationship_id,
-      driverUserId: row.driver_user_id,
-      driverName: row.driver_name,
-      invitedAt: row.invited_at,
-      acceptedAt,
+      relationshipId,
+      driverUserId,
+      driverName,
+      invitedAt,
+      acceptedAt: acceptedAt as string | null,
     });
   }
   return out;
