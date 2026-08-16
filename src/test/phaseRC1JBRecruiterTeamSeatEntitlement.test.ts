@@ -26,11 +26,15 @@ const lowerExecutable = lower
   .map((line) => line.replace(/--.*$/, ""))
   .join("\n");
 
-/** Extract the body of a `CREATE OR REPLACE FUNCTION public.<name>` block. */
+/**
+ * Extract the EXECUTABLE body of a `CREATE OR REPLACE FUNCTION public.<name>`
+ * block. Comments are stripped so narrative prose can never satisfy — or
+ * falsely violate — a behavioral assertion.
+ */
 function fnBody(name: string): string {
-  const start = lower.indexOf(`create or replace function public.${name}`);
+  const start = lowerExecutable.indexOf(`create or replace function public.${name}`);
   expect(start, `function ${name} must be defined`).toBeGreaterThan(-1);
-  const rest = lower.slice(start + 10);
+  const rest = lowerExecutable.slice(start + 10);
   const next = rest.indexOf("create or replace function public.");
   return next === -1 ? rest : rest.slice(0, next);
 }
