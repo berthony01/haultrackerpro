@@ -205,6 +205,21 @@ function StaffWorkspaceRoute({
     );
   }
 
+  if (staffView === 'team' && canOpenTeam) {
+    return (
+      <RecruiterTeamPanel
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewTeam={perms.canViewTeam}
+        canManageTeam={perms.canManageTeam}
+        isOwnerActor={false}
+        actorPermissions={perms.permissions}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+
 
 
 
