@@ -306,6 +306,16 @@ function StaffWorkspaceRoute({
             Manage Settlements
           </button>
         )}
+        {canOpenTeam && (
+          <button
+            type="button"
+            onClick={() => setStaffView('team')}
+            data-testid="staff-open-team"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            {perms.canManageTeam ? 'Manage Team' : 'View Team'}
+          </button>
+        )}
 
 
 
