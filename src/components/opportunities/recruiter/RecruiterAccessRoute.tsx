@@ -117,6 +117,10 @@ function StaffWorkspaceRoute({
   // on their own.
   const canOpenSettlements =
     !perms.isLoading && !perms.error && perms.canViewSettlements;
+  // Phase RC-1J-D — team entry point, same fail-closed contract.
+  // `team_manage` does NOT open the surface on its own.
+  const canOpenTeam =
+    !perms.isLoading && !perms.error && perms.canViewTeam;
 
 
 
