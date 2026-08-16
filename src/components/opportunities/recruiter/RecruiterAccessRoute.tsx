@@ -28,6 +28,8 @@ import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboar
 import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicationsDashboard';
 import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
 import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterStaffContractsView';
+import { RecruiterStaffReportsPanel } from '@/components/recruiter/RecruiterStaffReportsPanel';
+
 
 
 
