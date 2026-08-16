@@ -62,7 +62,6 @@ serve(async (req) => {
 
     const c = (version as any).contracts;
     if (!c) return json({ error: "Contract not found" }, 404);
-    if (c.recruiter_user_id !== userId) return json({ error: "Forbidden" }, 403);
 
     // Cross-check recruiter profile is still in good standing
     const { data: rp } = await admin
@@ -72,13 +71,35 @@ serve(async (req) => {
       .maybeSingle();
     if (
       !rp ||
-      rp.user_id !== userId ||
       rp.status === "suspended" ||
       rp.verification_status === "suspended" ||
       rp.verification_status !== "approved"
     ) {
       return json({ error: "Not authorized" }, 403);
     }
+
+    // Owner path: unchanged — the contract's canonical recruiter owner.
+    const isOwner = c.recruiter_user_id === userId && rp.user_id === userId;
+
+    // Phase RC-1G — the same authorized staff caller that started a version
+    // may confirm it. Authorization comes ONLY from the server-side helper
+    // (`contracts_manage`), never a role label, and is evaluated with the
+    // real staff auth.uid(). Stale-confirm and terminal-status protections
+    // below are untouched.
+    let isAuthorizedStaff = false;
+    if (!isOwner) {
+      const { data: staffOk, error: staffErr } = await userClient.rpc(
+        "current_user_can_recruiter_contract_action",
+        { _recruiter_id: c.recruiter_id, _permission: "contracts_manage" },
+      );
+      if (staffErr) {
+        console.error("[confirm-contract-upload] staff authz", staffErr);
+        return json({ error: "Could not verify contract access." }, 500);
+      }
+      isAuthorizedStaff = staffOk === true;
+    }
+
+    if (!isOwner && !isAuthorizedStaff) return json({ error: "Forbidden" }, 403);
 
     // Recruiter contract workflow tools are a Growth/Fleet premium feature.
     const { data: billingRow } = await admin
@@ -94,6 +115,7 @@ serve(async (req) => {
         403,
       );
     }
+
 
     if (version.upload_status === "uploaded") {
       return json({ ok: true, already: true });

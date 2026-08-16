@@ -27,6 +27,8 @@ import { useRecruiterStaffPermissions } from '@/hooks/recruiter/useRecruiterStaf
 import { RecruiterApplicationsDashboard } from '../RecruiterApplicationsDashboard';
 import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicationsDashboard';
 import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
+import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterStaffContractsView';
+
 
 
 import {
@@ -73,8 +75,9 @@ function StaffWorkspaceRoute({
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
   const [staffView, setStaffView] = useState<
-    'home' | 'opportunities' | 'applications' | 'referrals'
+    'home' | 'opportunities' | 'applications' | 'referrals' | 'contracts'
   >('home');
+
 
   const roleLabel =
     workspace.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff';
@@ -90,6 +93,11 @@ function StaffWorkspaceRoute({
     !perms.isLoading &&
     !perms.error &&
     (perms.canViewReferrals || perms.canManageReferralTerms);
+  // Phase RC-1G — contracts entry point, same fail-closed contract.
+  // `contracts_manage` does NOT open the surface on its own.
+  const canOpenContracts =
+    !perms.isLoading && !perms.error && perms.canViewContracts;
+
 
 
   if (staffView === 'opportunities' && canOpenOpportunities) {
@@ -134,6 +142,20 @@ function StaffWorkspaceRoute({
       />
     );
   }
+
+  if (staffView === 'contracts' && canOpenContracts) {
+    return (
+      <RecruiterStaffContractsView
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewContracts={perms.canViewContracts}
+        canManageContracts={perms.canManageContracts}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+
 
 
 
@@ -187,6 +209,18 @@ function StaffWorkspaceRoute({
             Manage Referrals
           </button>
         )}
+        {canOpenContracts && (
+          <button
+            type="button"
+            onClick={() => setStaffView('contracts')}
+            data-testid="staff-open-contracts"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            Manage Contracts
+          </button>
+        )}
+
+
 
       </div>
       {onChangeStaffWorkspace && (

@@ -72,15 +72,35 @@ serve(async (req) => {
     const c = (version as any).contracts;
     if (!c) return json({ error: "Contract not found" }, 404);
 
-    // Authorization: only owning recruiter or admin may trigger parsing.
-    // Drivers can VIEW the contract but cannot start parse jobs (Phase 3 hardening).
+    // Authorization: only the owning recruiter, an authorized recruiter staff
+    // member with `contracts_manage` (Phase RC-1G), or an admin may trigger
+    // parsing. Drivers can VIEW the contract but cannot start parse jobs
+    // (Phase 3 hardening) — unchanged.
     const { data: adminRow } = await admin
       .from("admin_users")
       .select("user_id")
       .eq("user_id", userId)
       .maybeSingle();
     const isAdmin = !!adminRow;
-    const isRecruiter = c.recruiter_user_id === userId;
+    const isRecruiterOwner = c.recruiter_user_id === userId;
+
+    // Never a role label: the helper requires active membership + posting
+    // readiness + explicit `contracts_manage` + standalone Growth/Fleet
+    // billing, evaluated with the real staff auth.uid().
+    let isAuthorizedStaff = false;
+    if (!isAdmin && !isRecruiterOwner) {
+      const { data: staffOk, error: staffErr } = await userClient.rpc(
+        "current_user_can_recruiter_contract_action",
+        { _recruiter_id: c.recruiter_id, _permission: "contracts_manage" },
+      );
+      if (staffErr) {
+        console.error("[parse-contract] staff authz", staffErr);
+        return json({ error: "Could not verify contract access." }, 500);
+      }
+      isAuthorizedStaff = staffOk === true;
+    }
+
+    const isRecruiter = isRecruiterOwner || isAuthorizedStaff;
     if (!isAdmin && !isRecruiter) {
       return json({ error: "Forbidden" }, 403);
     }
@@ -102,6 +122,7 @@ serve(async (req) => {
         );
       }
     }
+
 
     if (version.upload_status !== "uploaded") {
       return json({ error: "Version is not uploaded yet" }, 409);

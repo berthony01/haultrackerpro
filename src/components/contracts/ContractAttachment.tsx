@@ -16,7 +16,19 @@ interface Props {
   applicationId: string;
   /** 'recruiter' shows upload + replace; 'driver' shows view-only. */
   role: 'recruiter' | 'driver';
+  /**
+   * Phase RC-1G — recruiter-side MUTATION gate.
+   *
+   * Defaults to `true` so all existing owner recruiter call sites and all
+   * driver behavior are byte-for-byte unchanged. Recruiter STAFF mount this
+   * with the RC-1B `contracts_manage` boolean: `contracts_view` staff still
+   * see and open the document, but Attach/Upload New Version, Prepare AI
+   * Review, and Run AI Risk Review are withheld. UX only — PostgreSQL and the
+   * contract Edge Functions remain authoritative.
+   */
+  canManageRecruiterContract?: boolean;
 }
+
 
 const ACCEPT = 'application/pdf,image/png,image/jpeg,image/webp';
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -179,7 +191,14 @@ function ParsingSkeleton({ label }: { label: string }) {
   );
 }
 
-export function ContractAttachment({ applicationId, role }: Props) {
+export function ContractAttachment({
+  applicationId,
+  role,
+  canManageRecruiterContract = true,
+}: Props) {
+  // Recruiter-side mutation gate. Drivers are never affected by this flag.
+  const recruiterCanManage = role === 'recruiter' && canManageRecruiterContract !== false;
+
   const inputRef = useRef<HTMLInputElement>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [showChangesBox, setShowChangesBox] = useState(false);
@@ -261,7 +280,9 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const riskScore = typeof findings?.risk_score === 'number' ? findings.risk_score : null;
   const riskTier = (findings?.risk_tier || '').toLowerCase();
   const tierStyle = riskTier && TIER_STYLES[riskTier] ? TIER_STYLES[riskTier] : null;
-  const canAnalyze = hasContract && parseStatus === 'parsed' && role === 'recruiter';
+  const canAnalyze =
+    hasContract && parseStatus === 'parsed' && role === 'recruiter' && recruiterCanManage;
+
   const showAnalyzeBtn = canAnalyze && !aiReview;
 
   // Driver decision (Phase 5) — bound to current version only.
@@ -431,26 +452,29 @@ export function ContractAttachment({ applicationId, role }: Props) {
         </div>
         {role === 'recruiter' && (
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={hasContract ? 'outline' : 'default'}
-              size="sm"
-              onClick={handlePick}
-              disabled={uploadContract.isPending || isLoading}
-            >
-              {uploadContract.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              {hasContract ? 'Upload New Version' : 'Attach Contract'}
-            </Button>
+            {recruiterCanManage && (
+              <Button
+                variant={hasContract ? 'outline' : 'default'}
+                size="sm"
+                onClick={handlePick}
+                disabled={uploadContract.isPending || isLoading}
+              >
+                {uploadContract.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {hasContract ? 'Upload New Version' : 'Attach Contract'}
+              </Button>
+            )}
             {hasContract && (
               <Button variant="ghost" size="sm" onClick={handleView} disabled={isViewLoading}>
                 {isViewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                 View
               </Button>
             )}
-            {hasContract && parseStatus !== 'parsed' && (
+
+            {recruiterCanManage && hasContract && parseStatus !== 'parsed' && (
               <Button
                 variant="secondary"
                 size="sm"
@@ -465,6 +489,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
                 {parseStatus === 'failed' ? 'Retry Extraction' : 'Prepare AI Review'}
               </Button>
             )}
+
             {showAnalyzeBtn && (
               <Button
                 variant="secondary"
