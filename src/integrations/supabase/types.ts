@@ -4834,6 +4834,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      current_user_can_recruiter_contract_action: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
       current_user_can_recruiter_opportunity_action: {
         Args: {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
@@ -5584,6 +5591,10 @@ export type Database = {
         Args: { _recruiter_id: string }
         Returns: Json[]
       }
+      list_recruiter_contract_pipeline_safe: {
+        Args: { _recruiter_id: string }
+        Returns: Json[]
+      }
       list_recruiter_members: {
         Args: { _recruiter_id: string }
         Returns: {
@@ -5688,6 +5699,25 @@ export type Database = {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
         }
         Returns: {
+          recruiter_id: string
+        }[]
+      }
+      recruiter_contract_application_context: {
+        Args: {
+          _application_id: string
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+        }
+        Returns: {
+          recruiter_id: string
+        }[]
+      }
+      recruiter_contract_authorized_context: {
+        Args: {
+          _contract_id: string
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+        }
+        Returns: {
+          application_id: string
           recruiter_id: string
         }[]
       }
