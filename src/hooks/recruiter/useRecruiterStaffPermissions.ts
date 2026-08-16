@@ -54,6 +54,10 @@ export interface RecruiterStaffPermissionsState {
   canViewReferrals: boolean;
   canManageReferralStatus: boolean;
   canManageReferralTerms: boolean;
+  /** Phase RC-1G — contract authorization booleans (UX only). */
+  canViewContracts: boolean;
+  canManageContracts: boolean;
+
 
   isLoading: boolean;
   error: unknown;
