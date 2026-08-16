@@ -164,11 +164,32 @@ serve(async (req) => {
     const { data: adminRow } = await admin
       .from("admin_users").select("user_id").eq("user_id", userId).maybeSingle();
     const isAdmin = !!adminRow;
-    const isRecruiter = c.recruiter_user_id === userId;
+    const isRecruiterOwner = c.recruiter_user_id === userId;
     const isDriver = c.driver_user_id === userId;
+
+    // Phase RC-1G — recruiter STAFF may trigger/retrieve recruiter-side AI
+    // analysis ONLY with `contracts_manage`. Never a role label. View-only
+    // (`contracts_view`) staff resolve to false here and are rejected below,
+    // so they can neither trigger nor retrieve analysis through this function.
+    // Driver behavior is unchanged.
+    let isAuthorizedStaff = false;
+    if (!isAdmin && !isRecruiterOwner && !isDriver) {
+      const { data: staffOk, error: staffErr } = await userClient.rpc(
+        "current_user_can_recruiter_contract_action",
+        { _recruiter_id: c.recruiter_id, _permission: "contracts_manage" },
+      );
+      if (staffErr) {
+        console.error("[analyze-contract] staff authz", staffErr);
+        return json({ error: "Could not verify contract access." }, 500);
+      }
+      isAuthorizedStaff = staffOk === true;
+    }
+
+    const isRecruiter = isRecruiterOwner || isAuthorizedStaff;
     if (!isAdmin && !isRecruiter && !isDriver) return json({ error: "Forbidden" }, 403);
     const actorRole: "admin" | "recruiter" | "driver" = isAdmin ? "admin" : isRecruiter ? "recruiter" : "driver";
 
+    // force re-analysis stays ADMIN-ONLY. Recruiter staff never gain it.
     if (force && !isAdmin) return json({ error: "Only admin can force re-analysis" }, 403);
 
     if (version.upload_status !== "uploaded")
@@ -196,6 +217,7 @@ serve(async (req) => {
         );
       }
     }
+
 
     // Idempotency: existing AI review for this version
     const { data: existing } = await admin
