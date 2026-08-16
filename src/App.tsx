@@ -298,6 +298,7 @@ const App = () => (
               <Route path="/recruiter/applications" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:applications" replace /></ProtectedRoute>} />
               <Route path="/recruiter/reports" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:reports" replace /></ProtectedRoute>} />
               <Route path="/recruiter/onboarding" element={<ProtectedRoute><Navigate to="/dashboard?page=recruiter-access:onboarding" replace /></ProtectedRoute>} />
+              <Route path="/recruiter/invite/:token" element={<RecruiterInviteAccept />} />
               <Route path="/professional-profile" element={<ProtectedRoute><ProfessionalProfile /></ProtectedRoute>} />
               <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
               <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
