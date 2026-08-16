@@ -284,7 +284,23 @@ BEGIN
 
   IF NOT _refresh_unexpired THEN
     _limit    := public.recruiter_team_seat_limit(_recruiter_id);
-    _occupied := public.recruiter_team_occupied_seats(_recruiter_id);
+
+    -- RC-1J-B CONCURRENCY CORRECTION: recount occupied seats with a DIRECT
+    -- statement inside this VOLATILE function. A STABLE helper would reuse the
+    -- snapshot taken before this transaction waited on the FOR UPDATE lock and
+    -- could therefore miss a concurrently committed invite.
+    SELECT 1 + count(*)::integer INTO _occupied
+      FROM public.recruiter_members m
+     WHERE m.recruiter_id = _recruiter_id
+       AND m.role <> 'recruiter_owner'
+       AND (
+         m.status = 'active'
+         OR (
+           m.status = 'pending'
+           AND m.invite_expires_at IS NOT NULL
+           AND m.invite_expires_at > now()
+         )
+       );
 
     IF _limit IS NULL OR _limit < 1 OR _occupied >= _limit THEN
       -- Stable generic capacity exception: never leaks billing internals.
