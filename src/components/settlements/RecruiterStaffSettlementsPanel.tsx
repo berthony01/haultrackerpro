@@ -1,7 +1,7 @@
 /**
  * Phase RC-1I — recruiter STAFF settlement surface.
  *
- * Staff-only counterpart of the owner `CarrierSettlementsPanel`. It mounts NO
+ * Staff-only counterpart of the owner carrier settlement panel. It mounts NO
  * owner-only consumer: no recruiter profile hook, no billing/subscription
  * hook, no relationship invite/end mutation, no application pipeline. The only
  * workspace read is the RC-1I `list_recruiter_staff_settlement_relationships`
