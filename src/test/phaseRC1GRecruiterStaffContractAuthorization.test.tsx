@@ -371,7 +371,7 @@ describe('RC-1G — staff contracts view isolation', () => {
       'Referral',
       'Agency',
     ]) {
-      expect(STAFF_VIEW.replace('RecruiterStaffContractsView', '')).not.toContain(owner);
+      expect(STAFF_VIEW.split('RecruiterStaffContractsView').join('')).not.toContain(owner);
     }
   });
 
