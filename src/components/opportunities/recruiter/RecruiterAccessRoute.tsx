@@ -29,6 +29,7 @@ import { RecruiterStaffApplicationsDashboard } from '../RecruiterStaffApplicatio
 import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
 import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterStaffContractsView';
 import { RecruiterStaffReportsPanel } from '@/components/recruiter/RecruiterStaffReportsPanel';
+import { RecruiterStaffSettlementsPanel } from '@/components/settlements/RecruiterStaffSettlementsPanel';
 
 
 
@@ -77,7 +78,13 @@ function StaffWorkspaceRoute({
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
   const [staffView, setStaffView] = useState<
-    'home' | 'opportunities' | 'applications' | 'referrals' | 'contracts' | 'reports'
+    | 'home'
+    | 'opportunities'
+    | 'applications'
+    | 'referrals'
+    | 'contracts'
+    | 'reports'
+    | 'settlements'
   >('home');
 
 
@@ -104,6 +111,11 @@ function StaffWorkspaceRoute({
   // `reports_export` does NOT open the surface on its own.
   const canOpenReports =
     !perms.isLoading && !perms.error && perms.canViewReports;
+  // Phase RC-1I — settlements entry point, same fail-closed contract.
+  // `settlements_prepare` / `settlements_finalize` do NOT open the surface
+  // on their own.
+  const canOpenSettlements =
+    !perms.isLoading && !perms.error && perms.canViewSettlements;
 
 
 
@@ -170,6 +182,19 @@ function StaffWorkspaceRoute({
         companyName={workspace.companyName}
         canViewReports={perms.canViewReports}
         canExportReports={perms.canExportReports}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+  if (staffView === 'settlements' && canOpenSettlements) {
+    return (
+      <RecruiterStaffSettlementsPanel
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canViewSettlements={perms.canViewSettlements}
+        canPrepareSettlements={perms.canPrepareSettlements}
+        canFinalizeSettlements={perms.canFinalizeSettlements}
         onBack={() => setStaffView('home')}
       />
     );
@@ -248,6 +273,16 @@ function StaffWorkspaceRoute({
             className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
           >
             Manage Reports
+          </button>
+        )}
+        {canOpenSettlements && (
+          <button
+            type="button"
+            onClick={() => setStaffView('settlements')}
+            data-testid="staff-open-settlements"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            Manage Settlements
           </button>
         )}
 

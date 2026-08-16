@@ -4418,6 +4418,10 @@ export type Database = {
         }[]
       }
       _agency_plan_label: { Args: { _plan_key: string }; Returns: string }
+      _build_recruiter_staff_report_payload: {
+        Args: { _from: string; _recruiter_id: string; _to: string }
+        Returns: Json
+      }
       _derive_recruiter_capability_status: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["user_capability_status"]
@@ -4855,6 +4859,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      current_user_can_recruiter_staff_report_action: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
       current_user_has_recruiter_permission: {
         Args: {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
@@ -5145,6 +5156,14 @@ export type Database = {
       }
       get_recruiter_referral_settings_for_workspace: {
         Args: { _recruiter_id: string }
+        Returns: Json
+      }
+      get_recruiter_staff_report_export_data: {
+        Args: { _from: string; _recruiter_id: string; _to: string }
+        Returns: Json
+      }
+      get_recruiter_staff_report_view_data: {
+        Args: { _from: string; _recruiter_id: string; _to: string }
         Returns: Json
       }
       get_weekly_driver_leaderboard: {

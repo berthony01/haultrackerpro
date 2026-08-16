@@ -60,6 +60,10 @@ export interface RecruiterStaffPermissionsState {
   /** Phase RC-1H — reporting authorization booleans (UX only). */
   canViewReports: boolean;
   canExportReports: boolean;
+  /** Phase RC-1I — settlement authorization booleans (UX only). */
+  canViewSettlements: boolean;
+  canPrepareSettlements: boolean;
+  canFinalizeSettlements: boolean;
 
 
 
@@ -161,6 +165,9 @@ export function useRecruiterStaffPermissions(
     canViewReports: granted && permissions.reports_view === true,
 
     canExportReports: granted && permissions.reports_export === true,
+    canViewSettlements: granted && permissions.settlements_view === true,
+    canPrepareSettlements: granted && permissions.settlements_prepare === true,
+    canFinalizeSettlements: granted && permissions.settlements_finalize === true,
 
 
 

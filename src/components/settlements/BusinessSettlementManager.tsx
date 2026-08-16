@@ -541,6 +541,13 @@ export interface BusinessSettlementManagerProps {
   /** Presentation-only signal from the canonical billing/entitlement consumer. */
   canManage: boolean;
   blockedReason?: string;
+  /**
+   * Phase RC-1I — OPTIONAL granular presentation gates for recruiter STAFF.
+   * Omitted (owner surfaces) => unchanged behaviour: both follow `canManage`.
+   * These narrow the UI only; PostgreSQL remains the sole authority.
+   */
+  canPrepare?: boolean;
+  canFinalize?: boolean;
 }
 
 export function BusinessSettlementManager({
@@ -549,7 +556,11 @@ export function BusinessSettlementManager({
   driverOptions,
   canManage,
   blockedReason,
+  canPrepare,
+  canFinalize,
 }: BusinessSettlementManagerProps) {
+  const allowPrepare = canManage && (canPrepare ?? true);
+  const allowFinalize = canManage && (canFinalize ?? true);
   const settlementsQuery = useVisibleSettlements();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Narrow, short-lived hold of the EXACT row an accepted RPC just returned, so
@@ -601,6 +612,8 @@ export function BusinessSettlementManager({
         driverLabel={driverLabels[selected.driver_user_id] ?? 'Driver'}
         mode={mode}
         canManage={canManage}
+        allowPrepare={allowPrepare}
+        allowFinalize={allowFinalize}
         onBack={closeSelected}
         onSelect={openReturned}
       />
@@ -620,7 +633,7 @@ export function BusinessSettlementManager({
               <ReceiptText className="h-4 w-4 text-primary" />
               Settlement statements
             </CardTitle>
-            {canManage && (
+            {allowPrepare && (
               <Button
                 size="sm"
                 onClick={() => setCreating((v) => !v)}
@@ -656,7 +669,7 @@ export function BusinessSettlementManager({
         </CardContent>
       </Card>
 
-      {canManage && creating && (
+      {allowPrepare && creating && (
         <BusinessDraftForm
           mode={mode}
           businessId={businessId}
@@ -933,6 +946,8 @@ function BusinessSettlementDetail({
   driverLabel,
   mode,
   canManage,
+  allowPrepare,
+  allowFinalize,
   onBack,
   onSelect,
 }: {
@@ -940,6 +955,8 @@ function BusinessSettlementDetail({
   driverLabel: string;
   mode: BusinessSettlementMode;
   canManage: boolean;
+  allowPrepare: boolean;
+  allowFinalize: boolean;
   onBack: () => void;
   onSelect: (settlement: BusinessSettlementLike) => void;
 }) {
@@ -952,7 +969,7 @@ function BusinessSettlementDetail({
 
   const isDraft = canEditSettlementStatus(settlement.status);
   const isFinalized = settlement.status === 'finalized';
-  const editable = isDraft && canManage;
+  const editable = isDraft && allowPrepare;
 
   /**
    * Read-only export payload. Exporting is a READ capability: it stays
@@ -1256,13 +1273,13 @@ function BusinessSettlementDetail({
         editable={editable}
       />
 
-      {canManage && (
+      {(allowPrepare || allowFinalize) && (
         <Card className="border-border/60">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Statement lifecycle</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {isDraft && (
+            {isDraft && allowFinalize && (
               <ConfirmAction
                 trigger={
                   <Button
@@ -1280,6 +1297,7 @@ function BusinessSettlementDetail({
             )}
             {isFinalized && (
               <>
+                {allowPrepare && allowFinalize && (
                 <ConfirmAction
                   trigger={
                     <Button
@@ -1295,6 +1313,8 @@ function BusinessSettlementDetail({
                   actionLabel="Create correction"
                   onConfirm={runCorrection}
                 />
+                )}
+                {allowFinalize && (
                 <ConfirmAction
                   trigger={
                     <Button
@@ -1312,6 +1332,7 @@ function BusinessSettlementDetail({
                   destructive
                   onConfirm={runVoid}
                 />
+                )}
               </>
             )}
             {!isDraft && !isFinalized && (
