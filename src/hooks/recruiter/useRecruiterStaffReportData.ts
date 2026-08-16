@@ -22,90 +22,234 @@ import type {
   RecruiterReportRange,
 } from '@/lib/recruiterReports/aggregator';
 
-const str = (v: unknown): string | null =>
-  typeof v === 'string' && v.length > 0 ? v : null;
+/**
+ * Plain-object guard. Supabase JSON payloads carry Object.prototype (or a null
+ * prototype); arrays, class instances and exotic objects are rejected.
+ */
+const isPlainObject = (v: unknown): v is Record<string, unknown> => {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
+};
 
-const num = (v: unknown): number =>
-  typeof v === 'number' && Number.isFinite(v) ? v : 0;
+/**
+ * Defense-in-depth unknown-key rejection: an accidental future server addition
+ * of a PII / billing / driver-financial field must fail closed rather than
+ * flow into client state.
+ */
+const keysExactly = (o: Record<string, unknown>, allowed: readonly string[]): boolean => {
+  const keys = Object.keys(o);
+  if (keys.length !== allowed.length) return false;
+  for (const k of allowed) if (!Object.prototype.hasOwnProperty.call(o, k)) return false;
+  for (const k of keys) if (!allowed.includes(k)) return false;
+  return true;
+};
 
-const arr = (v: unknown): Record<string, unknown>[] =>
-  Array.isArray(v)
-    ? v.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
-    : [];
+const isStr = (v: unknown): v is string => typeof v === 'string';
+const isNonEmptyStr = (v: unknown): v is string => typeof v === 'string' && v.length > 0;
+const isFiniteNum = (v: unknown): v is number =>
+  typeof v === 'number' && Number.isFinite(v);
+
+const TOP_LEVEL_KEYS = [
+  'header',
+  'range',
+  'opportunities',
+  'applications',
+  'events',
+  'contactRequests',
+  'contracts',
+] as const;
+
+const HEADER_KEYS = [
+  'companyName',
+  'recruiterName',
+  'verificationStatus',
+  'audience',
+  'plan',
+  'planStatus',
+  'activeLimit',
+  'activeCount',
+] as const;
+
+const RANGE_KEYS = ['from', 'to', 'label'] as const;
+
+const OPPORTUNITY_KEYS = ['id', 'title', 'status', 'view_count', 'published_at'] as const;
+const APPLICATION_KEYS = [
+  'id',
+  'opportunity_id',
+  'status',
+  'created_at',
+  'updated_at',
+] as const;
+const EVENT_KEYS = ['application_id', 'event_type', 'created_at'] as const;
+const CONTACT_REQUEST_KEYS = ['id', 'status', 'created_at'] as const;
+const CONTRACT_KEYS = ['id', 'application_id', 'status', 'updated_at'] as const;
+
+/**
+ * Validate every row of a required collection. A single malformed row rejects
+ * the ENTIRE payload — rows are never silently dropped or repaired.
+ */
+function validateRows<T>(
+  value: unknown,
+  allowedKeys: readonly string[],
+  check: (row: Record<string, unknown>) => boolean,
+  project: (row: Record<string, unknown>) => T,
+): T[] | null {
+  if (!Array.isArray(value)) return null;
+  const out: T[] = [];
+  for (const raw of value) {
+    if (!isPlainObject(raw)) return null;
+    if (!keysExactly(raw, allowedKeys)) return null;
+    if (!check(raw)) return null;
+    out.push(project(raw));
+  }
+  return out;
+}
 
 /**
  * Strict, fail-closed normalization. Anything malformed yields `null`, which
  * the panel renders as an unavailable state — never partial report data.
+ *
+ * The server header must ITSELF assert the staff-safe contract
+ * (audience=staff, plan=workspace, planStatus=authorized, activeLimit=0); an
+ * unsafe server value is rejected, never silently overwritten with a safe one.
  */
 export function normalizeRecruiterStaffReportPayload(
   payload: unknown,
   range: RecruiterReportRange,
 ): RecruiterReportInput | null {
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
-  const p = payload as Record<string, unknown>;
-  const h = p.header;
-  if (!h || typeof h !== 'object' || Array.isArray(h)) return null;
-  const header = h as Record<string, unknown>;
+  // A + B — top-level shape and exact key allowlist.
+  if (!isPlainObject(payload)) return null;
+  if (!keysExactly(payload, TOP_LEVEL_KEYS)) return null;
 
-  const companyName = str(header.companyName);
-  const recruiterName = str(header.recruiterName);
-  if (!companyName || !recruiterName) return null;
+  const p = payload;
+  if (!isPlainObject(p.header)) return null;
+  if (!isPlainObject(p.range)) return null;
 
+  // C — server range must match the requested range exactly.
+  const serverRange = p.range;
+  if (!keysExactly(serverRange, RANGE_KEYS)) return null;
+  if (!isStr(serverRange.label)) return null;
+  if (serverRange.from !== range.from || serverRange.to !== range.to) return null;
+
+  // D — header must confirm the staff-safe server contract.
+  const header = p.header;
+  if (!keysExactly(header, HEADER_KEYS)) return null;
+  if (!isNonEmptyStr(header.companyName)) return null;
+  if (!isNonEmptyStr(header.recruiterName)) return null;
+  if (!isStr(header.verificationStatus)) return null;
+  if (header.audience !== 'staff') return null;
+  if (header.plan !== 'workspace') return null;
+  if (header.planStatus !== 'authorized') return null;
+  if (header.activeLimit !== 0) return null;
+  if (!isFiniteNum(header.activeCount) || header.activeCount < 0) return null;
+
+  // E + F — every row of every required collection is validated.
+  const opportunities = validateRows(
+    p.opportunities,
+    OPPORTUNITY_KEYS,
+    r =>
+      isNonEmptyStr(r.id) &&
+      isStr(r.title) &&
+      isStr(r.status) &&
+      (r.view_count === null || isFiniteNum(r.view_count)) &&
+      (r.published_at === null || isStr(r.published_at)),
+    r => ({
+      id: r.id as string,
+      title: r.title as string,
+      status: r.status as string,
+      view_count: r.view_count as number | null,
+      published_at: r.published_at as string | null,
+    }),
+  );
+  if (!opportunities) return null;
+
+  const applications = validateRows(
+    p.applications,
+    APPLICATION_KEYS,
+    r =>
+      isNonEmptyStr(r.id) &&
+      isNonEmptyStr(r.opportunity_id) &&
+      isStr(r.status) &&
+      isNonEmptyStr(r.created_at) &&
+      isNonEmptyStr(r.updated_at),
+    r => ({
+      id: r.id as string,
+      opportunity_id: r.opportunity_id as string,
+      status: r.status as string,
+      created_at: r.created_at as string,
+      updated_at: r.updated_at as string,
+    }),
+  );
+  if (!applications) return null;
+
+  const events = validateRows(
+    p.events,
+    EVENT_KEYS,
+    r =>
+      isNonEmptyStr(r.application_id) &&
+      isNonEmptyStr(r.event_type) &&
+      isNonEmptyStr(r.created_at),
+    r => ({
+      application_id: r.application_id as string,
+      event_type: r.event_type as string,
+      created_at: r.created_at as string,
+    }),
+  );
+  if (!events) return null;
+
+  const contactRequests = validateRows(
+    p.contactRequests,
+    CONTACT_REQUEST_KEYS,
+    r => isNonEmptyStr(r.id) && isStr(r.status) && isNonEmptyStr(r.created_at),
+    r => ({
+      id: r.id as string,
+      status: r.status as string,
+      created_at: r.created_at as string,
+    }),
+  );
+  if (!contactRequests) return null;
+
+  const contracts = validateRows(
+    p.contracts,
+    CONTRACT_KEYS,
+    r =>
+      isNonEmptyStr(r.id) &&
+      isNonEmptyStr(r.application_id) &&
+      isStr(r.status) &&
+      isNonEmptyStr(r.updated_at),
+    r => ({
+      id: r.id as string,
+      application_id: r.application_id as string,
+      status: r.status as string,
+      updated_at: r.updated_at as string,
+    }),
+  );
+  if (!contracts) return null;
+
+  // G — only now is a normalized input returned.
   return {
     header: {
-      companyName,
-      recruiterName,
-      verificationStatus: str(header.verificationStatus) ?? 'unknown',
+      companyName: header.companyName,
+      recruiterName: header.recruiterName,
+      verificationStatus: header.verificationStatus,
       // Neutral compatibility values only — never a real plan/billing label.
       plan: 'workspace',
       planStatus: 'authorized',
       activeLimit: 0,
-      activeCount: num(header.activeCount),
+      activeCount: header.activeCount,
       audience: 'staff',
     },
+    // Requested range is retained for display (label included).
     range,
-    opportunities: arr(p.opportunities)
-      .map(o => ({
-        id: str(o.id) ?? '',
-        title: str(o.title) ?? '—',
-        status: str(o.status) ?? 'unknown',
-        view_count: typeof o.view_count === 'number' ? o.view_count : 0,
-        published_at: str(o.published_at),
-      }))
-      .filter(o => o.id !== ''),
-    applications: arr(p.applications)
-      .map(a => ({
-        id: str(a.id) ?? '',
-        opportunity_id: str(a.opportunity_id) ?? '',
-        status: str(a.status) ?? 'unknown',
-        created_at: str(a.created_at) ?? '',
-        updated_at: str(a.updated_at) ?? '',
-      }))
-      .filter(a => a.id !== '' && a.created_at !== ''),
-    events: arr(p.events)
-      .map(e => ({
-        application_id: str(e.application_id) ?? '',
-        event_type: str(e.event_type) ?? '',
-        created_at: str(e.created_at) ?? '',
-      }))
-      .filter(e => e.application_id !== '' && e.created_at !== ''),
-    contactRequests: arr(p.contactRequests)
-      .map(c => ({
-        id: str(c.id) ?? '',
-        status: str(c.status) ?? 'unknown',
-        created_at: str(c.created_at) ?? '',
-      }))
-      .filter(c => c.id !== '' && c.created_at !== ''),
-    contracts: arr(p.contracts)
-      .map(c => ({
-        id: str(c.id) ?? '',
-        application_id: str(c.application_id) ?? '',
-        status: str(c.status) ?? 'unknown',
-        updated_at: str(c.updated_at) ?? '',
-      }))
-      .filter(c => c.id !== '' && c.application_id !== ''),
+    opportunities,
+    applications,
+    events,
+    contactRequests,
+    contracts,
   };
 }
+
 
 export function useRecruiterStaffReportData(args: {
   recruiterId: string | null | undefined;
