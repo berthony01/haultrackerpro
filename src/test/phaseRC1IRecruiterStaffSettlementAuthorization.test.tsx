@@ -97,7 +97,7 @@ describe('RC-1I — staff settlement helper vocabulary', () => {
 
   it('excludes the canonical recruiter owner and uses no role label', () => {
     expect(HELPER).toContain('NOT public.is_recruiter_owner(auth.uid(), _recruiter_id)');
-    for (const role of ["'recruiter_admin'", "'recruiter_staff'", 'rm.role', '.role =']) {
+    for (const role of ["'recruiter_admin'", "'recruiter_staff'", 'rm.role', 'recruiter_members']) {
       expect(HELPER).not.toContain(role);
     }
   });
