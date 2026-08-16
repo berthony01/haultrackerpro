@@ -4866,6 +4866,13 @@ export type Database = {
         }
         Returns: boolean
       }
+      current_user_can_recruiter_team_action: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
       current_user_has_recruiter_permission: {
         Args: {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
@@ -5643,6 +5650,21 @@ export type Database = {
           relationship_id: string
         }[]
       }
+      list_recruiter_team_members_safe: {
+        Args: { _recruiter_id: string }
+        Returns: {
+          accepted_at: string
+          invite_email: string
+          invite_expires_at: string
+          invited_at: string
+          member_role: Database["public"]["Enums"]["recruiter_member_role"]
+          member_status: Database["public"]["Enums"]["recruiter_member_status"]
+          member_user_id: string
+          membership_id: string
+          permissions: Json
+          revoked_at: string
+        }[]
+      }
       log_assistant_action: {
         Args: {
           _action: string
@@ -5872,6 +5894,13 @@ export type Database = {
       }
       set_recruiter_member_permissions: {
         Args: { _member_id: string; _permissions: Json }
+        Returns: Json
+      }
+      set_recruiter_member_role: {
+        Args: {
+          _member_id: string
+          _role: Database["public"]["Enums"]["recruiter_member_role"]
+        }
         Returns: Json
       }
       settlement_accept_my_carrier_relationship: {
