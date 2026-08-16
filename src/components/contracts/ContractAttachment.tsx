@@ -443,25 +443,28 @@ export function ContractAttachment({ applicationId, role }: Props) {
         </div>
         {role === 'recruiter' && (
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant={hasContract ? 'outline' : 'default'}
-              size="sm"
-              onClick={handlePick}
-              disabled={uploadContract.isPending || isLoading}
-            >
-              {uploadContract.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Upload className="h-4 w-4" />
-              )}
-              {hasContract ? 'Upload New Version' : 'Attach Contract'}
-            </Button>
+            {recruiterCanManage && (
+              <Button
+                variant={hasContract ? 'outline' : 'default'}
+                size="sm"
+                onClick={handlePick}
+                disabled={uploadContract.isPending || isLoading}
+              >
+                {uploadContract.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                {hasContract ? 'Upload New Version' : 'Attach Contract'}
+              </Button>
+            )}
             {hasContract && (
               <Button variant="ghost" size="sm" onClick={handleView} disabled={isViewLoading}>
                 {isViewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
                 View
               </Button>
             )}
+
             {recruiterCanManage && hasContract && parseStatus !== 'parsed' && (
               <Button
                 variant="secondary"
