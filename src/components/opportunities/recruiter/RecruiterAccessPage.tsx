@@ -570,6 +570,14 @@ function ToolsGrid({
           onClick={onToggleSettlements}
         />
         <ToolCard
+          icon={Users}
+          title="Recruiter Team"
+          body="Invite teammates and control exactly what each of them can do in this workspace."
+          cta={teamOpen ? 'Hide Team' : 'Manage Team'}
+          onClick={onToggleTeam}
+        />
+
+        <ToolCard
           icon={BarChart3}
           title="Recruiting Analytics"
           body="Track pipeline activity and improve your results."
