@@ -235,7 +235,7 @@ BEGIN
   END IF;
 
   _norm := lower(btrim(COALESCE(_email, '')));
-  IF _norm !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' THEN
+  IF _norm='' OR _norm !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
     RAISE EXCEPTION 'Invalid email' USING ERRCODE = '22023';
   END IF;
 
