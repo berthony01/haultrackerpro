@@ -152,6 +152,9 @@ export function useRecruiterStaffPermissions(
     canViewReferrals: granted && permissions.referrals_view === true,
     canManageReferralStatus: granted && permissions.referrals_manage_status === true,
     canManageReferralTerms: granted && permissions.referral_terms_manage === true,
+    canViewContracts: granted && permissions.contracts_view === true,
+    canManageContracts: granted && permissions.contracts_manage === true,
+
 
 
     isLoading: !!userId && !!id && isLoading,
