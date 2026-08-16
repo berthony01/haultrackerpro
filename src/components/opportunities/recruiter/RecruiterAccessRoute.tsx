@@ -93,6 +93,11 @@ function StaffWorkspaceRoute({
     !perms.isLoading &&
     !perms.error &&
     (perms.canViewReferrals || perms.canManageReferralTerms);
+  // Phase RC-1G — contracts entry point, same fail-closed contract.
+  // `contracts_manage` does NOT open the surface on its own.
+  const canOpenContracts =
+    !perms.isLoading && !perms.error && perms.canViewContracts;
+
 
 
   if (staffView === 'opportunities' && canOpenOpportunities) {
