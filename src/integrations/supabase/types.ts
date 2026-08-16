@@ -301,6 +301,7 @@ export type Database = {
           created_at: string
           id: string
           invite_email: string
+          invite_expires_at: string | null
           invite_token_hash: string | null
           invited_at: string
           member_user_id: string | null
@@ -315,6 +316,7 @@ export type Database = {
           created_at?: string
           id?: string
           invite_email: string
+          invite_expires_at?: string | null
           invite_token_hash?: string | null
           invited_at?: string
           member_user_id?: string | null
@@ -329,6 +331,7 @@ export type Database = {
           created_at?: string
           id?: string
           invite_email?: string
+          invite_expires_at?: string | null
           invite_token_hash?: string | null
           invited_at?: string
           member_user_id?: string | null
@@ -4409,6 +4412,18 @@ export type Database = {
       }
     }
     Functions: {
+      _agency_delegation_operationally_active: {
+        Args: {
+          _delegation_id: string
+          _driver_user_id: string
+          _member_user_id: string
+        }
+        Returns: boolean
+      }
+      _agency_member_paid_operational_authority: {
+        Args: { _agency_id: string; _uid: string }
+        Returns: boolean
+      }
       _agency_plan_defaults: {
         Args: { _plan_key: string }
         Returns: {
@@ -4457,6 +4472,7 @@ export type Database = {
           created_at: string
           id: string
           invite_email: string
+          invite_expires_at: string | null
           invite_token_hash: string | null
           invited_at: string
           member_user_id: string | null
@@ -4480,6 +4496,14 @@ export type Database = {
       accept_recruiter_posting_terms: {
         Args: { _version: string }
         Returns: string
+      }
+      agency_team_occupied_seats: {
+        Args: { _agency_id: string }
+        Returns: number
+      }
+      agency_team_workspace_within_limit: {
+        Args: { _agency_id: string }
+        Returns: boolean
       }
       apply_recruiter_intent: { Args: never; Returns: Json }
       assert_agency_limit: {
@@ -4871,6 +4895,10 @@ export type Database = {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
           _recruiter_id: string
         }
+        Returns: boolean
+      }
+      current_user_can_use_agency_delegation: {
+        Args: { _delegation_id: string; _driver_user_id: string }
         Returns: boolean
       }
       current_user_has_recruiter_permission: {
