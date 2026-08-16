@@ -77,15 +77,40 @@ AS $function$
     )
     -- Canonical owner is excluded from the STAFF settlement path entirely.
     AND NOT public.is_recruiter_owner(auth.uid(), _recruiter_id)
-    -- Non-owner STAFF branch. No role shortcut anywhere.
-    AND public.recruiter_profile_can_manage_opportunities(_recruiter_id)
+    -- VIEW-FOUNDATIONAL: settlements_view is required for EVERY settlement
+    -- action. settlements_prepare / settlements_finalize alone grant nothing.
+    AND public.current_user_has_recruiter_permission(
+          _recruiter_id,
+          'settlements_view'::public.recruiter_workspace_permission)
     AND public.current_user_has_recruiter_permission(_recruiter_id, _permission)
+    -- STANDALONE recruiter/carrier billing, matching the LIVE owner rule.
     AND EXISTS (
       SELECT 1
-      FROM public.recruiter_billing_profiles b
-      WHERE b.recruiter_id = _recruiter_id
-        AND b.plan IN ('growth', 'fleet')
-        AND b.status IN ('active', 'trialing') -- trial-allowlist
+      FROM public.recruiter_profiles rp
+      JOIN public.recruiter_billing_profiles rb
+        ON rb.recruiter_id = rp.id
+       AND rb.user_id = rp.user_id
+      WHERE rp.id = _recruiter_id
+        AND rp.status = 'active'
+        AND rb.plan IN ('starter', 'growth', 'fleet')
+        AND rb.status IN ('active', 'trialing') -- trial-allowlist
+        -- LIVE owner Agency conflict, anchored to the canonical recruiter
+        -- OWNER (rp.user_id) — never the staff caller. Agency-included
+        -- recruiter benefit alone never qualifies a staff member.
+        AND NOT EXISTS (
+          SELECT 1
+          FROM public.agency_profiles ap
+          JOIN public.agency_members am
+            ON am.agency_id = ap.id
+           AND am.member_user_id = rp.user_id
+           AND am.role = 'agency_owner'
+           AND am.status = 'active'
+          JOIN public.agency_entitlements ae
+            ON ae.agency_id = ap.id
+           AND ae.plan_key IN ('agency_starter', 'agency_team', 'agency_growth')
+           AND ae.status IN ('active', 'trialing')
+          WHERE ap.owner_user_id = rp.user_id
+        )
     );
 $function$;
 
