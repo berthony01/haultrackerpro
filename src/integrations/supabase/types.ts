@@ -5633,6 +5633,16 @@ export type Database = {
         Args: { _recruiter_id: string }
         Returns: Json[]
       }
+      list_recruiter_staff_settlement_relationships: {
+        Args: { _recruiter_id: string }
+        Returns: {
+          accepted_at: string
+          driver_name: string
+          driver_user_id: string
+          invited_at: string
+          relationship_id: string
+        }[]
+      }
       log_assistant_action: {
         Args: {
           _action: string
@@ -6161,6 +6171,22 @@ export type Database = {
       }
       settlement_current_user_can_manage_driver_import: {
         Args: never
+        Returns: boolean
+      }
+      settlement_current_user_can_recruiter_staff_action: {
+        Args: {
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+        }
+        Returns: boolean
+      }
+      settlement_current_user_can_recruiter_staff_relationship_action: {
+        Args: {
+          _driver_user_id: string
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+          _relationship_id: string
+        }
         Returns: boolean
       }
       settlement_current_user_can_view_settlement: {
