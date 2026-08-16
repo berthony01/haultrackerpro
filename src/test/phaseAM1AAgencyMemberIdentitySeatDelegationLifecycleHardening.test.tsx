@@ -430,7 +430,7 @@ describe("AM-1A F — target / assigned member lifecycle", () => {
       const p = policyBody(policy);
       expect(p).toContain("auth.uid()");
       expect(p).toContain("public.is_agency_member(agency_id, auth.uid())");
-      expect(p).toContain("for select");
+      expect(p).toContain("for select\n  to authenticated\n  using (");
       expect(count(exec, `create policy ${policy}`)).toBe(1);
     }
     // No mutation policies are introduced anywhere.
@@ -467,5 +467,44 @@ describe("AM-1A G — settlement composition", () => {
     expect(body).toContain("(dr.requested_permissions -> _permission) = to_jsonb(true)");
     expect(body).toContain("recruiter_billing_profiles");
     expect(body).toContain("set search_path to 'pg_catalog', 'public', 'auth'");
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("AM-1A — replacement policy ROLE contract (tighten, never broaden)", () => {
+  const REPLACEMENTS = [
+    ["driver_assistants_assistant_select", "driver_assistants"],
+    ["acr_assigned_member_select", "agency_client_requests"],
+    ["adr_member_select", "agency_delegation_requests"],
+    ["awi_assigned_member_select", "agency_work_items"],
+  ] as const;
+
+  it("every replacement policy is explicitly FOR SELECT TO authenticated", () => {
+    for (const [policy, table] of REPLACEMENTS) {
+      expect(exec).toContain(
+        `create policy ${policy}\n  on public.${table}\n  for select\n  to authenticated\n  using (`,
+      );
+    }
+  });
+
+  it("no replacement policy omits its role clause (implicit PUBLIC)", () => {
+    for (const [policy] of REPLACEMENTS) {
+      const p = policyBody(policy);
+      expect(p.indexOf("to authenticated")).toBeGreaterThan(-1);
+      expect(p.indexOf("to authenticated")).toBeLessThan(p.indexOf("using ("));
+    }
+    // matches the production role scope of the policies being replaced
+    expect(count(exec, "to authenticated\n  using (")).toBe(REPLACEMENTS.length);
+    expect(count(exec, "create policy ")).toBe(REPLACEMENTS.length);
+  });
+
+  it("grants no policy role to public / anon / service_role", () => {
+    for (const [policy] of REPLACEMENTS) {
+      const p = policyBody(policy);
+      expect(p).not.toContain("to public");
+      expect(p).not.toContain("anon");
+      expect(p).not.toContain("service_role");
+      expect(p).not.toContain("to authenticated, ");
+    }
   });
 });
