@@ -30,6 +30,7 @@ import { RecruiterStaffReferralsPanel } from '../RecruiterStaffReferralsPanel';
 import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterStaffContractsView';
 import { RecruiterStaffReportsPanel } from '@/components/recruiter/RecruiterStaffReportsPanel';
 import { RecruiterStaffSettlementsPanel } from '@/components/settlements/RecruiterStaffSettlementsPanel';
+import { RecruiterTeamPanel } from '@/components/recruiter/RecruiterTeamPanel';
 
 
 
