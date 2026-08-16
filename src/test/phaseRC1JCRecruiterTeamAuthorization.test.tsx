@@ -191,9 +191,11 @@ describe('RC-1J-C — safe team list RPC', () => {
   });
 
   it('returns all rows including revoked history in a deterministic order', () => {
-    expect(body).not.toMatch(/m\.status\s*(=|IN)\s*'?\(?'(active|pending)/);
+    const where = body.slice(body.indexOf('WHERE m.recruiter_id'), body.indexOf('ORDER BY'));
+    expect(where).not.toMatch(/m\.status/);
     expect(body).toMatch(/ORDER BY \(m\.role = 'recruiter_owner'\) DESC/);
   });
+
 
   it('is granted to authenticated and service_role only', () => {
     expect(sql).toMatch(
