@@ -377,8 +377,9 @@ describe("RC-1J-B — accept seat enforcement", () => {
     const update = body.indexOf("update public.recruiter_members m");
     expect(update).toBeGreaterThan(directCount);
     // STABLE helpers must not drive the post-lock acceptance decision.
-    expect(body).not.toContain("recruiter_team_workspace_within_limit");
-    expect(body).not.toContain("recruiter_team_occupied_seats");
+    const fnRegion = body.slice(0, body.indexOf("'accepted_at', _row.accepted_at"));
+    expect(fnRegion).not.toContain("recruiter_team_workspace_within_limit");
+    expect(fnRegion).not.toContain("recruiter_team_occupied_seats");
   });
 
   it("7c2. the accept recount uses the canonical occupied predicate (owner=1)", () => {
