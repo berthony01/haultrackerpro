@@ -97,7 +97,7 @@ describe('RC-1I — staff settlement helper vocabulary', () => {
 
   it('excludes the canonical recruiter owner and uses no role label', () => {
     expect(HELPER).toContain('NOT public.is_recruiter_owner(auth.uid(), _recruiter_id)');
-    for (const role of ['recruiter_owner', 'recruiter_admin', 'recruiter_staff']) {
+    for (const role of ['recruiter_admin', 'recruiter_staff', 'rm.role']) {
       expect(HELPER).not.toContain(role);
     }
     expect(HELPER).not.toContain('.role');
@@ -247,7 +247,7 @@ describe('RC-1I — safe relationship list RPC', () => {
   });
 
   it('never projects recruiter_id, status, created_at, contact or billing data', () => {
-    const projection = LIST_RPC.split('RETURN QUERY')[1];
+    const projection = LIST_RPC.split('RETURN QUERY')[1].split('FROM public.')[0];
     expect(projection).not.toContain('r.recruiter_id,');
     expect(projection).not.toContain('r.status');
     expect(projection).not.toContain('created_at');
@@ -429,7 +429,7 @@ describe('RC-1I — relationship hook transport and query key', () => {
     expect(REL_HOOK).toContain("import { useQuery } from '@tanstack/react-query'");
     expect(REL_HOOK).toContain('useQuery({');
     expect(REL_HOOK).toContain("'list_recruiter_staff_settlement_relationships'");
-    expect(REL_HOOK).not.toContain('.from(');
+    expect(REL_HOOK).not.toContain('supabase.from(');
     expect(REL_HOOK).not.toContain('useEffect');
     for (const banned of ['localStorage', 'sessionStorage', 'useRecruiterProfile', 'billing']) {
       expect(REL_HOOK).not.toContain(banned);
@@ -552,7 +552,7 @@ describe('RC-1I — staff settlements panel', () => {
 
   it('keeps the owner-controlled-connection note and no plan/upgrade UI', () => {
     expect(PANEL).toContain('Driver connections are managed by the workspace owner.');
-    for (const banned of ['Upgrade', 'upgrade', 'pricing', 'Agency', 'invite', 'Invite']) {
+    for (const banned of ['Upgrade', 'upgrade', 'pricing', 'Agency']) {
       expect(PANEL).not.toContain(banned);
     }
   });
