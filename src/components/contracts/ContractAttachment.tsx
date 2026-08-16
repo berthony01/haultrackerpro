@@ -462,7 +462,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
                 View
               </Button>
             )}
-            {hasContract && parseStatus !== 'parsed' && (
+            {recruiterCanManage && hasContract && parseStatus !== 'parsed' && (
               <Button
                 variant="secondary"
                 size="sm"
@@ -477,6 +477,7 @@ export function ContractAttachment({ applicationId, role }: Props) {
                 {parseStatus === 'failed' ? 'Retry Extraction' : 'Prepare AI Review'}
               </Button>
             )}
+
             {showAnalyzeBtn && (
               <Button
                 variant="secondary"
