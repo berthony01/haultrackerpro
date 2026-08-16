@@ -295,8 +295,8 @@ describe("AM-1A C — seat enforcement and concurrency", () => {
 
   it("stores only the SHA-256 hash and returns the raw token once", () => {
     const body = fnBody("invite_agency_member");
-    expect(body).toContain("encode(gen_random_bytes(24),'hex')");
-    expect(body).toContain("encode(digest(_t,'sha256'),'hex')");
+    expect(body).toContain("encode(extensions.gen_random_bytes(24),'hex')");
+    expect(body).toContain("encode(extensions.digest(_t,'sha256'),'hex')");
     expect(body).toContain("'invite_token',_t");
     expect(body).toContain("invite_token_hash");
   });
