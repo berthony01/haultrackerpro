@@ -191,7 +191,14 @@ function ParsingSkeleton({ label }: { label: string }) {
   );
 }
 
-export function ContractAttachment({ applicationId, role }: Props) {
+export function ContractAttachment({
+  applicationId,
+  role,
+  canManageRecruiterContract = true,
+}: Props) {
+  // Recruiter-side mutation gate. Drivers are never affected by this flag.
+  const recruiterCanManage = role === 'recruiter' && canManageRecruiterContract !== false;
+
   const inputRef = useRef<HTMLInputElement>(null);
   const [isViewLoading, setIsViewLoading] = useState(false);
   const [showChangesBox, setShowChangesBox] = useState(false);
