@@ -235,7 +235,7 @@ BEGIN
   END IF;
 
   _norm := lower(btrim(COALESCE(_email, '')));
-  IF _norm !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' THEN
+  IF _norm='' OR _norm !~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
     RAISE EXCEPTION 'Invalid email' USING ERRCODE = '22023';
   END IF;
 
@@ -284,7 +284,23 @@ BEGIN
 
   IF NOT _refresh_unexpired THEN
     _limit    := public.recruiter_team_seat_limit(_recruiter_id);
-    _occupied := public.recruiter_team_occupied_seats(_recruiter_id);
+
+    -- RC-1J-B CONCURRENCY CORRECTION: recount occupied seats with a DIRECT
+    -- statement inside this VOLATILE function. A STABLE helper would reuse the
+    -- snapshot taken before this transaction waited on the FOR UPDATE lock and
+    -- could therefore miss a concurrently committed invite.
+    SELECT 1 + count(*)::integer INTO _occupied
+      FROM public.recruiter_members m
+     WHERE m.recruiter_id = _recruiter_id
+       AND m.role <> 'recruiter_owner'
+       AND (
+         m.status = 'active'
+         OR (
+           m.status = 'pending'
+           AND m.invite_expires_at IS NOT NULL
+           AND m.invite_expires_at > now()
+         )
+       );
 
     IF _limit IS NULL OR _limit < 1 OR _occupied >= _limit THEN
       -- Stable generic capacity exception: never leaks billing internals.
@@ -354,6 +370,8 @@ DECLARE
   _hash text;
   _recruiter_id uuid;
   _lock_id uuid;
+  _limit integer;
+  _occupied integer;
   _row public.recruiter_members%ROWTYPE;
 BEGIN
   IF _uid IS NULL THEN
@@ -422,7 +440,26 @@ BEGIN
   -- adds none. It must still fail when the workspace is currently OVER its
   -- allowed limit (e.g. downgrade or cancellation after the invitation).
   -- No other member is ever auto-revoked to make room.
-  IF NOT public.recruiter_team_workspace_within_limit(_row.recruiter_id) THEN
+  --
+  -- RC-1J-B CONCURRENCY CORRECTION: recount occupied seats with a DIRECT
+  -- statement inside this VOLATILE function AFTER both the workspace and
+  -- membership locks. A STABLE helper would reuse the pre-wait snapshot.
+  SELECT 1 + count(*)::integer INTO _occupied
+    FROM public.recruiter_members m
+   WHERE m.recruiter_id = _row.recruiter_id
+     AND m.role <> 'recruiter_owner'
+     AND (
+       m.status = 'active'
+       OR (
+         m.status = 'pending'
+         AND m.invite_expires_at IS NOT NULL
+         AND m.invite_expires_at > now()
+       )
+     );
+
+  _limit := public.recruiter_team_seat_limit(_row.recruiter_id);
+
+  IF _limit IS NULL OR _limit < 1 OR _occupied > _limit THEN
     RAISE EXCEPTION 'Team seat limit reached' USING ERRCODE = '22023';
   END IF;
 

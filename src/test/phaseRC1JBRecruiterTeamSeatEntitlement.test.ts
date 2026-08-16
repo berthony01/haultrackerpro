@@ -266,6 +266,15 @@ describe("RC-1J-B — invite seat enforcement", () => {
     expect(body).toContain("already a member");
   });
 
+  it("6b2. preserves the EXACT existing RC-1A POSIX email validation", () => {
+    expect(body).toContain(
+      "if _norm='' or _norm !~ '^[^[:space:]@]+@[^[:space:]@]+\\.[^[:space:]@]+$' then",
+    );
+    // No alternate regex vocabulary was substituted.
+    expect(body).not.toContain("[^@\\s]");
+  });
+
+
   it("6c. preserves both audit events", () => {
     expect(body).toContain("'invite_created'");
     expect(body).toContain("'invite_refreshed'");
@@ -280,11 +289,32 @@ describe("RC-1J-B — invite seat enforcement", () => {
     expect(body).not.toContain("lock table");
   });
 
-  it("6e. counts seats only after the workspace lock is held (serialized)", () => {
-    const profileLock = body.indexOf("for update");
-    const seatCount = body.indexOf("public.recruiter_team_occupied_seats(_recruiter_id)");
-    expect(seatCount).toBeGreaterThan(profileLock);
+  it("6e. recounts seats with a DIRECT count AFTER both locks (no STABLE helper)", () => {
+    const profileLock = body.indexOf("from public.recruiter_profiles rp\n   where rp.id = _recruiter_id\n   for update");
+    const memberLock = body.indexOf("from public.recruiter_members m\n   where m.recruiter_id = _recruiter_id");
+    const directCount = body.indexOf("select 1 + count(*)::integer into _occupied");
+    expect(directCount).toBeGreaterThan(profileLock);
+    expect(directCount).toBeGreaterThan(memberLock);
+    // The STABLE helper would reuse the pre-wait snapshot: it must NOT be used
+    // for the post-lock capacity decision.
+    expect(body).not.toContain("recruiter_team_occupied_seats");
+    expect(body).not.toContain("recruiter_team_workspace_within_limit");
   });
+
+  it("6e2. the direct recount uses the canonical occupied predicate (owner=1)", () => {
+    const idx = body.indexOf("select 1 + count(*)::integer into _occupied");
+    expect(idx).toBeGreaterThan(-1);
+    const stmt = body.slice(idx, body.indexOf(";", idx));
+    expect(stmt).toContain("from public.recruiter_members m");
+    expect(stmt).toContain("m.recruiter_id = _recruiter_id");
+    expect(stmt).toContain("m.role <> 'recruiter_owner'");
+    expect(stmt).toContain("m.status = 'active'");
+    expect(stmt).toContain("m.status = 'pending'");
+    expect(stmt).toContain("m.invite_expires_at is not null");
+    expect(stmt).toContain("m.invite_expires_at > now()");
+    expect(stmt).not.toContain("'revoked'");
+  });
+
 
   it("6f. a NEW invite requires a free seat and raises a generic exception", () => {
     expect(body).toContain("_occupied >= _limit");
@@ -336,15 +366,32 @@ describe("RC-1J-B — accept seat enforcement", () => {
     expect(body.slice(memberLock)).toContain("for update");
   });
 
-  it("7c. denies acceptance when the workspace is over its seat limit", () => {
-    expect(body).toContain(
-      "if not public.recruiter_team_workspace_within_limit(_row.recruiter_id) then",
-    );
+  it("7c. denies acceptance over the limit using a DIRECT post-lock recount", () => {
+    const profileLock = body.indexOf("from public.recruiter_profiles rp\n   where rp.id = _recruiter_id\n   for update");
+    const memberLock = body.indexOf("select * into _row");
+    const directCount = body.indexOf("select 1 + count(*)::integer into _occupied");
+    expect(directCount).toBeGreaterThan(profileLock);
+    expect(directCount).toBeGreaterThan(memberLock);
+    expect(body).toContain("_occupied > _limit");
     expect(body).toContain("raise exception 'team seat limit reached'");
-    const guard = body.indexOf("recruiter_team_workspace_within_limit");
     const update = body.indexOf("update public.recruiter_members m");
-    expect(update).toBeGreaterThan(guard);
+    expect(update).toBeGreaterThan(directCount);
+    // STABLE helpers must not drive the post-lock acceptance decision.
+    const fnRegion = body.slice(0, body.indexOf("'accepted_at', _row.accepted_at"));
+    expect(fnRegion).not.toContain("recruiter_team_workspace_within_limit");
+    expect(fnRegion).not.toContain("recruiter_team_occupied_seats");
   });
+
+  it("7c2. the accept recount uses the canonical occupied predicate (owner=1)", () => {
+    const idx = body.indexOf("select 1 + count(*)::integer into _occupied");
+    const stmt = body.slice(idx, body.indexOf(";", idx));
+    expect(stmt).toContain("m.recruiter_id = _row.recruiter_id");
+    expect(stmt).toContain("m.role <> 'recruiter_owner'");
+    expect(stmt).toContain("m.status = 'active'");
+    expect(stmt).toContain("m.invite_expires_at > now()");
+    expect(body).toContain("_limit := public.recruiter_team_seat_limit(_row.recruiter_id)");
+  });
+
 
   it("7d. never auto-revokes or deletes another member to make room", () => {
     expect(body).not.toContain("delete from");
