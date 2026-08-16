@@ -706,6 +706,7 @@ DROP POLICY IF EXISTS driver_assistants_assistant_select ON public.driver_assist
 CREATE POLICY driver_assistants_assistant_select
   ON public.driver_assistants
   FOR SELECT
+  TO authenticated
   USING (
     auth.uid() IS NOT NULL
     AND auth.uid() = assistant_user_id
@@ -1079,6 +1080,7 @@ DROP POLICY IF EXISTS acr_assigned_member_select ON public.agency_client_request
 CREATE POLICY acr_assigned_member_select
   ON public.agency_client_requests
   FOR SELECT
+  TO authenticated
   USING (
     assigned_member_user_id = auth.uid()
     AND public.is_agency_member(agency_id, auth.uid())
@@ -1088,6 +1090,7 @@ DROP POLICY IF EXISTS adr_member_select ON public.agency_delegation_requests;
 CREATE POLICY adr_member_select
   ON public.agency_delegation_requests
   FOR SELECT
+  TO authenticated
   USING (
     member_user_id = auth.uid()
     AND public.is_agency_member(agency_id, auth.uid())
@@ -1097,6 +1100,7 @@ DROP POLICY IF EXISTS awi_assigned_member_select ON public.agency_work_items;
 CREATE POLICY awi_assigned_member_select
   ON public.agency_work_items
   FOR SELECT
+  TO authenticated
   USING (
     assigned_member_user_id = auth.uid()
     AND public.is_agency_member(agency_id, auth.uid())
