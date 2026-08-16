@@ -14,12 +14,17 @@
 --     which remain unmodified.
 --   * STAFF requires ALL of:
 --       - non-owner caller, AND
---       - posting-ready / non-suspended workspace
---         (public.recruiter_profile_can_manage_opportunities), AND
---       - the explicit RC-1B boolean permission on an ACTIVE membership
---         (public.current_user_has_recruiter_permission), AND
+--       - recruiter profile status = 'active' (NOT posting-readiness /
+--         verification semantics), AND
+--       - VIEW-FOUNDATIONAL RC-1B booleans on an ACTIVE membership
+--         (public.current_user_has_recruiter_permission): settlements_view is
+--         always required; prepare/finalize additionally require their own
+--         explicit boolean. prepare or finalize ALONE authorizes nothing, AND
 --       - a STANDALONE recruiter/carrier billing row for that recruiter
---         workspace at plan growth|fleet with status active|trialing.
+--         workspace (rb.recruiter_id = rp.id AND rb.user_id = rp.user_id) at
+--         plan starter|growth|fleet with status active|trialing, AND
+--       - the LIVE owner Agency conflict must not hold for the canonical
+--         recruiter OWNER (rp.user_id).
 --     Role labels alone grant nothing.
 --   * Agency-included recruiter entitlement is deliberately NOT consulted and
 --     NOT extended to recruiter staff. No Agency table/function is touched.
