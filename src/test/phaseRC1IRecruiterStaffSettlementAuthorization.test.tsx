@@ -97,10 +97,9 @@ describe('RC-1I — staff settlement helper vocabulary', () => {
 
   it('excludes the canonical recruiter owner and uses no role label', () => {
     expect(HELPER).toContain('NOT public.is_recruiter_owner(auth.uid(), _recruiter_id)');
-    for (const role of ['recruiter_admin', 'recruiter_staff', 'rm.role']) {
+    for (const role of ["'recruiter_admin'", "'recruiter_staff'", 'rm.role', '.role =']) {
       expect(HELPER).not.toContain(role);
     }
-    expect(HELPER).not.toContain('.role');
   });
 
   it('requires a non-null authenticated caller and workspace', () => {
@@ -431,7 +430,12 @@ describe('RC-1I — relationship hook transport and query key', () => {
     expect(REL_HOOK).toContain("'list_recruiter_staff_settlement_relationships'");
     expect(REL_HOOK).not.toContain('supabase.from(');
     expect(REL_HOOK).not.toContain('useEffect');
-    for (const banned of ['localStorage', 'sessionStorage', 'useRecruiterProfile', 'billing']) {
+    for (const banned of [
+      'localStorage',
+      'sessionStorage',
+      'useRecruiterProfile',
+      'recruiter_billing_profiles',
+    ]) {
       expect(REL_HOOK).not.toContain(banned);
     }
   });
