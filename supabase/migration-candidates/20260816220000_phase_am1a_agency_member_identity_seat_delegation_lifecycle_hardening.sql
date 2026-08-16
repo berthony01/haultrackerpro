@@ -403,10 +403,15 @@ BEGIN
     RAISE EXCEPTION 'That person is already an active member of this agency' USING ERRCODE='22023';
   END IF;
 
-  -- Billing validity (cancelled billing blocks invites for everyone).
-  PERFORM public.assert_agency_limit(_agency_id, 'create_work_item');
-
-  SELECT l.member_limit INTO _limit FROM public.get_effective_agency_limits(_agency_id) l;
+  -- Billing validity: cancelled / missing entitlement blocks invites for
+  -- everyone, using the same effective-limit source of truth.
+  SELECT * INTO _lim FROM public.get_effective_agency_limits(_agency_id);
+  IF _lim.status = 'cancelled' THEN
+    RAISE EXCEPTION
+      'Agency billing is not active. Start or restart your % plan from the Plan & Limits card to continue this action.',
+      public._agency_plan_label(_lim.plan_key) USING ERRCODE='P0001';
+  END IF;
+  _limit := _lim.member_limit;
 
   -- DIRECT post-lock recount inside this VOLATILE function.
   SELECT count(*)::integer INTO _used FROM public.agency_members am
