@@ -64,6 +64,14 @@ export interface RecruiterStaffPermissionsState {
   canViewSettlements: boolean;
   canPrepareSettlements: boolean;
   canFinalizeSettlements: boolean;
+  /**
+   * Phase RC-1J-C — team authorization booleans (UX only).
+   * `canManageTeam` requires BOTH team_view and team_manage; team_manage
+   * never implies team_view.
+   */
+  canViewTeam: boolean;
+  canManageTeam: boolean;
+
 
 
 
