@@ -43,6 +43,8 @@ import {
 import { resolveRecruiterReadiness } from '@/lib/opportunities/resolveRecruiterReadiness';
 import { RecruiterReadinessDialog } from '../RecruiterReadinessDialog';
 import { CarrierSettlementsPanel } from '@/components/settlements/CarrierSettlementsPanel';
+// Phase RC-1J-D — owner Team panel, mounted on demand only.
+import { RecruiterTeamPanel } from '@/components/recruiter/RecruiterTeamPanel';
 
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
