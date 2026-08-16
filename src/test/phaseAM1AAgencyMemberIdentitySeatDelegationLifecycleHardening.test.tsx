@@ -326,6 +326,28 @@ describe("AM-1A C — seat enforcement and concurrency", () => {
     expect(body).toContain("invite_token_hash=null, invite_expires_at=null");
     expect(count(body, "invite invalid or not addressed to your email")).toBeGreaterThanOrEqual(3);
   });
+
+  it("schema-qualifies all three pgcrypto calls against the extensions schema", () => {
+    const invite = fnBody("invite_agency_member");
+    expect(invite).toContain("extensions.gen_random_bytes(24)");
+    expect(invite).toContain("extensions.digest(_t,'sha256')");
+    expect(invite).not.toContain("(gen_random_bytes(24)");
+    expect(invite).not.toContain("(digest(_t");
+
+    const accept = fnBody("accept_agency_invite");
+    expect(accept).toContain("extensions.digest(coalesce(_token,''),'sha256')");
+    expect(accept).not.toContain("(digest(coalesce(_token,'')");
+  });
+
+  it("invite/accept keep a fixed search_path = public and never widen it", () => {
+    for (const fn of ["invite_agency_member", "accept_agency_invite"]) {
+      const body = fnBody(fn);
+      expect(body).toContain("set search_path = public");
+      expect(body).not.toContain("extensions");
+      expect(body).not.toContain("pg_catalog");
+      expect(body).not.toContain("auth");
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
