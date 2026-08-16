@@ -273,7 +273,9 @@ export function ContractAttachment({ applicationId, role }: Props) {
   const riskScore = typeof findings?.risk_score === 'number' ? findings.risk_score : null;
   const riskTier = (findings?.risk_tier || '').toLowerCase();
   const tierStyle = riskTier && TIER_STYLES[riskTier] ? TIER_STYLES[riskTier] : null;
-  const canAnalyze = hasContract && parseStatus === 'parsed' && role === 'recruiter';
+  const canAnalyze =
+    hasContract && parseStatus === 'parsed' && role === 'recruiter' && recruiterCanManage;
+
   const showAnalyzeBtn = canAnalyze && !aiReview;
 
   // Driver decision (Phase 5) — bound to current version only.
