@@ -75,8 +75,9 @@ function StaffWorkspaceRoute({
 }) {
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
   const [staffView, setStaffView] = useState<
-    'home' | 'opportunities' | 'applications' | 'referrals'
+    'home' | 'opportunities' | 'applications' | 'referrals' | 'contracts'
   >('home');
+
 
   const roleLabel =
     workspace.memberRole === 'recruiter_admin' ? 'Workspace Admin' : 'Workspace Staff';
