@@ -126,7 +126,7 @@ export function RecruiterStaffSettlementsPanel({
         mode="carrier"
         businessId={recruiterId}
         driverOptions={driverOptions}
-        canManage={canPrepareSettlements || canFinalizeSettlements}
+        canManage={false}
         canPrepare={canPrepareSettlements}
         canFinalize={canFinalizeSettlements}
         blockedReason="Your workspace access allows viewing settlement statements only."
