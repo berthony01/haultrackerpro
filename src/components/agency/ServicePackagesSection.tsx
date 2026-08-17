@@ -22,6 +22,7 @@ import {
   type ServicePackage,
 } from '@/hooks/useAgencyWorkflow';
 import { useAgencyEntitlement } from '@/hooks/useAgencyEntitlement';
+import { useAgencyWorkspacePermissions } from '@/hooks/useAgencyWorkspacePermissions';
 import {
   ASSISTANT_PERMISSION_KEYS,
   PERMISSION_LABELS,
