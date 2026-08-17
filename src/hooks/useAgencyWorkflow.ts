@@ -154,11 +154,21 @@ export interface DriverWaitingWorkItem {
 }
 
 // ---------- Packages ----------
-export function useAgencyPackages(agencyId: string | null | undefined, opts?: { publicView?: boolean }) {
+export function useAgencyPackages(
+  agencyId: string | null | undefined,
+  opts?: { publicView?: boolean; enabled?: boolean },
+) {
+  // Phase AM-1C-A: the non-public path reads `agency_service_packages`
+  // directly, which now requires the `packages_view` workspace permission.
+  // Callers pass `enabled: false` to fail closed while permission resolution
+  // is unsettled or when `packages_view` is absent. The public driver
+  // discovery path is unchanged.
+  const permissionGateOpen = opts?.publicView ? true : opts?.enabled !== false;
   return useQuery({
     queryKey: ['agency-packages', agencyId, !!opts?.publicView],
-    enabled: !!agencyId,
+    enabled: !!agencyId && permissionGateOpen,
     staleTime: 30_000,
+
     queryFn: async (): Promise<ServicePackage[]> => {
       const fn = opts?.publicView ? 'list_agency_packages_public' : 'list_agency_packages_public';
       // Members reading their own agency can also use the public listing,
