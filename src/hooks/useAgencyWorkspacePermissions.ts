@@ -81,5 +81,7 @@ export function useAgencyWorkspacePermissions(
     isError,
     canViewPackages: settled && resolved.packages_view === true,
     canManagePackages: settled && resolved.packages_manage === true,
+    canViewClientRequests: settled && resolved.client_requests_view === true,
+    canManageClientRequests: settled && resolved.client_requests_manage === true,
   };
 }
