@@ -29,6 +29,7 @@ import {
 } from '@/hooks/useAgency';
 import { useToast } from '@/hooks/use-toast';
 import { useAgencyClients } from '@/hooks/useAgencyWorkflow';
+import { useAgencyWorkspacePermissions } from '@/hooks/useAgencyWorkspacePermissions';
 import { ServicePackagesSection } from '@/components/agency/ServicePackagesSection';
 import { ClientRequestsSection } from '@/components/agency/ClientRequestsSection';
 import { ClientListSection } from '@/components/agency/ClientListSection';
