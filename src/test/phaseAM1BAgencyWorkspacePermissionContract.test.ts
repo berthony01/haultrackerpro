@@ -131,8 +131,12 @@ describe("AM-1B — membership permission storage", () => {
     expect(lowerExecutable).toContain("agency_members_workspace_permissions_object_chk");
   });
 
-  it("4b. performs no role-based backfill", () => {
-    expect(lowerExecutable).not.toMatch(/update\s+public\.agency_members/);
+  it("4b. performs no role-based backfill (only the setter updates the column)", () => {
+    const updates = lowerExecutable.match(/update\s+public\.agency_members/g) ?? [];
+    expect(updates.length).toBe(1);
+    expect(functionSlice("set_agency_member_permissions")).toContain(
+      "update public.agency_members",
+    );
     expect(lowerExecutable).not.toContain("'agency_admin'");
   });
 });
