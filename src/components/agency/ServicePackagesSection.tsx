@@ -30,9 +30,22 @@ import {
 } from '@/lib/assistantPermissions';
 
 export function ServicePackagesSection({ agencyId }: { agencyId: string }) {
-  const { data: packages, isLoading } = useAgencyPackages(agencyId);
+  // Phase AM-1C-A — packages are the first AM-1B permission consumer.
+  // `packages_view` gates the private list; `packages_manage` gates mutations.
+  // Role labels are never consulted, and manage never implies view.
+  const {
+    canViewPackages,
+    canManagePackages,
+    isLoading: permissionsLoading,
+    isError: permissionsError,
+  } = useAgencyWorkspacePermissions(agencyId);
+
+  const { data: packages, isLoading } = useAgencyPackages(agencyId, {
+    enabled: canViewPackages,
+  });
   const { entitlement } = useAgencyEntitlement(agencyId);
   const billingCancelled = entitlement.status === 'cancelled';
+  const createDisabled = billingCancelled || !canManagePackages;
 
   return (
     <Card>
@@ -42,44 +55,71 @@ export function ServicePackagesSection({ agencyId }: { agencyId: string }) {
             <Package className="h-4 w-4 text-primary" />
             Service packages
           </CardTitle>
-          <PackageEditorDialog agencyId={agencyId} disabled={billingCancelled} />
+          {!permissionsLoading && !permissionsError && canManagePackages && (
+            <PackageEditorDialog agencyId={agencyId} disabled={createDisabled} />
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-xs text-muted-foreground">
-          Drivers can request your active packages through the “Share request link” in the
-          Overview tab.
-        </p>
-
-        {billingCancelled && (
-          <p className="text-xs text-muted-foreground">
-            Agency billing is not active. Start or restart billing from Overview before creating a
-            new service package. Existing packages can still be edited or deactivated.
+        {permissionsLoading ? (
+          <p className="text-sm text-muted-foreground">Checking your access…</p>
+        ) : permissionsError ? (
+          <p className="text-sm text-muted-foreground">
+            Service packages are unavailable right now.
           </p>
-        )}
-
-
-        {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
-        ) : !packages || packages.length === 0 ? (
-          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground space-y-2">
-            <p className="font-medium text-foreground">No packages yet.</p>
-            <p>
-              Common starter packages: <em>Basic Load Entry</em>, <em>Expense and Fuel Tracking</em>,{' '}
-              <em>Monthly Bookkeeping Support</em>, <em>Full Back Office Management</em>.
-            </p>
-          </div>
+        ) : !canViewPackages && !canManagePackages ? (
+          <p className="text-sm text-muted-foreground">
+            You do not have access to service packages in this agency workspace.
+          </p>
         ) : (
-          <div className="space-y-2">
-            {packages.map((pk) => (
-              <PackageRow key={pk.id} pkg={pk} agencyId={agencyId} />
-            ))}
-          </div>
+          <>
+            <p className="text-xs text-muted-foreground">
+              Drivers can request your active packages through the “Share request link” in the
+              Overview tab.
+            </p>
+
+            {billingCancelled && canManagePackages && (
+              <p className="text-xs text-muted-foreground">
+                Agency billing is not active. Start or restart billing from Overview before creating
+                a new service package. Existing packages can still be edited or deactivated.
+              </p>
+            )}
+
+            {!canViewPackages ? (
+              <p className="text-xs text-muted-foreground">
+                You can create service packages, but you do not have permission to view this
+                agency’s existing packages.
+              </p>
+            ) : isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            ) : !packages || packages.length === 0 ? (
+              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground space-y-2">
+                <p className="font-medium text-foreground">No packages yet.</p>
+                <p>
+                  Common starter packages: <em>Basic Load Entry</em>,{' '}
+                  <em>Expense and Fuel Tracking</em>, <em>Monthly Bookkeeping Support</em>,{' '}
+                  <em>Full Back Office Management</em>.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {packages.map((pk) => (
+                  <PackageRow
+                    key={pk.id}
+                    pkg={pk}
+                    agencyId={agencyId}
+                    canManage={canManagePackages}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
   );
 }
+
 
 function PackageRow({ pkg, agencyId }: { pkg: ServicePackage; agencyId: string }) {
   return (
