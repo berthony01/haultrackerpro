@@ -273,10 +273,16 @@ export function useAgencyPublicView(agencyId: string | null | undefined) {
 }
 
 // ---------- Client requests ----------
-export function useAgencyClientRequests(agencyId: string | null | undefined) {
+export function useAgencyClientRequests(
+  agencyId: string | null | undefined,
+  opts?: { enabled?: boolean },
+) {
+  // AM-1C-B: callers may disable this query before the RPC runs (fail closed
+  // while Agency workspace permission resolution is pending, errored or absent).
+  const callerEnabled = opts?.enabled ?? true;
   return useQuery({
     queryKey: ['agency-client-requests', agencyId],
-    enabled: !!agencyId,
+    enabled: !!agencyId && callerEnabled,
     staleTime: 15_000,
     queryFn: async (): Promise<AgencyClientRequestRow[]> => {
       const { data, error } = await (supabase as any).rpc('list_agency_client_requests', {
