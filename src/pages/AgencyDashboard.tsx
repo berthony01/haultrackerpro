@@ -54,6 +54,14 @@ export default function AgencyDashboard() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: agency, isLoading } = useMyAgency();
+  // AM-1C-B: AM-1B workspace permissions gate the Packages and Requests tabs.
+  // Role labels never decide those tabs. Fails closed while unsettled/errored.
+  const {
+    canViewPackages,
+    canManagePackages,
+    canViewClientRequests,
+    canManageClientRequests,
+  } = useAgencyWorkspacePermissions(agency?.id);
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
   const focusedWorkItemId = new URLSearchParams(location.search).get('workItem');
