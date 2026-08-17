@@ -128,6 +128,7 @@ describe('AM-1C-B — listing RPC authorization', () => {
 describe('AM-1C-B — set-status RPC authorization', () => {
   const body = executable.slice(
     executable.indexOf('CREATE OR REPLACE FUNCTION public.set_agency_client_request_status'),
+    executable.indexOf('DROP POLICY'),
   );
 
   it('4. Agency branch uses client_requests_manage with no role shortcut', () => {
