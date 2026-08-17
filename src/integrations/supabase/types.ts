@@ -309,6 +309,7 @@ export type Database = {
           role: Database["public"]["Enums"]["agency_member_role"]
           status: Database["public"]["Enums"]["agency_member_status"]
           updated_at: string
+          workspace_permissions: Json
         }
         Insert: {
           accepted_at?: string | null
@@ -324,6 +325,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["agency_member_role"]
           status?: Database["public"]["Enums"]["agency_member_status"]
           updated_at?: string
+          workspace_permissions?: Json
         }
         Update: {
           accepted_at?: string | null
@@ -339,6 +341,7 @@ export type Database = {
           role?: Database["public"]["Enums"]["agency_member_role"]
           status?: Database["public"]["Enums"]["agency_member_status"]
           updated_at?: string
+          workspace_permissions?: Json
         }
         Relationships: [
           {
@@ -4480,6 +4483,7 @@ export type Database = {
           role: Database["public"]["Enums"]["agency_member_role"]
           status: Database["public"]["Enums"]["agency_member_status"]
           updated_at: string
+          workspace_permissions: Json
         }
         SetofOptions: {
           from: "*"
@@ -4901,6 +4905,13 @@ export type Database = {
         Args: { _delegation_id: string; _driver_user_id: string }
         Returns: boolean
       }
+      current_user_has_agency_permission: {
+        Args: {
+          _agency_id: string
+          _permission: Database["public"]["Enums"]["agency_workspace_permission"]
+        }
+        Returns: boolean
+      }
       current_user_has_recruiter_permission: {
         Args: {
           _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
@@ -5083,6 +5094,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_my_agency_permissions: { Args: { _agency_id: string }; Returns: Json }
       get_my_managed_drivers: { Args: never; Returns: Json[] }
       get_my_marketplace_restrictions: {
         Args: never
@@ -5934,6 +5946,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      set_agency_member_permissions: {
+        Args: { _member_id: string; _permissions: Json }
+        Returns: Json
       }
       set_agency_slug: {
         Args: { _agency_id: string; _slug: string }
@@ -6839,6 +6855,18 @@ export type Database = {
         | "monthly_closeout"
         | "document_followup"
         | "other"
+      agency_workspace_permission:
+        | "packages_view"
+        | "packages_manage"
+        | "client_requests_view"
+        | "client_requests_manage"
+        | "clients_view"
+        | "delegations_view"
+        | "delegations_manage"
+        | "work_items_view_all"
+        | "work_items_manage"
+        | "audit_view"
+        | "team_view"
       assistant_status: "pending" | "active" | "revoked" | "expired"
       contract_status:
         | "uploaded"
@@ -7041,6 +7069,19 @@ export const Constants = {
         "monthly_closeout",
         "document_followup",
         "other",
+      ],
+      agency_workspace_permission: [
+        "packages_view",
+        "packages_manage",
+        "client_requests_view",
+        "client_requests_manage",
+        "clients_view",
+        "delegations_view",
+        "delegations_manage",
+        "work_items_view_all",
+        "work_items_manage",
+        "audit_view",
+        "team_view",
       ],
       assistant_status: ["pending", "active", "revoked", "expired"],
       contract_status: [
