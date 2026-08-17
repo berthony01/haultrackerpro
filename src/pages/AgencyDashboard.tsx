@@ -118,11 +118,14 @@ export default function AgencyDashboard() {
           const role = agency.my_role;
           const isOwner = role === 'agency_owner';
           const isOwnerOrAdmin = isOwner || role === 'agency_admin';
-          // Member sees only what they can act on; admins see ops; owners see all.
+          // Packages and Requests are decided by AM-1B workspace permissions
+          // only; the remaining tabs stay on their existing rules.
+          const showPackages = canViewPackages || canManagePackages;
+          const showRequests = canViewClientRequests || canManageClientRequests;
           const tabs: { value: string; label: string; show: boolean }[] = [
             { value: 'overview', label: 'Overview', show: true },
-            { value: 'packages', label: 'Packages', show: isOwnerOrAdmin },
-            { value: 'requests', label: 'Requests', show: isOwnerOrAdmin },
+            { value: 'packages', label: 'Packages', show: showPackages },
+            { value: 'requests', label: 'Requests', show: showRequests },
             { value: 'clients', label: 'Clients', show: isOwnerOrAdmin },
             // Settlements are visible to every active member; PostgreSQL, not
             // this tab, decides who may prepare or change a statement.
@@ -148,18 +151,26 @@ export default function AgencyDashboard() {
                   </p>
                 )}
               </TabsContent>
+              {showPackages && (
+                <TabsContent value="packages">
+                  <ServicePackagesSection agencyId={agency.id} />
+                </TabsContent>
+              )}
+              {showRequests && (
+                <TabsContent value="requests">
+                  {/* isOwnerOrAdmin is passed ONLY as the transitional
+                      delegation authority mirror; delegation backend is not
+                      cut over to workspace permissions yet. */}
+                  <ClientRequestsSection
+                    agencyId={agency.id}
+                    canCreateDelegation={isOwnerOrAdmin}
+                  />
+                </TabsContent>
+              )}
               {isOwnerOrAdmin && (
-                <>
-                  <TabsContent value="packages">
-                    <ServicePackagesSection agencyId={agency.id} />
-                  </TabsContent>
-                  <TabsContent value="requests">
-                    <ClientRequestsSection agencyId={agency.id} />
-                  </TabsContent>
-                  <TabsContent value="clients">
-                    <ClientListSection agencyId={agency.id} />
-                  </TabsContent>
-                </>
+                <TabsContent value="clients">
+                  <ClientListSection agencyId={agency.id} />
+                </TabsContent>
               )}
               <TabsContent value="settlements">
                 <AgencySettlementsPanel agencyId={agency.id} />
