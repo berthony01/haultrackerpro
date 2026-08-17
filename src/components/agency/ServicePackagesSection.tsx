@@ -148,7 +148,7 @@ function PackageRow({
             )}
           </div>
         </div>
-        <PackageEditorDialog agencyId={agencyId} existing={pkg} />
+        {canManage && <PackageEditorDialog agencyId={agencyId} existing={pkg} />}
       </div>
     </div>
   );
