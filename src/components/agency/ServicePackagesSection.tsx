@@ -121,7 +121,15 @@ export function ServicePackagesSection({ agencyId }: { agencyId: string }) {
 }
 
 
-function PackageRow({ pkg, agencyId }: { pkg: ServicePackage; agencyId: string }) {
+function PackageRow({
+  pkg,
+  agencyId,
+  canManage,
+}: {
+  pkg: ServicePackage;
+  agencyId: string;
+  canManage: boolean;
+}) {
   return (
     <div className="rounded-md border p-3">
       <div className="flex items-start justify-between gap-3">
