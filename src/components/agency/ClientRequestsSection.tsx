@@ -20,6 +20,7 @@ import {
 import { Inbox } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAgencyMembers } from '@/hooks/useAgency';
+import { useAgencyWorkspacePermissions } from '@/hooks/useAgencyWorkspacePermissions';
 import {
   useAgencyClientRequests,
   useAgencyPackages,
@@ -34,8 +35,34 @@ import {
   type AssistantPermissions,
 } from '@/lib/assistantPermissions';
 
-export function ClientRequestsSection({ agencyId }: { agencyId: string }) {
-  const { data: requests, isLoading } = useAgencyClientRequests(agencyId);
+/**
+ * Phase AM-1C-B — Client requests are the second consumer of the AM-1B Agency
+ * workspace permission contract.
+ *
+ * `client_requests_view` controls broad list visibility, `client_requests_manage`
+ * controls direct request workflow (decline/status/assignment). The two are
+ * independent: manage never implies view.
+ *
+ * `canCreateDelegation` is a TRANSITIONAL prop mirroring the still-uncut
+ * delegation backend authority. It is NOT a client-request permission and must
+ * never gate the request list or direct request management.
+ */
+export function ClientRequestsSection({
+  agencyId,
+  canCreateDelegation,
+}: {
+  agencyId: string;
+  canCreateDelegation: boolean;
+}) {
+  const {
+    canViewClientRequests,
+    canManageClientRequests,
+    isLoading: permissionsLoading,
+    isError: permissionsError,
+  } = useAgencyWorkspacePermissions(agencyId);
+  const { data: requests, isLoading } = useAgencyClientRequests(agencyId, {
+    enabled: canViewClientRequests,
+  });
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'declined'>('pending');
   const filtered =
     requests?.filter((r) => filter === 'all' || r.status === filter) ?? [];
@@ -48,28 +75,46 @@ export function ClientRequestsSection({ agencyId }: { agencyId: string }) {
             <Inbox className="h-4 w-4 text-primary" />
             Client requests
           </CardTitle>
-          <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
-            <SelectTrigger className="w-36 h-8 text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="declined">Declined</SelectItem>
-              <SelectItem value="all">All</SelectItem>
-            </SelectContent>
-          </Select>
+          {canViewClientRequests && (
+            <Select value={filter} onValueChange={(v) => setFilter(v as any)}>
+              <SelectTrigger className="w-36 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="declined">Declined</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {permissionsLoading ? (
+          <p className="text-sm text-muted-foreground">Checking your access…</p>
+        ) : permissionsError ? (
+          <p className="text-sm text-muted-foreground">
+            We couldn't confirm your access to client requests.
+          </p>
+        ) : !canViewClientRequests ? (
+          <p className="text-sm text-muted-foreground">
+            You don't have access to view this agency's client requests.
+          </p>
+        ) : isLoading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : filtered.length === 0 ? (
           <p className="text-sm text-muted-foreground">No requests match this filter.</p>
         ) : (
           <div className="space-y-2">
             {filtered.map((r) => (
-              <ClientRequestRow key={r.id} agencyId={agencyId} req={r} />
+              <ClientRequestRow
+                key={r.id}
+                agencyId={agencyId}
+                req={r}
+                canManageClientRequests={canManageClientRequests}
+                canCreateDelegation={canCreateDelegation}
+              />
             ))}
           </div>
         )}
@@ -81,9 +126,13 @@ export function ClientRequestsSection({ agencyId }: { agencyId: string }) {
 function ClientRequestRow({
   agencyId,
   req,
+  canManageClientRequests,
+  canCreateDelegation,
 }: {
   agencyId: string;
   req: AgencyClientRequestRow;
+  canManageClientRequests: boolean;
+  canCreateDelegation: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const setStatus = useSetClientRequestStatus();
@@ -114,34 +163,40 @@ function ClientRequestRow({
         <div className="flex flex-col gap-2 items-end">
           {req.status === 'pending' && (
             <>
-              <Button size="sm" onClick={() => setOpen(true)}>
-                Assign &amp; request delegation
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={async () => {
-                  try {
-                    await setStatus.mutateAsync({ id: req.id, status: 'declined' });
-                    toast({ title: 'Request declined' });
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message, variant: 'destructive' });
-                  }
-                }}
-              >
-                Decline
-              </Button>
+              {canCreateDelegation && (
+                <Button size="sm" onClick={() => setOpen(true)}>
+                  Assign &amp; request delegation
+                </Button>
+              )}
+              {canManageClientRequests && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    try {
+                      await setStatus.mutateAsync({ id: req.id, status: 'declined' });
+                      toast({ title: 'Request declined' });
+                    } catch (e: any) {
+                      toast({ title: 'Error', description: e?.message, variant: 'destructive' });
+                    }
+                  }}
+                >
+                  Decline
+                </Button>
+              )}
             </>
           )}
         </div>
       </div>
 
-      <AssignDelegationDialog
-        open={open}
-        onOpenChange={setOpen}
-        agencyId={agencyId}
-        req={req}
-      />
+      {canCreateDelegation && open && (
+        <AssignDelegationDialog
+          open={open}
+          onOpenChange={setOpen}
+          agencyId={agencyId}
+          req={req}
+        />
+      )}
     </div>
   );
 }
