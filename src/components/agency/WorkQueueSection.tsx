@@ -147,7 +147,7 @@ export function WorkQueueSection({
               ))}
             </SelectContent>
           </Select>
-          {canManage && (
+          {canViewAllWorkItems && (
             <>
               <Select value={driverId} onValueChange={(v) => setDriverId(v as any)}>
                 <SelectTrigger className="h-8 text-xs">
