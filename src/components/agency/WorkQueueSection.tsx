@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { ListTodo, Plus, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useActingContext } from '@/hooks/useActingContext';
+import { useAuth } from '@/hooks/useAuth';
 import { hasPerm } from '@/lib/assistantPermissions';
 import { useToast } from '@/hooks/use-toast';
 import {
