@@ -201,8 +201,10 @@ describe('AM-1C-E — update_agency_work_item', () => {
     expect(body).not.toContain('_is_admin');
   });
 
-  it('15. initial allowed branch stays manager OR exact assigned member', () => {
-    expect(body).toContain('_is_assigned:=(_old.assigned_member_user_id=_uid)');
+  it('15. initial allowed branch stays manager OR exact assigned member (fail-closed for unassigned rows)', () => {
+    expect(body).toContain('_is_assigned:=COALESCE(_old.assigned_member_user_id=_uid,false)');
+    // The raw nullable form (which yields NULL for unassigned rows) must be gone.
+    expect(body).not.toContain('_is_assigned:=(_old.assigned_member_user_id=_uid)');
     expect(body).toContain(
       "IF NOT (_can_manage_work_items OR _is_assigned) THEN RAISE EXCEPTION 'Not allowed' USING ERRCODE='42501'",
     );
@@ -405,5 +407,87 @@ describe('AM-1C-E — AgencyDashboard', () => {
     expect(dashboardCode).toContain("{ value: 'clients', label: 'Clients', show: canViewClients }");
     expect(dashboardCode).toContain("{ value: 'activity', label: 'Activity', show: isOwner }");
     expect(dashboardCode).toContain('canManageDelegations={canManageDelegations}');
+  });
+});
+
+/**
+ * AM-1C-E pre-promotion security correction.
+ *
+ * `update_agency_work_item` previously set `_is_assigned:=(_old.assigned_member_user_id=_uid)`,
+ * which evaluates to NULL on an unassigned row. `IF NOT (_can_manage_work_items OR _is_assigned)`
+ * then evaluated NULL and did not raise, letting a view-only member or unrelated outsider update
+ * an unassigned Work Item. The correction wraps the comparison in COALESCE(...,false) so an
+ * unassigned row forces `_is_assigned` to false and the gate fails closed.
+ */
+describe('AM-1C-E pre-promotion security correction — fail-closed assignee boolean', () => {
+  const body = fnBody('update_agency_work_item');
+
+  it('38. _is_assigned is explicitly COALESCE(...,false), not raw nullable equality', () => {
+    expect(body).toContain('_is_assigned:=COALESCE(_old.assigned_member_user_id=_uid,false)');
+    // The raw nullable equality form (which yields NULL for unassigned rows) must be absent.
+    expect(body).not.toContain('_is_assigned:=(_old.assigned_member_user_id=_uid)');
+    // The inner equality still exists, but only inside the COALESCE wrapper.
+    expect(body).toContain('COALESCE(_old.assigned_member_user_id=_uid,false)');
+  });
+
+  it('39. an unassigned row cannot turn the manager-or-assignee gate into NULL', () => {
+    // For an unassigned row, _old.assigned_member_user_id IS NULL, so the COALESCE forces
+    // _is_assigned to false (not NULL). With no manage permission,
+    // `NOT (false OR false)` = true => RAISE 'Not allowed'. The gate must reference the
+    // COALESCE'd boolean, not a raw nullable expression.
+    const gate = "IF NOT (_can_manage_work_items OR _is_assigned) THEN RAISE EXCEPTION 'Not allowed' USING ERRCODE='42501'";
+    expect(body).toContain(gate);
+    const gateIdx = body.indexOf('IF NOT (_can_manage_work_items OR _is_assigned)');
+    expect(gateIdx).toBeGreaterThan(0);
+    const before = body.slice(0, gateIdx);
+    // _is_assigned is assigned exactly once, and only via the COALESCE form.
+    expect((before.match(/_is_assigned:=/g) ?? []).length).toBe(1);
+    expect(before).toContain('_is_assigned:=COALESCE(_old.assigned_member_user_id=_uid,false)');
+    // The raw nullable assignment must not survive anywhere before the gate.
+    expect(before).not.toContain('_is_assigned:=(_old.assigned_member_user_id=_uid)');
+  });
+
+  it('40. initial authorization still remains exactly manager OR exact assigned member', () => {
+    expect(body).toContain(
+      "_can_manage_work_items:=public.current_user_has_agency_permission(_old.agency_id,'work_items_manage')",
+    );
+    expect(body).toContain('_is_assigned:=COALESCE(_old.assigned_member_user_id=_uid,false)');
+    expect(body).toContain(
+      "IF NOT (_can_manage_work_items OR _is_assigned) THEN RAISE EXCEPTION 'Not allowed' USING ERRCODE='42501'",
+    );
+    // No alternate authority source leaked in alongside the correction.
+    expect(body).not.toContain('is_agency_owner_or_admin');
+    expect(body).not.toContain('agency_admin');
+    expect(body).not.toContain('_is_admin');
+  });
+
+  it('41. no other AM-1C-E SQL/function/policy contract changed by the correction', () => {
+    // Still exactly the three Work Item functions redefined.
+    const definitions = [
+      ...executableLower.matchAll(/create\s+or\s+replace\s+function\s+public\.([a-z0-9_]+)/g),
+    ].map((m) => m[1]);
+    expect(definitions.sort()).toEqual(
+      ['create_agency_work_item', 'list_agency_work_items', 'update_agency_work_item'].sort(),
+    );
+    // Still exactly one explicit transaction.
+    expect((sql.match(/^BEGIN;$/gm) ?? []).length).toBe(1);
+    expect((sql.match(/^COMMIT;$/gm) ?? []).length).toBe(1);
+    // RLS surface unchanged: drops only awi_agency_admin_select, creates only awi_workspace_view_all_select.
+    const drops = [
+      ...executableLower.matchAll(/drop\s+policy\s+(?:if\s+exists\s+)?([a-z0-9_]+)/g),
+    ].map((m) => m[1]);
+    expect(drops).toEqual(['awi_agency_admin_select']);
+    const creates = [...executableLower.matchAll(/create\s+policy\s+([a-z0-9_]+)/g)].map(
+      (m) => m[1],
+    );
+    expect(creates).toEqual(['awi_workspace_view_all_select']);
+    // No grants and no DML policies introduced by the correction.
+    expect(executableLower).not.toMatch(/for\s+(insert|update|delete|all)\b/);
+    expect(executableLower).not.toMatch(/\bgrant\b/);
+    // list/create bodies are untouched by the correction (no COALESCE assignee edit there).
+    const listBody = fnBody('list_agency_work_items');
+    expect(listBody).not.toContain('COALESCE(_old.assigned_member_user_id=_uid,false)');
+    const createBody = fnBody('create_agency_work_item');
+    expect(createBody).not.toContain('COALESCE(_old.assigned_member_user_id=_uid,false)');
   });
 });
