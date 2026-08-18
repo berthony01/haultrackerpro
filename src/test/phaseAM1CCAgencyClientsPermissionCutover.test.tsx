@@ -228,8 +228,15 @@ describe('AM-1C-C — ClientListSection', () => {
   });
 
   it('11b. never treats clients_view as revoke authority and adds no second permission query', () => {
-    expect(sectionSource).not.toContain('clients_view');
-    expect(sectionSource).not.toContain('useAgencyWorkspacePermissions');
+    // Comments may reference clients_view; executable code must not consume it.
+    const code = sectionSource
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .split('\n')
+      .map((l) => l.replace(/\/\/.*$/, ''))
+      .join('\n');
+    expect(code).not.toContain('clients_view');
+    expect(code).not.toContain('canViewClients');
+    expect(code).not.toContain('useAgencyWorkspacePermissions');
     expect(sectionSource).toContain('useRevokeAgencyDelegation');
     expect(sectionSource).toContain('revoke.mutateAsync(delegationId)');
   });
