@@ -90,5 +90,8 @@ export function useAgencyWorkspacePermissions(
     canViewClientRequests: settled && resolved.client_requests_view === true,
     canManageClientRequests: settled && resolved.client_requests_manage === true,
     canViewClients: settled && resolved.clients_view === true,
+    canViewDelegations: settled && resolved.delegations_view === true,
+    canManageDelegations: settled && resolved.delegations_manage === true,
+
   };
 }
