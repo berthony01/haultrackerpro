@@ -278,31 +278,33 @@ function WorkItemRowView({
         </div>
       </div>
       <div className="flex flex-wrap gap-2 pt-1 items-center">
-        <Select
-          value={item.status}
-          onValueChange={async (v) => {
-            try {
-              await update.mutateAsync({
-                id: item.id,
-                status: v as AgencyWorkItemStatus,
-              });
-              toast({ title: 'Status updated' });
-            } catch (e: any) {
-              toast({ title: 'Error', description: e?.message, variant: 'destructive' });
-            }
-          }}
-        >
-          <SelectTrigger className="h-7 text-xs w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {canEditStatus && (
+          <Select
+            value={item.status}
+            onValueChange={async (v) => {
+              try {
+                await update.mutateAsync({
+                  id: item.id,
+                  status: v as AgencyWorkItemStatus,
+                });
+                toast({ title: 'Status updated' });
+              } catch (e: any) {
+                toast({ title: 'Error', description: e?.message, variant: 'destructive' });
+              }
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s.replace(/_/g, ' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {delegation
           ? links.map((l) => (
