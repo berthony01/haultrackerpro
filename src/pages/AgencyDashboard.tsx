@@ -127,7 +127,9 @@ export default function AgencyDashboard() {
             { value: 'overview', label: 'Overview', show: true },
             { value: 'packages', label: 'Packages', show: showPackages },
             { value: 'requests', label: 'Requests', show: showRequests },
-            { value: 'clients', label: 'Clients', show: isOwnerOrAdmin },
+            // AM-1C-C: Clients visibility is the read-only `clients_view`
+            // workspace permission, never a role label.
+            { value: 'clients', label: 'Clients', show: canViewClients },
             // Settlements are visible to every active member; PostgreSQL, not
             // this tab, decides who may prepare or change a statement.
             { value: 'settlements', label: 'Settlements', show: true },
