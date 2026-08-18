@@ -297,9 +297,17 @@ function CreateAgencyCard() {
 
 function AgencyDetailCard({
   agency,
+  canViewTeam,
 }: {
   agency: NonNullable<ReturnType<typeof useMyAgency>['data']>;
+  /**
+   * AM-1C-FG: read-only presentation only. The safe RPC still returns the
+   * caller's own membership when this is false, so the card stays mounted.
+   * This never enables invite / revoke / permission assignment.
+   */
+  canViewTeam: boolean;
 }) {
+
   const { update, invite, revoke } = useAgencyMutations();
   const { data: members } = useAgencyMembers(agency.id);
   const { data: clients } = useAgencyClients(agency.id);
