@@ -62,6 +62,7 @@ export default function AgencyDashboard() {
     canManagePackages,
     canViewClientRequests,
     canManageClientRequests,
+    canViewClients,
   } = useAgencyWorkspacePermissions(agency?.id);
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
