@@ -123,7 +123,7 @@ export default function AgencyDashboard() {
         (() => {
           const role = agency.my_role;
           const isOwner = role === 'agency_owner';
-          const isOwnerOrAdmin = isOwner || role === 'agency_admin';
+          
           // Packages and Requests are decided by AM-1B workspace permissions
           // only; the remaining tabs stay on their existing rules.
           const showPackages = canViewPackages || canManagePackages;
