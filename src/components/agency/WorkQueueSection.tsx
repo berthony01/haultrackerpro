@@ -188,12 +188,17 @@ export function WorkQueueSection({
         ) : (
           <div className="space-y-2">
             {items.map((it) => (
-              <WorkItemRowView key={it.id} item={it} highlighted={focusedWorkItemId === it.id} />
+              <WorkItemRowView
+                key={it.id}
+                item={it}
+                highlighted={focusedWorkItemId === it.id}
+                canManageWorkItems={canManageWorkItems}
+              />
             ))}
           </div>
         )}
 
-        {canManage && (
+        {canManageWorkItems && (
           <CreateWorkItemDialog
             open={createOpen}
             onOpenChange={setCreateOpen}
