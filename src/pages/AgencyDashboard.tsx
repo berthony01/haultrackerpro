@@ -68,7 +68,12 @@ export default function AgencyDashboard() {
     // AM-1C-E: Work Item authority is a workspace permission, never a role.
     canViewAllWorkItems,
     canManageWorkItems,
+    // AM-1C-FG: Activity and Team read visibility are workspace permissions,
+    // never role labels. Neither grants any write/governance authority.
+    canViewAudit,
+    canViewTeam,
   } = useAgencyWorkspacePermissions(agency?.id);
+
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
   const focusedWorkItemId = new URLSearchParams(location.search).get('workItem');
@@ -139,7 +144,10 @@ export default function AgencyDashboard() {
             // this tab, decides who may prepare or change a statement.
             { value: 'settlements', label: 'Settlements', show: true },
             { value: 'work', label: 'Work queue', show: true },
-            { value: 'activity', label: 'Activity', show: isOwner },
+            // AM-1C-FG: Activity visibility is the read-only `audit_view`
+            // workspace permission, never a role label.
+            { value: 'activity', label: 'Activity', show: canViewAudit },
+
           ].filter((t) => t.show);
           const safeActive = tabs.some((t) => t.value === activeTab) ? activeTab : 'overview';
           return (
@@ -151,7 +159,7 @@ export default function AgencyDashboard() {
               </TabsList>
               <TabsContent value="overview" className="space-y-4">
                 <MyProfessionalProfileCard context="agency" />
-                <AgencyDetailCard agency={agency} />
+                <AgencyDetailCard agency={agency} canViewTeam={canViewTeam} />
                 {isOwner && <AgencyPlanLimitsCard agencyId={agency.id} />}
                 {!isOwner && (
                   <p className="text-xs text-muted-foreground">
@@ -198,9 +206,10 @@ export default function AgencyDashboard() {
                   canManageWorkItems={canManageWorkItems}
                 />
               </TabsContent>
-              {isOwner && (
+              {canViewAudit && (
                 <TabsContent value="activity">
                   <AgencyAuditSection agencyId={agency.id} />
+
                 </TabsContent>
               )}
             </Tabs>
@@ -288,9 +297,17 @@ function CreateAgencyCard() {
 
 function AgencyDetailCard({
   agency,
+  canViewTeam,
 }: {
   agency: NonNullable<ReturnType<typeof useMyAgency>['data']>;
+  /**
+   * AM-1C-FG: read-only presentation only. The safe RPC still returns the
+   * caller's own membership when this is false, so the card stays mounted.
+   * This never enables invite / revoke / permission assignment.
+   */
+  canViewTeam: boolean;
 }) {
+
   const { update, invite, revoke } = useAgencyMutations();
   const { data: members } = useAgencyMembers(agency.id);
   const { data: clients } = useAgencyClients(agency.id);
@@ -384,7 +401,7 @@ function AgencyDetailCard({
           icon={<Users className="h-4 w-4" />}
         />
         <Stat
-          label="Active members"
+          label={canViewTeam ? 'Active members' : 'Your active membership'}
           value={(members ?? []).filter((m) => m.status === 'active').length}
           icon={<ShieldCheck className="h-4 w-4" />}
         />
@@ -392,13 +409,22 @@ function AgencyDetailCard({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Members</CardTitle>
+          <CardTitle className="text-base">
+            {canViewTeam ? 'Members' : 'Your membership'}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
             Members do <strong>not</strong> automatically get access to any driver's account.
             Each driver must still invite each assistant directly through Driver Assistants.
           </p>
+          {!canViewTeam && (
+            <p className="text-xs text-muted-foreground">
+              You are seeing only your own membership. Viewing the full team list
+              is a separate read-only workspace permission.
+            </p>
+          )}
+
 
           {isOwner && (
             <div className="flex items-end gap-2">
