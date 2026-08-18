@@ -170,9 +170,15 @@ export default function AgencyDashboard() {
                   />
                 </TabsContent>
               )}
-              {isOwnerOrAdmin && (
+              {canViewClients && (
                 <TabsContent value="clients">
-                  <ClientListSection agencyId={agency.id} />
+                  {/* canRevokeDelegation mirrors the still-live delegation
+                      authorization model only; clients_view is read-only and
+                      never grants revocation. */}
+                  <ClientListSection
+                    agencyId={agency.id}
+                    canRevokeDelegation={isOwnerOrAdmin}
+                  />
                 </TabsContent>
               )}
               <TabsContent value="settlements">
