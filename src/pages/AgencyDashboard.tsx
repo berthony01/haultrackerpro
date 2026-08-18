@@ -159,7 +159,7 @@ export default function AgencyDashboard() {
               </TabsList>
               <TabsContent value="overview" className="space-y-4">
                 <MyProfessionalProfileCard context="agency" />
-                <AgencyDetailCard agency={agency} />
+                <AgencyDetailCard agency={agency} canViewTeam={canViewTeam} />
                 {isOwner && <AgencyPlanLimitsCard agencyId={agency.id} />}
                 {!isOwner && (
                   <p className="text-xs text-muted-foreground">
