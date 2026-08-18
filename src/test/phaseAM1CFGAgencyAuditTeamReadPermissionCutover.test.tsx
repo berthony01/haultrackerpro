@@ -287,12 +287,15 @@ describe('AM-1C-FG — RLS surface', () => {
       expect(created).not.toContain('agency_members');
       expect(created).not.toContain('team');
     }
+    // Statement-scoped: a CREATE POLICY block ends at its terminating `;`.
     const memberPolicyBlocks = executableLower
       .split(/create\s+policy\s+/)
       .slice(1)
+      .map((block) => block.slice(0, block.indexOf(';') + 1))
       .filter((block) => block.includes('public.agency_members'));
     expect(memberPolicyBlocks).toHaveLength(0);
   });
+
 
   it('24. preserves the narrow policies by never dropping them', () => {
     expect(drops).not.toContain('aal_driver_select_own');
