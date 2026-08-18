@@ -68,7 +68,12 @@ export default function AgencyDashboard() {
     // AM-1C-E: Work Item authority is a workspace permission, never a role.
     canViewAllWorkItems,
     canManageWorkItems,
+    // AM-1C-FG: Activity and Team read visibility are workspace permissions,
+    // never role labels. Neither grants any write/governance authority.
+    canViewAudit,
+    canViewTeam,
   } = useAgencyWorkspacePermissions(agency?.id);
+
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
   const focusedWorkItemId = new URLSearchParams(location.search).get('workItem');
