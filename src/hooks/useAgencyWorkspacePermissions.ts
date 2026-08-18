@@ -40,6 +40,8 @@ export interface AgencyWorkspacePermissionsState {
   /** AM-1C-B consumer booleans (exact boolean true semantics). */
   canViewClientRequests: boolean;
   canManageClientRequests: boolean;
+  /** AM-1C-C consumer boolean (exact boolean true semantics, read-only authority). */
+  canViewClients: boolean;
 }
 
 export function useAgencyWorkspacePermissions(
