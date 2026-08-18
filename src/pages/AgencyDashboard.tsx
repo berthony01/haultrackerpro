@@ -161,26 +161,24 @@ export default function AgencyDashboard() {
               )}
               {showRequests && (
                 <TabsContent value="requests">
-                  {/* isOwnerOrAdmin is passed ONLY as the transitional
-                      delegation authority mirror; delegation backend is not
-                      cut over to workspace permissions yet. */}
-                  <ClientRequestsSection
-                    agencyId={agency.id}
-                    canCreateDelegation={isOwnerOrAdmin}
-                  />
+                  {/* AM-1C-D: delegation authority is the `delegations_manage`
+                      workspace permission, resolved inside the section itself.
+                      No role-derived delegation prop is passed. */}
+                  <ClientRequestsSection agencyId={agency.id} />
                 </TabsContent>
               )}
               {canViewClients && (
                 <TabsContent value="clients">
-                  {/* canRevokeDelegation mirrors the still-live delegation
-                      authorization model only; clients_view is read-only and
+                  {/* AM-1C-D: End access is delegation authority
+                      (`delegations_manage`); clients_view is read-only and
                       never grants revocation. */}
                   <ClientListSection
                     agencyId={agency.id}
-                    canRevokeDelegation={isOwnerOrAdmin}
+                    canManageDelegations={canManageDelegations}
                   />
                 </TabsContent>
               )}
+
               <TabsContent value="settlements">
                 <AgencySettlementsPanel agencyId={agency.id} />
               </TabsContent>
