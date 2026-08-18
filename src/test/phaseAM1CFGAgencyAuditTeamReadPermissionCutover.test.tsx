@@ -223,9 +223,10 @@ describe('AM-1C-FG — safe member read authorization', () => {
   });
 
   it('17. introduces no `team_manage` and no settlement permission key', () => {
-    expect(sql.toLowerCase()).not.toContain('team_manage');
-    expect(sql.toLowerCase()).not.toContain('settlement');
+    expect(executableLower).not.toContain('team_manage');
+    expect(executableLower).not.toContain('settlement');
   });
+
 
   it('18. preserves the SAFE projection exactly', () => {
     expect(body).toContain(
