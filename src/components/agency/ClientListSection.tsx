@@ -77,7 +77,7 @@ export function ClientListSection({
                       Last activity {new Date(c.last_activity_at).toLocaleDateString()}
                     </span>
                   )}
-                  {canRevokeDelegation && (
+                  {canManageDelegations && (
                     <RevokeClientButton
                       delegationId={c.delegation_id}
                       driverLabel={c.driver_name || c.driver_email || 'this driver'}
