@@ -210,13 +210,30 @@ export function WorkQueueSection({
   );
 }
 
-function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted?: boolean }) {
+function WorkItemRowView({
+  item,
+  highlighted,
+  canManageWorkItems,
+}: {
+  item: WorkItemRow;
+  highlighted?: boolean;
+  canManageWorkItems: boolean;
+}) {
   const { update } = useWorkItemMutations();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { managedDrivers, beginActingAs } = useActingContext();
   const delegation = managedDrivers.find((d) => d.driver_user_id === item.driver_user_id) ?? null;
   const perms = delegation?.permissions ?? null;
+  // AM-1C-E: a broad read-only viewer (`work_items_view_all` without
+  // `work_items_manage`) must not be offered an update control. The editable
+  // status Select renders only for a full manager or the exact assigned member
+  // (preserved assigned-member limited self-service).
+  const canEditStatus =
+    canManageWorkItems === true ||
+    (!!user?.id && item.assigned_member_user_id === user.id);
+
 
   const go = (page: string) => {
     beginActingAs(item.driver_user_id);
