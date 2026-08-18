@@ -76,10 +76,12 @@ export function ClientListSection({
                       Last activity {new Date(c.last_activity_at).toLocaleDateString()}
                     </span>
                   )}
-                  <RevokeClientButton
-                    delegationId={c.delegation_id}
-                    driverLabel={c.driver_name || c.driver_email || 'this driver'}
-                  />
+                  {canRevokeDelegation && (
+                    <RevokeClientButton
+                      delegationId={c.delegation_id}
+                      driverLabel={c.driver_name || c.driver_email || 'this driver'}
+                    />
+                  )}
                 </div>
               </div>
             ))}
