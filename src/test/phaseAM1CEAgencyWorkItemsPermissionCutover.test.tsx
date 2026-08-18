@@ -201,8 +201,10 @@ describe('AM-1C-E — update_agency_work_item', () => {
     expect(body).not.toContain('_is_admin');
   });
 
-  it('15. initial allowed branch stays manager OR exact assigned member', () => {
-    expect(body).toContain('_is_assigned:=(_old.assigned_member_user_id=_uid)');
+  it('15. initial allowed branch stays manager OR exact assigned member (fail-closed for unassigned rows)', () => {
+    expect(body).toContain('_is_assigned:=COALESCE(_old.assigned_member_user_id=_uid,false)');
+    // The raw nullable form (which yields NULL for unassigned rows) must be gone.
+    expect(body).not.toContain('_is_assigned:=(_old.assigned_member_user_id=_uid)');
     expect(body).toContain(
       "IF NOT (_can_manage_work_items OR _is_assigned) THEN RAISE EXCEPTION 'Not allowed' USING ERRCODE='42501'",
     );
