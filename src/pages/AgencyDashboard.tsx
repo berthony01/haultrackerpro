@@ -188,12 +188,14 @@ export default function AgencyDashboard() {
                 <AgencySettlementsPanel agencyId={agency.id} />
               </TabsContent>
               <TabsContent value="work">
-
-
+                {/* AM-1C-E: the tab stays broadly visible so assigned-member
+                    narrow self-service remains reachable; exact AM-1B
+                    permissions decide broad filters and management. */}
                 <WorkQueueSection
                   agencyId={agency.id}
                   focusedWorkItemId={focusedWorkItemId}
-                  canManage={isOwnerOrAdmin}
+                  canViewAllWorkItems={canViewAllWorkItems}
+                  canManageWorkItems={canManageWorkItems}
                 />
               </TabsContent>
               {isOwner && (
