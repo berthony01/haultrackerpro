@@ -45,6 +45,9 @@ export interface AgencyWorkspacePermissionsState {
   /** AM-1C-D consumer booleans (exact boolean true semantics). Manage never implies view. */
   canViewDelegations: boolean;
   canManageDelegations: boolean;
+  /** AM-1C-E consumer booleans (exact boolean true semantics). Neither implies the other. */
+  canViewAllWorkItems: boolean;
+  canManageWorkItems: boolean;
 }
 
 
