@@ -17,7 +17,7 @@ import { useAgencyClients, useRevokeAgencyDelegation } from '@/hooks/useAgencyWo
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * Phase AM-1C-C — Agency client list.
+ * Phase AM-1C-C / AM-1C-D — Agency client list.
  *
  * READ visibility for this section is decided by the parent Clients tab
  * (`clients_view` workspace permission) and, authoritatively, by the
@@ -26,17 +26,18 @@ import { useToast } from '@/hooks/use-toast';
  *
  * Revocation is a SEPARATE delegation authority path: `clients_view` is
  * read-only and never implies revoke. The End access control renders only when
- * the parent passes `canRevokeDelegation`, which mirrors the still-live
- * `revoke_agency_delegation` authorization model (agency owner/admin or the
- * driver). The RPC remains the enforcement point — UI is cosmetic.
+ * the parent passes `canManageDelegations`, mirroring the AM-1C-D
+ * `delegations_manage` authorization model. The RPC remains the enforcement
+ * point — UI is cosmetic.
  */
 export function ClientListSection({
   agencyId,
-  canRevokeDelegation,
+  canManageDelegations,
 }: {
   agencyId: string;
-  canRevokeDelegation: boolean;
+  canManageDelegations: boolean;
 }) {
+
   const { data: clients, isLoading } = useAgencyClients(agencyId);
   return (
     <Card>
