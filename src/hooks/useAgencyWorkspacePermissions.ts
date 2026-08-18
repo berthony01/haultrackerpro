@@ -48,7 +48,15 @@ export interface AgencyWorkspacePermissionsState {
   /** AM-1C-E consumer booleans (exact boolean true semantics). Neither implies the other. */
   canViewAllWorkItems: boolean;
   canManageWorkItems: boolean;
+  /**
+   * AM-1C-FG consumer booleans (exact boolean true semantics, read-only).
+   * Neither implies the other and neither implies any write authority:
+   * invite / revoke / permission assignment stay canonical-owner-only.
+   */
+  canViewAudit: boolean;
+  canViewTeam: boolean;
 }
+
 
 
 export function useAgencyWorkspacePermissions(
