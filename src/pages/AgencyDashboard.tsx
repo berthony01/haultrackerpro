@@ -401,7 +401,7 @@ function AgencyDetailCard({
           icon={<Users className="h-4 w-4" />}
         />
         <Stat
-          label="Active members"
+          label={canViewTeam ? 'Active members' : 'Your active membership'}
           value={(members ?? []).filter((m) => m.status === 'active').length}
           icon={<ShieldCheck className="h-4 w-4" />}
         />
@@ -409,13 +409,22 @@ function AgencyDetailCard({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Members</CardTitle>
+          <CardTitle className="text-base">
+            {canViewTeam ? 'Members' : 'Your membership'}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-xs text-muted-foreground">
             Members do <strong>not</strong> automatically get access to any driver's account.
             Each driver must still invite each assistant directly through Driver Assistants.
           </p>
+          {!canViewTeam && (
+            <p className="text-xs text-muted-foreground">
+              You are seeing only your own membership. Viewing the full team list
+              is a separate read-only workspace permission.
+            </p>
+          )}
+
 
           {isOwner && (
             <div className="flex items-end gap-2">
