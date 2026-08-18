@@ -144,7 +144,10 @@ export default function AgencyDashboard() {
             // this tab, decides who may prepare or change a statement.
             { value: 'settlements', label: 'Settlements', show: true },
             { value: 'work', label: 'Work queue', show: true },
-            { value: 'activity', label: 'Activity', show: isOwner },
+            // AM-1C-FG: Activity visibility is the read-only `audit_view`
+            // workspace permission, never a role label.
+            { value: 'activity', label: 'Activity', show: canViewAudit },
+
           ].filter((t) => t.show);
           const safeActive = tabs.some((t) => t.value === activeTab) ? activeTab : 'overview';
           return (
