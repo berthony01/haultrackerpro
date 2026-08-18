@@ -42,7 +42,11 @@ export interface AgencyWorkspacePermissionsState {
   canManageClientRequests: boolean;
   /** AM-1C-C consumer boolean (exact boolean true semantics, read-only authority). */
   canViewClients: boolean;
+  /** AM-1C-D consumer booleans (exact boolean true semantics). Manage never implies view. */
+  canViewDelegations: boolean;
+  canManageDelegations: boolean;
 }
+
 
 export function useAgencyWorkspacePermissions(
   agencyId: string | null | undefined,
@@ -86,5 +90,8 @@ export function useAgencyWorkspacePermissions(
     canViewClientRequests: settled && resolved.client_requests_view === true,
     canManageClientRequests: settled && resolved.client_requests_manage === true,
     canViewClients: settled && resolved.clients_view === true,
+    canViewDelegations: settled && resolved.delegations_view === true,
+    canManageDelegations: settled && resolved.delegations_manage === true,
+
   };
 }

@@ -36,27 +36,28 @@ import {
 } from '@/lib/assistantPermissions';
 
 /**
- * Phase AM-1C-B — Client requests are the second consumer of the AM-1B Agency
- * workspace permission contract.
+ * Phase AM-1C-B / AM-1C-D — Client requests consume the AM-1B Agency workspace
+ * permission contract.
  *
  * `client_requests_view` controls broad list visibility, `client_requests_manage`
  * controls direct request workflow (decline/status/assignment). The two are
  * independent: manage never implies view.
  *
- * `canCreateDelegation` is a TRANSITIONAL prop mirroring the still-uncut
- * delegation backend authority. It is NOT a client-request permission and must
- * never gate the request list or direct request management.
+ * AM-1C-D: Agency-side delegation creation is governed exclusively by
+ * `delegations_manage`. It is NOT a client-request permission and must never
+ * gate the request list or direct request management, and no role label grants
+ * it. The `create_agency_delegation_request` RPC remains authoritative.
+ *
+ * Permission separation: the assignment dialog's package fallback query is
+ * itself gated on `packages_view`. A member may validly hold
+ * `client_requests_view + delegations_manage` without package visibility.
  */
-export function ClientRequestsSection({
-  agencyId,
-  canCreateDelegation,
-}: {
-  agencyId: string;
-  canCreateDelegation: boolean;
-}) {
+export function ClientRequestsSection({ agencyId }: { agencyId: string }) {
   const {
     canViewClientRequests,
     canManageClientRequests,
+    canManageDelegations,
+    canViewPackages,
     isLoading: permissionsLoading,
     isError: permissionsError,
   } = useAgencyWorkspacePermissions(agencyId);
@@ -66,6 +67,7 @@ export function ClientRequestsSection({
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'declined'>('pending');
   const filtered =
     requests?.filter((r) => filter === 'all' || r.status === filter) ?? [];
+
 
   return (
     <Card>
@@ -113,7 +115,8 @@ export function ClientRequestsSection({
                 agencyId={agencyId}
                 req={r}
                 canManageClientRequests={canManageClientRequests}
-                canCreateDelegation={canCreateDelegation}
+                canManageDelegations={canManageDelegations}
+                canViewPackages={canViewPackages}
               />
             ))}
           </div>
@@ -127,12 +130,14 @@ function ClientRequestRow({
   agencyId,
   req,
   canManageClientRequests,
-  canCreateDelegation,
+  canManageDelegations,
+  canViewPackages,
 }: {
   agencyId: string;
   req: AgencyClientRequestRow;
   canManageClientRequests: boolean;
-  canCreateDelegation: boolean;
+  canManageDelegations: boolean;
+  canViewPackages: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const setStatus = useSetClientRequestStatus();
@@ -163,7 +168,7 @@ function ClientRequestRow({
         <div className="flex flex-col gap-2 items-end">
           {req.status === 'pending' && (
             <>
-              {canCreateDelegation && (
+              {canManageDelegations && (
                 <Button size="sm" onClick={() => setOpen(true)}>
                   Assign &amp; request delegation
                 </Button>
@@ -189,12 +194,13 @@ function ClientRequestRow({
         </div>
       </div>
 
-      {canCreateDelegation && open && (
+      {canManageDelegations && open && (
         <AssignDelegationDialog
           open={open}
           onOpenChange={setOpen}
           agencyId={agencyId}
           req={req}
+          canViewPackages={canViewPackages}
         />
       )}
     </div>
@@ -206,14 +212,18 @@ function AssignDelegationDialog({
   onOpenChange,
   agencyId,
   req,
+  canViewPackages,
 }: {
   open: boolean;
   onOpenChange: (b: boolean) => void;
   agencyId: string;
   req: AgencyClientRequestRow;
+  canViewPackages: boolean;
 }) {
   const { data: members } = useAgencyMembers(agencyId);
-  const { data: packages } = useAgencyPackages(agencyId);
+  // Package visibility is a separate permission: fail closed without
+  // `packages_view` so delegation authority never implies package access.
+  const { data: packages } = useAgencyPackages(agencyId, { enabled: canViewPackages });
   const create = useCreateDelegationRequest();
   const { toast } = useToast();
   const activeMembers = (members ?? []).filter((m) => m.status === 'active');
