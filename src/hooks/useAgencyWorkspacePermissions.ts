@@ -105,5 +105,8 @@ export function useAgencyWorkspacePermissions(
     canManageDelegations: settled && resolved.delegations_manage === true,
     canViewAllWorkItems: settled && resolved.work_items_view_all === true,
     canManageWorkItems: settled && resolved.work_items_manage === true,
+    canViewAudit: settled && resolved.audit_view === true,
+    canViewTeam: settled && resolved.team_view === true,
   };
+
 }
