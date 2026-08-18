@@ -63,6 +63,9 @@ export default function AgencyDashboard() {
     canViewClientRequests,
     canManageClientRequests,
     canViewClients,
+    // AM-1C-D: delegation authority is a workspace permission, never a role.
+    canManageDelegations,
+
   } = useAgencyWorkspacePermissions(agency?.id);
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
