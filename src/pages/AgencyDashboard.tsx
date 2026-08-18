@@ -206,9 +206,10 @@ export default function AgencyDashboard() {
                   canManageWorkItems={canManageWorkItems}
                 />
               </TabsContent>
-              {isOwner && (
+              {canViewAudit && (
                 <TabsContent value="activity">
                   <AgencyAuditSection agencyId={agency.id} />
+
                 </TabsContent>
               )}
             </Tabs>
