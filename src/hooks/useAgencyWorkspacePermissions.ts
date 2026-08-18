@@ -45,6 +45,9 @@ export interface AgencyWorkspacePermissionsState {
   /** AM-1C-D consumer booleans (exact boolean true semantics). Manage never implies view. */
   canViewDelegations: boolean;
   canManageDelegations: boolean;
+  /** AM-1C-E consumer booleans (exact boolean true semantics). Neither implies the other. */
+  canViewAllWorkItems: boolean;
+  canManageWorkItems: boolean;
 }
 
 
@@ -92,6 +95,7 @@ export function useAgencyWorkspacePermissions(
     canViewClients: settled && resolved.clients_view === true,
     canViewDelegations: settled && resolved.delegations_view === true,
     canManageDelegations: settled && resolved.delegations_manage === true,
-
+    canViewAllWorkItems: settled && resolved.work_items_view_all === true,
+    canManageWorkItems: settled && resolved.work_items_manage === true,
   };
 }

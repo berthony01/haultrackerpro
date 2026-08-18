@@ -65,7 +65,9 @@ export default function AgencyDashboard() {
     canViewClients,
     // AM-1C-D: delegation authority is a workspace permission, never a role.
     canManageDelegations,
-
+    // AM-1C-E: Work Item authority is a workspace permission, never a role.
+    canViewAllWorkItems,
+    canManageWorkItems,
   } = useAgencyWorkspacePermissions(agency?.id);
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
@@ -121,7 +123,7 @@ export default function AgencyDashboard() {
         (() => {
           const role = agency.my_role;
           const isOwner = role === 'agency_owner';
-          const isOwnerOrAdmin = isOwner || role === 'agency_admin';
+          
           // Packages and Requests are decided by AM-1B workspace permissions
           // only; the remaining tabs stay on their existing rules.
           const showPackages = canViewPackages || canManagePackages;
@@ -186,12 +188,14 @@ export default function AgencyDashboard() {
                 <AgencySettlementsPanel agencyId={agency.id} />
               </TabsContent>
               <TabsContent value="work">
-
-
+                {/* AM-1C-E: the tab stays broadly visible so assigned-member
+                    narrow self-service remains reachable; exact AM-1B
+                    permissions decide broad filters and management. */}
                 <WorkQueueSection
                   agencyId={agency.id}
                   focusedWorkItemId={focusedWorkItemId}
-                  canManage={isOwnerOrAdmin}
+                  canViewAllWorkItems={canViewAllWorkItems}
+                  canManageWorkItems={canManageWorkItems}
                 />
               </TabsContent>
               {isOwner && (

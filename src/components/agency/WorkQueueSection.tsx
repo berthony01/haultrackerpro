@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { ListTodo, Plus, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useActingContext } from '@/hooks/useActingContext';
+import { useAuth } from '@/hooks/useAuth';
 import { hasPerm } from '@/lib/assistantPermissions';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -71,20 +72,30 @@ function workItemTypeLabel(t: AgencyWorkItemType): string {
 export function WorkQueueSection({
   agencyId,
   focusedWorkItemId,
-  canManage = false,
+  canViewAllWorkItems,
+  canManageWorkItems,
 }: {
   agencyId: string;
   focusedWorkItemId?: string | null;
-  /** Owner/admin: can create + filter by driver/member. Members: assigned-only view. */
-  canManage?: boolean;
+  /**
+   * AM-1C-E: exact AM-1B workspace permissions. Role labels grant no Work Item
+   * authority. Neither boolean implies the other.
+   * - `work_items_view_all`: broad driver/member filter controls.
+   * - `work_items_manage`: create + full management.
+   */
+  canViewAllWorkItems: boolean;
+  canManageWorkItems: boolean;
 }) {
   const [status, setStatus] = useState<AgencyWorkItemStatus | 'all'>('open');
   const [driverId, setDriverId] = useState<string | 'all'>('all');
   const [memberId, setMemberId] = useState<string | 'all'>('all');
+  // The list query stays available to every agency member: the backend returns
+  // either the broad set (via `work_items_view_all`) or the preserved
+  // assigned-member subset. Broad filters are only sent with view-all.
   const { data: items, isLoading } = useAgencyWorkItems(agencyId, {
     status: status === 'all' ? undefined : status,
-    driverId: canManage && driverId !== 'all' ? driverId : undefined,
-    memberId: canManage && memberId !== 'all' ? memberId : undefined,
+    driverId: canViewAllWorkItems && driverId !== 'all' ? driverId : undefined,
+    memberId: canViewAllWorkItems && memberId !== 'all' ? memberId : undefined,
   });
   const { data: clients } = useAgencyClients(agencyId);
   const { data: members } = useAgencyMembers(agencyId);
@@ -107,7 +118,7 @@ export function WorkQueueSection({
             <ListTodo className="h-4 w-4 text-primary" />
             Work queue
           </CardTitle>
-          {canManage && (
+          {canManageWorkItems && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               <Plus className="mr-1 h-4 w-4" />
               New task
@@ -117,11 +128,12 @@ export function WorkQueueSection({
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          {canManage
+          {canViewAllWorkItems
             ? "These are tasks your agency owes a client — not the client's own loads, expenses, or fuel records. Opening one routes you into that client's account using the delegation permissions they granted you."
             : "You'll only see work items assigned to you. Driver account access still requires driver-approved delegation."}
         </p>
-        <div className={canManage ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-1 gap-2'}>
+        <div className={canViewAllWorkItems ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-1 gap-2'}>
+
 
           <Select value={status} onValueChange={(v) => setStatus(v as any)}>
             <SelectTrigger className="h-8 text-xs">
@@ -136,7 +148,7 @@ export function WorkQueueSection({
               ))}
             </SelectContent>
           </Select>
-          {canManage && (
+          {canViewAllWorkItems && (
             <>
               <Select value={driverId} onValueChange={(v) => setDriverId(v as any)}>
                 <SelectTrigger className="h-8 text-xs">
@@ -177,12 +189,17 @@ export function WorkQueueSection({
         ) : (
           <div className="space-y-2">
             {items.map((it) => (
-              <WorkItemRowView key={it.id} item={it} highlighted={focusedWorkItemId === it.id} />
+              <WorkItemRowView
+                key={it.id}
+                item={it}
+                highlighted={focusedWorkItemId === it.id}
+                canManageWorkItems={canManageWorkItems}
+              />
             ))}
           </div>
         )}
 
-        {canManage && (
+        {canManageWorkItems && (
           <CreateWorkItemDialog
             open={createOpen}
             onOpenChange={setCreateOpen}
@@ -194,13 +211,30 @@ export function WorkQueueSection({
   );
 }
 
-function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted?: boolean }) {
+function WorkItemRowView({
+  item,
+  highlighted,
+  canManageWorkItems,
+}: {
+  item: WorkItemRow;
+  highlighted?: boolean;
+  canManageWorkItems: boolean;
+}) {
   const { update } = useWorkItemMutations();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { managedDrivers, beginActingAs } = useActingContext();
   const delegation = managedDrivers.find((d) => d.driver_user_id === item.driver_user_id) ?? null;
   const perms = delegation?.permissions ?? null;
+  // AM-1C-E: a broad read-only viewer (`work_items_view_all` without
+  // `work_items_manage`) must not be offered an update control. The editable
+  // status Select renders only for a full manager or the exact assigned member
+  // (preserved assigned-member limited self-service).
+  const canEditStatus =
+    canManageWorkItems === true ||
+    (!!user?.id && item.assigned_member_user_id === user.id);
+
 
   const go = (page: string) => {
     beginActingAs(item.driver_user_id);
@@ -244,31 +278,33 @@ function WorkItemRowView({ item, highlighted }: { item: WorkItemRow; highlighted
         </div>
       </div>
       <div className="flex flex-wrap gap-2 pt-1 items-center">
-        <Select
-          value={item.status}
-          onValueChange={async (v) => {
-            try {
-              await update.mutateAsync({
-                id: item.id,
-                status: v as AgencyWorkItemStatus,
-              });
-              toast({ title: 'Status updated' });
-            } catch (e: any) {
-              toast({ title: 'Error', description: e?.message, variant: 'destructive' });
-            }
-          }}
-        >
-          <SelectTrigger className="h-7 text-xs w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>
-                {s.replace(/_/g, ' ')}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {canEditStatus && (
+          <Select
+            value={item.status}
+            onValueChange={async (v) => {
+              try {
+                await update.mutateAsync({
+                  id: item.id,
+                  status: v as AgencyWorkItemStatus,
+                });
+                toast({ title: 'Status updated' });
+              } catch (e: any) {
+                toast({ title: 'Error', description: e?.message, variant: 'destructive' });
+              }
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s.replace(/_/g, ' ')}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {delegation
           ? links.map((l) => (
