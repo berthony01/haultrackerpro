@@ -62,6 +62,7 @@ export default function AgencyDashboard() {
     canManagePackages,
     canViewClientRequests,
     canManageClientRequests,
+    canViewClients,
   } = useAgencyWorkspacePermissions(agency?.id);
 
   // Notification deep-link: /agency?workItem=:id focuses the work queue tab.
@@ -126,7 +127,9 @@ export default function AgencyDashboard() {
             { value: 'overview', label: 'Overview', show: true },
             { value: 'packages', label: 'Packages', show: showPackages },
             { value: 'requests', label: 'Requests', show: showRequests },
-            { value: 'clients', label: 'Clients', show: isOwnerOrAdmin },
+            // AM-1C-C: Clients visibility is the read-only `clients_view`
+            // workspace permission, never a role label.
+            { value: 'clients', label: 'Clients', show: canViewClients },
             // Settlements are visible to every active member; PostgreSQL, not
             // this tab, decides who may prepare or change a statement.
             { value: 'settlements', label: 'Settlements', show: true },
@@ -167,9 +170,15 @@ export default function AgencyDashboard() {
                   />
                 </TabsContent>
               )}
-              {isOwnerOrAdmin && (
+              {canViewClients && (
                 <TabsContent value="clients">
-                  <ClientListSection agencyId={agency.id} />
+                  {/* canRevokeDelegation mirrors the still-live delegation
+                      authorization model only; clients_view is read-only and
+                      never grants revocation. */}
+                  <ClientListSection
+                    agencyId={agency.id}
+                    canRevokeDelegation={isOwnerOrAdmin}
+                  />
                 </TabsContent>
               )}
               <TabsContent value="settlements">

@@ -17,15 +17,26 @@ import { useAgencyClients, useRevokeAgencyDelegation } from '@/hooks/useAgencyWo
 import { useToast } from '@/hooks/use-toast';
 
 /**
- * Phase 4A — Agency client list with a working revoke-delegation control.
+ * Phase AM-1C-C — Agency client list.
  *
- * The revoke action calls the SECURITY DEFINER `revoke_agency_delegation` RPC,
- * which (1) marks the delegation revoked, (2) syncs the matching
- * driver_assistants row to revoked, and (3) writes audit entries to both
- * agency_audit_log and assistant_audit_log. UI is purely cosmetic — the
- * RPC enforces who is allowed to revoke (agency owner/admin or the driver).
+ * READ visibility for this section is decided by the parent Clients tab
+ * (`clients_view` workspace permission) and, authoritatively, by the
+ * SECURITY DEFINER `list_agency_clients` RPC. This component intentionally
+ * does not run a second workspace-permission query.
+ *
+ * Revocation is a SEPARATE delegation authority path: `clients_view` is
+ * read-only and never implies revoke. The End access control renders only when
+ * the parent passes `canRevokeDelegation`, which mirrors the still-live
+ * `revoke_agency_delegation` authorization model (agency owner/admin or the
+ * driver). The RPC remains the enforcement point — UI is cosmetic.
  */
-export function ClientListSection({ agencyId }: { agencyId: string }) {
+export function ClientListSection({
+  agencyId,
+  canRevokeDelegation,
+}: {
+  agencyId: string;
+  canRevokeDelegation: boolean;
+}) {
   const { data: clients, isLoading } = useAgencyClients(agencyId);
   return (
     <Card>
@@ -65,10 +76,12 @@ export function ClientListSection({ agencyId }: { agencyId: string }) {
                       Last activity {new Date(c.last_activity_at).toLocaleDateString()}
                     </span>
                   )}
-                  <RevokeClientButton
-                    delegationId={c.delegation_id}
-                    driverLabel={c.driver_name || c.driver_email || 'this driver'}
-                  />
+                  {canRevokeDelegation && (
+                    <RevokeClientButton
+                      delegationId={c.delegation_id}
+                      driverLabel={c.driver_name || c.driver_email || 'this driver'}
+                    />
+                  )}
                 </div>
               </div>
             ))}
