@@ -513,8 +513,9 @@ function AgencyDetailCard({
                           <AlertDialogHeader>
                             <AlertDialogTitle>Remove this member?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              {m.invite_email} will lose access to your agency. Their driver
-                              delegations are not affected.
+                              {m.invite_email} will lose access to your agency, and any driver access
+                              assigned to them through this agency will end. Direct Driver Assistant
+                              access granted to them separately by a driver is not affected.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
