@@ -327,10 +327,15 @@ describe('TG-2B — E. issue_telegram_link_token', () => {
     expect(issueFn).toMatch(
       /_token_hash := encode\(extensions\.digest\(_raw_token, 'sha256'\), 'hex'\);/,
     );
-    // The raw challenge is returned, never persisted.
+    // The raw challenge is returned, never persisted: the INSERT statement
+    // itself must reference only the digest.
     expect(issueFn).toMatch(/user_id, token_hash, expires_at/);
     expect(issueFn).toMatch(/_uid, _token_hash, now\(\) \+ interval '15 minutes'/);
-    expect(issueFn).not.toMatch(/INSERT[\s\S]*_raw_token/);
+    const insertStatement = issueFn.match(
+      /INSERT INTO public\.telegram_link_tokens[\s\S]*?\);/,
+    );
+    expect(insertStatement).toBeTruthy();
+    expect(insertStatement![0]).not.toMatch(/_raw_token/);
     expect(issueFn).toMatch(/RETURN _raw_token;/);
   });
 
