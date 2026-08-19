@@ -787,6 +787,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           driver_user_id: string
+          employment_start_date: string | null
           ended_at: string | null
           id: string
           invited_at: string
@@ -799,6 +800,7 @@ export type Database = {
           created_at?: string
           created_by_user_id: string
           driver_user_id: string
+          employment_start_date?: string | null
           ended_at?: string | null
           id?: string
           invited_at?: string
@@ -811,6 +813,7 @@ export type Database = {
           created_at?: string
           created_by_user_id?: string
           driver_user_id?: string
+          employment_start_date?: string | null
           ended_at?: string | null
           id?: string
           invited_at?: string
@@ -1263,6 +1266,70 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      dispatch_command_receipts: {
+        Row: {
+          action: string
+          actor_user_id: string
+          carrier_driver_relationship_id: string
+          created_at: string
+          driver_user_id: string
+          id: string
+          idempotency_key: string
+          load_id: string | null
+          recruiter_id: string
+          requested_status: string | null
+          source_channel: string
+        }
+        Insert: {
+          action: string
+          actor_user_id: string
+          carrier_driver_relationship_id: string
+          created_at?: string
+          driver_user_id: string
+          id?: string
+          idempotency_key: string
+          load_id?: string | null
+          recruiter_id: string
+          requested_status?: string | null
+          source_channel: string
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string
+          carrier_driver_relationship_id?: string
+          created_at?: string
+          driver_user_id?: string
+          id?: string
+          idempotency_key?: string
+          load_id?: string | null
+          recruiter_id?: string
+          requested_status?: string | null
+          source_channel?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_command_receipts_carrier_driver_relationship_id_fkey"
+            columns: ["carrier_driver_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_driver_relationships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_command_receipts_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dispatch_command_receipts_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       driver_assistants: {
         Row: {
@@ -2208,6 +2275,73 @@ export type Database = {
         }
         Relationships: []
       }
+      load_events: {
+        Row: {
+          actor_user_id: string | null
+          carrier_driver_relationship_id: string | null
+          created_at: string
+          driver_user_id: string
+          event_type: string
+          from_status: string | null
+          id: string
+          load_id: string
+          metadata: Json
+          recruiter_id: string | null
+          source_channel: string
+          to_status: string | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          carrier_driver_relationship_id?: string | null
+          created_at?: string
+          driver_user_id: string
+          event_type: string
+          from_status?: string | null
+          id?: string
+          load_id: string
+          metadata?: Json
+          recruiter_id?: string | null
+          source_channel: string
+          to_status?: string | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          carrier_driver_relationship_id?: string | null
+          created_at?: string
+          driver_user_id?: string
+          event_type?: string
+          from_status?: string | null
+          id?: string
+          load_id?: string
+          metadata?: Json
+          recruiter_id?: string | null
+          source_channel?: string
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "load_events_carrier_driver_relationship_id_fkey"
+            columns: ["carrier_driver_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_driver_relationships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_events_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "load_events_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       load_stops: {
         Row: {
           assistant_delegate_id: string | null
@@ -2277,6 +2411,7 @@ export type Database = {
           assistant_delegate_id: string | null
           broker_id: string | null
           broker_name_raw: string | null
+          carrier_driver_relationship_id: string | null
           created_at: string
           created_by_user_id: string | null
           deadhead_miles: number
@@ -2292,8 +2427,10 @@ export type Database = {
           id: string
           invoice_submitted_date: string | null
           load_date: string
+          load_reference: string | null
           loaded_miles: number
           notes: string | null
+          origin_channel: string
           other_fees: number
           paid_date: string | null
           pay_model: string | null
@@ -2316,6 +2453,7 @@ export type Database = {
           assistant_delegate_id?: string | null
           broker_id?: string | null
           broker_name_raw?: string | null
+          carrier_driver_relationship_id?: string | null
           created_at?: string
           created_by_user_id?: string | null
           deadhead_miles?: number
@@ -2331,8 +2469,10 @@ export type Database = {
           id?: string
           invoice_submitted_date?: string | null
           load_date: string
+          load_reference?: string | null
           loaded_miles?: number
           notes?: string | null
+          origin_channel?: string
           other_fees?: number
           paid_date?: string | null
           pay_model?: string | null
@@ -2355,6 +2495,7 @@ export type Database = {
           assistant_delegate_id?: string | null
           broker_id?: string | null
           broker_name_raw?: string | null
+          carrier_driver_relationship_id?: string | null
           created_at?: string
           created_by_user_id?: string | null
           deadhead_miles?: number
@@ -2370,8 +2511,10 @@ export type Database = {
           id?: string
           invoice_submitted_date?: string | null
           load_date?: string
+          load_reference?: string | null
           loaded_miles?: number
           notes?: string | null
+          origin_channel?: string
           other_fees?: number
           paid_date?: string | null
           pay_model?: string | null
@@ -2402,6 +2545,13 @@ export type Database = {
             columns: ["broker_id"]
             isOneToOne: false
             referencedRelation: "brokers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loads_carrier_driver_relationship_id_fkey"
+            columns: ["carrier_driver_relationship_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_driver_relationships"
             referencedColumns: ["id"]
           },
         ]
@@ -3680,6 +3830,7 @@ export type Database = {
           company_type: string | null
           company_website: string | null
           created_at: string
+          dispatch_week_start_day: string
           dot_number: string | null
           driver_types_hired: string[]
           equipment_types: string[]
@@ -3687,6 +3838,8 @@ export type Database = {
           id: string
           legacy_terms_grandfathered_at: string | null
           mc_number: string | null
+          pay_period_anchor_date: string | null
+          pay_period_cadence: string
           posting_terms_accepted_at: string | null
           posting_terms_version: string | null
           recruiter_email: string | null
@@ -3709,6 +3862,7 @@ export type Database = {
           company_type?: string | null
           company_website?: string | null
           created_at?: string
+          dispatch_week_start_day?: string
           dot_number?: string | null
           driver_types_hired?: string[]
           equipment_types?: string[]
@@ -3716,6 +3870,8 @@ export type Database = {
           id?: string
           legacy_terms_grandfathered_at?: string | null
           mc_number?: string | null
+          pay_period_anchor_date?: string | null
+          pay_period_cadence?: string
           posting_terms_accepted_at?: string | null
           posting_terms_version?: string | null
           recruiter_email?: string | null
@@ -3738,6 +3894,7 @@ export type Database = {
           company_type?: string | null
           company_website?: string | null
           created_at?: string
+          dispatch_week_start_day?: string
           dot_number?: string | null
           driver_types_hired?: string[]
           equipment_types?: string[]
@@ -3745,6 +3902,8 @@ export type Database = {
           id?: string
           legacy_terms_grandfathered_at?: string | null
           mc_number?: string | null
+          pay_period_anchor_date?: string | null
+          pay_period_cadence?: string
           posting_terms_accepted_at?: string | null
           posting_terms_version?: string | null
           recruiter_email?: string | null
@@ -4633,6 +4792,10 @@ export type Database = {
         Args: { _dropoff: string; _pickup: string }
         Returns: string
       }
+      canonical_load_operating_miles: {
+        Args: { _deadhead: number; _loaded: number; _stored_total: number }
+        Returns: number
+      }
       claim_business_checkout: {
         Args: {
           _context: string
@@ -4855,6 +5018,15 @@ export type Database = {
         }
         Returns: string
       }
+      current_user_can_dispatch_load_action: {
+        Args: {
+          _driver_user_id: string
+          _permission: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+          _relationship_id: string
+        }
+        Returns: boolean
+      }
       current_user_can_manage_recruiter_opportunities: {
         Args: { _recruiter_id: string }
         Returns: boolean
@@ -4927,6 +5099,139 @@ export type Database = {
       delete_recruiter_opportunity: {
         Args: { p_opportunity_id: string }
         Returns: Json
+      }
+      dispatch_create_driver_load: {
+        Args: {
+          _deadhead_miles?: number
+          _deadhead_rate_per_mile?: number
+          _detention_fee?: number
+          _driver_user_id: string
+          _dropoff_date?: string
+          _dropoff_location: string
+          _estimated_pay?: number
+          _flat_rate_amount?: number
+          _idempotency_key: string
+          _load_date: string
+          _load_reference?: string
+          _loaded_miles?: number
+          _notes?: string
+          _other_fees?: number
+          _pay_model?: string
+          _pickup_location: string
+          _rate_per_mile?: number
+          _recruiter_id: string
+          _relationship_id: string
+          _source_channel: string
+          _total_miles?: number
+          _wait_fee?: number
+        }
+        Returns: {
+          actual_pay_received: number | null
+          assistant_delegate_id: string | null
+          broker_id: string | null
+          broker_name_raw: string | null
+          carrier_driver_relationship_id: string | null
+          created_at: string
+          created_by_user_id: string | null
+          deadhead_miles: number
+          deadhead_pay_amount: number | null
+          deadhead_pay_status: string | null
+          deadhead_rate_per_mile: number | null
+          detention_fee: number
+          dropoff_date: string | null
+          dropoff_location: string
+          estimated_pay: number | null
+          flat_rate_amount: number | null
+          gross_revenue: number | null
+          id: string
+          invoice_submitted_date: string | null
+          load_date: string
+          load_reference: string | null
+          loaded_miles: number
+          notes: string | null
+          origin_channel: string
+          other_fees: number
+          paid_date: string | null
+          pay_model: string | null
+          payment_due_date: string | null
+          payment_notes: string | null
+          payment_status: string
+          pickup_location: string
+          pod_submitted_date: string | null
+          rate_per_mile: number
+          short_paid_amount: number | null
+          status: string
+          total_miles: number | null
+          updated_at: string
+          updated_by_user_id: string | null
+          user_id: string
+          wait_fee: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loads"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      dispatch_update_driver_load_status: {
+        Args: {
+          _driver_user_id: string
+          _idempotency_key: string
+          _load_id: string
+          _new_status: string
+          _recruiter_id: string
+          _relationship_id: string
+          _source_channel: string
+        }
+        Returns: {
+          actual_pay_received: number | null
+          assistant_delegate_id: string | null
+          broker_id: string | null
+          broker_name_raw: string | null
+          carrier_driver_relationship_id: string | null
+          created_at: string
+          created_by_user_id: string | null
+          deadhead_miles: number
+          deadhead_pay_amount: number | null
+          deadhead_pay_status: string | null
+          deadhead_rate_per_mile: number | null
+          detention_fee: number
+          dropoff_date: string | null
+          dropoff_location: string
+          estimated_pay: number | null
+          flat_rate_amount: number | null
+          gross_revenue: number | null
+          id: string
+          invoice_submitted_date: string | null
+          load_date: string
+          load_reference: string | null
+          loaded_miles: number
+          notes: string | null
+          origin_channel: string
+          other_fees: number
+          paid_date: string | null
+          pay_model: string | null
+          payment_due_date: string | null
+          payment_notes: string | null
+          payment_status: string
+          pickup_location: string
+          pod_submitted_date: string | null
+          rate_per_mile: number
+          short_paid_amount: number | null
+          status: string
+          total_miles: number | null
+          updated_at: string
+          updated_by_user_id: string | null
+          user_id: string
+          wait_fee: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loads"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       driver_can_access_opportunity: {
         Args: { _opportunity_id: string; _recruiter_id: string }
@@ -5051,6 +5356,15 @@ export type Database = {
       }
       get_application_contract_summary: {
         Args: { _application_id: string }
+        Returns: Json
+      }
+      get_carrier_driver_mileage_summary: {
+        Args: {
+          _as_of?: string
+          _driver_user_id: string
+          _recruiter_id: string
+          _relationship_id: string
+        }
         Returns: Json
       }
       get_driver_report_settings: {
@@ -5973,6 +6287,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           driver_user_id: string
+          employment_start_date: string | null
           ended_at: string | null
           id: string
           invited_at: string
@@ -6304,6 +6619,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           driver_user_id: string
+          employment_start_date: string | null
           ended_at: string | null
           id: string
           invited_at: string
@@ -6329,6 +6645,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           driver_user_id: string
+          employment_start_date: string | null
           ended_at: string | null
           id: string
           invited_at: string
@@ -6387,6 +6704,7 @@ export type Database = {
           created_at: string
           created_by_user_id: string
           driver_user_id: string
+          employment_start_date: string | null
           ended_at: string | null
           id: string
           invited_at: string
@@ -6907,6 +7225,9 @@ export type Database = {
         | "settlements_finalize"
         | "team_view"
         | "team_manage"
+        | "loads_view"
+        | "loads_dispatch"
+        | "loads_update_status"
       user_capability_status: "setup" | "active" | "suspended" | "revoked"
       user_capability_type: "driver" | "recruiter"
     }
@@ -7125,6 +7446,9 @@ export const Constants = {
         "settlements_finalize",
         "team_view",
         "team_manage",
+        "loads_view",
+        "loads_dispatch",
+        "loads_update_status",
       ],
       user_capability_status: ["setup", "active", "suspended", "revoked"],
       user_capability_type: ["driver", "recruiter"],
