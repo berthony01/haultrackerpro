@@ -156,9 +156,35 @@ CREATE TABLE IF NOT EXISTS public.dispatch_command_receipts (
   load_id uuid NULL REFERENCES public.loads(id) ON DELETE SET NULL,
   actor_user_id uuid NOT NULL,
   source_channel text NOT NULL CHECK (source_channel = ANY (ARRAY['web','telegram','api'])),
+  requested_status text NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT dispatch_command_receipts_recruiter_key_unique UNIQUE (recruiter_id, idempotency_key)
 );
+
+-- Generic dispatch command state (NOT Telegram-specific): binds a consumed
+-- idempotency key to the exact target status it was issued for, so the same
+-- key can never be replayed for a DIFFERENT requested status.
+ALTER TABLE public.dispatch_command_receipts
+  ADD COLUMN IF NOT EXISTS requested_status text NULL;
+
+ALTER TABLE public.dispatch_command_receipts
+  DROP CONSTRAINT IF EXISTS dispatch_command_receipts_requested_status_check;
+ALTER TABLE public.dispatch_command_receipts
+  ADD CONSTRAINT dispatch_command_receipts_requested_status_check
+  CHECK (
+    requested_status IS NULL
+    OR requested_status = ANY (ARRAY['pending','en_route','completed','cancelled'])
+  );
+
+-- Shape rule: create_load carries no target status; update_status must.
+ALTER TABLE public.dispatch_command_receipts
+  DROP CONSTRAINT IF EXISTS dispatch_command_receipts_action_status_shape_check;
+ALTER TABLE public.dispatch_command_receipts
+  ADD CONSTRAINT dispatch_command_receipts_action_status_shape_check
+  CHECK (
+    (action = 'create_load' AND requested_status IS NULL)
+    OR (action = 'update_status' AND requested_status IS NOT NULL)
+  );
 
 GRANT ALL ON public.dispatch_command_receipts TO service_role;
 
@@ -179,7 +205,7 @@ CREATE OR REPLACE FUNCTION public.current_user_can_dispatch_load_action(
 ) RETURNS boolean
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'auth'
 AS $function$
 DECLARE
   _uid uuid := auth.uid();
@@ -228,7 +254,8 @@ GRANT EXECUTE ON FUNCTION public.current_user_can_dispatch_load_action(uuid,uuid
 -- H. Canonical operating-miles helper — exact mirror of resolveOperatingMiles
 -- ---------------------------------------------------------------------------
 -- Mirrors src/lib/mileageMath.ts::resolveOperatingMiles EXACTLY:
---   non-finite / negative / null inputs are coerced to 0;
+--   non-finite (NaN / Infinity / -Infinity) / negative / null inputs are
+--   coerced to 0 via explicit ::text special-value detection;
 --   componentTotal = loaded + deadhead;
 --   if componentTotal > 0:
 --     stored <= 0                      -> componentTotal
@@ -251,9 +278,11 @@ DECLARE
   _s numeric;
   _component numeric;
 BEGIN
-  _l := CASE WHEN _loaded IS NULL OR _loaded <> _loaded OR _loaded < 0 THEN 0 ELSE _loaded END;
-  _d := CASE WHEN _deadhead IS NULL OR _deadhead <> _deadhead OR _deadhead < 0 THEN 0 ELSE _deadhead END;
-  _s := CASE WHEN _stored_total IS NULL OR _stored_total <> _stored_total OR _stored_total < 0 THEN 0 ELSE _stored_total END;
+  -- PostgreSQL numeric NaN compares EQUAL to itself, so self-equality is NOT a
+  -- usable non-finite test. Special values are detected explicitly by text.
+  _l := CASE WHEN _loaded IS NULL OR _loaded::text IN ('NaN','Infinity','-Infinity') OR _loaded < 0 THEN 0 ELSE _loaded END;
+  _d := CASE WHEN _deadhead IS NULL OR _deadhead::text IN ('NaN','Infinity','-Infinity') OR _deadhead < 0 THEN 0 ELSE _deadhead END;
+  _s := CASE WHEN _stored_total IS NULL OR _stored_total::text IN ('NaN','Infinity','-Infinity') OR _stored_total < 0 THEN 0 ELSE _stored_total END;
   _component := _l + _d;
 
   IF _component > 0 THEN
@@ -297,7 +326,7 @@ CREATE OR REPLACE FUNCTION public.dispatch_create_driver_load(
 ) RETURNS public.loads
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'auth'
 AS $function$
 DECLARE
   _uid uuid := auth.uid();
@@ -364,19 +393,20 @@ BEGIN
     RAISE EXCEPTION 'dispatch_invalid_pay_model';
   END IF;
 
-  -- Finite / nonnegative / practical upper bounds.
+  -- Finite / nonnegative / practical upper bounds. NaN and +/-Infinity are
+  -- rejected explicitly by text: numeric NaN = NaN is TRUE in PostgreSQL,
+  -- so self-equality can never detect a special value.
   IF NOT (
-    (_loaded_miles IS NULL OR (_loaded_miles = _loaded_miles AND _loaded_miles >= 0 AND _loaded_miles <= 100000))
-    AND (_deadhead_miles IS NULL OR (_deadhead_miles = _deadhead_miles AND _deadhead_miles >= 0 AND _deadhead_miles <= 100000))
-    AND (_total_miles IS NULL OR (_total_miles = _total_miles AND _total_miles >= 0 AND _total_miles <= 100000))
-    AND (_rate_per_mile IS NULL OR (_rate_per_mile = _rate_per_mile AND _rate_per_mile >= 0 AND _rate_per_mile <= 1000))
-    AND (_flat_rate_amount IS NULL OR (_flat_rate_amount = _flat_rate_amount AND _flat_rate_amount >= 0 AND _flat_rate_amount <= 1000000))
-    AND (_deadhead_rate_per_mile IS NULL OR (_deadhead_rate_per_mile = _deadhead_rate_per_mile AND _deadhead_rate_per_mile >= 0 AND _deadhead_rate_per_mile <= 1000))
-    AND (_wait_fee IS NULL OR (_wait_fee = _wait_fee AND _wait_fee >= 0 AND _wait_fee <= 1000000))
-    AND (_detention_fee IS NULL OR (_detention_fee = _detention_fee AND _detention_fee >= 0 AND _detention_fee <= 1000000))
-    AND (_other_fees IS NULL OR (_other_fees = _other_fees AND _other_fees >= 0 AND _other_fees <= 1000000))
-    AND (_estimated_pay IS NULL OR (_estimated_pay = _estimated_pay AND _estimated_pay >= 0 AND _estimated_pay <= 1000000))
-
+    (_loaded_miles IS NULL OR (_loaded_miles::text NOT IN ('NaN','Infinity','-Infinity') AND _loaded_miles >= 0 AND _loaded_miles <= 100000))
+    AND (_deadhead_miles IS NULL OR (_deadhead_miles::text NOT IN ('NaN','Infinity','-Infinity') AND _deadhead_miles >= 0 AND _deadhead_miles <= 100000))
+    AND (_total_miles IS NULL OR (_total_miles::text NOT IN ('NaN','Infinity','-Infinity') AND _total_miles >= 0 AND _total_miles <= 100000))
+    AND (_rate_per_mile IS NULL OR (_rate_per_mile::text NOT IN ('NaN','Infinity','-Infinity') AND _rate_per_mile >= 0 AND _rate_per_mile <= 1000))
+    AND (_flat_rate_amount IS NULL OR (_flat_rate_amount::text NOT IN ('NaN','Infinity','-Infinity') AND _flat_rate_amount >= 0 AND _flat_rate_amount <= 1000000))
+    AND (_deadhead_rate_per_mile IS NULL OR (_deadhead_rate_per_mile::text NOT IN ('NaN','Infinity','-Infinity') AND _deadhead_rate_per_mile >= 0 AND _deadhead_rate_per_mile <= 1000))
+    AND (_wait_fee IS NULL OR (_wait_fee::text NOT IN ('NaN','Infinity','-Infinity') AND _wait_fee >= 0 AND _wait_fee <= 1000000))
+    AND (_detention_fee IS NULL OR (_detention_fee::text NOT IN ('NaN','Infinity','-Infinity') AND _detention_fee >= 0 AND _detention_fee <= 1000000))
+    AND (_other_fees IS NULL OR (_other_fees::text NOT IN ('NaN','Infinity','-Infinity') AND _other_fees >= 0 AND _other_fees <= 1000000))
+    AND (_estimated_pay IS NULL OR (_estimated_pay::text NOT IN ('NaN','Infinity','-Infinity') AND _estimated_pay >= 0 AND _estimated_pay <= 1000000))
   ) THEN
     RAISE EXCEPTION 'dispatch_invalid_numeric_value';
   END IF;
@@ -403,10 +433,12 @@ BEGIN
 
   INSERT INTO public.dispatch_command_receipts (
     recruiter_id, carrier_driver_relationship_id, driver_user_id,
-    idempotency_key, action, load_id, actor_user_id, source_channel
+    idempotency_key, action, load_id, actor_user_id, source_channel,
+    requested_status
   ) VALUES (
     _recruiter_id, _relationship_id, _driver_user_id,
-    _key, 'create_load', _new_id, _uid, _source_channel
+    _key, 'create_load', _new_id, _uid, _source_channel,
+    NULL
   );
 
   INSERT INTO public.load_events (
@@ -427,7 +459,9 @@ EXCEPTION
     IF NOT FOUND
        OR _receipt.action <> 'create_load'
        OR _receipt.carrier_driver_relationship_id <> _relationship_id
-       OR _receipt.driver_user_id <> _driver_user_id THEN
+       OR _receipt.driver_user_id <> _driver_user_id
+       OR _receipt.source_channel <> _source_channel
+       OR _receipt.requested_status IS NOT NULL THEN
       RAISE EXCEPTION 'dispatch_idempotency_conflict';
     END IF;
     SELECT * INTO _row FROM public.loads WHERE id = _receipt.load_id;
@@ -454,7 +488,7 @@ CREATE OR REPLACE FUNCTION public.dispatch_update_driver_load_status(
 ) RETURNS public.loads
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'auth'
 AS $function$
 DECLARE
   _uid uuid := auth.uid();
@@ -491,7 +525,8 @@ BEGIN
        OR _receipt.carrier_driver_relationship_id <> _relationship_id
        OR _receipt.driver_user_id <> _driver_user_id
        OR _receipt.source_channel <> _source_channel
-       OR _receipt.load_id IS DISTINCT FROM _load_id THEN
+       OR _receipt.load_id IS DISTINCT FROM _load_id
+       OR _receipt.requested_status IS DISTINCT FROM _new_status THEN
       RAISE EXCEPTION 'dispatch_idempotency_conflict';
     END IF;
     SELECT * INTO _row FROM public.loads WHERE id = _load_id;
@@ -510,7 +545,19 @@ BEGIN
   _from := _row.status;
 
   IF _from = _new_status THEN
-    -- No-op: return the current row, no duplicate status event.
+    -- Idempotent no-op: the load is already at the requested status. The
+    -- command key is still CONSUMED (receipt recorded) so it can never be
+    -- replayed later for a different target status. No load_events row is
+    -- written because nothing changed.
+    INSERT INTO public.dispatch_command_receipts (
+      recruiter_id, carrier_driver_relationship_id, driver_user_id,
+      idempotency_key, action, load_id, actor_user_id, source_channel,
+      requested_status
+    ) VALUES (
+      _recruiter_id, _relationship_id, _driver_user_id,
+      _key, 'update_status', _load_id, _uid, _source_channel,
+      _new_status
+    );
     RETURN _row;
   END IF;
 
@@ -532,10 +579,12 @@ BEGIN
 
   INSERT INTO public.dispatch_command_receipts (
     recruiter_id, carrier_driver_relationship_id, driver_user_id,
-    idempotency_key, action, load_id, actor_user_id, source_channel
+    idempotency_key, action, load_id, actor_user_id, source_channel,
+    requested_status
   ) VALUES (
     _recruiter_id, _relationship_id, _driver_user_id,
-    _key, 'update_status', _load_id, _uid, _source_channel
+    _key, 'update_status', _load_id, _uid, _source_channel,
+    _new_status
   );
 
   INSERT INTO public.load_events (
@@ -554,7 +603,11 @@ EXCEPTION
      WHERE recruiter_id = _recruiter_id AND idempotency_key = _key;
     IF NOT FOUND
        OR _receipt.action <> 'update_status'
-       OR _receipt.load_id IS DISTINCT FROM _load_id THEN
+       OR _receipt.carrier_driver_relationship_id <> _relationship_id
+       OR _receipt.driver_user_id <> _driver_user_id
+       OR _receipt.source_channel <> _source_channel
+       OR _receipt.load_id IS DISTINCT FROM _load_id
+       OR _receipt.requested_status IS DISTINCT FROM _new_status THEN
       RAISE EXCEPTION 'dispatch_idempotency_conflict';
     END IF;
     SELECT * INTO _row FROM public.loads WHERE id = _load_id;
@@ -578,7 +631,7 @@ CREATE OR REPLACE FUNCTION public.get_carrier_driver_mileage_summary(
 ) RETURNS jsonb
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'auth'
 AS $function$
 DECLARE
   _as date := COALESCE(_as_of, current_date);
