@@ -104,14 +104,40 @@ const num = (v: unknown): number => {
 };
 
 /**
+ * Phase TG-1 — financial completion test.
+ *
+ * Operational statuses `pending` and `en_route` describe assigned work that has
+ * NOT been earned yet, and `cancelled` is never earned. Only those three are
+ * treated as not financially complete. A null/undefined status stays
+ * backwards-compatible with legacy rows and is treated as completed.
+ *
+ * This is deliberately narrower than `excludeCancelled()`, which remains the
+ * broad operational "not cancelled" helper for surfaces that mean exactly that.
+ */
+export function isCompletedLoadForFinancials(
+  load: { status?: string | null } | null | undefined,
+): boolean {
+  if (!load) return false;
+  const status = load.status;
+  if (status == null) return true;
+  return status !== 'pending' && status !== 'en_route' && status !== 'cancelled';
+}
+
+/** Returns only financially completed loads (see `isCompletedLoadForFinancials`). */
+export function onlyFinanciallyCompleted<T extends { status?: string | null }>(loads: T[]): T[] {
+  return loads.filter(isCompletedLoadForFinancials);
+}
+
+/**
  * Realized revenue for a single load.
  *
  * Uses `actual_pay_received` when present, otherwise the persisted
- * `estimated_pay` (which the form writes via `computeLoadPay`). Cancelled
- * loads always return $0.
+ * `estimated_pay` (which the form writes via `computeLoadPay`). Loads that are
+ * not financially complete — `pending`, `en_route`, `cancelled` — always
+ * return $0.
  */
 export function getLoadRealizedRevenue(load: Load): number {
-  if ((load.status ?? 'completed') === 'cancelled') return 0;
+  if (!isCompletedLoadForFinancials(load)) return 0;
   const actual = load.actual_pay_received;
   if (actual != null && Number.isFinite(Number(actual))) return Number(actual);
   return getLoadExpectedPay(load);
@@ -166,7 +192,7 @@ export function getPaymentDifference(load: Load): number | null {
 // ── Aggregate / fleet helpers ──────────────────────────────────────────────
 
 export interface LoadFinancialSummary {
-  /** Active load count (cancelled excluded). */
+  /** Financially completed load count (pending/en_route/cancelled excluded). */
   loadCount: number;
   cancelledCount: number;
 
@@ -209,25 +235,33 @@ export interface LoadFinancialSummary {
   overpaidCount: number;
 }
 
-/** Build the full summary used by dashboard cards and reports. */
+/**
+ * Build the full summary used by dashboard cards and reports.
+ *
+ * Phase TG-1: every financial figure (mileage, expected/actual pay, gross
+ * revenue, RPM, profit, payment counters, `loadCount`) is derived from
+ * FINANCIALLY COMPLETED loads only. Assigned-but-unearned operational loads
+ * (`pending`, `en_route`) contribute nothing. `cancelledCount` still counts
+ * cancelled loads. Nothing is removed from the caller's source array.
+ */
 export function summarizeLoads(allLoads: Load[], expenses: Expense[] = []): LoadFinancialSummary {
-  const active = excludeCancelled(allLoads);
+  const completed = onlyFinanciallyCompleted(allLoads);
   const cancelled = onlyCancelled(allLoads);
 
-  const estimatedPay = sumExpectedPay(active);
-  const actualPay = sumActualPay(active);
-  const grossRevenue = active.reduce((s, l) => s + getLoadRealizedRevenue(l), 0);
+  const estimatedPay = sumExpectedPay(completed);
+  const actualPay = sumActualPay(completed);
+  const grossRevenue = completed.reduce((s, l) => s + getLoadRealizedRevenue(l), 0);
 
-  const loadedMiles = sumLoadedMiles(active);
-  const deadheadMiles = sumDeadheadMiles(active);
-  const totalMiles = sumOperatingMiles(active);
+  const loadedMiles = sumLoadedMiles(completed);
+  const deadheadMiles = sumDeadheadMiles(completed);
+  const totalMiles = sumOperatingMiles(completed);
 
   const expensesTotal = expenses.reduce((s, e) => s + num(e.amount), 0);
   const netProfit = grossRevenue - expensesTotal;
 
   // Weighted avg contract rate = Σ(loaded * rate) / Σ(loaded)
   let weightedRate = 0;
-  for (const l of active) {
+  for (const l of completed) {
     const lm = num(l.loaded_miles);
     if (lm > 0) weightedRate += lm * num(l.rate_per_mile);
   }
@@ -243,7 +277,7 @@ export function summarizeLoads(allLoads: Load[], expenses: Expense[] = []): Load
   let paymentDifferenceTotal = 0;
   let underpaidCount = 0;
   let overpaidCount = 0;
-  for (const l of active) {
+  for (const l of completed) {
     const status = derivePaymentDisplayStatus(l);
     if (status === 'pending') {
       pendingPaymentCount += 1;
@@ -258,12 +292,12 @@ export function summarizeLoads(allLoads: Load[], expenses: Expense[] = []): Load
   }
 
   return {
-    loadCount: active.length,
+    loadCount: completed.length,
     cancelledCount: cancelled.length,
     loadedMiles,
     deadheadMiles,
     totalMiles,
-    deadheadPct: fleetDeadheadPct(active),
+    deadheadPct: fleetDeadheadPct(completed),
     estimatedPay,
     actualPay,
     grossRevenue,

@@ -71,6 +71,10 @@ export interface RecruiterStaffPermissionsState {
    */
   canViewTeam: boolean;
   canManageTeam: boolean;
+  /** Phase TG-1 — dispatch load authorization booleans (UX only). */
+  canViewLoads: boolean;
+  canDispatchLoads: boolean;
+  canUpdateLoadStatus: boolean;
 
 
 
@@ -179,6 +183,10 @@ export function useRecruiterStaffPermissions(
     canViewTeam: granted && permissions.team_view === true,
     canManageTeam:
       granted && permissions.team_view === true && permissions.team_manage === true,
+    canViewLoads: granted && permissions.loads_view === true,
+    canDispatchLoads: granted && permissions.loads_dispatch === true,
+    canUpdateLoadStatus: granted && permissions.loads_update_status === true,
+
 
 
 

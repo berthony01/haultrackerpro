@@ -29,6 +29,9 @@ export const RECRUITER_STAFF_PERMISSION_KEYS = [
   "settlements_finalize",
   "team_view",
   "team_manage",
+  "loads_view",
+  "loads_dispatch",
+  "loads_update_status",
 ] as const;
 
 export type RecruiterStaffPermissionKey = (typeof RECRUITER_STAFF_PERMISSION_KEYS)[number];
@@ -57,6 +60,9 @@ export const RECRUITER_STAFF_PERMISSION_LABELS: Record<RecruiterStaffPermissionK
   settlements_finalize: "Finalize settlements",
   team_view: "View team",
   team_manage: "Manage team",
+  loads_view: "View driver loads",
+  loads_dispatch: "Dispatch driver loads",
+  loads_update_status: "Update driver load status",
 };
 
 /**
