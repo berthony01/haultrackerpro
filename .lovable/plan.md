@@ -1,85 +1,72 @@
-# Agency UI Role-Gate Inventory (read-only audit, post AM-1C-FG)
+## Disclosure first — read before approving
 
-No files were edited, no SQL applied, nothing deployed.
+Two things you should know before greenlighting this plan, because they change what "PASS" for this audit means:
 
-## Start gate
+1. **The create_agency JSON defect is already fixed and live.** In the previous turn (build mode) I applied a migration to `create_agency` that switched `_defaults` from `jsonb` to `record` and trimmed the contact email before regex validation. The current network log confirms it: `POST …/rpc/create_agency` returned `200` at `2026-07-19T14:50:25Z` and produced agency `7657c655-…`. This turn's instruction says "do not apply a live migration"; that instruction arrived after the fix was already applied, so I'm disclosing rather than hiding it. No further live writes are proposed below.
+2. **A different live defect just surfaced in the same session.** `get_my_managed_drivers` returns `400 / 42703 / "column p.full_name does not exist"` on every call from `/agency`. I confirmed the function body references `COALESCE(p.display_name, p.full_name, lower(u.email))` while `public.profiles` has no `full_name` column (only `display_name`). This blocks the Assistant driver switcher and any surface that lists managed drivers.
 
-- `git rev-parse HEAD` = `4c85404c7c41dc7ea254a612d635125e7566fc27` (exact match)
-- `git status --porcelain` = empty (clean tree, before and after)
+Given your standing protocol (narrow scope, one focused implementation run, honest split rather than overreach), I do **not** recommend attempting the full 51-scenario, 12-part audit in a single turn. I'm proposing a scoped Pass A that closes both confirmed defects with real tests, and explicitly deferring the rest into a Pass B execution packet.
 
-## Search scope
+## Scope of this plan (Pass A only)
 
-`rg` over `src/pages`, `src/components/agency`, `src/components/settlements`, `src/hooks` for
-`agency_owner`, `agency_admin`, `agency_member`, `isOwner`, `isOwnerOrAdmin`, `my_role`, plus the
-exact string `delegations are not affected`.
+**In scope**
+- Candidate migration fixing `public.get_my_managed_drivers` to drop the non-existent `p.full_name` reference.
+- PGlite runtime test that reproduces the `42703` error against the current function body and proves the candidate fixes it.
+- Reproduction note + evidence for the already-applied `create_agency` fix (no code change; test already exists at `src/test/phase1iAgencyCreateJsonCast.test.ts`).
+- Full verification gates: `bunx vitest run`, `bunx tsgo` on both configs, `bun run build`, forbidden-test grep.
 
-`isOwnerOrAdmin` and `is_agency_owner_or_admin`: zero hits in UI code. No Agency workspace consumer
-surface still resolves authority from a role label.
+**Explicitly deferred to Pass B** (out of scope this turn)
+- Parts 2–10 of the audit prompt: profile/settings, members, service packages, delegation, assistant invitation lifecycle, permission enforcement, workspace switching, driver control, RLS cross-tenant proofs, full JSON/JSONB contract inventory.
+- Parts 47–51 driver-control tests and cross-agency isolation proofs.
+- Any RLS or grants changes.
 
-## Complete hit inventory
+Reason for the split: each of those parts requires reading 5–15 live functions/policies and writing role-scoped PGlite fixtures. Attempting all in one turn violates your "one focused implementation run" rule and produces exactly the kind of self-graded PASS you've called out before.
 
-### A — Intentionally owner-only governance (must stay role/owner gated)
+## Root cause (confirmed by live reads)
 
-| Location | Hit | Note |
-| --- | --- | --- |
-| `src/components/agency/AgencyPlanLimitsCard.tsx:64` | `const isOwner = agency?.my_role === 'agency_owner'` | Billing identity source for this card |
-| `src/components/agency/AgencyPlanLimitsCard.tsx:174` | `showStartCta = isOwner && …` | Stripe checkout start/restart |
-| `src/components/agency/AgencyPlanLimitsCard.tsx:180` | `showPortalCta = isOwner && …` | Stripe billing portal |
-| `src/components/agency/AgencyPlanLimitsCard.tsx:271` | `{isOwner ? … : "Only the agency owner can manage billing."}` | Billing block |
-| `src/pages/AgencyDashboard.tsx:130` | `const isOwner = role === 'agency_owner'` | Feeds only line 163/164 |
-| `src/pages/AgencyDashboard.tsx:163` | `{isOwner && <AgencyPlanLimitsCard/>}` | Plan & limits mount |
-| `src/pages/AgencyDashboard.tsx:328` | `const isOwner = agency.my_role === 'agency_owner'` (AgencyDetailCard) | Feeds 340/395/429/501 |
-| `src/pages/AgencyDashboard.tsx:340` | `{isOwner ? <edit name/desc/contact-email form> : <read-only description>}` | Agency identity mutation |
-| `src/pages/AgencyDashboard.tsx:395` | `<AgencySlugCard isOwner={isOwner} />` | Slug / private request link |
-| `src/components/agency/AgencySlugCard.tsx:18,71` | `isOwner` prop + `{isOwner ? …}` | Slug management, prop-driven only |
-| `src/pages/AgencyDashboard.tsx:429` | `{isOwner && <invite member form>}` | Member invite |
-| `src/pages/AgencyDashboard.tsx:501` | `{isOwner && m.role !== 'agency_owner' && m.status !== 'revoked' && <Revoke>}` | Member revoke; the `m.role !== 'agency_owner'` clause is owner-protection, not consumer authority |
-| `src/hooks/useAgency.ts:104,107,128` | `invite_agency_member` (`_role` default `'agency_member'`), `revoke_agency_member` | Governance RPC wrappers; server-authoritative |
+`public.get_my_managed_drivers` body (verified via `pg_get_functiondef`):
+```
+COALESCE(p.display_name, p.full_name, lower(u.email))
+LEFT JOIN public.profiles p ON p.user_id = da.driver_user_id
+```
+`public.profiles` columns (verified via `information_schema.columns`):
+```
+id, user_id, display_name, created_at, updated_at, subscription_status,
+subscription_plan, stripe_customer_id, subscription_expires_at,
+stripe_subscription_id, driver_handle, handle_emoji, handle_public,
+last_seen_release_id, intended_role
+```
+No `full_name`. Function raises `42703` on every call. Canonical fix: remove `p.full_name` from the COALESCE — `display_name` already exists and `lower(u.email)` is the fallback.
 
-### B — Migrated workspace consumers (verified clean, no role labels)
+## Files this turn will touch
 
-| Location | Evidence |
-| --- | --- |
-| `src/pages/AgencyDashboard.tsx:134-135,138-139,170-182` | Packages/Requests tabs on `canViewPackages`/`canManagePackages`, `canViewClientRequests`/`canManageClientRequests` |
-| `src/pages/AgencyDashboard.tsx:142,183-193` | Clients tab on `canViewClients`; `canManageDelegations` passed to `ClientListSection` |
-| `src/pages/AgencyDashboard.tsx:149` | Activity tab on `canViewAudit` (AM-1C-FG) |
-| `src/pages/AgencyDashboard.tsx:162,404,413,421` | `canViewTeam` drives member list/labels |
-| `src/components/agency/ServicePackagesSection.tsx:38-152` | Permission-only gating |
-| `src/components/agency/ClientRequestsSection.tsx:57-226` | Permission-only gating |
-| `src/components/agency/ClientListSection.tsx:35-80` | `canManageDelegations` only |
-| `src/components/agency/WorkQueueSection.tsx:75-235` | `canViewAllWorkItems` / `canManageWorkItems` only |
-| `src/components/agency/AgencyAuditSection.tsx` (whole file) | No role logic; server RPC is the authority |
+- `supabase/migration-candidates/20260719160500_fix_get_my_managed_drivers_full_name.sql` — candidate only, not moved to `supabase/migrations/`.
+- `src/test/phase1iGetManagedDriversColumn.test.ts` — new PGlite test: reproduces `42703` with current body, applies candidate, proves it returns rows without error.
 
-### C — Display-only role labels (not authorization)
+No client code changes (the hook just calls the RPC). No changes to `package.json`, lockfile, RLS, grants, or unrelated migrations.
 
-| Location | Hit |
-| --- | --- |
-| `src/pages/AgencyDashboard.tsx:336` | `<Badge>{agency.my_role.replace('agency_','')}</Badge>` |
-| `src/pages/AgencyDashboard.tsx:498` | `{m.role.replace('agency_','')} · {m.status}` in the member row |
-| `src/components/agency/ClientRequestsSection.tsx:258` | `{m.invite_email} · {m.role.replace('agency_','')}` in the assignee picker |
-| `src/hooks/useAgency.ts:5,18` | `AgencyRole` type / `my_role` field declarations |
+## Verification I will run and report verbatim
 
-### D — Stale/incorrect copy or comment
+1. `bunx vitest run src/test/phase1iGetManagedDriversColumn.test.ts src/test/phase1iAgencyCreateJsonCast.test.ts`
+2. `bunx vitest run` (full suite, single command, must exit 0)
+3. `bunx tsgo -p tsconfig.app.json --noEmit`
+4. `bunx tsgo -p tsconfig.node.json --noEmit`
+5. `bun run build`
+6. `grep -RInE '\.(only|skip)\(' src/test`
 
-| Location | Text | Why stale |
-| --- | --- | --- |
-| `src/pages/AgencyDashboard.tsx:516-517` | "…will lose access to your agency. Their driver **delegations are not affected**." | AM-1A member revocation explicitly cascades: `20260816220000_phase_am1a_….sql` §D ("member revocation that cascades to delegations, agency-originated"), lines 600-619 — revoking a member kills that member's agency-originated live delegations and deactivates the derived driver-assistant rows. Only direct, non-agency delegations (`agency_delegation_id IS NULL`) are untouched. The sentence is therefore false for agency-originated delegations. |
-| `src/pages/AgencyDashboard.tsx:143-144` | Comment: "Settlements are visible to every active member" | Accurate today, but reads as an authority claim in a file where every other tab comment cites a permission; server RLS is the actual authority. Comment-only. |
+I will not apply the candidate migration. You can promote it in a follow-up turn.
 
-### E — Other
+## What I will NOT do this turn
 
-| Location | Hit | Explanation |
-| --- | --- | --- |
-| `src/pages/AgencyDashboard.tsx:164-168` | `{!isOwner && "Billing and plan limits are managed by the agency owner."}` | Explanatory non-owner copy paired with the A-class billing gate. Correct as-is. |
-| `src/hooks/useAgency.ts:54` | `list_agency_members` RPC call | Post-FG the RPC itself enforces `team_view` OR exact self-membership; the hook passes no role. Server-authoritative, no UI role derivation. |
-| `src/hooks/opportunities/useRecruiterBilling.ts:252-255` | `agencyMembershipRole = myAgency.data?.my_role` | Recruiter billing surface, not Agency UI. Out of the audited consumer scope; flagged for completeness only. |
-| `src/hooks/recruiter/useRecruiterTeam.ts:50,95` | `isOwner = role === 'recruiter_owner'` | Recruiter workspace, not Agency. No action. |
-| `src/components/settlements/*` | `canManage`, `canViewSettlements` props | No agency role labels anywhere; matches were on the words "owner"/"role" in comments. |
+- No live SQL execution (migration or insert).
+- No RLS/grants changes.
+- No touching Phase 1H, Stripe, recruiter, driver dashboard, or account deletion paths.
+- No `package.json`/lockfile edits.
+- No publish/deploy.
+- No claim of PASS on any audit part I did not actually exercise — Parts 2–10 will be reported as DEFERRED, not PASS.
 
-## Smallest recommended UI-only cleanup allowlist
+## Stop conditions honored
 
-One file, one string. Nothing else in the inventory requires change.
+If the PGlite reproduction of `42703` fails to fire on the current body, or the full Vitest suite regresses, I stop and report FAIL rather than patch around it. If Pass B is needed, I'll return an execution packet naming the exact functions/policies/tests required instead of starting it inline.
 
-- `src/pages/AgencyDashboard.tsx` — replace the stale revoke-dialog sentence at lines 516-517 so it states that agency-issued delegations for this member end on revocation while delegations a driver granted them directly are unaffected.
-
-Explicitly NOT recommended: no new permissions, no `team_manage`, no change to any A-class owner gate, no Driver Assistant authorization change, no C-class label changes, no comment rewrites.
+Approve to proceed with Pass A, or tell me to reshape the split (e.g. include one more specific Part).
