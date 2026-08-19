@@ -230,9 +230,9 @@ describe("TG-1 / company employment + pay-period settings", () => {
 describe("TG-1 / dispatch authorization helper", () => {
   const body = fnSlice("current_user_can_dispatch_load_action");
 
-  it("is stable security definer with a fixed search_path and least privilege", () => {
+  it("is stable security definer with the hardened search_path and least privilege", () => {
     expect(body).toContain("stable security definer");
-    expect(body).toContain("set search_path to 'public'");
+    expect(body).toContain("set search_path to 'pg_catalog', 'public', 'auth'");
     expect(exec).toContain(
       "revoke all on function public.current_user_can_dispatch_load_action",
     );
@@ -303,6 +303,17 @@ describe("TG-1 / load_events and dispatch_command_receipts", () => {
     expect(exec).toMatch(/action = any \(array\['create_load','update_status'\]\)/);
     expect(exec).toContain("char_length(idempotency_key) between 1 and 200");
   });
+
+  it("binds a consumed key to its requested target status", () => {
+    expect(exec).toContain("add column if not exists requested_status text null");
+    expect(exec).toMatch(
+      /requested_status is null\s+or requested_status = any \(array\['pending','en_route','completed','cancelled'\]\)/,
+    );
+    // create_load carries no target status; update_status must.
+    expect(exec).toMatch(
+      /\(action = 'create_load' and requested_status is null\)\s+or \(action = 'update_status' and requested_status is not null\)/,
+    );
+  });
 });
 
 // ── 8. create RPC ──────────────────────────────────────────────────────────
@@ -344,6 +355,28 @@ describe("TG-1 / dispatch_create_driver_load", () => {
     expect(body).toContain("dispatch_invalid_numeric_value");
   });
 
+  it("rejects NaN / Infinity / -Infinity explicitly for every numeric input", () => {
+    const numerics = [
+      "_loaded_miles",
+      "_deadhead_miles",
+      "_total_miles",
+      "_rate_per_mile",
+      "_flat_rate_amount",
+      "_deadhead_rate_per_mile",
+      "_wait_fee",
+      "_detention_fee",
+      "_other_fees",
+      "_estimated_pay",
+    ];
+    for (const v of numerics) {
+      expect(
+        body.includes(`${v}::text not in ('nan','infinity','-infinity')`),
+        `${v} must reject special numeric values by text`,
+      ).toBe(true);
+      expect(body.includes(`${v} = ${v}`), `${v} must not use self-equality`).toBe(false);
+    }
+  });
+
   it("writes exactly one created event and one idempotency receipt", () => {
     expect([...body.matchAll(/insert into public\.load_events/g)].length).toBe(1);
     expect(body).toContain("'created', _source_channel, null, 'pending'");
@@ -356,9 +389,24 @@ describe("TG-1 / dispatch_create_driver_load", () => {
     expect(body).toContain("when unique_violation then");
   });
 
+  it("records the receipt with a NULL requested_status", () => {
+    expect(body).toMatch(
+      /idempotency_key, action, load_id, actor_user_id, source_channel,\s+requested_status\s+\) values \([\s\S]*'create_load', _new_id, _uid, _source_channel,\s+null\s+\);/,
+    );
+  });
+
+  it("concurrent-replay handler compares source_channel and create shape", () => {
+    const handler = body.slice(body.indexOf("when unique_violation then"));
+    expect(handler).toContain("_receipt.action <> 'create_load'");
+    expect(handler).toContain("_receipt.carrier_driver_relationship_id <> _relationship_id");
+    expect(handler).toContain("_receipt.driver_user_id <> _driver_user_id");
+    expect(handler).toContain("_receipt.source_channel <> _source_channel");
+    expect(handler).toContain("_receipt.requested_status is not null");
+  });
+
   it("is least privilege", () => {
     expect(body).toContain("security definer");
-    expect(body).toContain("set search_path to 'public'");
+    expect(body).toContain("set search_path to 'pg_catalog', 'public', 'auth'");
     expect(exec).toContain("revoke all on function public.dispatch_create_driver_load");
     expect(exec).toMatch(
       /grant execute on function public\.dispatch_create_driver_load[^;]*to authenticated/,
@@ -390,13 +438,51 @@ describe("TG-1 / dispatch_update_driver_load_status", () => {
     expect(body).toContain("dispatch_invalid_status_transition");
   });
 
-  it("no-ops without a duplicate event when the status already matches", () => {
-    expect(body).toMatch(/if _from = _new_status then[\s\S]*return _row;/);
+  it("existing-receipt replay binds the exact requested target status", () => {
+    const replay = body.slice(
+      body.indexOf("if found then"),
+      body.indexOf("when unique_violation then"),
+    );
+    expect(replay).toContain("_receipt.action <> 'update_status'");
+    expect(replay).toContain("_receipt.carrier_driver_relationship_id <> _relationship_id");
+    expect(replay).toContain("_receipt.driver_user_id <> _driver_user_id");
+    expect(replay).toContain("_receipt.source_channel <> _source_channel");
+    expect(replay).toContain("_receipt.load_id is distinct from _load_id");
+    expect(replay).toContain("_receipt.requested_status is distinct from _new_status");
   });
 
-  it("stamps actor and writes one status_changed event", () => {
+  it("no-op consumes the key with a receipt but writes zero load_events", () => {
+    const noop = body.slice(
+      body.indexOf("if _from = _new_status then"),
+      body.indexOf("if _from in ('completed','cancelled')"),
+    );
+    expect(noop).toContain("insert into public.dispatch_command_receipts");
+    expect(noop).toContain("_key, 'update_status', _load_id, _uid, _source_channel,");
+    expect(noop).toContain("_new_status");
+    expect(noop).not.toContain("insert into public.load_events");
+    expect(noop).toContain("return _row;");
+  });
+
+  it("concurrent-replay handler compares the full command context", () => {
+    const handler = body.slice(body.indexOf("when unique_violation then"));
+    expect(handler).toContain("_receipt.action <> 'update_status'");
+    expect(handler).toContain("_receipt.carrier_driver_relationship_id <> _relationship_id");
+    expect(handler).toContain("_receipt.driver_user_id <> _driver_user_id");
+    expect(handler).toContain("_receipt.source_channel <> _source_channel");
+    expect(handler).toContain("_receipt.load_id is distinct from _load_id");
+    expect(handler).toContain("_receipt.requested_status is distinct from _new_status");
+  });
+
+  it("stamps actor, stores requested_status and writes one status_changed event", () => {
     expect(body).toContain("updated_by_user_id = _uid");
     expect([...body.matchAll(/insert into public\.load_events/g)].length).toBe(1);
+    // exactly two receipt inserts: the no-op consumption and the real change.
+    expect(
+      [...body.matchAll(/insert into public\.dispatch_command_receipts/g)].length,
+    ).toBe(2);
+    expect(body).toMatch(
+      /_key, 'update_status', _load_id, _uid, _source_channel,\s+_new_status\s+\);[\s\S]*insert into public\.load_events/,
+    );
     expect(body).toContain("'status_changed', _source_channel, _from, _new_status");
   });
 
@@ -428,10 +514,19 @@ describe("TG-1 / canonical_load_operating_miles", () => {
     expect(body).toMatch(/if _s > 0 then return _s; end if;\s+return 0;/);
   });
 
-  it("coerces null / NaN / negative inputs to zero", () => {
+  it("coerces null / NaN / +-Infinity / negative inputs to zero via ::text", () => {
     for (const v of ["_loaded", "_deadhead", "_stored_total"]) {
-      expect(body).toContain(`${v} is null or ${v} <> ${v} or ${v} < 0`);
+      expect(body).toContain(
+        `${v} is null or ${v}::text in ('nan','infinity','-infinity') or ${v} < 0`,
+      );
     }
+  });
+
+  it("uses no self-equality NaN test anywhere (numeric NaN = NaN is true)", () => {
+    for (const v of ["_loaded", "_deadhead", "_stored_total", "_l", "_d", "_s"]) {
+      expect(body.includes(`${v} <> ${v}`), `self-equality test on ${v}`).toBe(false);
+    }
+    expect(exec).not.toMatch(/(?<![\w.])(_\w+) <> \1(?![\w.])/);
   });
 });
 
@@ -525,6 +620,22 @@ describe("TG-1 / completed-only financial semantics", () => {
     expect(isCompletedLoadForFinancials({ status: "cancelled" })).toBe(false);
   });
 
+  it("fails closed on unknown / future / malformed non-null statuses", () => {
+    for (const status of ["", " completed", "Completed", "COMPLETED", "delivered", "archived", "unknown_future"]) {
+      expect(
+        isCompletedLoadForFinancials({ status }),
+        `status ${JSON.stringify(status)} must not be financially complete`,
+      ).toBe(false);
+    }
+    expect(getLoadRealizedRevenue(baseLoad({ status: "delivered" }))).toBe(0);
+    const s = summarizeLoads([
+      baseLoad({ id: "x", status: "delivered" }),
+      baseLoad({ id: "y", status: "completed" }),
+    ]);
+    expect(s.loadCount).toBe(1);
+    expect(s.grossRevenue).toBe(200);
+  });
+
   it("realized revenue is 0 for pending / en_route / cancelled", () => {
     expect(getLoadRealizedRevenue(baseLoad({ status: "completed" }))).toBe(200);
     expect(getLoadRealizedRevenue(baseLoad({ status: "pending" }))).toBe(0);
@@ -565,18 +676,17 @@ describe("TG-1 / completed-only financial semantics", () => {
 });
 
 // ── 14. allowlist enforcement ──────────────────────────────────────────────
-describe("TG-1 / allowlist", () => {
+describe("TG-1R / allowlist", () => {
+  /** TG-1R correction scope, relative to the TG-1R start commit. */
   const ALLOWED = [
     SQL_REL,
-    "src/lib/recruiterStaffPermissions.ts",
-    "src/hooks/recruiter/useRecruiterStaffPermissions.ts",
     "src/lib/financialCalculations.ts",
     "src/test/phaseTG1CanonicalDispatchLoadFoundation.test.ts",
   ].sort();
 
-  it("changes only the five allowlisted files", () => {
+  it("changes only the three TG-1R allowlisted files", () => {
     const committed = execSync(
-      "git diff --name-only a8c4c11abad8a642cbca2bbdcdc6fc8b65150286..HEAD",
+      "git diff --name-only 062f996ee6933ec6bb3a3798b5f3a39121303cde..HEAD",
       { encoding: "utf8" },
     ).split("\n");
     const working = execSync("git status --porcelain", { encoding: "utf8" })
