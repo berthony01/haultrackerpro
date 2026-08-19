@@ -526,7 +526,7 @@ describe("TG-1 / canonical_load_operating_miles", () => {
     for (const v of ["_loaded", "_deadhead", "_stored_total", "_l", "_d", "_s"]) {
       expect(body.includes(`${v} <> ${v}`), `self-equality test on ${v}`).toBe(false);
     }
-    expect(exec).not.toMatch(/(_\w+) <> \1\b/);
+    expect(exec).not.toMatch(/(?<![\w.])(_\w+) <> \1(?![\w.])/);
   });
 });
 
