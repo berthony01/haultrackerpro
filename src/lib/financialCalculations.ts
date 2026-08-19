@@ -104,12 +104,16 @@ const num = (v: unknown): number => {
 };
 
 /**
- * Phase TG-1 — financial completion test.
+ * Phase TG-1 (hardened in TG-1R) — financial completion test.
  *
- * Operational statuses `pending` and `en_route` describe assigned work that has
- * NOT been earned yet, and `cancelled` is never earned. Only those three are
- * treated as not financially complete. A null/undefined status stays
- * backwards-compatible with legacy rows and is treated as completed.
+ * FAIL CLOSED: only the exact status `completed` is financially earned. The
+ * operational statuses `pending` / `en_route` describe assigned work that has
+ * not been earned yet, `cancelled` is never earned, and any unknown, future,
+ * or malformed non-null status is treated as NOT complete rather than being
+ * silently counted as revenue.
+ *
+ * A null/undefined status remains backwards-compatible with legacy rows
+ * written before the status vocabulary existed and is treated as completed.
  *
  * This is deliberately narrower than `excludeCancelled()`, which remains the
  * broad operational "not cancelled" helper for surfaces that mean exactly that.
@@ -120,8 +124,9 @@ export function isCompletedLoadForFinancials(
   if (!load) return false;
   const status = load.status;
   if (status == null) return true;
-  return status !== 'pending' && status !== 'en_route' && status !== 'cancelled';
+  return status === 'completed';
 }
+
 
 /** Returns only financially completed loads (see `isCompletedLoadForFinancials`). */
 export function onlyFinanciallyCompleted<T extends { status?: string | null }>(loads: T[]): T[] {
