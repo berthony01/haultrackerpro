@@ -6907,6 +6907,9 @@ export type Database = {
         | "settlements_finalize"
         | "team_view"
         | "team_manage"
+        | "loads_view"
+        | "loads_dispatch"
+        | "loads_update_status"
       user_capability_status: "setup" | "active" | "suspended" | "revoked"
       user_capability_type: "driver" | "recruiter"
     }
@@ -7125,6 +7128,9 @@ export const Constants = {
         "settlements_finalize",
         "team_view",
         "team_manage",
+        "loads_view",
+        "loads_dispatch",
+        "loads_update_status",
       ],
       user_capability_status: ["setup", "active", "suspended", "revoked"],
       user_capability_type: ["driver", "recruiter"],
