@@ -55,6 +55,7 @@ function makeRecruiterProfile(overrides: Partial<RecruiterProfile> = {}): Recrui
     company_name: 'Acme Trucking', company_phone: null, company_state: null,
     company_type: 'carrier',
     company_website: null, created_at: '2026-07-01T00:00:00Z', dot_number: '123456',
+    dispatch_week_start_day: 'sunday', pay_period_cadence: 'weekly', pay_period_anchor_date: null,
     driver_types_hired: [], equipment_types: [], hiring_states: [], id: 'r-1',
     legacy_terms_grandfathered_at: null, mc_number: null,
     posting_terms_accepted_at: '2026-07-17T00:00:00Z',
