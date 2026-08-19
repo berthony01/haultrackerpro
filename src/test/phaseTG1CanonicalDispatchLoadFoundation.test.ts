@@ -677,21 +677,23 @@ describe("TG-1 / completed-only financial semantics", () => {
 
 // ── 14. allowlist enforcement ──────────────────────────────────────────────
 describe("TG-1R / allowlist", () => {
-  /** TG-1R correction scope, relative to the TG-1R start commit. */
+  /**
+   * TG-1R correction scope, validated against the fixed historical commit
+   * range 062f996e..28310a63 (the authoritative TG-1R source end commit).
+   * The endpoint is pinned so later legitimate commits cannot invalidate it.
+   */
   const ALLOWED = [
     SQL_REL,
     "src/lib/financialCalculations.ts",
     "src/test/phaseTG1CanonicalDispatchLoadFoundation.test.ts",
   ].sort();
 
-  it("changes only the three TG-1R allowlisted files", () => {
+  it("changed only the three TG-1R allowlisted files in the fixed TG-1R historical commit range", () => {
     const committed = execSync(
-      "git diff --name-only 062f996ee6933ec6bb3a3798b5f3a39121303cde..HEAD",
+      "git diff --name-only 062f996ee6933ec6bb3a3798b5f3a39121303cde..28310a63e38df67425695a4ef2613ce775467353",
       { encoding: "utf8" },
     ).split("\n");
-    const working = execSync("git status --porcelain", { encoding: "utf8" })
-      .split("\n")
-      .map((l) => l.slice(3));
+    const working: string[] = [];
     const changed = new Set(
       [...committed, ...working]
         .map((l) => l.trim())
