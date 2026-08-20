@@ -768,9 +768,10 @@ describe("TG-2D orchestrator — leakage control", () => {
   });
 
   it("keeps the shared orchestrator runtime-neutral", () => {
-    expect(ORCHESTRATOR_SOURCE).not.toMatch(/\bDeno\b/);
-    expect(ORCHESTRATOR_SOURCE).not.toMatch(/https?:\/\//);
-    expect(ORCHESTRATOR_SOURCE).not.toMatch(/fetch\(/);
+    expect(ORCHESTRATOR_CODE).not.toMatch(/\bDeno\b/);
+    expect(ORCHESTRATOR_CODE).not.toMatch(/https?:\/\//);
+    expect(ORCHESTRATOR_CODE).not.toMatch(/fetch\(/);
+    expect(EDGE_CODE).toContain("runTelegramPoll");
   });
 });
 
