@@ -145,9 +145,15 @@ export function useTelegramLink() {
         openDeepLink(buildTelegramDeepLink(rpcData));
         startAwaitingConfirmation();
         return { ok: true as const };
+      } catch {
+        // Unexpected promise/network/runtime failure. Raw error details are
+        // intentionally not logged or surfaced.
+        onFailure?.();
+        return { ok: false as const, message: 'Could not start Telegram connection.' };
       } finally {
         setIsConnecting(false);
       }
+
     },
     [startAwaitingConfirmation],
   );
