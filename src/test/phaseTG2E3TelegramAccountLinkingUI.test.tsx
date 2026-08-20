@@ -52,7 +52,7 @@ describe('TG-2E3-A — RPC surface', () => {
       'create table',
       'CREATE TABLE',
     ]) {
-      expect(both).not.toContain(forbidden);
+      expect(bothCode).not.toContain(forbidden);
     }
   });
 });
@@ -96,10 +96,10 @@ describe('TG-2E3-A — bot identity and token validation', () => {
 describe('TG-2E3-A — token confinement', () => {
   it('never persists or logs the raw token', () => {
     for (const forbidden of ['localStorage', 'sessionStorage', 'console.log', 'gtag', 'dataLayer']) {
-      expect(both).not.toContain(forbidden);
+      expect(bothCode).not.toContain(forbidden);
     }
-    expect(both).not.toMatch(/useState[^\n]*token/i);
-    expect(both).not.toMatch(/setToken/);
+    expect(bothCode).not.toMatch(/useState[^\n]*token/i);
+    expect(bothCode).not.toMatch(/setToken/);
   });
 });
 
