@@ -90,7 +90,7 @@ describe("TG-2D candidate SQL — object surface", () => {
   });
 
   it("never uses CREATE OR REPLACE or DROP", () => {
-    expect(CANDIDATE_SQL).not.toMatch(/CREATE OR REPLACE/i);
+    expect(CANDIDATE_CODE).not.toMatch(/CREATE OR REPLACE/i);
     expect(CANDIDATE_SQL).not.toMatch(/\bDROP\b/i);
   });
 
