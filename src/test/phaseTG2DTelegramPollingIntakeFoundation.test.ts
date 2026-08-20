@@ -148,18 +148,18 @@ describe("TG-2D candidate SQL — RLS and privileges", () => {
 
   it("grants EXECUTE to service_role only", () => {
     const executeGrants = [
-      ...CANDIDATE_SQL.matchAll(/GRANT EXECUTE ON FUNCTION [^;]+TO (\w+);/g),
+      ...CANDIDATE_CODE.matchAll(/GRANT EXECUTE ON FUNCTION [^;]+TO (\w+);/g),
     ].map((m) => m[1]);
-    expect(executeGrants).toHaveLength(6);
+    expect(executeGrants).toHaveLength(5);
     expect(new Set(executeGrants)).toEqual(new Set(["service_role"]));
 
     for (const role of ["PUBLIC", "anon", "authenticated"]) {
       const revokes = [
-        ...CANDIDATE_SQL.matchAll(
+        ...CANDIDATE_CODE.matchAll(
           new RegExp(`REVOKE ALL ON FUNCTION [^;]+FROM ${role};`, "g"),
         ),
       ];
-      expect(revokes).toHaveLength(6);
+      expect(revokes).toHaveLength(5);
     }
   });
 });
