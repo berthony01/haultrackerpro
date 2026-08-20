@@ -287,32 +287,6 @@ REVOKE ALL ON FUNCTION public.telegram_advance_poll_cursor(uuid, bigint) FROM an
 REVOKE ALL ON FUNCTION public.telegram_advance_poll_cursor(uuid, bigint) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.telegram_advance_poll_cursor(uuid, bigint) TO service_role;
 
--- ---------------------------------------------------------------------------
--- B4. Internal lease assertion shared by the two terminal RPCs
--- ---------------------------------------------------------------------------
-CREATE FUNCTION public._telegram_assert_poll_lease(_lease_token uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'pg_catalog', 'public'
-AS $$
-BEGIN
-  IF _lease_token IS NULL OR NOT EXISTS (
-    SELECT 1
-    FROM public.telegram_poll_state s
-    WHERE s.id = 1
-      AND s.lease_token = _lease_token
-      AND s.lease_expires_at > now()
-  ) THEN
-    RAISE EXCEPTION 'telegram_poll_lease_invalid';
-  END IF;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public._telegram_assert_poll_lease(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public._telegram_assert_poll_lease(uuid) FROM anon;
-REVOKE ALL ON FUNCTION public._telegram_assert_poll_lease(uuid) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public._telegram_assert_poll_lease(uuid) TO service_role;
 
 -- ---------------------------------------------------------------------------
 -- C1. telegram_record_ignored_update(...)
@@ -353,7 +327,15 @@ BEGIN
     RAISE EXCEPTION 'telegram_update_invalid';
   END IF;
 
-  PERFORM public._telegram_assert_poll_lease(_lease_token);
+  IF _lease_token IS NULL OR NOT EXISTS (
+    SELECT 1
+    FROM public.telegram_poll_state s
+    WHERE s.id = 1
+      AND s.lease_token = _lease_token
+      AND s.lease_expires_at > now()
+  ) THEN
+    RAISE EXCEPTION 'telegram_poll_lease_invalid';
+  END IF;
 
   SELECT * INTO _existing
     FROM public.telegram_update_receipts r
@@ -444,7 +426,15 @@ BEGIN
     RAISE EXCEPTION 'telegram_update_invalid';
   END IF;
 
-  PERFORM public._telegram_assert_poll_lease(_lease_token);
+  IF _lease_token IS NULL OR NOT EXISTS (
+    SELECT 1
+    FROM public.telegram_poll_state s
+    WHERE s.id = 1
+      AND s.lease_token = _lease_token
+      AND s.lease_expires_at > now()
+  ) THEN
+    RAISE EXCEPTION 'telegram_poll_lease_invalid';
+  END IF;
 
   SELECT * INTO _existing
     FROM public.telegram_update_receipts r

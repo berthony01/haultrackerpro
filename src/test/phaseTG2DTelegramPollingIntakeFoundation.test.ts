@@ -75,12 +75,11 @@ describe("TG-2D candidate SQL — object surface", () => {
     ]);
   });
 
-  it("creates exactly the five TG-2D RPCs plus the internal lease assertion", () => {
-    const functions = [...CANDIDATE_SQL.matchAll(/CREATE FUNCTION public\.(\w+)/g)].map(
+  it("creates exactly the five authorized TG-2D RPCs and nothing else", () => {
+    const functions = [...CANDIDATE_CODE.matchAll(/CREATE FUNCTION public\.(\w+)/g)].map(
       (m) => m[1],
     );
     expect(functions.sort()).toEqual([
-      "_telegram_assert_poll_lease",
       "telegram_advance_poll_cursor",
       "telegram_claim_poll_lease",
       "telegram_process_start_update",
@@ -88,6 +87,13 @@ describe("TG-2D candidate SQL — object surface", () => {
       "telegram_release_poll_lease",
     ]);
   });
+
+  it("declares no sixth function and no private lease helper", () => {
+    expect(CANDIDATE_CODE.match(/CREATE FUNCTION/g) ?? []).toHaveLength(5);
+    expect(CANDIDATE_CODE).not.toContain("_telegram_assert_poll_lease");
+    expect(CANDIDATE_CODE).not.toMatch(/CREATE FUNCTION public\._/);
+  });
+
 
   it("never uses CREATE OR REPLACE or DROP", () => {
     expect(CANDIDATE_CODE).not.toMatch(/CREATE OR REPLACE/i);
@@ -135,25 +141,25 @@ describe("TG-2D candidate SQL — RLS and privileges", () => {
     const searchPathCount = (
       CANDIDATE_CODE.match(/SET search_path TO 'pg_catalog', 'public'/g) ?? []
     ).length;
-    expect(definerCount).toBe(6);
-    expect(searchPathCount).toBe(6);
+    expect(definerCount).toBe(5);
+    expect(searchPathCount).toBe(5);
     expect(CANDIDATE_SQL).not.toMatch(/SET search_path TO 'public'/);
   });
 
   it("grants EXECUTE to service_role only", () => {
     const executeGrants = [
-      ...CANDIDATE_SQL.matchAll(/GRANT EXECUTE ON FUNCTION [^;]+TO (\w+);/g),
+      ...CANDIDATE_CODE.matchAll(/GRANT EXECUTE ON FUNCTION [^;]+TO (\w+);/g),
     ].map((m) => m[1]);
-    expect(executeGrants).toHaveLength(6);
+    expect(executeGrants).toHaveLength(5);
     expect(new Set(executeGrants)).toEqual(new Set(["service_role"]));
 
     for (const role of ["PUBLIC", "anon", "authenticated"]) {
       const revokes = [
-        ...CANDIDATE_SQL.matchAll(
+        ...CANDIDATE_CODE.matchAll(
           new RegExp(`REVOKE ALL ON FUNCTION [^;]+FROM ${role};`, "g"),
         ),
       ];
-      expect(revokes).toHaveLength(6);
+      expect(revokes).toHaveLength(5);
     }
   });
 });
@@ -204,7 +210,7 @@ describe("TG-2D candidate SQL — poll state shape", () => {
 describe("TG-2D candidate SQL — cursor advancement", () => {
   const advanceBody = CANDIDATE_SQL.slice(
     CANDIDATE_SQL.indexOf("CREATE FUNCTION public.telegram_advance_poll_cursor"),
-    CANDIDATE_SQL.indexOf("CREATE FUNCTION public._telegram_assert_poll_lease"),
+    CANDIDATE_SQL.indexOf("CREATE FUNCTION public.telegram_record_ignored_update"),
   );
 
   it("requires a live matching lease", () => {
@@ -294,11 +300,27 @@ describe("TG-2D candidate SQL — terminal record RPCs", () => {
     CANDIDATE_SQL.indexOf("CREATE FUNCTION public.telegram_process_start_update"),
   );
 
-  it("both return (is_new, result_code) and require a live lease", () => {
+  /** The exact inline fail-closed lease predicate both terminal RPCs must carry
+   *  now that the unauthorized shared helper has been removed. */
+  const INLINE_LEASE_ASSERTION = [
+    "IF _lease_token IS NULL OR NOT EXISTS (",
+    "    SELECT 1",
+    "    FROM public.telegram_poll_state s",
+    "    WHERE s.id = 1",
+    "      AND s.lease_token = _lease_token",
+    "      AND s.lease_expires_at > now()",
+    "  ) THEN",
+    "    RAISE EXCEPTION 'telegram_poll_lease_invalid';",
+    "  END IF;",
+  ].join("\n");
+
+  it("both return (is_new, result_code) and inline the live-lease assertion", () => {
     expect(ignoredBody).toContain("RETURNS TABLE(is_new boolean, result_code text)");
     expect(startBody).toContain("RETURNS TABLE(is_new boolean, result_code text)");
-    expect(ignoredBody).toContain("PERFORM public._telegram_assert_poll_lease(_lease_token)");
-    expect(startBody).toContain("PERFORM public._telegram_assert_poll_lease(_lease_token)");
+    expect(ignoredBody).toContain(INLINE_LEASE_ASSERTION);
+    expect(startBody).toContain(INLINE_LEASE_ASSERTION);
+    expect(ignoredBody).not.toContain("_telegram_assert_poll_lease");
+    expect(startBody).not.toContain("_telegram_assert_poll_lease");
   });
 
   it("restricts the ignored RPC to the four ignore codes", () => {
