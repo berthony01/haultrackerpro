@@ -41,12 +41,22 @@ export function TelegramConnectionSection() {
 
   const handleConnect = async () => {
     // Open a blank window synchronously from the click gesture so popup
-    // blockers do not reject the later navigation.
-    const popup = window.open('', '_blank', 'noopener,noreferrer');
+    // blockers do not reject the later navigation. `noopener`/`noreferrer`
+    // MUST NOT be passed here: they sever the opener relationship and make
+    // window.open return null, defeating the retained-handle strategy.
+    const popup = window.open('about:blank', '_blank');
+    // Preserve reverse-tabnabbing protection without losing the handle.
+    if (popup) {
+      try {
+        popup.opener = null;
+      } catch {
+        // Some browsers disallow assigning opener; navigation still proceeds.
+      }
+    }
     const result = await connect(
       (url) => {
         if (popup && !popup.closed) {
-          popup.location.href = url;
+          popup.location.replace(url);
         } else {
           // Fallback: same-tab navigation when the blank window was blocked.
           window.location.href = url;
@@ -60,6 +70,7 @@ export function TelegramConnectionSection() {
       toast.error(result.message);
     }
   };
+
 
   const handleDisconnect = async () => {
     const result = await disconnect();

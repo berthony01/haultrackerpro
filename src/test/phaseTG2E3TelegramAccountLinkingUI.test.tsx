@@ -103,17 +103,34 @@ describe('TG-2E3-A — token confinement', () => {
   });
 });
 
-describe('TG-2E3-A — popup strategy', () => {
-  it('opens a blank window synchronously and falls back to same-tab', () => {
-    const openIdx = section.indexOf("window.open('', '_blank'");
+describe('TG-2E3-B — popup strategy', () => {
+  it('opens about:blank synchronously before awaiting connect, without noopener/noreferrer', () => {
+    const openIdx = section.indexOf("window.open('about:blank', '_blank')");
+    const openerIdx = section.indexOf('popup.opener = null');
     const connectIdx = section.indexOf('await connect(');
     expect(openIdx).toBeGreaterThan(-1);
-    expect(connectIdx).toBeGreaterThan(openIdx);
-    expect(section).toContain('popup.location.href = url');
+    expect(openerIdx).toBeGreaterThan(openIdx);
+    expect(connectIdx).toBeGreaterThan(openerIdx);
+    expect(section).not.toMatch(/window\.open\([^)]*noopener/);
+    expect(section).not.toMatch(/window\.open\([^)]*noreferrer/);
+  });
+
+  it('navigates the retained popup, falls back to same-tab, and closes on failure', () => {
+    expect(section).toContain('popup.location.replace(url)');
     expect(section).toContain('window.location.href = url');
     expect(section).toContain('popup.close()');
   });
 });
+
+describe('TG-2E3-B — unexpected connect failure', () => {
+  it('catches unexpected failures, calls onFailure, and returns fixed friendly copy', () => {
+    expect(hook).toMatch(
+      /\} catch \{[\s\S]{0,300}onFailure\?\.\(\);[\s\S]{0,200}message: 'Could not start Telegram connection\.'/,
+    );
+    expect(stripComments(hook)).not.toMatch(/console\.(log|error|warn)/);
+  });
+});
+
 
 describe('TG-2E3-A — UI states', () => {
   it('renders connected / not-connected / reconnect states and disconnect confirmation', () => {
