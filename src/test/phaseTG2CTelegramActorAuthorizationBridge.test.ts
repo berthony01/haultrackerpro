@@ -304,6 +304,39 @@ describe("TG-2C candidate — thin bridge to TG-1", () => {
       expect(signature).toContain(arg);
     }
   });
+
+  it("wrapper optional business defaults match TG-1 dispatch_create_driver_load exactly", () => {
+    const block = functionBlock("telegram_dispatch_create_driver_load");
+    const signature = block.slice(0, block.indexOf("RETURNS "));
+    // Each entry is "<param> <type> DEFAULT <value>" and must equal the
+    // corresponding TG-1 dispatch_create_driver_load default byte-for-byte in
+    // value semantics (NULL vs 0).
+    const expectedDefaults: Record<string, string> = {
+      _load_reference: "DEFAULT NULL::text",
+      _dropoff_date: "DEFAULT NULL::date",
+      _loaded_miles: "DEFAULT 0",
+      _deadhead_miles: "DEFAULT 0",
+      _total_miles: "DEFAULT NULL::numeric",
+      _rate_per_mile: "DEFAULT 0",
+      _pay_model: "DEFAULT NULL::text",
+      _flat_rate_amount: "DEFAULT NULL::numeric",
+      _deadhead_rate_per_mile: "DEFAULT NULL::numeric",
+      _wait_fee: "DEFAULT 0",
+      _detention_fee: "DEFAULT 0",
+      _other_fees: "DEFAULT 0",
+      _estimated_pay: "DEFAULT NULL::numeric",
+      _notes: "DEFAULT NULL::text",
+    };
+    for (const [param, defaultExpr] of Object.entries(expectedDefaults)) {
+      // Match the whole "<param> <...> DEFAULT <value>," declaration so a
+      // partial substring cannot satisfy a wrong default.
+      const re = new RegExp(`${param}\\s+\\S+\\s+${defaultExpr.replace(/::/g, "::")},`);
+      expect(
+        signature,
+        `expected ${param} ${defaultExpr} in wrapper signature`,
+      ).toMatch(re);
+    }
+  });
 });
 
 describe("TG-2C candidate — TG-2B prerequisite alignment", () => {
