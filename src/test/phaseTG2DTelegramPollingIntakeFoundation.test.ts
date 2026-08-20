@@ -45,6 +45,17 @@ const EDGE_SOURCE = readFileSync(
   "utf8",
 );
 
+/** Executable SQL only — `--` prose is stripped so a comment that merely
+ *  NAMES a forbidden construct cannot pass or fail a contract assertion. */
+const CANDIDATE_CODE = CANDIDATE_SQL.replace(/--.*$/gm, "");
+
+/** Executable TypeScript only, for the same reason. */
+const stripTsComments = (source: string) =>
+  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+const ORCHESTRATOR_CODE = stripTsComments(ORCHESTRATOR_SOURCE);
+const EDGE_CODE = stripTsComments(EDGE_SOURCE);
+
 // ───────────────────────────── SQL contract ─────────────────────────────
 
 describe("TG-2D candidate SQL — object surface", () => {
