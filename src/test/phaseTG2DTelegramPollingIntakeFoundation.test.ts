@@ -210,7 +210,7 @@ describe("TG-2D candidate SQL — poll state shape", () => {
 describe("TG-2D candidate SQL — cursor advancement", () => {
   const advanceBody = CANDIDATE_SQL.slice(
     CANDIDATE_SQL.indexOf("CREATE FUNCTION public.telegram_advance_poll_cursor"),
-    CANDIDATE_SQL.indexOf("CREATE FUNCTION public._telegram_assert_poll_lease"),
+    CANDIDATE_SQL.indexOf("CREATE FUNCTION public.telegram_record_ignored_update"),
   );
 
   it("requires a live matching lease", () => {
