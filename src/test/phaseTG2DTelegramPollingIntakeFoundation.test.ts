@@ -75,12 +75,11 @@ describe("TG-2D candidate SQL — object surface", () => {
     ]);
   });
 
-  it("creates exactly the five TG-2D RPCs plus the internal lease assertion", () => {
-    const functions = [...CANDIDATE_SQL.matchAll(/CREATE FUNCTION public\.(\w+)/g)].map(
+  it("creates exactly the five authorized TG-2D RPCs and nothing else", () => {
+    const functions = [...CANDIDATE_CODE.matchAll(/CREATE FUNCTION public\.(\w+)/g)].map(
       (m) => m[1],
     );
     expect(functions.sort()).toEqual([
-      "_telegram_assert_poll_lease",
       "telegram_advance_poll_cursor",
       "telegram_claim_poll_lease",
       "telegram_process_start_update",
@@ -88,6 +87,13 @@ describe("TG-2D candidate SQL — object surface", () => {
       "telegram_release_poll_lease",
     ]);
   });
+
+  it("declares no sixth function and no private lease helper", () => {
+    expect(CANDIDATE_CODE.match(/CREATE FUNCTION/g) ?? []).toHaveLength(5);
+    expect(CANDIDATE_CODE).not.toContain("_telegram_assert_poll_lease");
+    expect(CANDIDATE_CODE).not.toMatch(/CREATE FUNCTION public\._/);
+  });
+
 
   it("never uses CREATE OR REPLACE or DROP", () => {
     expect(CANDIDATE_CODE).not.toMatch(/CREATE OR REPLACE/i);
