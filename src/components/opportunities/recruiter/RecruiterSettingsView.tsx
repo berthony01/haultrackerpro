@@ -276,6 +276,8 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
         </CardContent>
       </Card>
 
+      <TelegramConnectionSection />
+
       <NotificationPreferencesPanel />
 
       <DeleteAccountModal open={showDelete} onOpenChange={setShowDelete} />
