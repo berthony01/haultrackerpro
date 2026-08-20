@@ -327,7 +327,15 @@ BEGIN
     RAISE EXCEPTION 'telegram_update_invalid';
   END IF;
 
-  PERFORM public._telegram_assert_poll_lease(_lease_token);
+  IF _lease_token IS NULL OR NOT EXISTS (
+    SELECT 1
+    FROM public.telegram_poll_state s
+    WHERE s.id = 1
+      AND s.lease_token = _lease_token
+      AND s.lease_expires_at > now()
+  ) THEN
+    RAISE EXCEPTION 'telegram_poll_lease_invalid';
+  END IF;
 
   SELECT * INTO _existing
     FROM public.telegram_update_receipts r
