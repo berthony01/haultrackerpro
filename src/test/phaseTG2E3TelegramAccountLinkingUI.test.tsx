@@ -26,6 +26,13 @@ const driverSettings = read(DRIVER_SETTINGS_PATH);
 const recruiterSettings = read(RECRUITER_SETTINGS_PATH);
 const both = `${hook}\n${section}`;
 
+/** Strips block and line comments so prohibition checks apply to real code only. */
+const stripComments = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+const bothCode = stripComments(both);
+
+
 describe('TG-2E3-A — RPC surface', () => {
   it('uses only the two existing live TG-2B RPCs', () => {
     expect(hook).toContain("'issue_telegram_link_token'");
