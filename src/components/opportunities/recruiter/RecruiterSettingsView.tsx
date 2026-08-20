@@ -16,6 +16,8 @@ import { useRecruiterBilling, RECRUITER_PLAN_LABELS } from '@/hooks/opportunitie
 import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { SendFeedbackModal } from '@/components/SendFeedbackModal';
 import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
+import { TelegramConnectionSection } from '@/components/TelegramConnectionSection';
+
 
 interface Props {
   onBack: () => void;
@@ -273,6 +275,8 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
           </div>
         </CardContent>
       </Card>
+
+      <TelegramConnectionSection />
 
       <NotificationPreferencesPanel />
 

@@ -25,6 +25,8 @@ import { NotificationPreferencesPanel } from '@/components/notifications/Notific
 import { QuarterlyReminderSettings } from '@/components/QuarterlyReminderSettings';
 import { CSVImport } from '@/components/CSVImport';
 import { PublicProfileSection } from '@/components/PublicProfileSection';
+import { TelegramConnectionSection } from '@/components/TelegramConnectionSection';
+
 import { supabase } from '@/integrations/supabase/client';
 import { useAdmin } from '@/hooks/useAdmin';
 import { PAY_MODEL_VALUES, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PayModel } from '@/lib/payModels';
@@ -371,6 +373,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
             </>
           ) : null}
         </div>
+
+        <TelegramConnectionSection />
+
+
 
         </AccordionContent>
       </AccordionItem>
