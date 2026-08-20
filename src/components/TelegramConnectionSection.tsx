@@ -162,8 +162,8 @@ export function TelegramConnectionSection() {
               Disconnect
             </AlertDialogAction>
           </AlertDialogFooter>
-        </AlertDialogFooter>
         </AlertDialogContent>
+
       </AlertDialog>
     </div>
   );
