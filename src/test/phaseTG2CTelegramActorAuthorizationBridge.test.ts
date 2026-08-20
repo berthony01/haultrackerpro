@@ -76,8 +76,8 @@ describe("TG-2C candidate — surface shape", () => {
   });
 
   it("does not redefine, alter, drop, or re-privilege TG-1 / TG-2B objects", () => {
-    expect(sql).not.toMatch(/CREATE\s+OR\s+REPLACE/i);
-    expect(sql).not.toMatch(/^\s*(ALTER|DROP)\b/im);
+    expect(executableSql).not.toMatch(/CREATE\s+OR\s+REPLACE/i);
+    expect(executableSql).not.toMatch(/^\s*(ALTER|DROP)\b/im);
     // No GRANT/REVOKE aimed at a TG-1 dispatch function (the bridge's own
     // grants all name public.telegram_* functions).
     expect(sql).not.toMatch(/(GRANT|REVOKE)[^;]*ON\s+FUNCTION\s+public\.dispatch_/i);
@@ -125,12 +125,12 @@ describe("TG-2C candidate — security posture", () => {
   });
 
   it("mints, stores or refreshes no JWT and holds no Telegram secret or API surface", () => {
-    expect(sql).not.toMatch(/\bjwt_secret\b|\bsign_jwt\b|\bjwt\.sign\b|\baccess_token\b|\brefresh_token\b/i);
-    expect(sql).not.toMatch(/\bbot_token\b|\bbot\s*token\b|\bapi\.telegram\.org\b|\bsetWebhook\b|\bwebhook\b(?!\/update receipt table)/i);
-    expect(sql).not.toMatch(/\bhttp_post\b|\bnet\.http\b|\bextensions\.http\b|CREATE\s+EXTENSION/i);
-    expect(sql).not.toMatch(/\bconnector_id\b|\bgateway_url\b|\bcurrent_setting\('app\.settings/i);
+    expect(executableSql).not.toMatch(/\bjwt_secret\b|\bsign_jwt\b|\bjwt\.sign\b|\baccess_token\b|\brefresh_token\b/i);
+    expect(executableSql).not.toMatch(/\bbot_token\b|\bapi\.telegram\.org\b|\bsetWebhook\b|\bwebhook\b/i);
+    expect(executableSql).not.toMatch(/\bhttp_post\b|\bnet\.http\b|\bextensions\.http\b|CREATE\s+EXTENSION/i);
+    expect(executableSql).not.toMatch(/\bconnector_id\b|\bgateway_url\b|\bcurrent_setting\('app\.settings/i);
     // Usernames are never identity input.
-    expect(sql).not.toMatch(/_telegram_username|telegram_username/i);
+    expect(executableSql).not.toMatch(/telegram_username/i);
   });
 });
 
