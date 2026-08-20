@@ -372,6 +372,10 @@ export function SettingsView({ onBack }: SettingsViewProps) {
           ) : null}
         </div>
 
+        <TelegramConnectionSection />
+
+
+
         </AccordionContent>
       </AccordionItem>
 
