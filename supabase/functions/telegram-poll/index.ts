@@ -49,7 +49,7 @@ async function sha256Hex(input: string): Promise<string> {
 }
 
 /** Constant-time-ish comparison so an attacker cannot probe the expected
- *  service-role bearer value byte by byte. */
+ *  purpose-scoped invocation secret byte by byte. */
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
@@ -212,15 +212,19 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  // Platform-injected; used ONLY to build the internal Supabase client below.
+  // It is never accepted from, nor sent to, any external caller.
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) {
+  const internalSecret = Deno.env.get("TELEGRAM_POLL_INTERNAL_SECRET");
+  if (!supabaseUrl || !serviceRoleKey || !internalSecret) {
     return json({ error: "telegram_poll_not_configured" }, 503);
   }
 
-  // Internal service invocation only. The header value is compared and then
+  // Internal service invocation only, authenticated with a purpose-scoped
+  // secret held by the scheduler. The header value is compared and then
   // dropped; it is never logged.
-  const authorization = req.headers.get("Authorization") ?? "";
-  if (!safeEqual(authorization, `Bearer ${serviceRoleKey}`)) {
+  const presentedSecret = req.headers.get("X-HTP-Internal-Secret") ?? "";
+  if (!safeEqual(presentedSecret, internalSecret)) {
     return json({ error: "unauthorized" }, 401);
   }
 

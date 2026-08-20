@@ -815,11 +815,31 @@ describe("TG-2D edge function shell", () => {
     expect(EDGE_SOURCE).not.toMatch(/\/bot\$\{|\/bot</);
   });
 
-  it("requires an exact service-role bearer and fails closed without a connection", () => {
-    expect(EDGE_SOURCE).toContain('Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")');
-    expect(EDGE_SOURCE).toContain("safeEqual(authorization, `Bearer ${serviceRoleKey}`)");
+  it("requires an exact purpose-scoped invocation secret and fails closed", () => {
+    // TG-2E2-H1: external auth is a dedicated header secret, never the
+    // service-role key.
+    expect(EDGE_SOURCE).toContain('Deno.env.get("TELEGRAM_POLL_INTERNAL_SECRET")');
+    expect(EDGE_SOURCE).toContain('req.headers.get("X-HTP-Internal-Secret")');
+    expect(EDGE_SOURCE).toContain("safeEqual(presentedSecret, internalSecret)");
     expect(EDGE_SOURCE).toContain('json({ error: "unauthorized" }, 401)');
+    expect(EDGE_SOURCE).toContain('json({ error: "telegram_poll_not_configured" }, 503)');
     expect(EDGE_SOURCE).toContain('json({ error: "telegram_connection_not_configured" }, 503)');
+    expect(EDGE_SOURCE).not.toMatch(/Bearer \$\{serviceRoleKey\}/);
+    expect(EDGE_SOURCE).not.toMatch(/safeEqual\(\s*authorization/);
+  });
+
+  it("keeps the service-role key internal to the Supabase client only", () => {
+    expect(EDGE_SOURCE).toContain('Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")');
+    expect(EDGE_SOURCE).toContain("createClient(supabaseUrl, serviceRoleKey");
+    const serviceRoleUses = [...EDGE_SOURCE.matchAll(/serviceRoleKey/g)].length;
+    // env read, null guard, client construction — and nothing else.
+    expect(serviceRoleUses).toBe(3);
+    expect(EDGE_SOURCE).not.toMatch(/console\.log\([^)]*serviceRoleKey/);
+  });
+
+  it("exposes no CORS surface for this internal-only function", () => {
+    expect(EDGE_SOURCE).not.toMatch(/corsHeaders|Access-Control-Allow/);
+    expect(EDGE_SOURCE).toContain('req.method !== "POST"');
   });
 
   it("handles both HTTP status and Bot API ok, and drops provider bodies", () => {
