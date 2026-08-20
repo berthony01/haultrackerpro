@@ -4287,6 +4287,161 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_chat_bindings: {
+        Row: {
+          bound_at: string
+          bound_by_user_id: string | null
+          chat_type: string
+          id: string
+          recruiter_id: string
+          revoked_at: string | null
+          status: string
+          telegram_chat_id: number
+        }
+        Insert: {
+          bound_at?: string
+          bound_by_user_id?: string | null
+          chat_type: string
+          id?: string
+          recruiter_id: string
+          revoked_at?: string | null
+          status?: string
+          telegram_chat_id: number
+        }
+        Update: {
+          bound_at?: string
+          bound_by_user_id?: string | null
+          chat_type?: string
+          id?: string
+          recruiter_id?: string
+          revoked_at?: string | null
+          status?: string
+          telegram_chat_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_chat_bindings_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_link_tokens: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          invalidated_at: string | null
+          token_hash: string
+          user_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          invalidated_at?: string | null
+          token_hash: string
+          user_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invalidated_at?: string | null
+          token_hash?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      telegram_poll_state: {
+        Row: {
+          id: number
+          last_confirmed_update_id: number
+          lease_expires_at: string | null
+          lease_token: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          last_confirmed_update_id?: number
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          last_confirmed_update_id?: number
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      telegram_update_receipts: {
+        Row: {
+          payload_hash: string
+          processed_at: string
+          result_code: string
+          status: string
+          telegram_chat_id: number | null
+          telegram_user_id: number | null
+          update_id: number
+          update_type: string
+        }
+        Insert: {
+          payload_hash: string
+          processed_at?: string
+          result_code: string
+          status: string
+          telegram_chat_id?: number | null
+          telegram_user_id?: number | null
+          update_id: number
+          update_type: string
+        }
+        Update: {
+          payload_hash?: string
+          processed_at?: string
+          result_code?: string
+          status?: string
+          telegram_chat_id?: number | null
+          telegram_user_id?: number | null
+          update_id?: number
+          update_type?: string
+        }
+        Relationships: []
+      }
+      telegram_user_links: {
+        Row: {
+          id: string
+          linked_at: string
+          revoked_at: string | null
+          status: string
+          telegram_user_id: number
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          linked_at?: string
+          revoked_at?: string | null
+          status?: string
+          telegram_user_id: number
+          user_id: string
+        }
+        Update: {
+          id?: string
+          linked_at?: string
+          revoked_at?: string | null
+          status?: string
+          telegram_user_id?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_alerts: {
         Row: {
           created_at: string
@@ -4879,6 +5034,23 @@ export type Database = {
           p_result_code: string
         }
         Returns: boolean
+      }
+      consume_telegram_link_token: {
+        Args: { _raw_token: string; _telegram_user_id: number }
+        Returns: {
+          id: string
+          linked_at: string
+          revoked_at: string | null
+          status: string
+          telegram_user_id: number
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "telegram_user_links"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       create_agency: {
         Args: { _contact_email?: string; _description?: string; _name: string }
@@ -5611,6 +5783,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      issue_telegram_link_token: { Args: never; Returns: string }
       list_agency_audit_log: {
         Args: { _agency_id: string; _limit?: number }
         Returns: {
@@ -6231,6 +6404,7 @@ export type Database = {
         Args: { _driver_user_id: string }
         Returns: number
       }
+      revoke_my_telegram_link: { Args: never; Returns: boolean }
       revoke_recruiter_member: { Args: { _member_id: string }; Returns: Json }
       set_agency_client_request_status: {
         Args: {
@@ -6974,6 +7148,209 @@ export type Database = {
           application_status: string
           result_code: string
         }[]
+      }
+      telegram_advance_poll_cursor: {
+        Args: { _last_update_id: number; _lease_token: string }
+        Returns: number
+      }
+      telegram_bind_dispatch_chat: {
+        Args: {
+          _chat_type: string
+          _recruiter_id: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+        }
+        Returns: {
+          bound_at: string
+          bound_by_user_id: string | null
+          chat_type: string
+          id: string
+          recruiter_id: string
+          revoked_at: string | null
+          status: string
+          telegram_chat_id: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "telegram_chat_bindings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      telegram_claim_poll_lease: {
+        Args: never
+        Returns: {
+          lease_token: string
+          next_offset: number
+        }[]
+      }
+      telegram_dispatch_create_driver_load: {
+        Args: {
+          _deadhead_miles?: number
+          _deadhead_rate_per_mile?: number
+          _detention_fee?: number
+          _dropoff_date?: string
+          _dropoff_location: string
+          _estimated_pay?: number
+          _flat_rate_amount?: number
+          _idempotency_key: string
+          _load_date: string
+          _load_reference?: string
+          _loaded_miles?: number
+          _notes?: string
+          _other_fees?: number
+          _pay_model?: string
+          _pickup_location: string
+          _rate_per_mile?: number
+          _relationship_id: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _total_miles?: number
+          _wait_fee?: number
+        }
+        Returns: {
+          actual_pay_received: number | null
+          assistant_delegate_id: string | null
+          broker_id: string | null
+          broker_name_raw: string | null
+          carrier_driver_relationship_id: string | null
+          created_at: string
+          created_by_user_id: string | null
+          deadhead_miles: number
+          deadhead_pay_amount: number | null
+          deadhead_pay_status: string | null
+          deadhead_rate_per_mile: number | null
+          detention_fee: number
+          dropoff_date: string | null
+          dropoff_location: string
+          estimated_pay: number | null
+          flat_rate_amount: number | null
+          gross_revenue: number | null
+          id: string
+          invoice_submitted_date: string | null
+          load_date: string
+          load_reference: string | null
+          loaded_miles: number
+          notes: string | null
+          origin_channel: string
+          other_fees: number
+          paid_date: string | null
+          pay_model: string | null
+          payment_due_date: string | null
+          payment_notes: string | null
+          payment_status: string
+          pickup_location: string
+          pod_submitted_date: string | null
+          rate_per_mile: number
+          short_paid_amount: number | null
+          status: string
+          total_miles: number | null
+          updated_at: string
+          updated_by_user_id: string | null
+          user_id: string
+          wait_fee: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loads"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      telegram_dispatch_update_driver_load_status: {
+        Args: {
+          _idempotency_key: string
+          _load_id: string
+          _new_status: string
+          _relationship_id: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+        }
+        Returns: {
+          actual_pay_received: number | null
+          assistant_delegate_id: string | null
+          broker_id: string | null
+          broker_name_raw: string | null
+          carrier_driver_relationship_id: string | null
+          created_at: string
+          created_by_user_id: string | null
+          deadhead_miles: number
+          deadhead_pay_amount: number | null
+          deadhead_pay_status: string | null
+          deadhead_rate_per_mile: number | null
+          detention_fee: number
+          dropoff_date: string | null
+          dropoff_location: string
+          estimated_pay: number | null
+          flat_rate_amount: number | null
+          gross_revenue: number | null
+          id: string
+          invoice_submitted_date: string | null
+          load_date: string
+          load_reference: string | null
+          loaded_miles: number
+          notes: string | null
+          origin_channel: string
+          other_fees: number
+          paid_date: string | null
+          pay_model: string | null
+          payment_due_date: string | null
+          payment_notes: string | null
+          payment_status: string
+          pickup_location: string
+          pod_submitted_date: string | null
+          rate_per_mile: number
+          short_paid_amount: number | null
+          status: string
+          total_miles: number | null
+          updated_at: string
+          updated_by_user_id: string | null
+          user_id: string
+          wait_fee: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "loads"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      telegram_process_start_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _raw_token: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+        }[]
+      }
+      telegram_record_ignored_update: {
+        Args: {
+          _lease_token: string
+          _payload_hash: string
+          _result_code: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+        }[]
+      }
+      telegram_release_poll_lease: {
+        Args: { _lease_token: string }
+        Returns: boolean
+      }
+      telegram_revoke_dispatch_chat: {
+        Args: { _telegram_chat_id: number; _telegram_user_id: number }
+        Returns: boolean
       }
       update_agency_package: {
         Args: {
