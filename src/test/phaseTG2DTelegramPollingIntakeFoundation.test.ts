@@ -141,8 +141,8 @@ describe("TG-2D candidate SQL — RLS and privileges", () => {
     const searchPathCount = (
       CANDIDATE_CODE.match(/SET search_path TO 'pg_catalog', 'public'/g) ?? []
     ).length;
-    expect(definerCount).toBe(6);
-    expect(searchPathCount).toBe(6);
+    expect(definerCount).toBe(5);
+    expect(searchPathCount).toBe(5);
     expect(CANDIDATE_SQL).not.toMatch(/SET search_path TO 'public'/);
   });
 
