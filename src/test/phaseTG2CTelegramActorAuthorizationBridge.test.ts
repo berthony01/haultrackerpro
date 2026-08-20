@@ -20,6 +20,11 @@ const TG2B_PATH = resolve(
 );
 
 const sql = readFileSync(CANDIDATE_PATH, "utf8");
+/** Executable SQL only: `--` commentary is documentation, not behaviour. */
+const executableSql = sql
+  .split("\n")
+  .filter((line) => !line.trimStart().startsWith("--"))
+  .join("\n");
 const tg2bSql = readFileSync(TG2B_PATH, "utf8");
 
 const BRIDGE_FUNCTIONS = [
