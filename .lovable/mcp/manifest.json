@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.2",
+  "path": "/functions/v1/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://pngptztxwbtozwxrtbwo.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "haul-tracker-pro",
+      "version": "0.1.0",
+      "title": "Haul Tracker Pro"
+    },
+    "tools": [
+      {
+        "name": "list_loads",
+        "title": "List loads",
+        "description": "List the signed-in driver's most recent loads, newest first. Optionally filter by load status, payment status, or a load date range (YYYY-MM-DD).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Maximum loads to return (1-100)."
+            },
+            "status": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Filter by load status, e.g. delivered, en_route, cancelled."
+            },
+            "payment_status": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Filter by payment status, e.g. paid, unpaid, overdue, short_paid."
+            },
+            "from_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Only loads with load_date on or after this date (YYYY-MM-DD)."
+            },
+            "to_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Only loads with load_date on or before this date (YYYY-MM-DD)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_expenses",
+        "title": "List expenses",
+        "description": "List the signed-in driver's most recent expenses, newest first. Optionally filter by category or an expense date range (YYYY-MM-DD).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "description": "Maximum expenses to return (1-100)."
+            },
+            "category": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Filter by expense category, e.g. Fuel, Maintenance, Insurance."
+            },
+            "from_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Only expenses on or after this date (YYYY-MM-DD)."
+            },
+            "to_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Only expenses on or before this date (YYYY-MM-DD)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "profit_summary",
+        "title": "Profit summary",
+        "description": "Summarize the signed-in driver's revenue, expenses, net profit, miles, and rate per mile over a date range (YYYY-MM-DD). Cancelled loads are excluded from revenue.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "from_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "Start of the period (YYYY-MM-DD), inclusive."
+            },
+            "to_date": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "description": "End of the period (YYYY-MM-DD), inclusive."
+            }
+          },
+          "required": [
+            "from_date",
+            "to_date"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

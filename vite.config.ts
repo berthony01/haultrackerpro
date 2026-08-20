@@ -4,6 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from "vite-plugin-pwa";
 import { htpBuildShaPlugin } from "./vite/htpBuildShaPlugin";
+import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/supabase/vite";
 
 
 // CRITICAL: Production-build resilience for Supabase env injection.
@@ -78,6 +79,7 @@ export default defineConfig(({ mode }) => ({
       injectRegister: false,
     }),
     htpBuildShaPlugin(),
+    mcpPlugin(),
   ].filter(Boolean),
 
   build: {
