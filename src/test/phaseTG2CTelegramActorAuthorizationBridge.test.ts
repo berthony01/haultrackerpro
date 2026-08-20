@@ -304,6 +304,37 @@ describe("TG-2C candidate — thin bridge to TG-1", () => {
       expect(signature).toContain(arg);
     }
   });
+
+  it("wrapper optional business defaults match TG-1 dispatch_create_driver_load exactly", () => {
+    const block = functionBlock("telegram_dispatch_create_driver_load");
+    const signature = block.slice(0, block.indexOf("RETURNS "));
+    // Each entry is the exact wrapper declaration "<param> <type> DEFAULT <value>,"
+    // and must equal the corresponding TG-1 dispatch_create_driver_load default
+    // in value semantics (NULL vs 0). TG-1 uses bare NULL/0; the wrapper spells
+    // the cast form, which is value-equivalent.
+    const expectedDeclarations = [
+      "_load_reference text DEFAULT NULL::text,",
+      "_dropoff_date date DEFAULT NULL::date,",
+      "_loaded_miles numeric DEFAULT 0,",
+      "_deadhead_miles numeric DEFAULT 0,",
+      "_total_miles numeric DEFAULT NULL::numeric,",
+      "_rate_per_mile numeric DEFAULT 0,",
+      "_pay_model text DEFAULT NULL::text,",
+      "_flat_rate_amount numeric DEFAULT NULL::numeric,",
+      "_deadhead_rate_per_mile numeric DEFAULT NULL::numeric,",
+      "_wait_fee numeric DEFAULT 0,",
+      "_detention_fee numeric DEFAULT 0,",
+      "_other_fees numeric DEFAULT 0,",
+      "_estimated_pay numeric DEFAULT NULL::numeric,",
+      "_notes text DEFAULT NULL::text",
+    ];
+    for (const decl of expectedDeclarations) {
+      expect(
+        signature,
+        `expected wrapper signature to contain "${decl}"`,
+      ).toContain(decl);
+    }
+  });
 });
 
 describe("TG-2C candidate — TG-2B prerequisite alignment", () => {
