@@ -330,7 +330,9 @@ describe("TG-2D candidate SQL — terminal record RPCs", () => {
     expect(startBody).toContain(
       "PERFORM public.consume_telegram_link_token(_raw_token, _telegram_user_id);",
     );
-    expect(startBody).not.toMatch(/COMMIT|ROLLBACK|dblink|pg_background/i);
+    expect(startBody).not.toMatch(/ROLLBACK|dblink|pg_background/i);
+    // The only COMMIT in the candidate is the single closing statement.
+    expect(CANDIDATE_CODE.match(/\bCOMMIT\b/gi) ?? []).toHaveLength(1);
     // `_raw_token` is only validated and passed through — never inserted.
     const insertBlock = startBody.slice(
       startBody.indexOf("INSERT INTO public.telegram_update_receipts"),
