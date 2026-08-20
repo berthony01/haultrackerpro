@@ -300,11 +300,27 @@ describe("TG-2D candidate SQL — terminal record RPCs", () => {
     CANDIDATE_SQL.indexOf("CREATE FUNCTION public.telegram_process_start_update"),
   );
 
-  it("both return (is_new, result_code) and require a live lease", () => {
+  /** The exact inline fail-closed lease predicate both terminal RPCs must carry
+   *  now that the unauthorized shared helper has been removed. */
+  const INLINE_LEASE_ASSERTION = [
+    "IF _lease_token IS NULL OR NOT EXISTS (",
+    "    SELECT 1",
+    "    FROM public.telegram_poll_state s",
+    "    WHERE s.id = 1",
+    "      AND s.lease_token = _lease_token",
+    "      AND s.lease_expires_at > now()",
+    "  ) THEN",
+    "    RAISE EXCEPTION 'telegram_poll_lease_invalid';",
+    "  END IF;",
+  ].join("\n");
+
+  it("both return (is_new, result_code) and inline the live-lease assertion", () => {
     expect(ignoredBody).toContain("RETURNS TABLE(is_new boolean, result_code text)");
     expect(startBody).toContain("RETURNS TABLE(is_new boolean, result_code text)");
-    expect(ignoredBody).toContain("PERFORM public._telegram_assert_poll_lease(_lease_token)");
-    expect(startBody).toContain("PERFORM public._telegram_assert_poll_lease(_lease_token)");
+    expect(ignoredBody).toContain(INLINE_LEASE_ASSERTION);
+    expect(startBody).toContain(INLINE_LEASE_ASSERTION);
+    expect(ignoredBody).not.toContain("_telegram_assert_poll_lease");
+    expect(startBody).not.toContain("_telegram_assert_poll_lease");
   });
 
   it("restricts the ignored RPC to the four ignore codes", () => {
