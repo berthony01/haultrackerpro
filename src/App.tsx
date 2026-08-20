@@ -52,6 +52,7 @@ const Recruiters = lazy(() => import("./pages/Recruiters"));
 const Admin = lazy(() => import("./pages/Admin"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const Install = lazy(() => import("./pages/Install"));
+const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const HowToUseHaulTrackerPro = lazy(() => import("./pages/HowToUseHaulTrackerPro"));
 const Parking = lazy(() => import("./pages/Parking"));
@@ -232,6 +233,7 @@ const App = () => (
               <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/install" element={<Install />} />
+              <Route path="/.lovable/oauth/consent" element={<OAuthConsent />} />
               <Route path="/truck-driver-tax-deductions" element={<TruckDriverTaxDeductions />} />
               <Route path="/owner-operator-expense-tracker" element={<OwnerOperatorExpenseTracker />} />
               <Route path="/trucking-profit-calculator" element={<TruckingProfitCalculator />} />
