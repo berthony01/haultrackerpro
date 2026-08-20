@@ -91,7 +91,7 @@ describe("TG-2D candidate SQL — object surface", () => {
 
   it("never uses CREATE OR REPLACE or DROP", () => {
     expect(CANDIDATE_CODE).not.toMatch(/CREATE OR REPLACE/i);
-    expect(CANDIDATE_SQL).not.toMatch(/\bDROP\b/i);
+    expect(CANDIDATE_CODE).not.toMatch(/\bDROP\b/i);
   });
 
   it("creates no other database object vocabulary", () => {
@@ -131,9 +131,9 @@ describe("TG-2D candidate SQL — RLS and privileges", () => {
   });
 
   it("makes every function SECURITY DEFINER with a pinned search_path", () => {
-    const definerCount = (CANDIDATE_SQL.match(/SECURITY DEFINER/g) ?? []).length;
+    const definerCount = (CANDIDATE_CODE.match(/SECURITY DEFINER/g) ?? []).length;
     const searchPathCount = (
-      CANDIDATE_SQL.match(/SET search_path TO 'pg_catalog', 'public'/g) ?? []
+      CANDIDATE_CODE.match(/SET search_path TO 'pg_catalog', 'public'/g) ?? []
     ).length;
     expect(definerCount).toBe(6);
     expect(searchPathCount).toBe(6);
