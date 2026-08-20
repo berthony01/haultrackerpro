@@ -217,7 +217,7 @@ CREATE FUNCTION public.telegram_dispatch_create_driver_load(
   _loaded_miles numeric DEFAULT 0,
   _deadhead_miles numeric DEFAULT 0,
   _total_miles numeric DEFAULT NULL::numeric,
-  _rate_per_mile numeric DEFAULT NULL::numeric,
+  _rate_per_mile numeric DEFAULT 0,
   _pay_model text DEFAULT NULL::text,
   _flat_rate_amount numeric DEFAULT NULL::numeric,
   _deadhead_rate_per_mile numeric DEFAULT NULL::numeric,
