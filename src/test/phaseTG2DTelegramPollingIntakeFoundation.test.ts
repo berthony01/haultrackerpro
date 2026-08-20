@@ -373,27 +373,27 @@ describe("TG-2D candidate SQL — no TG-1 / TG-2C entanglement", () => {
       "request.jwt.claim.sub",
       "loads_dispatch",
     ]) {
-      expect(CANDIDATE_SQL).not.toContain(forbidden);
+      expect(CANDIDATE_CODE).not.toContain(forbidden);
     }
-    expect(CANDIDATE_SQL).not.toMatch(/ALTER TABLE public\.loads/i);
+    expect(CANDIDATE_CODE).not.toMatch(/ALTER TABLE public\.loads/i);
   });
 
   it("touches TG-2B only through the consume call", () => {
     const tg2bMentions = [
-      ...CANDIDATE_SQL.matchAll(/consume_telegram_link_token/g),
+      ...CANDIDATE_CODE.matchAll(/consume_telegram_link_token/g),
     ];
-    expect(tg2bMentions).toHaveLength(2); // one comment reference, one call
-    expect(CANDIDATE_SQL).not.toContain("issue_telegram_link_token");
-    expect(CANDIDATE_SQL).not.toContain("revoke_my_telegram_link");
-    expect(CANDIDATE_SQL).not.toContain("telegram_user_links");
-    expect(CANDIDATE_SQL).not.toContain("telegram_link_tokens");
+    expect(tg2bMentions).toHaveLength(1);
+    expect(CANDIDATE_CODE).not.toContain("issue_telegram_link_token");
+    expect(CANDIDATE_CODE).not.toContain("revoke_my_telegram_link");
+    expect(CANDIDATE_CODE).not.toContain("telegram_user_links");
+    expect(CANDIDATE_CODE).not.toContain("telegram_link_tokens");
   });
 
   it("contains no webhook, bot token, or secret vocabulary", () => {
-    expect(CANDIDATE_SQL).not.toMatch(/api\.telegram\.org/);
-    expect(CANDIDATE_SQL).not.toMatch(/setWebhook/i);
-    expect(CANDIDATE_SQL).not.toMatch(/bot_token|BOT_TOKEN/);
-    expect(CANDIDATE_SQL).not.toMatch(/vault\./i);
+    expect(CANDIDATE_CODE).not.toMatch(/api\.telegram\.org/);
+    expect(CANDIDATE_CODE).not.toMatch(/setWebhook/i);
+    expect(CANDIDATE_CODE).not.toMatch(/bot_token|BOT_TOKEN/);
+    expect(CANDIDATE_CODE).not.toMatch(/vault\./i);
   });
 });
 
