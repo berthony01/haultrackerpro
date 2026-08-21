@@ -25,6 +25,8 @@ import { AdminAuditLogPanel } from '@/components/admin/audit/AdminAuditLogPanel'
 import { AdminApplicationsPanel } from '@/components/admin/applications/AdminApplicationsPanel';
 import { AdminRecruiterLeaderboardPanel } from '@/components/admin/recruiters/AdminRecruiterLeaderboardPanel';
 import { INTERNAL_TEST_ACCOUNTS } from '@/lib/internalTestAccounts';
+import { OwnerQaModePanel } from '@/components/admin/OwnerQaModePanel';
+
 
 interface OverviewData {
   total_users: number;
@@ -698,8 +700,10 @@ export default function Admin() {
 
           {/* OVERVIEW */}
           <TabsContent value="overview" className="space-y-4">
+            <OwnerQaModePanel />
             <AdminOverviewPremium overview={overview} onGoToTab={setTab} />
           </TabsContent>
+
 
 
           {/* ACTIVATION */}

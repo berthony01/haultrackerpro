@@ -8,6 +8,9 @@ import {
   defaultUnsubscribedEntitlement,
   effectiveLimits,
 } from '@/lib/agencyPlans';
+import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import { agencyQaOverlay } from '@/lib/billing/ownerQaPersona';
+
 
 /**
  * Phase 7 / Phase 1S-A2 — Read the entitlement row for an agency.
@@ -66,8 +69,18 @@ export function useAgencyEntitlement(
     },
   });
 
+  // Phase TG-2E3-O2 — Owner QA persona overlay (super_admin only, server-resident
+  // session). Mirrors the server `get_effective_agency_limits` QA branch so the
+  // rendered plan/limits match the limits the server will actually enforce.
+  // Real `agency_entitlements` rows are never modified.
+  const ownerQa = useOwnerQaPersona();
+  const qa =
+    ownerQa.isActive && ownerQa.domain === 'agency'
+      ? agencyQaOverlay(ownerQa.persona)
+      : null;
+
   const row = q.data;
-  const entitlement: AgencyEntitlement = row
+  const baseEntitlement: AgencyEntitlement = row
     ? {
         agencyId: row.agency_id,
         planKey: row.plan_key,
@@ -82,15 +95,27 @@ export function useAgencyEntitlement(
       }
     : defaultUnsubscribedEntitlement(agencyId ?? '');
 
+  const entitlement: AgencyEntitlement = qa
+    ? {
+        ...baseEntitlement,
+        planKey: qa.planKey,
+        status: qa.status,
+        activeClientLimit: qa.activeClientLimit,
+        memberLimit: qa.memberLimit,
+        servicePackageLimit: qa.servicePackageLimit,
+      }
+    : baseEntitlement;
+
   return {
     entitlement,
-    hasRow: !!row,
+    hasRow: qa ? qa.hasRow : !!row,
     isLoading: q.isLoading,
     isError: q.isError,
     error: (q.error as Error | null) ?? null,
     refetch: () => q.refetch(),
   };
 }
+
 
 
 export { ASSISTANT_AGENCY_PLANS, effectiveLimits };
