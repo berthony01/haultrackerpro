@@ -1,16 +1,19 @@
 /**
- * Phase TG-2E3-O2 — Real PostgreSQL 16 gate for the Owner QA entitlement
+ * Phase TG-2E3-O2 — Real PostgreSQL gate for the Owner QA entitlement
  * candidate.
  *
- * Exercises the candidate SQL against a real PostgreSQL database so ACL,
- * SECURITY DEFINER binding, `auth.uid()` GUC semantics, RLS, CHECK
- * constraints, and expiry behaviour reflect production reality.
+ * Exercises the FULL candidate SQL (including F4 `opportunities_billing_guard`)
+ * against a real PostgreSQL database so ACL, SECURITY DEFINER binding,
+ * `auth.uid()` GUC semantics, RLS, CHECK constraints, trigger behaviour, and
+ * expiry all reflect production reality.
  *
  * Lives OUTSIDE `src/` so the default `bunx vitest run` never picks it up.
- * Runs only via `vitest.phase-tg2e3-o2-owner-qa-postgres.config.ts`.
+ * No repository Vitest config targets it; run it with an ad-hoc config created
+ * at runtime (for example under /tmp) that includes only this file.
  *
  * NEVER SKIPS. Fails hard if TG2E3O2_DATABASE_URL is absent.
  */
+
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -140,20 +143,65 @@ DO $$ BEGIN
   CREATE ROLE service_role NOLOGIN;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 GRANT USAGE ON SCHEMA public TO authenticated, anon, service_role;
+
+-- --- F4 scaffold: minimum objects the candidate guard genuinely needs ---
+DO $$ BEGIN
+  CREATE TYPE public.recruiter_workspace_permission AS ENUM (
+    'opportunities_create',
+    'opportunities_edit',
+    'opportunities_change_status'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.opportunities (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recruiter_id uuid NOT NULL,
+  status text NOT NULL DEFAULT 'draft'
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.opportunities TO authenticated;
+
+-- TEST-ONLY controllable permission resolver. Fail-closed by default; each
+-- transaction may flip it via SET LOCAL "test.perm_allow". The candidate SQL is
+-- never modified to accommodate this.
+CREATE OR REPLACE FUNCTION public.current_user_can_recruiter_opportunity_action(
+  _recruiter_id uuid,
+  _permission public.recruiter_workspace_permission
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+  SELECT COALESCE(
+    NULLIF(current_setting('test.perm_allow', true), '')::boolean,
+    false
+  )
+$$;
+
+-- TEST-ONLY wrapper mapping the real candidate tier resolver to live limits.
+CREATE OR REPLACE FUNCTION public.effective_recruiter_active_opportunity_limit(
+  _recruiter_id uuid
+) RETURNS integer
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE _tier text;
+BEGIN
+  _tier := public.effective_recruiter_tier(_recruiter_id);
+  RETURN CASE _tier
+    WHEN 'conflict'      THEN 0
+    WHEN 'free_standard' THEN 1
+    WHEN 'starter'       THEN 5
+    WHEN 'growth'        THEN 15
+    WHEN 'fleet'         THEN 25
+    ELSE 0
+  END;
+END;
+$$;
 `;
 
-/**
- * The candidate also replaces `opportunities_billing_guard`, which depends on
- * the wider opportunities/permission stack. That trigger is out of scope for
- * this gate (it is covered by source-contract assertions in the frontend
- * suite); everything before it is applied verbatim.
- */
-function candidateWithoutOpportunityGuard(): string {
-  const marker = '-- F4. opportunities_billing_guard';
-  const idx = CANDIDATE_SQL.indexOf(marker);
-  if (idx < 0) throw new Error('candidate: F4 marker not found');
-  return CANDIDATE_SQL.slice(0, idx);
-}
+/** The full candidate is applied verbatim, F4 included. */
+const TRIGGER_SQL = `
+DROP TRIGGER IF EXISTS opportunities_billing_guard_trg ON public.opportunities;
+CREATE TRIGGER opportunities_billing_guard_trg
+BEFORE INSERT OR UPDATE ON public.opportunities
+FOR EACH ROW EXECUTE FUNCTION public.opportunities_billing_guard();
+`;
+
 
 const pool = new pg.Pool({ connectionString: URL_STR, max: 4 });
 
@@ -189,7 +237,9 @@ async function asUser<T>(
 
 beforeAll(async () => {
   await pool.query(SCAFFOLD);
-  await pool.query(candidateWithoutOpportunityGuard());
+  await pool.query(CANDIDATE_SQL);
+  await pool.query(TRIGGER_SQL);
+
 
   await pool.query(
     `INSERT INTO auth.users(id) VALUES ($1),($2),($3)`,
@@ -551,5 +601,153 @@ describe('get_effective_agency_limits QA overlay', () => {
       `SELECT count(*)::int AS n FROM public.agency_entitlements`,
     );
     expect(after.rows[0].n).toBe(before.rows[0].n);
+  });
+});
+
+/**
+ * F4 — opportunities_billing_guard, exercised as a real BEFORE INSERT/UPDATE
+ * trigger against the applied candidate.
+ */
+async function asUserWithPerm<T>(
+  uid: string,
+  permAllow: boolean,
+  fn: (c: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  return asUser(uid, async (c) => {
+    await c.query(`SELECT set_config('test.perm_allow', $1, true)`, [
+      permAllow ? 'true' : 'false',
+    ]);
+    return fn(c);
+  });
+}
+
+async function setPersona(domain: string, persona: string) {
+  await asUser(OWNER, (c) =>
+    c.query(`SELECT public.set_owner_qa_persona($1,$2)`, [domain, persona]),
+  );
+}
+
+async function seedActive(count: number) {
+  await pool.query(`DELETE FROM public.opportunities WHERE recruiter_id = $1`, [
+    recruiterId,
+  ]);
+  await pool.query(
+    `ALTER TABLE public.opportunities DISABLE TRIGGER opportunities_billing_guard_trg`,
+  );
+  try {
+    for (let i = 0; i < count; i += 1) {
+      await pool.query(
+        `INSERT INTO public.opportunities(recruiter_id, status) VALUES ($1,'active')`,
+        [recruiterId],
+      );
+    }
+  } finally {
+    await pool.query(
+      `ALTER TABLE public.opportunities ENABLE TRIGGER opportunities_billing_guard_trg`,
+    );
+  }
+}
+
+const INSERT_ACTIVE = `INSERT INTO public.opportunities(recruiter_id, status) VALUES ($1,'active') RETURNING id`;
+
+describe('F4 opportunities_billing_guard QA overlay', () => {
+  it('preserves the existing admin bypass when QA is off', async () => {
+    await asUser(OWNER, (c) =>
+      c.query(`SELECT public.disable_owner_qa_persona()`),
+    );
+    // Far above any free-tier limit, and the permission resolver says NO.
+    await seedActive(40);
+
+    const r = await asUserWithPerm(OWNER, false, (c) =>
+      c.query(INSERT_ACTIVE, [recruiterId]),
+    );
+    expect(r.rowCount).toBe(1);
+  });
+
+  it('does NOT let a QA recruiter owner bypass the permission check', async () => {
+    await setPersona('recruiter', 'starter');
+    await seedActive(0);
+
+    await expect(
+      asUserWithPerm(OWNER, false, (c) => c.query(INSERT_ACTIVE, [recruiterId])),
+    ).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('enforces the selected starter limit of 5 for a QA recruiter owner', async () => {
+    await setPersona('recruiter', 'starter');
+    await seedActive(5);
+
+    let err: any;
+    try {
+      await asUserWithPerm(OWNER, true, (c) =>
+        c.query(INSERT_ACTIVE, [recruiterId]),
+      );
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    expect(err.code).toBe('23514');
+    const detail = JSON.parse(err.detail);
+    expect(detail.code).toBe('active_opportunity_limit_reached');
+    expect(detail.limit).toBe(5);
+    expect(detail.active_count).toBe(5);
+  });
+
+  it('enforces the free_verified limit of 1', async () => {
+    await setPersona('recruiter', 'free_verified');
+    await seedActive(1);
+
+    let err: any;
+    try {
+      await asUserWithPerm(OWNER, true, (c) =>
+        c.query(INSERT_ACTIVE, [recruiterId]),
+      );
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    const detail = JSON.parse(err.detail);
+    expect(detail.code).toBe('active_opportunity_limit_reached');
+    expect(detail.limit).toBe(1);
+  });
+
+  it('allows an insert below the fleet limit of 25', async () => {
+    await setPersona('recruiter', 'fleet');
+    await seedActive(10);
+
+    const r = await asUserWithPerm(OWNER, true, (c) =>
+      c.query(INSERT_ACTIVE, [recruiterId]),
+    );
+    expect(r.rowCount).toBe(1);
+  });
+
+  it('leaves the non-super-admin bypass entirely unchanged', async () => {
+    const otherRecruiter = await pool.query(
+      `INSERT INTO public.recruiter_profiles(user_id) VALUES ($1) RETURNING id`,
+      [OTHER_ADMIN],
+    );
+    const r = await asUserWithPerm(OTHER_ADMIN, false, (c) =>
+      c.query(INSERT_ACTIVE, [otherRecruiter.rows[0].id]),
+    );
+    expect(r.rowCount).toBe(1);
+  });
+
+  it('writes no billing rows while enforcing QA limits', async () => {
+    const before = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM public.recruiter_billing_profiles) AS rbp,
+         (SELECT count(*)::int FROM public.agency_entitlements) AS ae,
+         (SELECT count(*)::int FROM public.subscriptions) AS subs`,
+    );
+    await setPersona('recruiter', 'growth');
+    await seedActive(2);
+    await asUserWithPerm(OWNER, true, (c) => c.query(INSERT_ACTIVE, [recruiterId]));
+    const after = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM public.recruiter_billing_profiles) AS rbp,
+         (SELECT count(*)::int FROM public.agency_entitlements) AS ae,
+         (SELECT count(*)::int FROM public.subscriptions) AS subs`,
+    );
+    expect(after.rows[0]).toEqual(before.rows[0]);
   });
 });
