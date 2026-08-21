@@ -260,34 +260,43 @@ export function useRecruiterBilling() {
   const agencyEntitlementRow = agencyEnt.entitlement;
   const agencyHasRow = agencyEnt.hasRow;
 
+  // Phase TG-2E3-O2 — Owner QA persona overlay (super_admin only, server-resident).
+  const ownerQa = useOwnerQaPersona();
+  const ownerQaSelection = ownerQa.isActive ? ownerQa.selection : null;
+
   const effectiveBusinessEntitlement: EffectiveBusinessEntitlement = useMemo(
     () =>
-      resolveEffectiveBusinessEntitlement({
-        sourceState: {
-          recruiterBilling: recruiterSourceState,
-          agencyEntitlement: agencySourceState,
-        },
-        recruiterBilling: {
-          hasRow: !!billing,
-          plan: billing?.plan ?? null,
-          status: billing?.status ?? null,
-        },
-        agencyEntitlement: {
-          hasRow: agencyHasRow,
-          planKey: agencyHasRow ? agencyEntitlementRow.planKey : null,
-          status: agencyHasRow ? agencyEntitlementRow.status : null,
-          source: agencyHasRow ? agencyEntitlementRow.source : null,
-        },
-        agencyMembership: {
-          role: agencyMembershipRole,
-          status: agencyMembershipStatus,
-        },
-        recruiterProfile: {
-          exists: !!profile,
-          readyToPost: isProfileComplete,
-          suspended: isSuspended,
-        },
-      }),
+      resolveEffectiveBusinessEntitlement(
+        applyBusinessQaOverlay(
+          {
+            sourceState: {
+              recruiterBilling: recruiterSourceState,
+              agencyEntitlement: agencySourceState,
+            },
+            recruiterBilling: {
+              hasRow: !!billing,
+              plan: billing?.plan ?? null,
+              status: billing?.status ?? null,
+            },
+            agencyEntitlement: {
+              hasRow: agencyHasRow,
+              planKey: agencyHasRow ? agencyEntitlementRow.planKey : null,
+              status: agencyHasRow ? agencyEntitlementRow.status : null,
+              source: agencyHasRow ? agencyEntitlementRow.source : null,
+            },
+            agencyMembership: {
+              role: agencyMembershipRole,
+              status: agencyMembershipStatus,
+            },
+            recruiterProfile: {
+              exists: !!profile,
+              readyToPost: isProfileComplete,
+              suspended: isSuspended,
+            },
+          },
+          ownerQaSelection,
+        ),
+      ),
     [
       recruiterSourceState,
       agencySourceState,
@@ -301,8 +310,10 @@ export function useRecruiterBilling() {
       profile,
       isProfileComplete,
       isSuspended,
+      ownerQaSelection,
     ],
   );
+
 
   const effectiveRecruiterTier = effectiveBusinessEntitlement.effectiveRecruiterTier;
   const effectiveRecruiterPlan: RecruiterPlan =
