@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS public.agency_entitlements (
 CREATE OR REPLACE FUNCTION public._agency_plan_defaults(_plan_key text)
 RETURNS TABLE(member_limit integer, active_client_limit integer, service_package_limit integer)
 LANGUAGE sql IMMUTABLE AS $$
-  SELECT * FROM (VALUES
+  SELECT t.m, t.c, t.s FROM (VALUES
     ('agency_starter', 2, 5, 3),
     ('agency_team',    5, 25, 10),
     ('agency_growth', 15, 100, 30)
