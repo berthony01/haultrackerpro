@@ -698,8 +698,10 @@ export default function Admin() {
 
           {/* OVERVIEW */}
           <TabsContent value="overview" className="space-y-4">
+            <OwnerQaModePanel />
             <AdminOverviewPremium overview={overview} onGoToTab={setTab} />
           </TabsContent>
+
 
 
           {/* ACTIVATION */}
