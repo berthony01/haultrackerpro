@@ -620,6 +620,7 @@ describe('B. suppression of registered synthetic user roots', () => {
   it('19. QA owner/super_admin holding recruiter + agency roots but no user root => original send', async () => {
     await registerRoot('recruiter_profile', randomUUID(), qaOwner);
     await registerRoot('agency_profile', randomUUID(), qaOwner);
+    await client.query(`SELECT pgmq.create('transactional_emails')`);
     const before = await counters();
     const result = await enqueue('transactional_emails', {
       to: 'owner.real@fixture.invalid',
