@@ -176,6 +176,25 @@ describe('TG-2E3-O4 — Owner QA agency billing safety', () => {
     expect(screen.queryByText(/Agency QA testing/i)).toBeNull();
   });
 
+  it('5b. Non-owner agency member with Owner QA active renders read-only copy and never shows QA switcher or real billing CTAs', () => {
+    // super_admin Owner QA active (Recruiter Fleet) but signed in as a
+    // non-owner member of the agency being viewed.
+    setQa('recruiter', 'fleet', 'Recruiter Fleet');
+    agencyState.data = { my_role: 'agency_member' };
+    renderCard();
+
+    expect(realBillingCtas()).toHaveLength(0);
+    expect(
+      screen.getByText(/Only the agency owner can manage billing/i),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Agency QA testing/i)).toBeNull();
+    expect(
+      screen.queryAllByRole('button', { name: /Switch QA —|Testing QA —/i }),
+    ).toHaveLength(0);
+    expect(setPersona).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it('6. QA OFF owner still invokes the existing checkout path when Start Agency Billing is clicked', async () => {
     renderCard();
     fireEvent.click(

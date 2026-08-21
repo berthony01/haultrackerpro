@@ -307,7 +307,7 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
           </div>
         )}
 
-        {qaActive ? (
+        {qaActive && isOwner ? (
           <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-primary">
               Agency QA testing
