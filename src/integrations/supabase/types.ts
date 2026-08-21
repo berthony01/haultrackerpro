@@ -3509,6 +3509,42 @@ export type Database = {
         }
         Relationships: []
       }
+      qa_fixture_roots: {
+        Row: {
+          active: boolean
+          created_at: string
+          note: string | null
+          qa_owner_user_id: string
+          registered_by_user_id: string
+          revoked_at: string | null
+          root_id: string
+          root_kind: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          note?: string | null
+          qa_owner_user_id: string
+          registered_by_user_id: string
+          revoked_at?: string | null
+          root_id: string
+          root_kind: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          note?: string | null
+          qa_owner_user_id?: string
+          registered_by_user_id?: string
+          revoked_at?: string | null
+          root_id?: string
+          root_kind?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       recruiter_billing_profiles: {
         Row: {
           active_opportunity_limit: number
@@ -5817,6 +5853,14 @@ export type Database = {
         Returns: boolean
       }
       is_current_user_recruiter: { Args: never; Returns: boolean }
+      is_qa_fixture_root: {
+        Args: {
+          _qa_owner_user_id?: string
+          _root_id: string
+          _root_kind: string
+        }
+        Returns: boolean
+      }
       is_recruiter_owner: {
         Args: { _recruiter_id: string; _user_id: string }
         Returns: boolean
