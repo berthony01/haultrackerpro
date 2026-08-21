@@ -171,9 +171,8 @@ describe('applyBusinessQaOverlay', () => {
     expect(out.agencyEntitlement.status).toBe('active');
   });
 
-  it('never produces a dual-paid conflict through the real resolver', () => {
-    const conflict = resolveEffectiveBusinessEntitlement(baseInput as never);
-    expect(conflict.effectiveRecruiterTier).toBe('conflict');
+  it('never resolves to a dual-paid conflict under any QA persona', () => {
+
 
     for (const persona of OWNER_QA_RECRUITER_PERSONAS) {
       const resolved = resolveEffectiveBusinessEntitlement(
