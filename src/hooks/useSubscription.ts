@@ -20,6 +20,12 @@ export interface SubscriptionState {
 export function useSubscription(): SubscriptionState {
   const { user } = useAuth();
   const { isAdmin, isLoading: isAdminLoading } = useAdmin();
+  // Phase TG-2E3-O2 — server-resident Owner QA persona (super_admin only).
+  const ownerQa = useOwnerQaPersona();
+  const driverQa =
+    ownerQa.isActive && ownerQa.domain === 'driver'
+      ? driverQaOverlay(ownerQa.persona)
+      : null;
   const [isLoading, setIsLoading] = useState(true);
   const [planKey, setPlanKey] = useState<PlanKey>('free');
   const [status, setStatus] = useState('free');
@@ -36,6 +42,18 @@ export function useSubscription(): SubscriptionState {
       return;
     }
 
+    // Owner QA Mode — a selected driver persona wins over the admin auto-Pro
+    // override (including Free), matching `driver_has_active_pro` on the
+    // server. Real subscription rows are never modified.
+    if (driverQa) {
+      setPlanKey(driverQa.planKey);
+      setStatus(driverQa.status);
+      setCancelAtPeriodEnd(driverQa.cancelAtPeriodEnd);
+      setCurrentPeriodEnd(driverQa.currentPeriodEnd);
+      setIsLoading(false);
+      return;
+    }
+
     // Admin override — always Pro
     if (isAdmin) {
       setPlanKey('pro_monthly');
@@ -44,6 +62,7 @@ export function useSubscription(): SubscriptionState {
       setCurrentPeriodEnd(null);
       setIsLoading(false);
       return;
+
     }
 
     try {
