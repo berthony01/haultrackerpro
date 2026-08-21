@@ -307,7 +307,64 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
           </div>
         )}
 
-        {isOwner ? (
+        {qaActive ? (
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Agency QA testing
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Owner QA mode is active. Real billing is unchanged and disabled during
+              QA testing — no charge, no subscription change, and no Stripe checkout
+              or billing portal is reachable from this card while QA is on.
+            </p>
+            {!qaIsAgency && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  You&rsquo;re currently testing {ownerQa.label ?? 'another workspace'}.
+                  That does not override Agency entitlements. Choose an Agency QA plan
+                  below.
+                </span>
+              </div>
+            )}
+            <div className="space-y-2">
+              {AGENCY_QA_PERSONAS.map((k) => {
+                const p = ASSISTANT_AGENCY_PLANS[k];
+                const isActivePlan = qaIsAgency && ownerQa.persona === k;
+                return (
+                  <div
+                    key={k}
+                    className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 ${
+                      isActivePlan ? 'border-primary bg-primary/10' : 'border-border'
+                    }`}
+                  >
+                    <div className="text-xs">
+                      <p className="font-semibold">
+                        {p.label}
+                        {isActivePlan && (
+                          <span className="ml-2 text-primary">· Active QA plan</span>
+                        )}
+                      </p>
+                      <p className="text-muted-foreground">
+                        ${p.monthlyPrice}/mo plan limits (display only)
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isActivePlan ? 'secondary' : 'outline'}
+                      disabled={ownerQa.isMutating || isActivePlan}
+                      onClick={() => selectQaPlan(k)}
+                    >
+                      {isActivePlan ? `Testing QA — ${p.label}` : `Switch QA — ${p.label}`}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : isOwner ? (
+
           <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Agency billing
