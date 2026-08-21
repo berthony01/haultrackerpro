@@ -3206,36 +3206,6 @@ export type Database = {
           },
         ]
       }
-      owner_qa_sessions: {
-        Row: {
-          created_at: string
-          domain: string
-          enabled: boolean
-          expires_at: string
-          persona: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          domain: string
-          enabled?: boolean
-          expires_at: string
-          persona: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          domain?: string
-          enabled?: boolean
-          expires_at?: string
-          persona?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       parking_favorites: {
         Row: {
           created_at: string
@@ -4790,14 +4760,6 @@ export type Database = {
       }
       _opportunity_jsonb_number: { Args: { j: Json }; Returns: number }
       _opportunity_numeric_is_finite: { Args: { v: number }; Returns: boolean }
-      _owner_qa_persona_for: {
-        Args: { _user_id: string }
-        Returns: {
-          domain: string
-          expires_at: string
-          persona: string
-        }[]
-      }
       _professional_profile_normalize_string_array: {
         Args: {
           _input: string[]
@@ -5228,14 +5190,6 @@ export type Database = {
         }
         Returns: string
       }
-      current_owner_qa_persona: {
-        Args: never
-        Returns: {
-          domain: string
-          expires_at: string
-          persona: string
-        }[]
-      }
       current_user_can_dispatch_load_action: {
         Args: {
           _driver_user_id: string
@@ -5318,7 +5272,6 @@ export type Database = {
         Args: { p_opportunity_id: string }
         Returns: Json
       }
-      disable_owner_qa_persona: { Args: never; Returns: boolean }
       dispatch_create_driver_load: {
         Args: {
           _deadhead_miles?: number
@@ -6489,14 +6442,6 @@ export type Database = {
       set_agency_slug: {
         Args: { _agency_id: string; _slug: string }
         Returns: string
-      }
-      set_owner_qa_persona: {
-        Args: { _domain: string; _persona: string }
-        Returns: {
-          domain: string
-          expires_at: string
-          persona: string
-        }[]
       }
       set_recruiter_member_permissions: {
         Args: { _member_id: string; _permissions: Json }
