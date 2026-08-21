@@ -16,12 +16,26 @@ import { useAgencyMembers, useMyAgency } from '@/hooks/useAgency';
 import { useAgencyClients, useAgencyPackages } from '@/hooks/useAgencyWorkflow';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import type { OwnerQaAgencyPersona } from '@/lib/billing/ownerQaPersona';
 import {
   AGENCY_CHECKOUT_MESSAGES,
   agencyCheckoutMessageForCode,
   isSafeAgencyStripeCheckoutUrl,
   parseAgencyCheckoutError,
 } from '@/lib/agencyCheckoutMessages';
+
+/**
+ * Phase TG-2E3-O4 — the three paid Agency QA personas offered while Owner QA
+ * mode is active. Deliberately excludes `assistant_free` (not a paid plan) and
+ * mirrors ALL_AGENCY_PLAN_KEYS without redefining any plan data.
+ */
+const AGENCY_QA_PERSONAS: readonly OwnerQaAgencyPersona[] = [
+  'agency_starter',
+  'agency_team',
+  'agency_growth',
+];
+
 
 interface Props {
   agencyId: string;
@@ -60,10 +74,16 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [busy, setBusy] = useState(false);
+  // Phase TG-2E3-O4 — Owner QA context safety. While the platform owner holds
+  // ANY active QA session, real Stripe billing controls are withheld entirely.
+  const ownerQa = useOwnerQaPersona();
+  const qaActive = ownerQa.isOwner && ownerQa.isActive;
+  const qaIsAgency = qaActive && ownerQa.domain === 'agency';
 
   const isOwner = agency?.my_role === 'agency_owner';
   const preselectedPlan = sanitizeAgencyPlanKey(searchParams.get('plan'));
   const [selectedPlan, setSelectedPlan] = useState<AssistantAgencyPlanKey>(preselectedPlan);
+
 
   if (isLoading) {
     return (
@@ -170,16 +190,35 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
     }
   };
 
+  const selectQaPlan = async (persona: OwnerQaAgencyPersona) => {
+    try {
+      await ownerQa.setPersona('agency', persona);
+      toast({
+        title: 'QA plan switched',
+        description: `Now testing ${ASSISTANT_AGENCY_PLANS[persona].label}. Real billing is unchanged.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Could not switch QA plan',
+        description: e?.message ?? 'Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const showStartCta =
+    !qaActive &&
     isOwner &&
     (entitlement.status === 'manual_beta' ||
       entitlement.status === 'cancelled' ||
       !entitlement.stripeSubscriptionId);
 
   const showPortalCta =
+    !qaActive &&
     isOwner &&
     !!entitlement.stripeCustomerId &&
     ['active', 'trialing', 'past_due'].includes(entitlement.status);  // trial-allowlist: Stripe subscription status
+
 
   // Refresh entitlement when we land back from Stripe success.
   if (typeof window !== 'undefined' && searchParams.get('billing') === 'success') {
@@ -268,7 +307,64 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
           </div>
         )}
 
-        {isOwner ? (
+        {qaActive ? (
+          <div className="rounded-lg border border-primary/40 bg-primary/5 p-3 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              Agency QA testing
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Owner QA mode is active. Real billing is unchanged and disabled during
+              QA testing — no charge, no subscription change, and no Stripe checkout
+              or billing portal is reachable from this card while QA is on.
+            </p>
+            {!qaIsAgency && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300 flex gap-2">
+                <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>
+                  You&rsquo;re currently testing {ownerQa.label ?? 'another workspace'}.
+                  That does not override Agency entitlements. Choose an Agency QA plan
+                  below.
+                </span>
+              </div>
+            )}
+            <div className="space-y-2">
+              {AGENCY_QA_PERSONAS.map((k) => {
+                const p = ASSISTANT_AGENCY_PLANS[k];
+                const isActivePlan = qaIsAgency && ownerQa.persona === k;
+                return (
+                  <div
+                    key={k}
+                    className={`flex items-center justify-between gap-3 rounded-md border px-3 py-2 ${
+                      isActivePlan ? 'border-primary bg-primary/10' : 'border-border'
+                    }`}
+                  >
+                    <div className="text-xs">
+                      <p className="font-semibold">
+                        {p.label}
+                        {isActivePlan && (
+                          <span className="ml-2 text-primary">· Active QA plan</span>
+                        )}
+                      </p>
+                      <p className="text-muted-foreground">
+                        ${p.monthlyPrice}/mo plan limits (display only)
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={isActivePlan ? 'secondary' : 'outline'}
+                      disabled={ownerQa.isMutating || isActivePlan}
+                      onClick={() => selectQaPlan(k)}
+                    >
+                      {isActivePlan ? `Testing QA — ${p.label}` : `Switch QA — ${p.label}`}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : isOwner ? (
+
           <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Agency billing
