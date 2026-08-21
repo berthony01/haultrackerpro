@@ -3,7 +3,7 @@
  *
  * This module is intentionally PURE:
  *  - no React, react-query, Supabase, Stripe, network, timers, randomness;
- *  - NO browser persistence (no localStorage / sessionStorage / cookies);
+ *  - NO browser-side persistence of QA state whatsoever;
  *  - no email, no admin identity literal, no hardcoded user id;
  *  - never mutates caller input and never writes billing data.
  *
