@@ -103,22 +103,47 @@ describe('TG-2E3-A — token confinement', () => {
   });
 });
 
-describe('TG-2E3-B — popup strategy', () => {
-  it('opens about:blank synchronously before awaiting connect, without noopener/noreferrer', () => {
-    const openIdx = section.indexOf("window.open('about:blank', '_blank')");
-    const openerIdx = section.indexOf('popup.opener = null');
-    const connectIdx = section.indexOf('await connect(');
-    expect(openIdx).toBeGreaterThan(-1);
-    expect(openerIdx).toBeGreaterThan(openIdx);
-    expect(connectIdx).toBeGreaterThan(openerIdx);
-    expect(section).not.toMatch(/window\.open\([^)]*noopener/);
-    expect(section).not.toMatch(/window\.open\([^)]*noreferrer/);
+describe('TG-2E3-B — same-tab handoff strategy (F1)', () => {
+  it('uses no popup window, about:blank, opener handle, popup navigation, or postMessage', () => {
+    const sectionCode = stripComments(section);
+    for (const forbidden of [
+      'window.open',
+      'about:blank',
+      'popup.opener',
+      'popup.location.replace',
+      'popup.close',
+      'postMessage',
+    ]) {
+      expect(sectionCode).not.toContain(forbidden);
+    }
+    expect(sectionCode).not.toMatch(/window\.location\.href\s*=/);
+    expect(sectionCode).not.toMatch(/window\.location\.replace\(/);
   });
 
-  it('navigates the retained popup, falls back to same-tab, and closes on failure', () => {
-    expect(section).toContain('popup.location.replace(url)');
-    expect(section).toContain('window.location.href = url');
-    expect(section).toContain('popup.close()');
+  it('awaits connect and passes the callback URL straight to telegramHandoff.navigate', () => {
+    expect(section).toMatch(/await connect\(/);
+    expect(section).toMatch(/telegramHandoff\.navigate\(url\)/);
+  });
+
+  it('telegramHandoff.navigate performs same-tab window.location.assign(url)', () => {
+    expect(section).toContain('export const telegramHandoff');
+    expect(section).toMatch(/navigate:\s*\(url:\s*string\)\s*=>\s*\{/);
+    expect(section).toContain('window.location.assign(url)');
+  });
+
+  it('introduces no token/url state, storage, or logging in the handoff path', () => {
+    const sectionCode = stripComments(section);
+    expect(sectionCode).not.toMatch(/useState[^\n]*token/i);
+    expect(sectionCode).not.toMatch(/setToken/);
+    for (const forbidden of ['localStorage', 'sessionStorage', 'console.log', 'gtag', 'dataLayer']) {
+      expect(sectionCode).not.toContain(forbidden);
+    }
+  });
+
+  it('renders the non-sensitive F1 fallback copy and Try Telegram Again state', () => {
+    expect(section).toContain('Telegram didn’t open. Try again. We’ll create a new secure one-time link.');
+    expect(section).toContain("'Try Telegram Again'");
+    expect(section).toContain('handoffFailed');
   });
 });
 
