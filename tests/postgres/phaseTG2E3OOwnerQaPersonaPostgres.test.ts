@@ -1,16 +1,19 @@
 /**
- * Phase TG-2E3-O2 — Real PostgreSQL 16 gate for the Owner QA entitlement
+ * Phase TG-2E3-O2 — Real PostgreSQL gate for the Owner QA entitlement
  * candidate.
  *
- * Exercises the candidate SQL against a real PostgreSQL database so ACL,
- * SECURITY DEFINER binding, `auth.uid()` GUC semantics, RLS, CHECK
- * constraints, and expiry behaviour reflect production reality.
+ * Exercises the FULL candidate SQL (including F4 `opportunities_billing_guard`)
+ * against a real PostgreSQL database so ACL, SECURITY DEFINER binding,
+ * `auth.uid()` GUC semantics, RLS, CHECK constraints, trigger behaviour, and
+ * expiry all reflect production reality.
  *
  * Lives OUTSIDE `src/` so the default `bunx vitest run` never picks it up.
- * Runs only via `vitest.phase-tg2e3-o2-owner-qa-postgres.config.ts`.
+ * No repository Vitest config targets it; run it with an ad-hoc config created
+ * at runtime (for example under /tmp) that includes only this file.
  *
  * NEVER SKIPS. Fails hard if TG2E3O2_DATABASE_URL is absent.
  */
+
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -140,20 +143,65 @@ DO $$ BEGIN
   CREATE ROLE service_role NOLOGIN;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 GRANT USAGE ON SCHEMA public TO authenticated, anon, service_role;
+
+-- --- F4 scaffold: minimum objects the candidate guard genuinely needs ---
+DO $$ BEGIN
+  CREATE TYPE public.recruiter_workspace_permission AS ENUM (
+    'opportunities_create',
+    'opportunities_edit',
+    'opportunities_change_status'
+  );
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+CREATE TABLE IF NOT EXISTS public.opportunities (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  recruiter_id uuid NOT NULL,
+  status text NOT NULL DEFAULT 'draft'
+);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.opportunities TO authenticated;
+
+-- TEST-ONLY controllable permission resolver. Fail-closed by default; each
+-- transaction may flip it via SET LOCAL "test.perm_allow". The candidate SQL is
+-- never modified to accommodate this.
+CREATE OR REPLACE FUNCTION public.current_user_can_recruiter_opportunity_action(
+  _recruiter_id uuid,
+  _permission public.recruiter_workspace_permission
+) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+  SELECT COALESCE(
+    NULLIF(current_setting('test.perm_allow', true), '')::boolean,
+    false
+  )
+$$;
+
+-- TEST-ONLY wrapper mapping the real candidate tier resolver to live limits.
+CREATE OR REPLACE FUNCTION public.effective_recruiter_active_opportunity_limit(
+  _recruiter_id uuid
+) RETURNS integer
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public' AS $$
+DECLARE _tier text;
+BEGIN
+  _tier := public.effective_recruiter_tier(_recruiter_id);
+  RETURN CASE _tier
+    WHEN 'conflict'      THEN 0
+    WHEN 'free_standard' THEN 1
+    WHEN 'starter'       THEN 5
+    WHEN 'growth'        THEN 15
+    WHEN 'fleet'         THEN 25
+    ELSE 0
+  END;
+END;
+$$;
 `;
 
-/**
- * The candidate also replaces `opportunities_billing_guard`, which depends on
- * the wider opportunities/permission stack. That trigger is out of scope for
- * this gate (it is covered by source-contract assertions in the frontend
- * suite); everything before it is applied verbatim.
- */
-function candidateWithoutOpportunityGuard(): string {
-  const marker = '-- F4. opportunities_billing_guard';
-  const idx = CANDIDATE_SQL.indexOf(marker);
-  if (idx < 0) throw new Error('candidate: F4 marker not found');
-  return CANDIDATE_SQL.slice(0, idx);
-}
+/** The full candidate is applied verbatim, F4 included. */
+const TRIGGER_SQL = `
+DROP TRIGGER IF EXISTS opportunities_billing_guard_trg ON public.opportunities;
+CREATE TRIGGER opportunities_billing_guard_trg
+BEFORE INSERT OR UPDATE ON public.opportunities
+FOR EACH ROW EXECUTE FUNCTION public.opportunities_billing_guard();
+`;
+
 
 const pool = new pg.Pool({ connectionString: URL_STR, max: 4 });
 
@@ -189,7 +237,9 @@ async function asUser<T>(
 
 beforeAll(async () => {
   await pool.query(SCAFFOLD);
-  await pool.query(candidateWithoutOpportunityGuard());
+  await pool.query(CANDIDATE_SQL);
+  await pool.query(TRIGGER_SQL);
+
 
   await pool.query(
     `INSERT INTO auth.users(id) VALUES ($1),($2),($3)`,
