@@ -18,6 +18,9 @@ import {
   resolveEffectiveBusinessEntitlement,
   type EffectiveBusinessEntitlement,
 } from '@/lib/billing/effectiveBusinessEntitlement';
+import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import { applyBusinessQaOverlay } from '@/lib/billing/ownerQaPersona';
+
 
 import {
   isSafeStripeCheckoutUrl,
