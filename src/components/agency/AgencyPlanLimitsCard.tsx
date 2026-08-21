@@ -16,12 +16,26 @@ import { useAgencyMembers, useMyAgency } from '@/hooks/useAgency';
 import { useAgencyClients, useAgencyPackages } from '@/hooks/useAgencyWorkflow';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import type { OwnerQaAgencyPersona } from '@/lib/billing/ownerQaPersona';
 import {
   AGENCY_CHECKOUT_MESSAGES,
   agencyCheckoutMessageForCode,
   isSafeAgencyStripeCheckoutUrl,
   parseAgencyCheckoutError,
 } from '@/lib/agencyCheckoutMessages';
+
+/**
+ * Phase TG-2E3-O4 — the three paid Agency QA personas offered while Owner QA
+ * mode is active. Deliberately excludes `assistant_free` (not a paid plan) and
+ * mirrors ALL_AGENCY_PLAN_KEYS without redefining any plan data.
+ */
+const AGENCY_QA_PERSONAS: readonly OwnerQaAgencyPersona[] = [
+  'agency_starter',
+  'agency_team',
+  'agency_growth',
+];
+
 
 interface Props {
   agencyId: string;
