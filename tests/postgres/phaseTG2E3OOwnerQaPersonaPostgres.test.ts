@@ -603,3 +603,151 @@ describe('get_effective_agency_limits QA overlay', () => {
     expect(after.rows[0].n).toBe(before.rows[0].n);
   });
 });
+
+/**
+ * F4 — opportunities_billing_guard, exercised as a real BEFORE INSERT/UPDATE
+ * trigger against the applied candidate.
+ */
+async function asUserWithPerm<T>(
+  uid: string,
+  permAllow: boolean,
+  fn: (c: pg.PoolClient) => Promise<T>,
+): Promise<T> {
+  return asUser(uid, async (c) => {
+    await c.query(`SELECT set_config('test.perm_allow', $1, true)`, [
+      permAllow ? 'true' : 'false',
+    ]);
+    return fn(c);
+  });
+}
+
+async function setPersona(domain: string, persona: string) {
+  await asUser(OWNER, (c) =>
+    c.query(`SELECT public.set_owner_qa_persona($1,$2)`, [domain, persona]),
+  );
+}
+
+async function seedActive(count: number) {
+  await pool.query(`DELETE FROM public.opportunities WHERE recruiter_id = $1`, [
+    recruiterId,
+  ]);
+  await pool.query(
+    `ALTER TABLE public.opportunities DISABLE TRIGGER opportunities_billing_guard_trg`,
+  );
+  try {
+    for (let i = 0; i < count; i += 1) {
+      await pool.query(
+        `INSERT INTO public.opportunities(recruiter_id, status) VALUES ($1,'active')`,
+        [recruiterId],
+      );
+    }
+  } finally {
+    await pool.query(
+      `ALTER TABLE public.opportunities ENABLE TRIGGER opportunities_billing_guard_trg`,
+    );
+  }
+}
+
+const INSERT_ACTIVE = `INSERT INTO public.opportunities(recruiter_id, status) VALUES ($1,'active') RETURNING id`;
+
+describe('F4 opportunities_billing_guard QA overlay', () => {
+  it('preserves the existing admin bypass when QA is off', async () => {
+    await asUser(OWNER, (c) =>
+      c.query(`SELECT public.disable_owner_qa_persona()`),
+    );
+    // Far above any free-tier limit, and the permission resolver says NO.
+    await seedActive(40);
+
+    const r = await asUserWithPerm(OWNER, false, (c) =>
+      c.query(INSERT_ACTIVE, [recruiterId]),
+    );
+    expect(r.rowCount).toBe(1);
+  });
+
+  it('does NOT let a QA recruiter owner bypass the permission check', async () => {
+    await setPersona('recruiter', 'starter');
+    await seedActive(0);
+
+    await expect(
+      asUserWithPerm(OWNER, false, (c) => c.query(INSERT_ACTIVE, [recruiterId])),
+    ).rejects.toMatchObject({ code: '42501' });
+  });
+
+  it('enforces the selected starter limit of 5 for a QA recruiter owner', async () => {
+    await setPersona('recruiter', 'starter');
+    await seedActive(5);
+
+    let err: any;
+    try {
+      await asUserWithPerm(OWNER, true, (c) =>
+        c.query(INSERT_ACTIVE, [recruiterId]),
+      );
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    expect(err.code).toBe('23514');
+    const detail = JSON.parse(err.detail);
+    expect(detail.code).toBe('active_opportunity_limit_reached');
+    expect(detail.limit).toBe(5);
+    expect(detail.active_count).toBe(5);
+  });
+
+  it('enforces the free_verified limit of 1', async () => {
+    await setPersona('recruiter', 'free_verified');
+    await seedActive(1);
+
+    let err: any;
+    try {
+      await asUserWithPerm(OWNER, true, (c) =>
+        c.query(INSERT_ACTIVE, [recruiterId]),
+      );
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeDefined();
+    const detail = JSON.parse(err.detail);
+    expect(detail.code).toBe('active_opportunity_limit_reached');
+    expect(detail.limit).toBe(1);
+  });
+
+  it('allows an insert below the fleet limit of 25', async () => {
+    await setPersona('recruiter', 'fleet');
+    await seedActive(10);
+
+    const r = await asUserWithPerm(OWNER, true, (c) =>
+      c.query(INSERT_ACTIVE, [recruiterId]),
+    );
+    expect(r.rowCount).toBe(1);
+  });
+
+  it('leaves the non-super-admin bypass entirely unchanged', async () => {
+    const otherRecruiter = await pool.query(
+      `INSERT INTO public.recruiter_profiles(user_id) VALUES ($1) RETURNING id`,
+      [OTHER_ADMIN],
+    );
+    const r = await asUserWithPerm(OTHER_ADMIN, false, (c) =>
+      c.query(INSERT_ACTIVE, [otherRecruiter.rows[0].id]),
+    );
+    expect(r.rowCount).toBe(1);
+  });
+
+  it('writes no billing rows while enforcing QA limits', async () => {
+    const before = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM public.recruiter_billing_profiles) AS rbp,
+         (SELECT count(*)::int FROM public.agency_entitlements) AS ae,
+         (SELECT count(*)::int FROM public.subscriptions) AS subs`,
+    );
+    await setPersona('recruiter', 'growth');
+    await seedActive(2);
+    await asUserWithPerm(OWNER, true, (c) => c.query(INSERT_ACTIVE, [recruiterId]));
+    const after = await pool.query(
+      `SELECT
+         (SELECT count(*)::int FROM public.recruiter_billing_profiles) AS rbp,
+         (SELECT count(*)::int FROM public.agency_entitlements) AS ae,
+         (SELECT count(*)::int FROM public.subscriptions) AS subs`,
+    );
+    expect(after.rows[0]).toEqual(before.rows[0]);
+  });
+});
