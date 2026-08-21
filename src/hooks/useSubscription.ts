@@ -107,7 +107,7 @@ export function useSubscription(): SubscriptionState {
     } finally {
       setIsLoading(false);
     }
-  }, [user, isAdmin]);
+  }, [user, isAdmin, driverQa?.planKey, driverQa?.status, driverQa?.isPro]);
 
   useEffect(() => {
     if (isAdminLoading) return;
