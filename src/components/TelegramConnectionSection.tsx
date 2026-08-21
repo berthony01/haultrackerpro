@@ -53,7 +53,7 @@ export function TelegramConnectionSection() {
   const [handoffFailed, setHandoffFailed] = useState(false);
 
   const handleConnect = async () => {
-    // Same-tab handoff: no popup, no about:blank, no retained window handle.
+    // Same-tab handoff only; no extra browser window is created.
     // The deep link exists only as the immediate callback argument.
     const result = await connect((url) => {
       telegramHandoff.navigate(url);
