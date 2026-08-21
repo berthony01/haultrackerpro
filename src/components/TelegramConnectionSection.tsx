@@ -122,15 +122,31 @@ export function TelegramConnectionSection() {
           {previouslyConnected && formattedLinkedAt && (
             <p className="text-xs text-muted-foreground">Previously connected on {formattedLinkedAt}</p>
           )}
+          {handoffFailed && (
+            <p className="text-xs text-destructive" role="alert">
+              Telegram didn’t open. Try again. We’ll create a new secure one-time link.
+            </p>
+          )}
           <Button
             className="w-full h-11 rounded-xl font-bold gap-2"
-            aria-label={previouslyConnected ? 'Reconnect Telegram' : 'Connect Telegram'}
+            aria-label={
+              handoffFailed
+                ? 'Try Telegram Again'
+                : previouslyConnected
+                  ? 'Reconnect Telegram'
+                  : 'Connect Telegram'
+            }
             disabled={isConnecting}
             onClick={handleConnect}
           >
             {isConnecting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {previouslyConnected ? 'Reconnect Telegram' : 'Connect Telegram'}
+            {handoffFailed
+              ? 'Try Telegram Again'
+              : previouslyConnected
+                ? 'Reconnect Telegram'
+                : 'Connect Telegram'}
           </Button>
+
           {isAwaitingConfirmation && (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">Waiting for Telegram confirmation…</p>
