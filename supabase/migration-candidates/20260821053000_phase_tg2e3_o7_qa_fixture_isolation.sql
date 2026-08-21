@@ -52,7 +52,7 @@ AS $function$
     AND public.recruiter_profile_can_manage_opportunities(o.recruiter_id)
     AND (
       NOT public.is_qa_fixture_root('recruiter_profile', o.recruiter_id)
-      OR public.is_qa_fixture_root('recruiter_profile', o.recruiter_id, auth.uid())
+      OR (auth.uid() IS NOT NULL AND public.is_qa_fixture_root('recruiter_profile', o.recruiter_id, auth.uid()))
     )
     AND (_state IS NULL OR o.hiring_state = _state)
     AND (_driver_type IS NULL OR o.driver_type = _driver_type)
@@ -86,7 +86,7 @@ AS $function$
       AND public.recruiter_profile_can_manage_opportunities(o.recruiter_id)
       AND (
         NOT public.is_qa_fixture_root('recruiter_profile', o.recruiter_id)
-        OR public.is_qa_fixture_root('recruiter_profile', o.recruiter_id, auth.uid())
+        OR (auth.uid() IS NOT NULL AND public.is_qa_fixture_root('recruiter_profile', o.recruiter_id, auth.uid()))
       )
   );
 $function$;
@@ -150,7 +150,7 @@ BEGIN
       AND public.recruiter_profile_can_manage_opportunities(o.recruiter_id)
       AND (
         NOT public.is_qa_fixture_root('recruiter_profile', o.recruiter_id)
-        OR public.is_qa_fixture_root('recruiter_profile', o.recruiter_id, auth.uid())
+        OR (auth.uid() IS NOT NULL AND public.is_qa_fixture_root('recruiter_profile', o.recruiter_id, auth.uid()))
       )
   ) INTO _opp_ok;
 
@@ -192,7 +192,7 @@ AS $function$
          IN ('manual_beta','active','trialing','past_due')
      AND (
        NOT public.is_qa_fixture_root('agency_profile', ap.id)
-       OR public.is_qa_fixture_root('agency_profile', ap.id, auth.uid())
+       OR (auth.uid() IS NOT NULL AND public.is_qa_fixture_root('agency_profile', ap.id, auth.uid()))
      )
    LIMIT 1;
 $function$;
@@ -211,7 +211,7 @@ AS $function$
          IN ('manual_beta','active','trialing','past_due')
      AND (
        NOT public.is_qa_fixture_root('agency_profile', ap.id)
-       OR public.is_qa_fixture_root('agency_profile', ap.id, auth.uid())
+       OR (auth.uid() IS NOT NULL AND public.is_qa_fixture_root('agency_profile', ap.id, auth.uid()))
      );
 $function$;
 
@@ -230,7 +230,7 @@ AS $function$
          IN ('manual_beta','active','trialing','past_due')
      AND (
        NOT public.is_qa_fixture_root('agency_profile', _agency_id)
-       OR public.is_qa_fixture_root('agency_profile', _agency_id, auth.uid())
+       OR (auth.uid() IS NOT NULL AND public.is_qa_fixture_root('agency_profile', _agency_id, auth.uid()))
      )
    ORDER BY sort_order ASC, created_at ASC;
 $function$;
@@ -263,7 +263,7 @@ AS $function$
     FROM public.driver_points d
     WHERE (
       NOT public.is_qa_fixture_root('user', d.user_id)
-      OR public.is_qa_fixture_root('user', d.user_id, auth.uid())
+      OR (auth.uid() IS NOT NULL AND public.is_qa_fixture_root('user', d.user_id, auth.uid()))
     )
   ), ranked AS (
     SELECT
