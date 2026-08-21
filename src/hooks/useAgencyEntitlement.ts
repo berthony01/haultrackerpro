@@ -8,6 +8,9 @@ import {
   defaultUnsubscribedEntitlement,
   effectiveLimits,
 } from '@/lib/agencyPlans';
+import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import { agencyQaOverlay } from '@/lib/billing/ownerQaPersona';
+
 
 /**
  * Phase 7 / Phase 1S-A2 — Read the entitlement row for an agency.
