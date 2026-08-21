@@ -215,6 +215,7 @@ CREATE TABLE IF NOT EXISTS public.opportunities (
   published_at timestamptz
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.opportunities TO authenticated;
+GRANT SELECT ON public.recruiter_profiles TO authenticated;
 
 CREATE TABLE IF NOT EXISTS public.driver_referrals (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -765,7 +766,13 @@ describe('O7 blast radius', () => {
     ).toBe(true);
   });
 
-  it('contains no plan/tier/Stripe/Telegram/email logic', () => {
+  it('contains no plan/tier/Stripe/Telegram/email logic in executable SQL', () => {
+    // Strip `--` comment lines so prose describing the guarantee cannot
+    // satisfy or defeat the check; only executable SQL is scanned.
+    const executable = O7_SQL.split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n')
+      .toLowerCase();
     for (const forbidden of [
       'stripe',
       'telegram',
@@ -773,15 +780,16 @@ describe('O7 blast radius', () => {
       'subscription',
       'entitlement',
       'email_send',
-      'GRANT ',
-      'REVOKE ',
-      'CREATE TABLE',
-      'CREATE POLICY',
-      'CREATE TRIGGER',
-      'CREATE INDEX',
-      'EXECUTE format',
+      'grant ',
+      'revoke ',
+      'create table',
+      'create policy',
+      'create trigger',
+      'create index',
+      'create view',
+      'execute format',
     ]) {
-      expect(O7_SQL.toLowerCase()).not.toContain(forbidden.toLowerCase());
+      expect(executable).not.toContain(forbidden);
     }
   });
 });
