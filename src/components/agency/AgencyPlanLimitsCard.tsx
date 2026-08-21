@@ -74,10 +74,16 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
   const [busy, setBusy] = useState(false);
+  // Phase TG-2E3-O4 — Owner QA context safety. While the platform owner holds
+  // ANY active QA session, real Stripe billing controls are withheld entirely.
+  const ownerQa = useOwnerQaPersona();
+  const qaActive = ownerQa.isOwner && ownerQa.isActive;
+  const qaIsAgency = qaActive && ownerQa.domain === 'agency';
 
   const isOwner = agency?.my_role === 'agency_owner';
   const preselectedPlan = sanitizeAgencyPlanKey(searchParams.get('plan'));
   const [selectedPlan, setSelectedPlan] = useState<AssistantAgencyPlanKey>(preselectedPlan);
+
 
   if (isLoading) {
     return (
