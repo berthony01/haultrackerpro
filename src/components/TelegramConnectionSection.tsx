@@ -24,6 +24,18 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useTelegramLink, TELEGRAM_BOT_USERNAME } from '@/hooks/useTelegramLink';
 
+/**
+ * Local test seam (allowlisted file only). Same-tab navigation is performed
+ * through this indirection so focused tests can observe the handoff without
+ * mocking jsdom's read-only location. The URL is passed straight through and
+ * never stored.
+ */
+export const telegramHandoff = {
+  navigate: (url: string) => {
+    window.location.assign(url);
+  },
+};
+
 export function TelegramConnectionSection() {
   const {
     connected,
@@ -38,38 +50,22 @@ export function TelegramConnectionSection() {
     isAwaitingConfirmation,
   } = useTelegramLink();
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [handoffFailed, setHandoffFailed] = useState(false);
 
   const handleConnect = async () => {
-    // Open a blank window synchronously from the click gesture so popup
-    // blockers do not reject the later navigation. `noopener`/`noreferrer`
-    // MUST NOT be passed here: they sever the opener relationship and make
-    // window.open return null, defeating the retained-handle strategy.
-    const popup = window.open('about:blank', '_blank');
-    // Preserve reverse-tabnabbing protection without losing the handle.
-    if (popup) {
-      try {
-        popup.opener = null;
-      } catch {
-        // Some browsers disallow assigning opener; navigation still proceeds.
-      }
-    }
-    const result = await connect(
-      (url) => {
-        if (popup && !popup.closed) {
-          popup.location.replace(url);
-        } else {
-          // Fallback: same-tab navigation when the blank window was blocked.
-          window.location.href = url;
-        }
-      },
-      () => {
-        if (popup && !popup.closed) popup.close();
-      },
-    );
+    // Same-tab handoff: no popup, no about:blank, no retained window handle.
+    // The deep link exists only as the immediate callback argument.
+    const result = await connect((url) => {
+      telegramHandoff.navigate(url);
+    });
     if (!result.ok) {
+      setHandoffFailed(true);
       toast.error(result.message);
+    } else {
+      setHandoffFailed(false);
     }
   };
+
 
 
   const handleDisconnect = async () => {
