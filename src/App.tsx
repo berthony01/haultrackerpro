@@ -208,8 +208,10 @@ const App = () => (
             <ActingContextProvider>
             <PageViewTracker />
             <RoleIntentReconcilerMount />
+            <OwnerQaModeBanner />
             <ActingAsBanner />
             <PendingDelegationBanner />
+
             <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
