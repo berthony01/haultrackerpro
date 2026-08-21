@@ -233,7 +233,7 @@ async function objectInventory(): Promise<string[]> {
        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
       WHERE n.nspname = 'public'
       UNION ALL
-     SELECT 'rel:' || c.relkind || ':' || c.relname
+     SELECT 'rel:' || c.relkind::text || ':' || c.relname
        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE n.nspname = 'public'
       UNION ALL
