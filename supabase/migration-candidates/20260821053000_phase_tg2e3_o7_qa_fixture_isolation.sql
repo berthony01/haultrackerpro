@@ -23,11 +23,15 @@
 --
 --   AND (
 --     NOT public.is_qa_fixture_root('<root_kind>', <root_id>)
---     OR public.is_qa_fixture_root('<root_kind>', <root_id>, auth.uid())
+--     OR (auth.uid() IS NOT NULL
+--         AND public.is_qa_fixture_root('<root_kind>', <root_id>, auth.uid()))
 --   )
 --
--- For an anonymous caller auth.uid() IS NULL, and the owner-match form cannot
--- match NULL (qa_owner_user_id is NOT NULL), so active fixtures are hidden.
+-- The explicit `auth.uid() IS NOT NULL` guard is required and fail-closed: the
+-- O6 helper treats a NULL _qa_owner_user_id as "any owner", so without the
+-- guard an anonymous caller would match every registered root. With it, an
+-- anonymous caller can never take the owner escape and active fixtures stay
+-- hidden on the public agency surfaces.
 
 -- ---------------------------------------------------------------------------
 -- 1) Driver-facing opportunity discovery
