@@ -11,6 +11,8 @@ import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
 import { ActingContextProvider } from "@/hooks/useActingContext";
 import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
 import { PendingDelegationBanner } from "@/components/agency/PendingDelegationBanner";
+import { OwnerQaModeBanner } from "@/components/admin/OwnerQaModeBanner";
+
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Critical path — eagerly loaded
