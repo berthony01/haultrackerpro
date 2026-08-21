@@ -190,16 +190,35 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
     }
   };
 
+  const selectQaPlan = async (persona: OwnerQaAgencyPersona) => {
+    try {
+      await ownerQa.setPersona('agency', persona);
+      toast({
+        title: 'QA plan switched',
+        description: `Now testing ${ASSISTANT_AGENCY_PLANS[persona].label}. Real billing is unchanged.`,
+      });
+    } catch (e: any) {
+      toast({
+        title: 'Could not switch QA plan',
+        description: e?.message ?? 'Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const showStartCta =
+    !qaActive &&
     isOwner &&
     (entitlement.status === 'manual_beta' ||
       entitlement.status === 'cancelled' ||
       !entitlement.stripeSubscriptionId);
 
   const showPortalCta =
+    !qaActive &&
     isOwner &&
     !!entitlement.stripeCustomerId &&
     ['active', 'trialing', 'past_due'].includes(entitlement.status);  // trial-allowlist: Stripe subscription status
+
 
   // Refresh entitlement when we land back from Stripe success.
   if (typeof window !== 'undefined' && searchParams.get('billing') === 'success') {
