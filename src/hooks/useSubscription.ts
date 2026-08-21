@@ -130,7 +130,9 @@ export function useSubscription(): SubscriptionState {
     };
   }, [fetchSubscription, isAdminLoading]);
 
-  const isPro = isAdmin || isProStatus(status);
+  // Owner QA driver persona wins over the admin auto-Pro override.
+  const isPro = driverQa ? driverQa.isPro : isAdmin || isProStatus(status);
+
 
   return {
     isLoading,
