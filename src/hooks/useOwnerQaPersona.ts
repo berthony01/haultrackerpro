@@ -3,8 +3,9 @@
  *
  * The server is the source of truth: `current_owner_qa_persona()` returns the
  * caller's active QA session (super-admin only, unexpired, enabled) and
- * NOTHING otherwise. There is no browser persistence — no localStorage, no
- * sessionStorage — because the server gates must agree with the UI.
+ * NOTHING otherwise. There is deliberately no browser-side persistence of QA
+ * state, because the server gates must always agree with the UI.
+
  */
 
 import { useCallback, useEffect, useMemo } from 'react';
