@@ -3,6 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { isProStatus, PlanKey } from '@/lib/billing/plans';
+import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import { driverQaOverlay } from '@/lib/billing/ownerQaPersona';
+
 
 export interface SubscriptionState {
   isLoading: boolean;
