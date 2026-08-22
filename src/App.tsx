@@ -73,6 +73,7 @@ const CompareVsQuickBooks = lazy(() => import("./pages/comparisons/HaulTrackerPr
 const BestProfitTracker = lazy(() => import("./pages/comparisons/BestTruckDriverProfitTracker"));
 const ResourceArticlesAdmin = lazy(() => import("./pages/admin/ResourceArticlesAdmin"));
 const ContentCalendarAdmin = lazy(() => import("./pages/admin/ContentCalendarAdmin"));
+const OwnerQaCenter = lazy(() => import("./pages/OwnerQaCenter"));
 const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
 const AssistantDashboard = lazy(() => import("./pages/AssistantDashboard"));
 const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept"));
