@@ -402,36 +402,51 @@ describe('AM-1C-FG — dashboard Team read-only presentation', () => {
   it('35. keeps the member card mounted regardless of canViewTeam', () => {
     expect(dashboardCode).not.toMatch(/canViewTeam\s*&&\s*<AgencyDetailCard/);
     expect(dashboardCode).not.toMatch(/\{canViewTeam && \(\s*<Card>/);
-    // No new Team tab is introduced.
-    expect(dashboardCode).not.toContain("value: 'team'");
+    // RW-1: the Team surface is a dedicated tab, and it is shown only via the
+    // read-only `team_view` permission — never a role label.
+    expect(dashboardCode).toContain(
+      "{ value: 'team', label: 'Team', show: canViewTeam },",
+    );
+    expect(dashboardCode).not.toMatch(/value: 'team', label: 'Team', show: isOwner/);
+    expect(dashboardCode).toMatch(
+      /\{canViewTeam && \(\s*<TabsContent value="team">/,
+    );
   });
 
-  it('36. uses canViewTeam only for read-only labelling', () => {
-    expect(dashboardCode).toContain(
-      "{canViewTeam ? 'Members' : 'Your membership'}",
-    );
+  it('36. uses canViewTeam only for read-only labelling and read-only surfacing', () => {
     expect(dashboardCode).toContain(
       "label={canViewTeam ? 'Active members' : 'Your active membership'}",
     );
-  });
-
-  it('37. never lets canViewTeam gate invite, revoke or governance controls', () => {
-    const guarded = [
-      ...dashboardCode.matchAll(/canViewTeam\s*(&&|\?)/g),
-    ];
-    expect(guarded.length).toBeGreaterThan(0);
-    expect(dashboardCode).not.toMatch(/canViewTeam[^\n]*invite/i);
-    expect(dashboardCode).not.toMatch(/canViewTeam[^\n]*revoke/i);
-    expect(dashboardCode).not.toMatch(/canViewTeam[^\n]*mutateAsync/);
-  });
-
-  it('38. keeps invite and revoke owner-only', () => {
-    expect(dashboardCode).toContain('{isOwner && (');
-    expect(dashboardCode).toContain(
-      "{isOwner && m.role !== 'agency_owner' && m.status !== 'revoked' && (",
+    // RW-1 moved the roster heading into the panel; still read-only labelling.
+    expect(teamPanelSource).toContain("{canViewTeam ? 'Team' : 'Your membership'}");
+    expect(teamPanelSource).toContain(
+      '/** Read-only `team_view` workspace permission. Never a write grant. */',
     );
-    expect(dashboardCode).toContain('Invite member by email');
   });
+
+  it('38. keeps invite, revoke and permission assignment owner-only in the Team panel', () => {
+    const panelCode = stripComments(teamPanelSource);
+    // The panel is the Team surface RW-1 mounts.
+    expect(dashboardCode).toContain('<AgencyTeamPanel');
+    expect(panelCode).toContain('{isOwner && (');
+    expect(panelCode).toContain(
+      "isOwner && m.role !== 'agency_owner' && m.status !== 'revoked'",
+    );
+    expect(panelCode).toContain('Invite member by email');
+    expect(panelCode).toContain('{isOwner && editingMember && (');
+    // `team_view` never becomes write authority inside the panel.
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*invite/i);
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*revoke/i);
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*setPermissions/);
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*mutateAsync/);
+    // No `team_manage` permission is introduced anywhere.
+    expect(panelCode).not.toContain('team_manage');
+    expect(dashboardCode).not.toContain('team_manage');
+    // No Driver Assistant authority leaks into the Team surface.
+    expect(panelCode).not.toContain('useActingContext');
+    expect(panelCode).not.toContain('assistant_permissions');
+  });
+
 
   it('39. keeps plan/limits and slug governance owner-only', () => {
     expect(dashboardCode).toContain('{isOwner && <AgencyPlanLimitsCard');
