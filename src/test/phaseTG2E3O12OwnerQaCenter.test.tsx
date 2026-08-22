@@ -104,7 +104,10 @@ describe('O12 — inactive owner state', () => {
     expect(screen.queryByTestId('owner-qa-end')).toBeNull();
     expect(invoke).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
-    expect(pageSource).not.toMatch(/stripe|checkout|customer-portal|create-checkout/i);
+    // No billing invocation surface: no edge-function names, no billing hooks.
+    expect(pageSource).not.toMatch(
+      /create-checkout|customer-portal|recruiter-billing-portal|agency-customer-portal|functions\.invoke|useSubscription|useAgencyEntitlement|useRecruiterBilling/,
+    );
   });
 });
 
