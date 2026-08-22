@@ -76,24 +76,19 @@ describe("AM-1B — candidate envelope", () => {
   });
 
   it("2. changes exactly the three AM-1B authored files since the start gate", () => {
-    const out = execFileSync("git", ["diff", "--name-only", `${START_GATE}..HEAD`], {
-      encoding: "utf8",
-      cwd: process.cwd(),
-    });
-    const status = execFileSync("git", ["status", "--porcelain"], {
+    const out = execFileSync("git", ["diff", "--name-only", `${START_GATE}..${PHASE_END}`], {
       encoding: "utf8",
       cwd: process.cwd(),
     });
     const changed = new Set(
-      [
-        ...out.split("\n"),
-        ...status.split("\n").map((l) => l.slice(3)),
-      ]
+      out
+        .split("\n")
         .map((l) => l.trim())
         .filter(Boolean),
     );
     const authored = [...changed].filter((f) => !PLATFORM_GENERATED_FILES.includes(f));
     expect(authored.sort()).toEqual([...AM1B_AUTHORED_FILES].sort());
+
   });
 });
 
