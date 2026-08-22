@@ -79,6 +79,16 @@ export function AdminSidebar({ value, onChange, role, email }: AdminSidebarProps
       </nav>
 
       <div className="space-y-2">
+        {role === 'super_admin' && (
+          <Link
+            to="/owner-qa"
+            data-testid="admin-nav-owner-qa"
+            className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-medium text-white/80 transition-colors hover:bg-primary/20 hover:text-white"
+          >
+            <FlaskConical className="h-4 w-4 text-primary" />
+            Owner QA Center
+          </Link>
+        )}
         <Link
           to="/admin/resource-articles"
           className="flex items-center gap-2 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
