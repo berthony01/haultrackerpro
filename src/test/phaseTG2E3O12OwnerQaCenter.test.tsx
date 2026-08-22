@@ -179,7 +179,7 @@ describe('O12 — persona switching', () => {
     await waitFor(() => expect(setPersona).toHaveBeenCalledTimes(1));
     expect(setPersona).toHaveBeenCalledWith('agency', 'agency_team');
     expect(invoke).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expectOnlyAuthorizedResetRpc();
   });
 
   it('D2) exposes every live persona from the source-of-truth vocabulary', () => {
