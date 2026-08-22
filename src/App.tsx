@@ -73,6 +73,7 @@ const CompareVsQuickBooks = lazy(() => import("./pages/comparisons/HaulTrackerPr
 const BestProfitTracker = lazy(() => import("./pages/comparisons/BestTruckDriverProfitTracker"));
 const ResourceArticlesAdmin = lazy(() => import("./pages/admin/ResourceArticlesAdmin"));
 const ContentCalendarAdmin = lazy(() => import("./pages/admin/ContentCalendarAdmin"));
+const OwnerQaCenter = lazy(() => import("./pages/OwnerQaCenter"));
 const ResourceArticleDynamic = lazy(() => import("./pages/resources/ResourceArticleDynamic"));
 const AssistantDashboard = lazy(() => import("./pages/AssistantDashboard"));
 const AssistantInviteAccept = lazy(() => import("./pages/AssistantInviteAccept"));
@@ -292,6 +293,8 @@ const App = () => (
               <Route path="/best-truck-driver-profit-tracker" element={<BestProfitTracker />} />
               <Route path="/admin/resource-articles" element={<AdminRoute><ResourceArticlesAdmin /></AdminRoute>} />
               <Route path="/admin/content-calendar" element={<AdminRoute><ContentCalendarAdmin /></AdminRoute>} />
+              {/* TG-2E3-O12: owner-only QA control center. Page itself enforces super_admin. */}
+              <Route path="/owner-qa" element={<AdminRoute><OwnerQaCenter /></AdminRoute>} />
               {/* Dynamic published-article fallback. Registered AFTER all static /resources/* routes
                   so existing static guides always win. Published articles only — drafts are blocked by RLS. */}
               <Route path="/resources/:slug" element={<ResourceArticleDynamic />} />
