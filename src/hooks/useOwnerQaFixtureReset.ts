@@ -5,10 +5,12 @@
  * functions that resolve the caller's registered QA fixture roots themselves —
  * no root or row identifier is ever supplied from the browser. There is no
  * billing, Stripe, Telegram, or email call on this path.
+ *
+ * Deliberately dependency-free (no query client) so the owner-only page keeps
+ * its existing render contract.
  */
 
-import { useCallback, useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
 
@@ -21,8 +23,6 @@ type ResetRpcClient = {
 };
 
 const resetRpc = supabase as unknown as ResetRpcClient;
-
-export const OWNER_QA_RESET_PREVIEW_KEY = ['owner-qa-fixture-reset-preview'] as const;
 
 export const OWNER_QA_RESET_CATEGORIES = [
   'carrier_relationships',
@@ -82,47 +82,67 @@ export interface UseOwnerQaFixtureResetResult {
 
 export function useOwnerQaFixtureReset(): UseOwnerQaFixtureResetResult {
   const { isOwner } = useOwnerQaPersona();
-  const qc = useQueryClient();
+  const [preview, setPreview] = useState<OwnerQaResetSummary | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
+  const mounted = useRef(true);
 
-  const query = useQuery({
-    queryKey: OWNER_QA_RESET_PREVIEW_KEY,
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+
+  const load = useCallback(async () => {
     // Fail closed: never queried unless a resolved super_admin.
-    enabled: isOwner,
-    staleTime: 15_000,
-    queryFn: async (): Promise<OwnerQaResetSummary | null> => {
-      const { data, error } = await resetRpc.rpc('owner_qa_fixture_reset_preview');
-      if (error) throw new Error(error.message);
-      return toSummary(data);
-    },
-  });
+    if (!isOwner) {
+      setPreview(null);
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { data, error: rpcError } = await resetRpc.rpc(
+        'owner_qa_fixture_reset_preview',
+      );
+      if (rpcError) throw new Error(rpcError.message);
+      if (!mounted.current) return;
+      setPreview(toSummary(data));
+      setError(null);
+    } catch (e) {
+      if (mounted.current) setError(e as Error);
+    } finally {
+      if (mounted.current) setIsLoading(false);
+    }
+  }, [isOwner]);
 
-  const mutation = useMutation({
-    mutationFn: async (): Promise<OwnerQaResetSummary | null> => {
-      const { data, error } = await resetRpc.rpc('owner_qa_fixture_reset');
-      if (error) throw new Error(error.message);
-      return toSummary(data);
-    },
-    onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: OWNER_QA_RESET_PREVIEW_KEY });
-    },
-  });
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const reset = useCallback(async () => mutation.mutateAsync(), [mutation]);
-
-  const preview = useMemo(
-    () => (isOwner ? (query.data ?? null) : null),
-    [isOwner, query.data],
-  );
+  const reset = useCallback(async (): Promise<OwnerQaResetSummary | null> => {
+    setIsResetting(true);
+    try {
+      const { data, error: rpcError } = await resetRpc.rpc('owner_qa_fixture_reset');
+      if (rpcError) throw new Error(rpcError.message);
+      const summary = toSummary(data);
+      await load();
+      return summary;
+    } finally {
+      if (mounted.current) setIsResetting(false);
+    }
+  }, [load]);
 
   return {
     isOwner,
     preview,
-    isLoading: isOwner ? query.isLoading : false,
-    isResetting: mutation.isPending,
-    error: ((query.error ?? mutation.error) as Error | null) ?? null,
+    isLoading,
+    isResetting,
+    error,
     reset,
     refetch: () => {
-      void query.refetch();
+      void load();
     },
   };
 }
