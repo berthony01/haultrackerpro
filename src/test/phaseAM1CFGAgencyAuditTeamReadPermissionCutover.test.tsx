@@ -61,6 +61,7 @@ const stripComments = (src: string) =>
 const hookCode = stripComments(hookSource);
 const dashboardCode = stripComments(dashboardSource);
 
+
 /** Body of a single `CREATE OR REPLACE FUNCTION public.<name>` statement. */
 function fnBody(name: string): string {
   const start = executableLower.indexOf(`create or replace function public.${name}`);
