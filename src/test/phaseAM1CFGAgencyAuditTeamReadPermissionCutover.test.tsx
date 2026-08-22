@@ -1,9 +1,11 @@
 /**
  * Phase AM-1C-FG — Agency Audit + Team READ-ONLY workspace-permission cutover.
  *
- * Deterministic source/SQL contract test. The candidate migration is NOT
- * applied live and no managed migration is authored; these assertions read the
- * candidate text and the authored sources only.
+ * Deterministic source/SQL contract test. The historical envelope is asserted
+ * against the immutable AM-1C-FG commit range (start gate .. phase end), never
+ * against current HEAD. Team-surface assertions were reconciled in RW-1T to the
+ * current RW-1 architecture (dedicated Team tab + AgencyTeamPanel) while
+ * preserving the original security invariants.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -12,12 +14,15 @@ import { describe, it, expect } from 'vitest';
 
 /** Accepted pre-phase tree (recorded AM-1C-E live migration state). */
 const START_GATE = '7ed7f6f75b32be1dcfe0f34d9fbb13ecbbc36acf';
+/** Immutable AM-1C-FG phase-end commit (last commit authored by the phase). */
+const PHASE_END = '3fc2360e8a79873e829793087b0022177990898c';
 
 const SQL_REL =
   'supabase/migration-candidates/20260818090000_phase_am1cfg_agency_audit_team_read_permission_cutover.sql';
 const HOOK_REL = 'src/hooks/useAgencyWorkspacePermissions.ts';
 const DASHBOARD_REL = 'src/pages/AgencyDashboard.tsx';
 const TEST_REL = 'src/test/phaseAM1CFGAgencyAuditTeamReadPermissionCutover.test.tsx';
+const TEAM_PANEL_REL = 'src/components/agency/AgencyTeamPanel.tsx';
 
 const MANAGED_FG_REL =
   'supabase/migrations/20260818090000_phase_am1cfg_agency_audit_team_read_permission_cutover.sql';
@@ -33,6 +38,8 @@ const read = (rel: string) => readFileSync(path.resolve(process.cwd(), rel), 'ut
 const sql = read(SQL_REL);
 const hookSource = read(HOOK_REL);
 const dashboardSource = read(DASHBOARD_REL);
+const teamPanelSource = read(TEAM_PANEL_REL);
+
 
 /** Executable SQL only: `--` line comments stripped. */
 const executable = sql
