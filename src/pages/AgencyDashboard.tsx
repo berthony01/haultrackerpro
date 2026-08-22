@@ -308,24 +308,16 @@ function AgencyDetailCard({
   canViewTeam: boolean;
 }) {
 
-  const { update, invite, revoke } = useAgencyMutations();
+  const { update } = useAgencyMutations();
   const { data: members } = useAgencyMembers(agency.id);
   const { data: clients } = useAgencyClients(agency.id);
   const { toast } = useToast();
 
-  const memberUserIds = useMemo(
-    () => (members ?? []).map((member) => member.member_user_id),
-    [members],
-  );
-  const { data: memberProfiles = {} } =
-    useAuthorizedProfessionalProfiles(memberUserIds);
-
   const [name, setName] = useState(agency.name);
   const [desc, setDesc] = useState(agency.description ?? '');
   const [email, setEmail] = useState(agency.contact_email ?? '');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
   const isOwner = agency.my_role === 'agency_owner';
+
 
   return (
     <div className="space-y-6">
