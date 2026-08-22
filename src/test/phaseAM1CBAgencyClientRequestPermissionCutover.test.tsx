@@ -11,6 +11,8 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 const START_GATE = 'd80afbd635ee97a27c1ef3db821bab2f8613f1f1';
+/** Immutable AM-1C-B phase-end commit. The envelope is a historical fact. */
+const PHASE_END = 'e0cf3342d1c7cc1a59d6ddd7777b7ba37642f75a';
 
 const SQL_PATH = path.resolve(
   process.cwd(),
@@ -57,7 +59,7 @@ describe('AM-1C-B — candidate envelope and authored scope', () => {
   });
 
   it('17. changes exactly the six authored files and no generated type file', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..HEAD`], {
+    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });
@@ -217,17 +219,21 @@ describe('AM-1C-B — client request query hook', () => {
 });
 
 describe('AM-1C-B — ClientRequestsSection gating', () => {
-  it('13. gates list by view, direct controls by manage, delegation by the transitional prop', () => {
-    expect(sectionSource).toContain('canCreateDelegation: boolean');
+  it('13. gates list by view, direct controls by manage, delegation by delegations_manage', () => {
+    // AM-1C-D superseded the transitional role-derived delegation prop with the
+    // exact `delegations_manage` workspace permission. The invariant is
+    // unchanged: delegation UI is never gated by client-request permissions.
+    expect(sectionSource).toContain('canManageDelegations: boolean;');
     expect(sectionSource).toContain('useAgencyWorkspacePermissions(agencyId)');
     expect(sectionSource).toContain('enabled: canViewClientRequests');
     expect(sectionSource).toContain('{canManageClientRequests && (');
-    expect(sectionSource).toContain('{canCreateDelegation && (');
-    expect(sectionSource).toContain('{canCreateDelegation && open && (');
+    expect(sectionSource).toContain('{canManageDelegations && (');
+    expect(sectionSource).toContain('{canManageDelegations && open && (');
     // Delegation UI is never gated by client-request permissions.
     expect(sectionSource).not.toContain('canManageClientRequests && open');
     expect(sectionSource).not.toContain('isOwnerOrAdmin');
   });
+
 
   it('14. manage does not imply view — rows render only under view', () => {
     const listGate = sectionSource.indexOf('!canViewClientRequests ? (');
@@ -257,12 +263,16 @@ describe('AM-1C-B — AgencyDashboard tab authorization', () => {
     expect(dashboardSource).toContain('{showRequests && (');
   });
 
-  it('16. isOwnerOrAdmin is only the transitional delegation prop in the Requests integration', () => {
-    expect(dashboardSource).toContain('canCreateDelegation={isOwnerOrAdmin}');
+  it('16. no role-derived authority remains in the Requests integration', () => {
+    // The AM-1C-B transitional `canCreateDelegation={isOwnerOrAdmin}` prop was
+    // removed by AM-1C-D; delegation authority is resolved from the exact
+    // `delegations_manage` permission inside the section itself.
     expect(dashboardSource).not.toContain("label: 'Packages', show: isOwnerOrAdmin");
     expect(dashboardSource).not.toContain("label: 'Requests', show: isOwnerOrAdmin");
-    // Clients / work queue remain on their existing rules.
-    expect(dashboardSource).toContain("{ value: 'clients', label: 'Clients', show: isOwnerOrAdmin }");
-    expect(dashboardSource).toContain('canManage={isOwnerOrAdmin}');
+    expect(dashboardSource).not.toContain('isOwnerOrAdmin');
+    expect(dashboardSource).toContain('<ClientRequestsSection agencyId={agency.id} />');
+    // Clients tab is the read-only `clients_view` permission, never a role.
+    expect(dashboardSource).toContain("{ value: 'clients', label: 'Clients', show: canViewClients }");
   });
+
 });

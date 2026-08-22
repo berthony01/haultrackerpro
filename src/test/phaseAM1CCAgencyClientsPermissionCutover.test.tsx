@@ -11,6 +11,8 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 const START_GATE = '8f20c71c032042422a97f0d281f46463df1eefe0';
+/** Immutable AM-1C-C phase-end commit. The envelope is a historical fact. */
+const PHASE_END = 'd1c93169e5720dec35de20ec7a2b27fec5794578';
 
 const SQL_PATH = path.resolve(
   process.cwd(),
@@ -53,7 +55,7 @@ describe('AM-1C-C — candidate envelope and authored scope', () => {
   });
 
   it('12/13. changes exactly the five authored files, not the workflow hook or generated types', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..HEAD`], {
+    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });
@@ -204,28 +206,31 @@ describe('AM-1C-C — dashboard gating', () => {
     expect(dashboardSource).toContain('canViewClients,');
   });
 
-  it('10. passes canRevokeDelegation as transitional delegation authorization only', () => {
-    expect(dashboardSource).toContain('canRevokeDelegation={isOwnerOrAdmin}');
+  it('10. passes delegation authorization as the exact delegations_manage permission', () => {
+    // AM-1C-D replaced the transitional role-derived props; revocation
+    // authority is still separate from `clients_view`.
+    expect(dashboardSource).toContain('canManageDelegations={canManageDelegations}');
+    expect(dashboardSource).not.toContain('canRevokeDelegation');
+    expect(dashboardSource).not.toContain('canCreateDelegation');
+    expect(dashboardSource).not.toContain('isOwnerOrAdmin');
     // AM-1C-A/B gating is unchanged.
     expect(dashboardSource).toContain('const showPackages = canViewPackages || canManagePackages;');
     expect(dashboardSource).toContain(
       'const showRequests = canViewClientRequests || canManageClientRequests;',
     );
-    expect(dashboardSource).toContain('canCreateDelegation={isOwnerOrAdmin}');
-    // Surfaces not yet cut over keep the role mirror.
-    expect(dashboardSource).toContain('canManage={isOwnerOrAdmin}');
   });
 });
 
 describe('AM-1C-C — ClientListSection', () => {
-  it('11. requires canRevokeDelegation and hides End access when false', () => {
-    expect(sectionSource).toContain('canRevokeDelegation: boolean;');
-    expect(sectionSource).toContain('{canRevokeDelegation && (');
+  it('11. requires delegation authority and hides End access when false', () => {
+    expect(sectionSource).toContain('canManageDelegations: boolean;');
+    expect(sectionSource).toContain('{canManageDelegations && (');
     const revokeIdx = sectionSource.indexOf('<RevokeClientButton');
-    const gateIdx = sectionSource.indexOf('{canRevokeDelegation && (');
+    const gateIdx = sectionSource.indexOf('{canManageDelegations && (');
     expect(gateIdx).toBeGreaterThan(-1);
     expect(gateIdx).toBeLessThan(revokeIdx);
   });
+
 
   it('11b. never treats clients_view as revoke authority and adds no second permission query', () => {
     // Comments may reference clients_view; executable code must not consume it.

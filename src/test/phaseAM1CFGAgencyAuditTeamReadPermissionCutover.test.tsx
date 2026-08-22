@@ -1,9 +1,11 @@
 /**
  * Phase AM-1C-FG — Agency Audit + Team READ-ONLY workspace-permission cutover.
  *
- * Deterministic source/SQL contract test. The candidate migration is NOT
- * applied live and no managed migration is authored; these assertions read the
- * candidate text and the authored sources only.
+ * Deterministic source/SQL contract test. The historical envelope is asserted
+ * against the immutable AM-1C-FG commit range (start gate .. phase end), never
+ * against current HEAD. Team-surface assertions were reconciled in RW-1T to the
+ * current RW-1 architecture (dedicated Team tab + AgencyTeamPanel) while
+ * preserving the original security invariants.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -12,12 +14,15 @@ import { describe, it, expect } from 'vitest';
 
 /** Accepted pre-phase tree (recorded AM-1C-E live migration state). */
 const START_GATE = '7ed7f6f75b32be1dcfe0f34d9fbb13ecbbc36acf';
+/** Immutable AM-1C-FG phase-end commit (last commit authored by the phase). */
+const PHASE_END = '3fc2360e8a79873e829793087b0022177990898c';
 
 const SQL_REL =
   'supabase/migration-candidates/20260818090000_phase_am1cfg_agency_audit_team_read_permission_cutover.sql';
 const HOOK_REL = 'src/hooks/useAgencyWorkspacePermissions.ts';
 const DASHBOARD_REL = 'src/pages/AgencyDashboard.tsx';
 const TEST_REL = 'src/test/phaseAM1CFGAgencyAuditTeamReadPermissionCutover.test.tsx';
+const TEAM_PANEL_REL = 'src/components/agency/AgencyTeamPanel.tsx';
 
 const MANAGED_FG_REL =
   'supabase/migrations/20260818090000_phase_am1cfg_agency_audit_team_read_permission_cutover.sql';
@@ -33,6 +38,8 @@ const read = (rel: string) => readFileSync(path.resolve(process.cwd(), rel), 'ut
 const sql = read(SQL_REL);
 const hookSource = read(HOOK_REL);
 const dashboardSource = read(DASHBOARD_REL);
+const teamPanelSource = read(TEAM_PANEL_REL);
+
 
 /** Executable SQL only: `--` line comments stripped. */
 const executable = sql
@@ -54,6 +61,7 @@ const stripComments = (src: string) =>
 const hookCode = stripComments(hookSource);
 const dashboardCode = stripComments(dashboardSource);
 
+
 /** Body of a single `CREATE OR REPLACE FUNCTION public.<name>` statement. */
 function fnBody(name: string): string {
   const start = executableLower.indexOf(`create or replace function public.${name}`);
@@ -72,8 +80,8 @@ describe('AM-1C-FG — candidate envelope and authored scope', () => {
     expect(sql.indexOf('\nBEGIN;')).toBeLessThan(sql.indexOf('\nCOMMIT;'));
   });
 
-  it('2. changes exactly the four authored files and no prohibited file', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..HEAD`], {
+  it('2. changed exactly the four authored files and no prohibited file (historical range)', () => {
+    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });
@@ -90,9 +98,16 @@ describe('AM-1C-FG — candidate envelope and authored scope', () => {
     }
   });
 
-  it('3. authors no managed migration for the FG timestamp', () => {
-    expect(existsSync(path.resolve(process.cwd(), MANAGED_FG_REL))).toBe(false);
+  it('3. any managed migration for the FG timestamp is the exact candidate text', () => {
+    // The phase authored no managed migration. It was promoted verbatim later;
+    // if the managed file exists it must still be byte-identical to the
+    // candidate contract asserted throughout this suite.
+    const managed = path.resolve(process.cwd(), MANAGED_FG_REL);
+    if (existsSync(managed)) {
+      expect(readFileSync(managed, 'utf8')).toBe(sql);
+    }
   });
+
 });
 
 describe('AM-1C-FG — SQL redefinition surface', () => {
@@ -388,36 +403,51 @@ describe('AM-1C-FG — dashboard Team read-only presentation', () => {
   it('35. keeps the member card mounted regardless of canViewTeam', () => {
     expect(dashboardCode).not.toMatch(/canViewTeam\s*&&\s*<AgencyDetailCard/);
     expect(dashboardCode).not.toMatch(/\{canViewTeam && \(\s*<Card>/);
-    // No new Team tab is introduced.
-    expect(dashboardCode).not.toContain("value: 'team'");
+    // RW-1: the Team surface is a dedicated tab, and it is shown only via the
+    // read-only `team_view` permission — never a role label.
+    expect(dashboardCode).toContain(
+      "{ value: 'team', label: 'Team', show: canViewTeam },",
+    );
+    expect(dashboardCode).not.toMatch(/value: 'team', label: 'Team', show: isOwner/);
+    expect(dashboardCode).toMatch(
+      /\{canViewTeam && \(\s*<TabsContent value="team">/,
+    );
   });
 
-  it('36. uses canViewTeam only for read-only labelling', () => {
-    expect(dashboardCode).toContain(
-      "{canViewTeam ? 'Members' : 'Your membership'}",
-    );
+  it('36. uses canViewTeam only for read-only labelling and read-only surfacing', () => {
     expect(dashboardCode).toContain(
       "label={canViewTeam ? 'Active members' : 'Your active membership'}",
     );
-  });
-
-  it('37. never lets canViewTeam gate invite, revoke or governance controls', () => {
-    const guarded = [
-      ...dashboardCode.matchAll(/canViewTeam\s*(&&|\?)/g),
-    ];
-    expect(guarded.length).toBeGreaterThan(0);
-    expect(dashboardCode).not.toMatch(/canViewTeam[^\n]*invite/i);
-    expect(dashboardCode).not.toMatch(/canViewTeam[^\n]*revoke/i);
-    expect(dashboardCode).not.toMatch(/canViewTeam[^\n]*mutateAsync/);
-  });
-
-  it('38. keeps invite and revoke owner-only', () => {
-    expect(dashboardCode).toContain('{isOwner && (');
-    expect(dashboardCode).toContain(
-      "{isOwner && m.role !== 'agency_owner' && m.status !== 'revoked' && (",
+    // RW-1 moved the roster heading into the panel; still read-only labelling.
+    expect(teamPanelSource).toContain("{canViewTeam ? 'Team' : 'Your membership'}");
+    expect(teamPanelSource).toContain(
+      '/** Read-only `team_view` workspace permission. Never a write grant. */',
     );
-    expect(dashboardCode).toContain('Invite member by email');
   });
+
+  it('38. keeps invite, revoke and permission assignment owner-only in the Team panel', () => {
+    const panelCode = stripComments(teamPanelSource);
+    // The panel is the Team surface RW-1 mounts.
+    expect(dashboardCode).toContain('<AgencyTeamPanel');
+    expect(panelCode).toContain('{isOwner && (');
+    expect(panelCode).toContain(
+      "isOwner && m.role !== 'agency_owner' && m.status !== 'revoked'",
+    );
+    expect(panelCode).toContain('Invite member by email');
+    expect(panelCode).toContain('{isOwner && editingMember && (');
+    // `team_view` never becomes write authority inside the panel.
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*invite/i);
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*revoke/i);
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*setPermissions/);
+    expect(panelCode).not.toMatch(/canViewTeam[^\n]*mutateAsync/);
+    // No `team_manage` permission is introduced anywhere.
+    expect(panelCode).not.toContain('team_manage');
+    expect(dashboardCode).not.toContain('team_manage');
+    // No Driver Assistant authority leaks into the Team surface.
+    expect(panelCode).not.toContain('useActingContext');
+    expect(panelCode).not.toContain('assistant_permissions');
+  });
+
 
   it('39. keeps plan/limits and slug governance owner-only', () => {
     expect(dashboardCode).toContain('{isOwner && <AgencyPlanLimitsCard');

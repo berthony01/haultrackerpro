@@ -11,6 +11,8 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 const START_GATE = '9c84c1a78e6a5ccfe494673464bc59e72e0e32e5';
+/** Immutable AM-1C-A phase-end commit. The envelope is a historical fact. */
+const PHASE_END = 'd511072baee7974321317dbb36c339ecfb9711df';
 
 const SQL_PATH = path.resolve(
   process.cwd(),
@@ -53,25 +55,16 @@ describe('AM-1C-A — candidate envelope and authored scope', () => {
     expect(sql.indexOf('\nBEGIN;')).toBeLessThan(sql.indexOf('\nCOMMIT;'));
   });
 
-  it('14. changes exactly the five authored files and no generated type file', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..HEAD`], {
+  it('14. changed exactly the five authored files and no generated type file (historical range)', () => {
+    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });
-    const status = execFileSync('git', ['status', '--porcelain'], {
-      encoding: 'utf8',
-      cwd: process.cwd(),
-    });
-    const changed = [
-      ...out.split('\n'),
-      ...status.split('\n').map((l) => l.slice(3)),
-    ]
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const unique = [...new Set(changed)];
+    const unique = [...new Set(out.split('\n').map((l) => l.trim()).filter(Boolean))];
     expect(unique).not.toContain(GENERATED_TYPES);
     expect(unique.sort()).toEqual([...AM1CA_AUTHORED_FILES].sort());
   });
+
 });
 
 describe('AM-1C-A — package RPC authorization cutover', () => {
