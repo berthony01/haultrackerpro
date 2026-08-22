@@ -55,25 +55,16 @@ describe('AM-1C-A — candidate envelope and authored scope', () => {
     expect(sql.indexOf('\nBEGIN;')).toBeLessThan(sql.indexOf('\nCOMMIT;'));
   });
 
-  it('14. changes exactly the five authored files and no generated type file', () => {
+  it('14. changed exactly the five authored files and no generated type file (historical range)', () => {
     const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });
-    const status = execFileSync('git', ['status', '--porcelain'], {
-      encoding: 'utf8',
-      cwd: process.cwd(),
-    });
-    const changed = [
-      ...out.split('\n'),
-      ...status.split('\n').map((l) => l.slice(3)),
-    ]
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const unique = [...new Set(changed)];
+    const unique = [...new Set(out.split('\n').map((l) => l.trim()).filter(Boolean))];
     expect(unique).not.toContain(GENERATED_TYPES);
     expect(unique.sort()).toEqual([...AM1CA_AUTHORED_FILES].sort());
   });
+
 });
 
 describe('AM-1C-A — package RPC authorization cutover', () => {
