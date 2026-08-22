@@ -119,12 +119,14 @@ describe('O12 — access control', () => {
 });
 
 describe('O12 — inactive owner state', () => {
-  it('B) renders the control center with no Stripe/billing action', () => {
+  it('B) renders the control center with no Stripe/billing action', async () => {
     renderPage();
     expect(screen.getByTestId('owner-qa-center')).toBeInTheDocument();
     expect(screen.getByTestId('owner-qa-state-badge')).toHaveTextContent('Inactive');
     expect(screen.queryByTestId('owner-qa-end')).toBeNull();
     expect(invoke).not.toHaveBeenCalled();
+    // O13: the reset preview rpc is authorized on mount; await its resolution.
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview'));
     expectOnlyAuthorizedResetRpc();
     // No billing invocation surface: no edge-function names, no billing hooks.
     expect(pageSource).not.toMatch(
