@@ -312,15 +312,17 @@ describe('AM-1C-D — dashboard gating', () => {
     expect(dashboardSource).toContain('<ClientRequestsSection agencyId={agency.id} />');
   });
 
-  it('23. prior tab gating and later-phase transitional rules are unchanged', () => {
+  it('23. prior tab gating stays permission-based and no role mirror remains', () => {
     expect(dashboardSource).toContain('const showPackages = canViewPackages || canManagePackages;');
     expect(dashboardSource).toContain(
       'const showRequests = canViewClientRequests || canManageClientRequests;',
     );
     expect(dashboardSource).toContain("{ value: 'clients', label: 'Clients', show: canViewClients }");
-    expect(dashboardSource).toContain("{ value: 'activity', label: 'Activity', show: isOwner }");
-    // Work items are a later consumer and keep the transitional role mirror.
-    expect(dashboardSource).toContain('canManage={isOwnerOrAdmin}');
+    // AM-1C-FG cut Activity over from the role label to `audit_view`.
+    expect(dashboardSource).toContain("{ value: 'activity', label: 'Activity', show: canViewAudit }");
+    expect(dashboardSource).not.toContain("label: 'Activity', show: isOwner");
+    // AM-1C-E removed the transitional work-item role mirror.
+    expect(dashboardSource).not.toContain('isOwnerOrAdmin');
     // No Delegations product surface is introduced in this phase.
     expect(dashboardSource).not.toContain("value: 'delegations'");
   });

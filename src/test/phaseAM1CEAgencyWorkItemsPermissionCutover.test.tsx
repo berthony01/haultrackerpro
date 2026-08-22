@@ -407,7 +407,9 @@ describe('AM-1C-E — AgencyDashboard', () => {
       'const showRequests = canViewClientRequests || canManageClientRequests;',
     );
     expect(dashboardCode).toContain("{ value: 'clients', label: 'Clients', show: canViewClients }");
-    expect(dashboardCode).toContain("{ value: 'activity', label: 'Activity', show: isOwner }");
+    // AM-1C-FG cut Activity over from the role label to `audit_view`.
+    expect(dashboardCode).toContain("{ value: 'activity', label: 'Activity', show: canViewAudit }");
+    expect(dashboardCode).not.toContain("label: 'Activity', show: isOwner }");
     expect(dashboardCode).toContain('canManageDelegations={canManageDelegations}');
   });
 });
