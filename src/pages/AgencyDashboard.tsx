@@ -35,6 +35,8 @@ import { ClientRequestsSection } from '@/components/agency/ClientRequestsSection
 import { ClientListSection } from '@/components/agency/ClientListSection';
 import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
 import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
+import { AgencyTeamPanel } from '@/components/agency/AgencyTeamPanel';
+
 import { AgencySettlementsPanel } from '@/components/settlements/AgencySettlementsPanel';
 import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 import { AgencyPlanLimitsCard } from '@/components/agency/AgencyPlanLimitsCard';
