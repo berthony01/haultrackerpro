@@ -7,15 +7,29 @@
  * client-side timer semantics (expiry comes from the server session row).
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink } from 'lucide-react';
+import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import {
+  useOwnerQaFixtureReset,
+  OWNER_QA_RESET_CATEGORIES,
+} from '@/hooks/useOwnerQaFixtureReset';
 import {
   OWNER_QA_AGENCY_PERSONAS,
   OWNER_QA_DRIVER_PERSONAS,
@@ -24,6 +38,28 @@ import {
   type OwnerQaDomain,
   type OwnerQaPersona,
 } from '@/lib/billing/ownerQaPersona';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  carrier_relationships: 'Carrier relationships',
+  assistant_relationships: 'Assistant relationships',
+  agency_delegations: 'Agency delegations',
+  driver_profiles: 'Driver profiles',
+  loads: 'Loads',
+  expenses: 'Expenses',
+  fuel_logs: 'Fuel logs',
+  applications: 'Applications',
+  application_events: 'Application events',
+  referrals: 'Referrals',
+  agency_work_items: 'Agency work items',
+  settlements: 'Settlements',
+  settlement_items: 'Settlement items',
+  settlement_matches: 'Settlement matches',
+  notifications: 'Notifications',
+  lane_stats: 'Lane stats',
+  broker_stats: 'Broker stats',
+  operating_metrics: 'Operating metrics',
+};
+
 
 const DOMAIN_LABELS: Record<OwnerQaDomain, string> = {
   driver: 'Driver',
