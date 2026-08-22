@@ -293,6 +293,8 @@ const App = () => (
               <Route path="/best-truck-driver-profit-tracker" element={<BestProfitTracker />} />
               <Route path="/admin/resource-articles" element={<AdminRoute><ResourceArticlesAdmin /></AdminRoute>} />
               <Route path="/admin/content-calendar" element={<AdminRoute><ContentCalendarAdmin /></AdminRoute>} />
+              {/* TG-2E3-O12: owner-only QA control center. Page itself enforces super_admin. */}
+              <Route path="/owner-qa" element={<AdminRoute><OwnerQaCenter /></AdminRoute>} />
               {/* Dynamic published-article fallback. Registered AFTER all static /resources/* routes
                   so existing static guides always win. Published articles only — drafts are blocked by RLS. */}
               <Route path="/resources/:slug" element={<ResourceArticleDynamic />} />
