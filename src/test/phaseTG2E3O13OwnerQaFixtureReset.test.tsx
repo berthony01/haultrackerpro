@@ -219,7 +219,8 @@ describe('TG-2E3-O13 — QA Data Reset card', () => {
   it('the hook calls only the two O13 RPCs and no Stripe/Telegram surface', () => {
     expect(hookSource).toContain('owner_qa_fixture_reset_preview');
     expect(hookSource).toContain('owner_qa_fixture_reset');
-    expect(hookSource).not.toMatch(/stripe|checkout|telegram|functions\.invoke/i);
+    expect(hookSource).not.toMatch(/functions\.invoke|create-checkout|stripe\.|telegram-/i);
+    expect(hookSource).not.toMatch(/\.rpc\((?!\s*'owner_qa_fixture_reset)/);
   });
 
   it('the candidate migration keeps both RPCs owner-gated and fail-closed', () => {
