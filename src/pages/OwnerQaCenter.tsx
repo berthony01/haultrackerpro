@@ -7,15 +7,29 @@
  * client-side timer semantics (expiry comes from the server session row).
  */
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink } from 'lucide-react';
+import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
+import {
+  useOwnerQaFixtureReset,
+  OWNER_QA_RESET_CATEGORIES,
+} from '@/hooks/useOwnerQaFixtureReset';
 import {
   OWNER_QA_AGENCY_PERSONAS,
   OWNER_QA_DRIVER_PERSONAS,
@@ -24,6 +38,28 @@ import {
   type OwnerQaDomain,
   type OwnerQaPersona,
 } from '@/lib/billing/ownerQaPersona';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  carrier_relationships: 'Carrier relationships',
+  assistant_relationships: 'Assistant relationships',
+  agency_delegations: 'Agency delegations',
+  driver_profiles: 'Driver profiles',
+  loads: 'Loads',
+  expenses: 'Expenses',
+  fuel_logs: 'Fuel logs',
+  applications: 'Applications',
+  application_events: 'Application events',
+  referrals: 'Referrals',
+  agency_work_items: 'Agency work items',
+  settlements: 'Settlements',
+  settlement_items: 'Settlement items',
+  settlement_matches: 'Settlement matches',
+  notifications: 'Notifications',
+  lane_stats: 'Lane stats',
+  broker_stats: 'Broker stats',
+  operating_metrics: 'Operating metrics',
+};
+
 
 const DOMAIN_LABELS: Record<OwnerQaDomain, string> = {
   driver: 'Driver',
@@ -73,7 +109,20 @@ export default function OwnerQaCenter() {
     error,
   } = useOwnerQaPersona();
 
+  const {
+    preview,
+    isLoading: resetLoading,
+    isResetting,
+    reset,
+    error: resetError,
+  } = useOwnerQaFixtureReset();
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const remaining = useMemo(() => remainingCopy(expiresAt), [expiresAt]);
+
+  const totalRows = preview?.totalRows ?? 0;
+  const nothingToReset = !resetLoading && totalRows === 0;
 
   // Owner-only. Non-owners follow the app's established redirect behavior.
   if (isLoading) return null;
@@ -96,6 +145,17 @@ export default function OwnerQaCenter() {
       toast.error('Could not end QA Mode.');
     }
   };
+
+  const handleReset = async () => {
+    setConfirmOpen(false);
+    try {
+      const result = await reset();
+      toast.success(`QA test data reset — ${result?.totalRows ?? 0} rows removed`);
+    } catch {
+      toast.error('Could not reset QA test data.');
+    }
+  };
+
 
   return (
     <main
@@ -241,6 +301,95 @@ export default function OwnerQaCenter() {
           ))}
         </CardContent>
       </Card>
+
+      <Card data-testid="owner-qa-reset-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
+            QA Data Reset
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Removes only the QA operational test data and relationships seeded
+            under your registered QA fixture roots. QA roots, test identities,
+            QA opportunities, billing/subscriptions, and Telegram are preserved.
+          </p>
+
+          {resetLoading ? (
+            <p className="text-sm text-muted-foreground" data-testid="owner-qa-reset-loading">
+              Loading preview…
+            </p>
+          ) : resetError ? (
+            <p className="text-xs text-destructive" data-testid="owner-qa-reset-error">
+              QA reset preview is unavailable right now.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold" data-testid="owner-qa-reset-total">
+                {totalRows} rows would be removed
+              </p>
+              {totalRows > 0 && (
+                <div className="grid gap-1 sm:grid-cols-3" data-testid="owner-qa-reset-breakdown">
+                  {OWNER_QA_RESET_CATEGORIES.filter(
+                    (c) => (preview?.counts[c] ?? 0) > 0,
+                  ).map((c) => (
+                    <div
+                      key={c}
+                      className="flex items-center justify-between gap-2 rounded border border-border bg-muted/30 px-2 py-1 text-xs"
+                    >
+                      <span className="truncate text-muted-foreground">
+                        {CATEGORY_LABELS[c] ?? c}
+                      </span>
+                      <span className="font-semibold">{preview?.counts[c] ?? 0}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {nothingToReset && (
+                <p className="text-sm text-muted-foreground" data-testid="owner-qa-reset-empty">
+                  QA test data is already reset.
+                </p>
+              )}
+            </div>
+          )}
+
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={isResetting || resetLoading || nothingToReset}
+            onClick={() => setConfirmOpen(true)}
+            data-testid="owner-qa-reset-button"
+          >
+            Reset QA Test Data
+          </Button>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent data-testid="owner-qa-reset-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset QA test data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the QA operational test data and
+              relationships under your QA fixture roots. It preserves the QA
+              fixture roots and test identities, QA opportunities, billing and
+              subscriptions, and Telegram links. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="owner-qa-reset-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="owner-qa-reset-confirm-action"
+              onClick={() => void handleReset()}
+            >
+              Reset QA Test Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
 
       <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
