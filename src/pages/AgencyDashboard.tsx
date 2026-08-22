@@ -147,8 +147,14 @@ export default function AgencyDashboard() {
             // AM-1C-FG: Activity visibility is the read-only `audit_view`
             // workspace permission, never a role label.
             { value: 'activity', label: 'Activity', show: canViewAudit },
+            // RW-1: Team visibility is the read-only `team_view` workspace
+            // permission. The owner sees it because the resolver returns all
+            // permissions true for the canonical owner. Write controls inside
+            // the panel remain canonical-owner-only.
+            { value: 'team', label: 'Team', show: canViewTeam },
 
           ].filter((t) => t.show);
+
           const safeActive = tabs.some((t) => t.value === activeTab) ? activeTab : 'overview';
           return (
             <Tabs value={safeActive} onValueChange={setActiveTab} className="space-y-4">
