@@ -4826,6 +4826,33 @@ export type Database = {
       }
       _opportunity_jsonb_number: { Args: { j: Json }; Returns: number }
       _opportunity_numeric_is_finite: { Args: { v: number }; Returns: boolean }
+      _owner_qa_fixture_related_users: {
+        Args: {
+          _qa_agency_profile_id: string
+          _qa_owner_user_id: string
+          _qa_recruiter_profile_id: string
+          _qa_user_id: string
+        }
+        Returns: string[]
+      }
+      _owner_qa_fixture_reset_counts: {
+        Args: {
+          _qa_agency_profile_id: string
+          _qa_owner_user_id: string
+          _qa_recruiter_profile_id: string
+          _qa_user_id: string
+        }
+        Returns: Json
+      }
+      _owner_qa_fixture_reset_guard: {
+        Args: {
+          _qa_agency_profile_id: string
+          _qa_recruiter_profile_id: string
+          _qa_user_id: string
+        }
+        Returns: undefined
+      }
+      _owner_qa_fixture_roots: { Args: never; Returns: Record<string, unknown> }
       _owner_qa_persona_for: {
         Args: { _user_id: string }
         Returns: {
@@ -6331,6 +6358,8 @@ export type Database = {
         Args: { o: Database["public"]["Tables"]["opportunities"]["Row"] }
         Returns: string[]
       }
+      owner_qa_fixture_reset: { Args: never; Returns: Json }
+      owner_qa_fixture_reset_preview: { Args: never; Returns: Json }
       persist_my_recruiter_profile: {
         Args: {
           _company_address: string
