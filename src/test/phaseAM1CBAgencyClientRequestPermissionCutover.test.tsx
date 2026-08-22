@@ -263,12 +263,16 @@ describe('AM-1C-B — AgencyDashboard tab authorization', () => {
     expect(dashboardSource).toContain('{showRequests && (');
   });
 
-  it('16. isOwnerOrAdmin is only the transitional delegation prop in the Requests integration', () => {
-    expect(dashboardSource).toContain('canCreateDelegation={isOwnerOrAdmin}');
+  it('16. no role-derived authority remains in the Requests integration', () => {
+    // The AM-1C-B transitional `canCreateDelegation={isOwnerOrAdmin}` prop was
+    // removed by AM-1C-D; delegation authority is resolved from the exact
+    // `delegations_manage` permission inside the section itself.
     expect(dashboardSource).not.toContain("label: 'Packages', show: isOwnerOrAdmin");
     expect(dashboardSource).not.toContain("label: 'Requests', show: isOwnerOrAdmin");
-    // Clients / work queue remain on their existing rules.
-    expect(dashboardSource).toContain("{ value: 'clients', label: 'Clients', show: isOwnerOrAdmin }");
-    expect(dashboardSource).toContain('canManage={isOwnerOrAdmin}');
+    expect(dashboardSource).not.toContain('isOwnerOrAdmin');
+    expect(dashboardSource).toContain('<ClientRequestsSection agencyId={agency.id} />');
+    // Clients tab is the read-only `clients_view` permission, never a role.
+    expect(dashboardSource).toContain("{ value: 'clients', label: 'Clients', show: canViewClients }");
   });
+
 });
