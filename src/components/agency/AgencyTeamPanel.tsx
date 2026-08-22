@@ -141,7 +141,7 @@ function PermissionEditorDialog({
                   onCheckedChange={(checked) => {
                     if (!loaded) return;
                     // Exactly one independent boolean changes. No dependency,
-                    // no implication, no role preset.
+                    // no implication, no role-derived defaults.
                     setDraft((prev) => ({ ...prev, [key]: checked === true }));
                   }}
                 />
