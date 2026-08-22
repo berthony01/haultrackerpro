@@ -10,6 +10,8 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 const START_GATE = '002904b759e98f64905bc6f95c0bffe369b925e9';
+/** Immutable AM-1C-E phase-end commit. The envelope is a historical fact. */
+const PHASE_END = '0b52ccb783213b9aaa5fd2a4ced073d9f3278ff2';
 
 const SQL_REL =
   'supabase/migration-candidates/20260818064000_phase_am1ce_agency_work_items_permission_cutover.sql';
@@ -68,7 +70,7 @@ describe('AM-1C-E — candidate envelope and authored scope', () => {
   });
 
   it('2. changes exactly the five authored files and no prohibited file', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..HEAD`], {
+    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });

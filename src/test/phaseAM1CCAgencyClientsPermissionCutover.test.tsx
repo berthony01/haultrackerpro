@@ -11,6 +11,8 @@ import path from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 const START_GATE = '8f20c71c032042422a97f0d281f46463df1eefe0';
+/** Immutable AM-1C-C phase-end commit. The envelope is a historical fact. */
+const PHASE_END = 'd1c93169e5720dec35de20ec7a2b27fec5794578';
 
 const SQL_PATH = path.resolve(
   process.cwd(),
@@ -53,7 +55,7 @@ describe('AM-1C-C — candidate envelope and authored scope', () => {
   });
 
   it('12/13. changes exactly the five authored files, not the workflow hook or generated types', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..HEAD`], {
+    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });
