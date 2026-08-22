@@ -302,6 +302,95 @@ export default function OwnerQaCenter() {
         </CardContent>
       </Card>
 
+      <Card data-testid="owner-qa-reset-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Trash2 className="h-4 w-4 text-destructive" aria-hidden="true" />
+            QA Data Reset
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Removes only the QA operational test data and relationships seeded
+            under your registered QA fixture roots. QA roots, test identities,
+            QA opportunities, billing/subscriptions, and Telegram are preserved.
+          </p>
+
+          {resetLoading ? (
+            <p className="text-sm text-muted-foreground" data-testid="owner-qa-reset-loading">
+              Loading preview…
+            </p>
+          ) : resetError ? (
+            <p className="text-xs text-destructive" data-testid="owner-qa-reset-error">
+              QA reset preview is unavailable right now.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold" data-testid="owner-qa-reset-total">
+                {totalRows} rows would be removed
+              </p>
+              {totalRows > 0 && (
+                <div className="grid gap-1 sm:grid-cols-3" data-testid="owner-qa-reset-breakdown">
+                  {OWNER_QA_RESET_CATEGORIES.filter(
+                    (c) => (preview?.counts[c] ?? 0) > 0,
+                  ).map((c) => (
+                    <div
+                      key={c}
+                      className="flex items-center justify-between gap-2 rounded border border-border bg-muted/30 px-2 py-1 text-xs"
+                    >
+                      <span className="truncate text-muted-foreground">
+                        {CATEGORY_LABELS[c] ?? c}
+                      </span>
+                      <span className="font-semibold">{preview?.counts[c] ?? 0}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {nothingToReset && (
+                <p className="text-sm text-muted-foreground" data-testid="owner-qa-reset-empty">
+                  QA test data is already reset.
+                </p>
+              )}
+            </div>
+          )}
+
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={isResetting || resetLoading || nothingToReset}
+            onClick={() => setConfirmOpen(true)}
+            data-testid="owner-qa-reset-button"
+          >
+            Reset QA Test Data
+          </Button>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent data-testid="owner-qa-reset-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset QA test data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently deletes the QA operational test data and
+              relationships under your QA fixture roots. It preserves the QA
+              fixture roots and test identities, QA opportunities, billing and
+              subscriptions, and Telegram links. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="owner-qa-reset-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="owner-qa-reset-confirm-action"
+              onClick={() => void handleReset()}
+            >
+              Reset QA Test Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+
+
       <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
         <p>
