@@ -1118,6 +1118,7 @@ describe('O13 — reset', () => {
     expect(O13_SQL).not.toMatch(/session_replication_role/i);
     expect(O13_SQL).not.toMatch(/DISABLE TRIGGER/i);
     expect(O13_SQL).not.toMatch(/DELETE FROM public\.qa_fixture_roots/i);
-    expect(O13_SQL).not.toMatch(/stripe|pgmq|http|net\./i);
+    expect(O13_SQL).not.toMatch(/pgmq\.|net\.http|extensions\.http/i);
+    expect(O13_SQL).not.toMatch(/UPDATE public\.subscriptions|DELETE FROM public\.subscriptions/i);
   });
 });
