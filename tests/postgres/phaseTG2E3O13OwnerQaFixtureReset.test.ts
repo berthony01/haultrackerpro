@@ -584,6 +584,10 @@ async function seedFixtureData() {
   );
 
   expect(Number(carrier.rowCount)).toBe(1);
+
+  // Non-QA control rows are re-seeded alongside the fixture because the
+  // blanket clean-up above is a harness reset, not an O13 behaviour.
+  await seedControlData();
 }
 
 /** Non-QA control data that must never be touched. */
@@ -743,7 +747,6 @@ beforeAll(async () => {
     );
   }
 
-  await seedControlData();
 }, 90_000);
 
 afterAll(async () => {
