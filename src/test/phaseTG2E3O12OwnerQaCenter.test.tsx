@@ -125,7 +125,7 @@ describe('O12 — inactive owner state', () => {
     expect(screen.getByTestId('owner-qa-state-badge')).toHaveTextContent('Inactive');
     expect(screen.queryByTestId('owner-qa-end')).toBeNull();
     expect(invoke).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    expectOnlyAuthorizedResetRpc();
     // No billing invocation surface: no edge-function names, no billing hooks.
     expect(pageSource).not.toMatch(
       /create-checkout|customer-portal|recruiter-billing-portal|agency-customer-portal|functions\.invoke|useSubscription|useAgencyEntitlement|useRecruiterBilling/,
