@@ -144,6 +144,72 @@ describe('RW-1 — Agency team surface gating', () => {
   });
 });
 
+describe('RW-1-H1 — malformed permission read cannot be saved', () => {
+  it('hook: a malformed RPC payload resolves to isError, never to editable data', async () => {
+    const { useAgencyMemberPermissions } = await vi.importActual<
+      typeof import('@/hooks/useAgency')
+    >('@/hooks/useAgency');
+
+    // Malformed: missing keys / wrong value types. Must not become an
+    // all-false success map.
+    rpcMock.mockResolvedValue({ data: { packages_view: 'yes' }, error: null });
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useAgencyMemberPermissions('m1'), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    expect(rpcMock).toHaveBeenCalledWith('get_agency_member_permissions', {
+      _member_id: 'm1',
+    });
+  });
+
+  it('hook: a well-formed payload still resolves normally', async () => {
+    const { useAgencyMemberPermissions } = await vi.importActual<
+      typeof import('@/hooks/useAgency')
+    >('@/hooks/useAgency');
+
+    const valid = Object.fromEntries(
+      AGENCY_WORKSPACE_PERMISSION_KEYS.map((k) => [k, k === 'team_view']),
+    );
+    rpcMock.mockResolvedValue({ data: valid, error: null });
+
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useAgencyMemberPermissions('m1'), { wrapper });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual(valid);
+  });
+
+  it('editor: an errored permission read shows the error and blocks Save', async () => {
+    memberPermissionsIsError = true;
+    render(<AgencyTeamPanel agencyId="a1" isOwner canViewTeam />);
+    fireEvent.click(screen.getByTestId('agency-edit-permissions-m1'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('agency-permission-load-error')).toBeInTheDocument(),
+    );
+    // No editable toggles are rendered at all.
+    expect(screen.queryByTestId('agency-permission-editor')).not.toBeInTheDocument();
+
+    const save = screen.getByTestId('agency-permission-save');
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(setPermissionsMutate).not.toHaveBeenCalled();
+  });
+});
+
+
 describe('RW-1 — source contract', () => {
   const panel = readFileSync('src/components/agency/AgencyTeamPanel.tsx', 'utf8');
   const hooks = readFileSync('src/hooks/useAgency.ts', 'utf8');
