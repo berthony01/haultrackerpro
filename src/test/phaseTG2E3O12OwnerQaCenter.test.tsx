@@ -38,9 +38,10 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-// Supabase must never be reached by this page.
+// Supabase must never be reached by this page for billing/Stripe flows.
+// (O13: the reset preview rpc is the only authorized call on mount.)
 const invoke = vi.fn(async () => ({ data: null, error: null }));
-const rpc = vi.fn(async () => ({ data: null, error: null }));
+const rpc = vi.fn(async (fn: string) => ({ data: null, error: null }));
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: { functions: { invoke }, rpc },
 }));
