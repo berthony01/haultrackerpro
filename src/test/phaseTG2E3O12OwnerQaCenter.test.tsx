@@ -38,9 +38,10 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
-// Supabase must never be reached by this page.
+// Supabase must never be reached by this page for billing/Stripe flows.
+// (O13: the reset preview rpc is the only authorized call on mount.)
 const invoke = vi.fn(async () => ({ data: null, error: null }));
-const rpc = vi.fn(async () => ({ data: null, error: null }));
+const rpc = vi.fn(async (fn: string) => ({ data: null, error: null }));
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: { functions: { invoke }, rpc },
 }));
@@ -64,6 +65,27 @@ function renderPage() {
       <OwnerQaCenter />
     </MemoryRouter>,
   );
+}
+
+/**
+ * O13 integration: rendering OwnerQaCenter legitimately invokes the
+ * `owner_qa_fixture_reset_preview` RPC on mount. Assert that the preview is
+ * the only rpc invoked by mere render / persona-switch / end-QA flows, that
+ * the destructive `owner_qa_fixture_reset` is never called without the
+ * explicit O13 confirmation, and that no billing/Stripe/checkout surface is
+ * ever touched from this page.
+ */
+function expectOnlyAuthorizedResetRpc() {
+  expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview');
+  for (const call of rpc.mock.calls) {
+    expect(call[0]).toBe('owner_qa_fixture_reset_preview');
+  }
+  expect(rpc).not.toHaveBeenCalledWith('owner_qa_fixture_reset');
+  for (const call of rpc.mock.calls) {
+    expect(String(call[0])).not.toMatch(
+      /checkout|stripe|billing|portal|subscription|customer|payment|invoice/i,
+    );
+  }
 }
 
 beforeEach(() => {
@@ -97,13 +119,15 @@ describe('O12 — access control', () => {
 });
 
 describe('O12 — inactive owner state', () => {
-  it('B) renders the control center with no Stripe/billing action', () => {
+  it('B) renders the control center with no Stripe/billing action', async () => {
     renderPage();
     expect(screen.getByTestId('owner-qa-center')).toBeInTheDocument();
     expect(screen.getByTestId('owner-qa-state-badge')).toHaveTextContent('Inactive');
     expect(screen.queryByTestId('owner-qa-end')).toBeNull();
     expect(invoke).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    // O13: the reset preview rpc is authorized on mount; await its resolution.
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview'));
+    expectOnlyAuthorizedResetRpc();
     // No billing invocation surface: no edge-function names, no billing hooks.
     expect(pageSource).not.toMatch(
       /create-checkout|customer-portal|recruiter-billing-portal|agency-customer-portal|functions\.invoke|useSubscription|useAgencyEntitlement|useRecruiterBilling/,
@@ -157,7 +181,8 @@ describe('O12 — persona switching', () => {
     await waitFor(() => expect(setPersona).toHaveBeenCalledTimes(1));
     expect(setPersona).toHaveBeenCalledWith('agency', 'agency_team');
     expect(invoke).not.toHaveBeenCalled();
-    expect(rpc).not.toHaveBeenCalled();
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview'));
+    expectOnlyAuthorizedResetRpc();
   });
 
   it('D2) exposes every live persona from the source-of-truth vocabulary', () => {
