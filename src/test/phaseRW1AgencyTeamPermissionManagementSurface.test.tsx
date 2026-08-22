@@ -29,19 +29,37 @@ const members = [
 ];
 
 let memberPermissions: Record<string, boolean> | undefined;
+/** RW-1-H1: lets a test put the permission read into a real error state. */
+let memberPermissionsIsError = false;
 
-vi.mock('@/hooks/useAgency', () => ({
-  useAgencyMembers: () => ({ data: members }),
-  useAgencyMemberPermissions: () => ({
-    data: memberPermissions,
-    isLoading: false,
-    isError: false,
-  }),
-  useAgencyMutations: () => ({
-    invite: { mutateAsync: inviteMutate, isPending: false },
-    revoke: { mutateAsync: revokeMutate, isPending: false },
-    setPermissions: { mutateAsync: setPermissionsMutate, isPending: false },
-  }),
+const rpcMock = vi.fn();
+
+vi.mock('@/hooks/useAgency', async () => {
+  const actual = await vi.importActual<typeof import('@/hooks/useAgency')>(
+    '@/hooks/useAgency',
+  );
+  return {
+    ...actual,
+    useAgencyMembers: () => ({ data: members }),
+    useAgencyMemberPermissions: () => ({
+      data: memberPermissionsIsError ? undefined : memberPermissions,
+      isLoading: false,
+      isError: memberPermissionsIsError,
+    }),
+    useAgencyMutations: () => ({
+      invite: { mutateAsync: inviteMutate, isPending: false },
+      revoke: { mutateAsync: revokeMutate, isPending: false },
+      setPermissions: { mutateAsync: setPermissionsMutate, isPending: false },
+    }),
+  };
+});
+
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
+}));
+
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: 'owner-1' } }),
 }));
 
 vi.mock('@/hooks/useProfessionalProfile', () => ({
@@ -56,10 +74,12 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  memberPermissionsIsError = false;
   memberPermissions = Object.fromEntries(
     AGENCY_WORKSPACE_PERMISSION_KEYS.map((k) => [k, false]),
   );
 });
+
 
 describe('RW-1 — Agency team surface gating', () => {
   it('non-owner with team_view sees the roster but no write controls', () => {
