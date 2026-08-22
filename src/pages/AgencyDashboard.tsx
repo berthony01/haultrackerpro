@@ -218,6 +218,19 @@ export default function AgencyDashboard() {
 
                 </TabsContent>
               )}
+              {canViewTeam && (
+                <TabsContent value="team">
+                  {/* RW-1: read-only roster for `team_view`; invite, revoke and
+                      permission assignment inside the panel are gated on the
+                      canonical Agency owner only. */}
+                  <AgencyTeamPanel
+                    agencyId={agency.id}
+                    isOwner={isOwner}
+                    canViewTeam={canViewTeam}
+                  />
+                </TabsContent>
+              )}
+
             </Tabs>
           );
         })()
