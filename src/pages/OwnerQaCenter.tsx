@@ -109,7 +109,20 @@ export default function OwnerQaCenter() {
     error,
   } = useOwnerQaPersona();
 
+  const {
+    preview,
+    isLoading: resetLoading,
+    isResetting,
+    reset,
+    error: resetError,
+  } = useOwnerQaFixtureReset();
+
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const remaining = useMemo(() => remainingCopy(expiresAt), [expiresAt]);
+
+  const totalRows = preview?.totalRows ?? 0;
+  const nothingToReset = !resetLoading && totalRows === 0;
 
   // Owner-only. Non-owners follow the app's established redirect behavior.
   if (isLoading) return null;
@@ -132,6 +145,17 @@ export default function OwnerQaCenter() {
       toast.error('Could not end QA Mode.');
     }
   };
+
+  const handleReset = async () => {
+    setConfirmOpen(false);
+    try {
+      const result = await reset();
+      toast.success(`QA test data reset — ${result?.totalRows ?? 0} rows removed`);
+    } catch {
+      toast.error('Could not reset QA test data.');
+    }
+  };
+
 
   return (
     <main
