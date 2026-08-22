@@ -66,6 +66,27 @@ function renderPage() {
   );
 }
 
+/**
+ * O13 integration: rendering OwnerQaCenter legitimately invokes the
+ * `owner_qa_fixture_reset_preview` RPC on mount. Assert that the preview is
+ * the only rpc invoked by mere render / persona-switch / end-QA flows, that
+ * the destructive `owner_qa_fixture_reset` is never called without the
+ * explicit O13 confirmation, and that no billing/Stripe/checkout surface is
+ * ever touched from this page.
+ */
+function expectOnlyAuthorizedResetRpc() {
+  expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview');
+  for (const call of rpc.mock.calls) {
+    expect(call[0]).toBe('owner_qa_fixture_reset_preview');
+  }
+  expect(rpc).not.toHaveBeenCalledWith('owner_qa_fixture_reset');
+  for (const call of rpc.mock.calls) {
+    expect(String(call[0])).not.toMatch(
+      /checkout|stripe|billing|portal|subscription|customer|payment|invoice/i,
+    );
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   Object.assign(qaState, {
