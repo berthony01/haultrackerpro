@@ -66,6 +66,34 @@ export function useAgencyMembers(agencyId: string | null | undefined) {
   });
 }
 
+/**
+ * Phase RW-1 — canonical-owner-only read of one non-owner membership's
+ * COMPLETE workspace permission map, through the read-only RPC
+ * `get_agency_member_permissions`. There is no direct table read: the database
+ * is the only authority and a malformed payload grants nothing.
+ */
+export function useAgencyMemberPermissions(memberId: string | null | undefined) {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const enabled = !!userId && !!memberId;
+
+  return useQuery({
+    queryKey: ['agency-member-permissions', userId, memberId],
+    enabled,
+    staleTime: 15_000,
+    queryFn: async (): Promise<ParsedAgencyWorkspacePermissions> => {
+      const { data, error } = await (supabase as any).rpc('get_agency_member_permissions', {
+        _member_id: memberId,
+      });
+      if (error) throw error;
+      const parsed = parseAgencyWorkspacePermissions(data);
+      // Fail closed: malformed payload never grants anything.
+      return parsed ?? emptyAgencyWorkspacePermissions();
+    },
+  });
+}
+
+
 export function useAgencyMutations() {
   const qc = useQueryClient();
   const invalidate = () => {
