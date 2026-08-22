@@ -6,7 +6,10 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+
 import { AgencyTeamPanel } from '@/components/agency/AgencyTeamPanel';
 import { AGENCY_WORKSPACE_PERMISSION_KEYS } from '@/lib/agencyWorkspacePermissions';
 
