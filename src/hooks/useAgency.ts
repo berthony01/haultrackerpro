@@ -167,5 +167,31 @@ export function useAgencyMutations() {
     onSuccess: invalidate,
   });
 
-  return { create, update, invite, accept, revoke };
+  /**
+   * Phase RW-1 — canonical-owner-only permission assignment through the
+   * EXISTING `set_agency_member_permissions` RPC. The client always sends a
+   * COMPLETE boolean map; the database remains the only authority.
+   */
+  const setPermissions = useMutation({
+    mutationFn: async (input: {
+      member_id: string;
+      permissions: Record<string, boolean>;
+    }) => {
+      const { data, error } = await (supabase as any).rpc('set_agency_member_permissions', {
+        _member_id: input.member_id,
+        _permissions: input.permissions,
+      });
+      if (error) throw error;
+      return data as unknown;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['agency-member-permissions'] });
+      qc.invalidateQueries({ queryKey: ['agency-members'] });
+      qc.invalidateQueries({ queryKey: ['agency-workspace-permissions'] });
+      qc.invalidateQueries({ queryKey: ['agency-audit'] });
+    },
+  });
+
+  return { create, update, invite, accept, revoke, setPermissions };
+
 }
