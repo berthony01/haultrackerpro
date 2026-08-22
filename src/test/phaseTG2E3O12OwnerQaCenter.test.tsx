@@ -181,6 +181,7 @@ describe('O12 — persona switching', () => {
     await waitFor(() => expect(setPersona).toHaveBeenCalledTimes(1));
     expect(setPersona).toHaveBeenCalledWith('agency', 'agency_team');
     expect(invoke).not.toHaveBeenCalled();
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview'));
     expectOnlyAuthorizedResetRpc();
   });
 
