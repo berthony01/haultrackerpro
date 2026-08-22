@@ -219,17 +219,21 @@ describe('AM-1C-B — client request query hook', () => {
 });
 
 describe('AM-1C-B — ClientRequestsSection gating', () => {
-  it('13. gates list by view, direct controls by manage, delegation by the transitional prop', () => {
-    expect(sectionSource).toContain('canCreateDelegation: boolean');
+  it('13. gates list by view, direct controls by manage, delegation by delegations_manage', () => {
+    // AM-1C-D superseded the transitional role-derived delegation prop with the
+    // exact `delegations_manage` workspace permission. The invariant is
+    // unchanged: delegation UI is never gated by client-request permissions.
+    expect(sectionSource).toContain('canManageDelegations: boolean;');
     expect(sectionSource).toContain('useAgencyWorkspacePermissions(agencyId)');
     expect(sectionSource).toContain('enabled: canViewClientRequests');
     expect(sectionSource).toContain('{canManageClientRequests && (');
-    expect(sectionSource).toContain('{canCreateDelegation && (');
-    expect(sectionSource).toContain('{canCreateDelegation && open && (');
+    expect(sectionSource).toContain('{canManageDelegations && (');
+    expect(sectionSource).toContain('{canManageDelegations && open && (');
     // Delegation UI is never gated by client-request permissions.
     expect(sectionSource).not.toContain('canManageClientRequests && open');
     expect(sectionSource).not.toContain('isOwnerOrAdmin');
   });
+
 
   it('14. manage does not imply view — rows render only under view', () => {
     const listGate = sectionSource.indexOf('!canViewClientRequests ? (');
