@@ -79,8 +79,8 @@ describe('AM-1C-FG — candidate envelope and authored scope', () => {
     expect(sql.indexOf('\nBEGIN;')).toBeLessThan(sql.indexOf('\nCOMMIT;'));
   });
 
-  it('2. changes exactly the four authored files and no prohibited file', () => {
-    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..HEAD`], {
+  it('2. changed exactly the four authored files and no prohibited file (historical range)', () => {
+    const out = execFileSync('git', ['diff', '--name-only', `${START_GATE}..${PHASE_END}`], {
       encoding: 'utf8',
       cwd: process.cwd(),
     });
@@ -97,9 +97,16 @@ describe('AM-1C-FG — candidate envelope and authored scope', () => {
     }
   });
 
-  it('3. authors no managed migration for the FG timestamp', () => {
-    expect(existsSync(path.resolve(process.cwd(), MANAGED_FG_REL))).toBe(false);
+  it('3. any managed migration for the FG timestamp is the exact candidate text', () => {
+    // The phase authored no managed migration. It was promoted verbatim later;
+    // if the managed file exists it must still be byte-identical to the
+    // candidate contract asserted throughout this suite.
+    const managed = path.resolve(process.cwd(), MANAGED_FG_REL);
+    if (existsSync(managed)) {
+      expect(readFileSync(managed, 'utf8')).toBe(sql);
+    }
   });
+
 });
 
 describe('AM-1C-FG — SQL redefinition surface', () => {
