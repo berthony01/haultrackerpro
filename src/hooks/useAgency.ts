@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
-  emptyAgencyWorkspacePermissions,
   parseAgencyWorkspacePermissions,
   type ParsedAgencyWorkspacePermissions,
 } from '@/lib/agencyWorkspacePermissions';
+
 
 
 export type AgencyRole = 'agency_owner' | 'agency_admin' | 'agency_member';
@@ -87,8 +87,13 @@ export function useAgencyMemberPermissions(memberId: string | null | undefined) 
       });
       if (error) throw error;
       const parsed = parseAgencyWorkspacePermissions(data);
-      // Fail closed: malformed payload never grants anything.
-      return parsed ?? emptyAgencyWorkspacePermissions();
+      // RW-1-H1: a malformed payload is an error, not an all-false map. In an
+      // editor, a successful all-false result could be saved back over the
+      // member's real permissions. Throwing keeps the query in `isError`, so
+      // no editable data is ever exposed and Save stays unavailable.
+      if (!parsed) throw new Error('agency_member_permissions_invalid');
+      return parsed;
+
     },
   });
 }

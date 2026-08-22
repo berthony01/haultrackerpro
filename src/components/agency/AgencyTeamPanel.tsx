@@ -277,8 +277,10 @@ export function AgencyTeamPanel({
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   Role labels are descriptive only — they grant no permissions.
-                  Assign permissions explicitly after the invite is accepted.
+                  Assign permissions explicitly after the invite is created; they
+                  take effect only within the member's authorized Agency workspace.
                 </p>
+
               </div>
               <Button
                 disabled={invite.isPending || inviteEmail.trim() === ''}
