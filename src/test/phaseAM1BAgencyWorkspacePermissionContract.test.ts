@@ -19,6 +19,8 @@ import {
 } from "@/lib/agencyWorkspacePermissions";
 
 const START_GATE = "6c7f3c4005ef60e70fd6e2dd531ed912d7bb20fa";
+/** Immutable AM-1B phase-end commit. The envelope is a historical fact. */
+const PHASE_END = "6188ec17e958788a53a182eae0fed6310c83517d";
 
 const SQL_PATH = path.resolve(
   process.cwd(),
