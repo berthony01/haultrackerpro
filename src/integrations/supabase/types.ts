@@ -5626,6 +5626,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_agency_member_permissions: {
+        Args: { _member_id: string }
+        Returns: Json
+      }
       get_agency_public_view: {
         Args: { _agency_id: string }
         Returns: {

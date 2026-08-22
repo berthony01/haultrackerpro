@@ -35,6 +35,8 @@ import { ClientRequestsSection } from '@/components/agency/ClientRequestsSection
 import { ClientListSection } from '@/components/agency/ClientListSection';
 import { WorkQueueSection } from '@/components/agency/WorkQueueSection';
 import { AgencyAuditSection } from '@/components/agency/AgencyAuditSection';
+import { AgencyTeamPanel } from '@/components/agency/AgencyTeamPanel';
+
 import { AgencySettlementsPanel } from '@/components/settlements/AgencySettlementsPanel';
 import { AgencySlugCard } from '@/components/agency/AgencySlugCard';
 import { AgencyPlanLimitsCard } from '@/components/agency/AgencyPlanLimitsCard';
@@ -147,8 +149,14 @@ export default function AgencyDashboard() {
             // AM-1C-FG: Activity visibility is the read-only `audit_view`
             // workspace permission, never a role label.
             { value: 'activity', label: 'Activity', show: canViewAudit },
+            // RW-1: Team visibility is the read-only `team_view` workspace
+            // permission. The owner sees it because the resolver returns all
+            // permissions true for the canonical owner. Write controls inside
+            // the panel remain canonical-owner-only.
+            { value: 'team', label: 'Team', show: canViewTeam },
 
           ].filter((t) => t.show);
+
           const safeActive = tabs.some((t) => t.value === activeTab) ? activeTab : 'overview';
           return (
             <Tabs value={safeActive} onValueChange={setActiveTab} className="space-y-4">
@@ -212,6 +220,19 @@ export default function AgencyDashboard() {
 
                 </TabsContent>
               )}
+              {canViewTeam && (
+                <TabsContent value="team">
+                  {/* RW-1: read-only roster for `team_view`; invite, revoke and
+                      permission assignment inside the panel are gated on the
+                      canonical Agency owner only. */}
+                  <AgencyTeamPanel
+                    agencyId={agency.id}
+                    isOwner={isOwner}
+                    canViewTeam={canViewTeam}
+                  />
+                </TabsContent>
+              )}
+
             </Tabs>
           );
         })()
@@ -308,24 +329,16 @@ function AgencyDetailCard({
   canViewTeam: boolean;
 }) {
 
-  const { update, invite, revoke } = useAgencyMutations();
+  const { update } = useAgencyMutations();
   const { data: members } = useAgencyMembers(agency.id);
   const { data: clients } = useAgencyClients(agency.id);
   const { toast } = useToast();
 
-  const memberUserIds = useMemo(
-    () => (members ?? []).map((member) => member.member_user_id),
-    [members],
-  );
-  const { data: memberProfiles = {} } =
-    useAuthorizedProfessionalProfiles(memberUserIds);
-
   const [name, setName] = useState(agency.name);
   const [desc, setDesc] = useState(agency.description ?? '');
   const [email, setEmail] = useState(agency.contact_email ?? '');
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
   const isOwner = agency.my_role === 'agency_owner';
+
 
   return (
     <div className="space-y-6">
@@ -407,154 +420,11 @@ function AgencyDetailCard({
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            {canViewTeam ? 'Members' : 'Your membership'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            Members do <strong>not</strong> automatically get access to any driver's account.
-            Each driver must still invite each assistant directly through Driver Assistants.
-          </p>
-          {!canViewTeam && (
-            <p className="text-xs text-muted-foreground">
-              You are seeing only your own membership. Viewing the full team list
-              is a separate read-only workspace permission.
-            </p>
-          )}
+      <p className="text-xs text-muted-foreground">
+        Members do <strong>not</strong> automatically get access to any driver's account.
+        Each driver must still invite each assistant directly through Driver Assistants.
+      </p>
 
-
-          {isOwner && (
-            <div className="flex items-end gap-2">
-              <div className="flex-1 space-y-2">
-                <Label htmlFor="im">Invite member by email</Label>
-                <Input
-                  id="im"
-                  type="email"
-                  value={inviteEmail}
-                  onChange={(e) => setInviteEmail(e.target.value)}
-                  placeholder="teammate@example.com"
-                />
-              </div>
-              <Button
-                disabled={invite.isPending || inviteEmail.trim() === ''}
-                onClick={async () => {
-                  try {
-                    const r = await invite.mutateAsync({
-                      agency_id: agency.id,
-                      email: inviteEmail.trim(),
-                    });
-                    const link = `${window.location.origin}/agency/invite/${r.invite_token}`;
-                    setLastInviteLink(link);
-                    setInviteEmail('');
-                    toast({ title: 'Invite created — share the link' });
-                  } catch (e: any) {
-                    toast({
-                      title: 'Could not invite',
-                      description: e?.message,
-                      variant: 'destructive',
-                    });
-                  }
-                }}
-              >
-                Invite
-              </Button>
-            </div>
-          )}
-
-          {lastInviteLink && (
-            <div className="rounded-md border bg-muted/40 p-3 text-xs space-y-2">
-              <p className="font-medium">Share this link with your teammate</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 truncate rounded bg-background px-2 py-1">
-                  {lastInviteLink}
-                </code>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    navigator.clipboard.writeText(lastInviteLink);
-                    toast({ title: 'Link copied' });
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {!members || members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No members yet.</p>
-          ) : (
-            <div className="rounded-md border divide-y">
-              {members.map((m) => (
-                <div key={m.id} className="p-3 text-sm space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{m.invite_email}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {m.role.replace('agency_', '')} · {m.status}
-                      </p>
-                    </div>
-                    {isOwner && m.role !== 'agency_owner' && m.status !== 'revoked' && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive"
-                          >
-                            Revoke
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Remove this member?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              {m.invite_email} will lose access to your agency, and any driver access
-                              assigned to them through this agency will end. Direct Driver Assistant
-                              access granted to them separately by a driver is not affected.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={async () => {
-                                try {
-                                  await revoke.mutateAsync(m.id);
-                                  toast({ title: 'Member removed' });
-                                } catch (e: any) {
-                                  toast({
-                                    title: 'Could not remove',
-                                    description: e?.message,
-                                    variant: 'destructive',
-                                  });
-                                }
-                              }}
-                            >
-                              Remove
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
-                  </div>
-                  <ProfessionalProfileSummaryCard
-                    summary={
-                      m.member_user_id
-                        ? memberProfiles[m.member_user_id]
-                        : null
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }
