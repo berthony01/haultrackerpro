@@ -11,7 +11,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useOwnerQaPersona } from '@/hooks/useOwnerQaPersona';
 
 /** Narrow typed RPC adapter (generated types are not regenerated for candidates). */
@@ -22,7 +21,14 @@ type ResetRpcClient = {
   ) => Promise<{ data: unknown; error: { message: string } | null }>;
 };
 
-const resetRpc = supabase as unknown as ResetRpcClient;
+/**
+ * Resolved lazily so this owner-only surface never pulls the Supabase client
+ * into module initialization for consumers that do not use it.
+ */
+async function getResetRpc(): Promise<ResetRpcClient> {
+  const { supabase } = await import('@/integrations/supabase/client');
+  return supabase as unknown as ResetRpcClient;
+}
 
 export const OWNER_QA_RESET_CATEGORIES = [
   'carrier_relationships',
@@ -103,7 +109,8 @@ export function useOwnerQaFixtureReset(): UseOwnerQaFixtureResetResult {
     }
     setIsLoading(true);
     try {
-      const { data, error: rpcError } = await resetRpc.rpc(
+      const client = await getResetRpc();
+      const { data, error: rpcError } = await client.rpc(
         'owner_qa_fixture_reset_preview',
       );
       if (rpcError) throw new Error(rpcError.message);
@@ -124,7 +131,8 @@ export function useOwnerQaFixtureReset(): UseOwnerQaFixtureResetResult {
   const reset = useCallback(async (): Promise<OwnerQaResetSummary | null> => {
     setIsResetting(true);
     try {
-      const { data, error: rpcError } = await resetRpc.rpc('owner_qa_fixture_reset');
+      const client = await getResetRpc();
+      const { data, error: rpcError } = await client.rpc('owner_qa_fixture_reset');
       if (rpcError) throw new Error(rpcError.message);
       const summary = toSummary(data);
       await load();
