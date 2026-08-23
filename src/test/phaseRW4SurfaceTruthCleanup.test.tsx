@@ -180,7 +180,10 @@ describe('RW-4 — scope guard: copy-only, no new backend/billing/authorization'
     for (const rel of [FAQ, FEATURES, GUIDE, AA, DOCS]) {
       const src = read(rel);
       expect(src, `${rel} must not query the database directly`).not.toMatch(/supabase\s*\.\s*(from|rpc|functions)\b/);
-      expect(src, `${rel} must not invoke checkout/billing`).not.toMatch(/create-checkout|customer-portal|stripe/i);
+      // Prose may legitimately mention Stripe; only invocation is forbidden.
+      expect(src, `${rel} must not invoke checkout/billing endpoints`).not.toMatch(
+        /invoke\(\s*['"](create-checkout|customer-portal|recruiter-billing-portal|agency-customer-portal)/,
+      );
     }
   });
 
