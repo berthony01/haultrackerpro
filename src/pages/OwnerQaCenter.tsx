@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink, Trash2 } from 'lucide-react';
+import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,10 @@ import {
   OWNER_QA_RESET_CATEGORIES,
 } from '@/hooks/useOwnerQaFixtureReset';
 import {
+  useOwnerQaRelationshipScenario,
+  type OwnerQaRelationshipScenario,
+} from '@/hooks/useOwnerQaRelationshipScenario';
+import {
   OWNER_QA_AGENCY_PERSONAS,
   OWNER_QA_DRIVER_PERSONAS,
   OWNER_QA_PERSONA_LABELS,
@@ -38,6 +42,7 @@ import {
   type OwnerQaDomain,
   type OwnerQaPersona,
 } from '@/lib/billing/ownerQaPersona';
+
 
 const CATEGORY_LABELS: Record<string, string> = {
   carrier_relationships: 'Carrier relationships',
@@ -86,6 +91,48 @@ const TEST_SURFACES: ReadonlyArray<{ to: string; label: string; hint: string }> 
   { to: '/driver/assistant-control', label: 'Driver Assistant Control', hint: 'Driver-side permission enforcement' },
 ];
 
+/** RW-2 — the locked scenario vocabulary, grouped for the owner surface. */
+const SCENARIO_GROUPS: ReadonlyArray<{
+  key: string;
+  title: string;
+  scenarios: ReadonlyArray<{ key: OwnerQaRelationshipScenario; label: string }>;
+}> = [
+  {
+    key: 'assistant',
+    title: 'Driver Assistant',
+    scenarios: [
+      { key: 'assistant_none', label: 'No drivers' },
+      { key: 'assistant_one', label: 'One driver' },
+      { key: 'assistant_many', label: 'Two drivers — mixed permissions' },
+    ],
+  },
+  {
+    key: 'agency',
+    title: 'Agency',
+    scenarios: [
+      { key: 'agency_owner_populated', label: 'Owner — populated' },
+      { key: 'agency_admin', label: 'Admin' },
+      { key: 'agency_member', label: 'Member' },
+    ],
+  },
+  {
+    key: 'recruiter',
+    title: 'Recruiter',
+    scenarios: [
+      { key: 'recruiter_staff_one', label: 'Staff — one workspace' },
+      { key: 'recruiter_admin_multi', label: 'Admin — two workspaces' },
+    ],
+  },
+];
+
+const SCENARIO_LABELS: Record<string, string> = Object.fromEntries(
+  SCENARIO_GROUPS.flatMap((g) =>
+    g.scenarios.map((s) => [s.key, `${g.title} · ${s.label}`]),
+  ),
+);
+
+
+
 function remainingCopy(expiresAt: string | null): string | null {
   if (!expiresAt) return null;
   const ms = new Date(expiresAt).getTime() - Date.now();
@@ -117,12 +164,25 @@ export default function OwnerQaCenter() {
     error: resetError,
   } = useOwnerQaFixtureReset();
 
+  const {
+    state: scenarioState,
+    isLoading: scenarioLoading,
+    isApplying: scenarioApplying,
+    error: scenarioError,
+    apply: applyScenario,
+    clear: clearScenario,
+    refetch: refetchScenario,
+  } = useOwnerQaRelationshipScenario();
+
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingScenario, setPendingScenario] =
+    useState<OwnerQaRelationshipScenario | null>(null);
 
   const remaining = useMemo(() => remainingCopy(expiresAt), [expiresAt]);
 
   const totalRows = preview?.totalRows ?? 0;
-  const nothingToReset = !resetLoading && totalRows === 0;
+  const scenarioActive = scenarioState?.active === true;
+  const nothingToReset = !resetLoading && totalRows === 0 && !scenarioActive;
 
   // Owner-only. Non-owners follow the app's established redirect behavior.
   if (isLoading) return null;
@@ -149,12 +209,41 @@ export default function OwnerQaCenter() {
   const handleReset = async () => {
     setConfirmOpen(false);
     try {
+      // RW-2: auxiliaries must be deactivated before the existing operational
+      // reset runs, so an active relationship scenario is cleared first.
+      if (scenarioActive) {
+        await clearScenario();
+      }
       const result = await reset();
+      refetchScenario();
       toast.success(`QA test data reset — ${result?.totalRows ?? 0} rows removed`);
     } catch {
       toast.error('Could not reset QA test data.');
     }
   };
+
+  const handleApplyScenario = async () => {
+    const next = pendingScenario;
+    setPendingScenario(null);
+    if (!next) return;
+    try {
+      await applyScenario(next);
+      toast.success(`Scenario applied — ${SCENARIO_LABELS[next] ?? next}`);
+    } catch {
+      toast.error('Could not apply the relationship scenario.');
+    }
+  };
+
+  const handleClearScenario = async () => {
+    try {
+      await clearScenario();
+      toast.success('Relationship scenario cleared');
+    } catch {
+      toast.error('Could not clear the relationship scenario.');
+    }
+  };
+
+
 
 
   return (
@@ -279,6 +368,146 @@ export default function OwnerQaCenter() {
           </p>
         </CardContent>
       </Card>
+
+      <Card data-testid="owner-qa-scenario-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Users className="h-4 w-4 text-primary" aria-hidden="true" />
+            Relationship &amp; Workspace Scenarios
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <p className="text-sm text-muted-foreground" data-testid="owner-qa-scenario-copy">
+            These scenarios build synthetic QA relationships only, under your
+            registered QA fixture roots. Real membership, RLS, and permission
+            resolvers remain fully authoritative — nothing here bypasses a
+            security, membership, relationship, or seat check, and no billing,
+            subscription, or Stripe record is touched. Assistant direct
+            scenarios additionally require a Driver Pro QA persona before the
+            managed drivers appear operationally, and recruiter team capability
+            follows the selected Recruiter QA persona plus the real seat and
+            permission checks.
+          </p>
+
+          <div
+            className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-4"
+            data-testid="owner-qa-scenario-summary"
+          >
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Scenario</p>
+              <p className="text-sm font-semibold" data-testid="owner-qa-scenario-current">
+                {scenarioLoading
+                  ? 'Loading…'
+                  : scenarioState?.scenario
+                    ? (SCENARIO_LABELS[scenarioState.scenario] ?? scenarioState.scenario)
+                    : 'None'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Managed drivers</p>
+              <p className="text-sm font-semibold" data-testid="owner-qa-scenario-drivers">
+                {scenarioState?.assistantDriverCount ?? 0}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Agency role</p>
+              <p className="text-sm font-semibold" data-testid="owner-qa-scenario-agency">
+                {scenarioState?.agencyRole
+                  ? `${scenarioState.agencyRole} · ${scenarioState.agencyPermissionCount} permissions`
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Recruiter workspaces</p>
+              <p className="text-sm font-semibold" data-testid="owner-qa-scenario-recruiter">
+                {scenarioState?.recruiterWorkspaceCount ?? 0}
+                {scenarioState?.recruiterRoles?.length
+                  ? ` · ${scenarioState.recruiterRoles.join(', ')}`
+                  : ''}
+              </p>
+            </div>
+          </div>
+
+          {SCENARIO_GROUPS.map((group) => (
+            <div key={group.key} className="space-y-2">
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                {group.title}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {group.scenarios.map((s) => {
+                  const selected = scenarioState?.scenario === s.key;
+                  return (
+                    <Button
+                      key={s.key}
+                      type="button"
+                      size="sm"
+                      variant={selected ? 'default' : 'outline'}
+                      aria-pressed={selected}
+                      disabled={scenarioApplying || scenarioLoading}
+                      data-testid={`owner-qa-scenario-${s.key}`}
+                      onClick={() => setPendingScenario(s.key)}
+                    >
+                      {s.label}
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+
+          <Separator />
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={scenarioApplying || !scenarioActive}
+            onClick={() => void handleClearScenario()}
+            data-testid="owner-qa-scenario-clear"
+          >
+            Clear scenario
+          </Button>
+
+          {scenarioError && (
+            <p className="text-xs text-destructive" data-testid="owner-qa-scenario-error">
+              Relationship scenarios are unavailable right now.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog
+        open={pendingScenario !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingScenario(null);
+        }}
+      >
+        <AlertDialogContent data-testid="owner-qa-scenario-confirm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Apply this QA scenario?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Applying{' '}
+              {pendingScenario
+                ? (SCENARIO_LABELS[pendingScenario] ?? pendingScenario)
+                : 'this scenario'}{' '}
+              first resets the synthetic QA operational fixture data under your
+              QA roots, then rebuilds only the synthetic relationships this
+              scenario needs. Real membership, RLS, and permission resolvers
+              stay authoritative, and no real billing, subscription, Stripe, or
+              Telegram record is changed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="owner-qa-scenario-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="owner-qa-scenario-confirm-action"
+              onClick={() => void handleApplyScenario()}
+            >
+              Apply scenario
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
 
       <Card>
         <CardHeader className="pb-3">

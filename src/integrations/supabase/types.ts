@@ -4861,6 +4861,11 @@ export type Database = {
           persona: string
         }[]
       }
+      _owner_qa_rw2_ensure_aux_user: { Args: never; Returns: string }
+      _owner_qa_rw2_perm_map: {
+        Args: { _enum: string; _true_keys: string[] }
+        Returns: Json
+      }
       _professional_profile_normalize_string_array: {
         Args: {
           _input: string[]
@@ -6362,8 +6367,14 @@ export type Database = {
         Args: { o: Database["public"]["Tables"]["opportunities"]["Row"] }
         Returns: string[]
       }
+      owner_qa_apply_relationship_scenario: {
+        Args: { _scenario: string }
+        Returns: Json
+      }
+      owner_qa_clear_relationship_scenario: { Args: never; Returns: Json }
       owner_qa_fixture_reset: { Args: never; Returns: Json }
       owner_qa_fixture_reset_preview: { Args: never; Returns: Json }
+      owner_qa_relationship_scenario_state: { Args: never; Returns: Json }
       persist_my_recruiter_profile: {
         Args: {
           _company_address: string
