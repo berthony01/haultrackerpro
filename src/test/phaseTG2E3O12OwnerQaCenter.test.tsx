@@ -84,19 +84,33 @@ function renderPage() {
 }
 
 /**
- * O13 integration: rendering OwnerQaCenter legitimately invokes the
- * `owner_qa_fixture_reset_preview` RPC on mount. Assert that the preview is
- * the only rpc invoked by mere render / persona-switch / end-QA flows, that
- * the destructive `owner_qa_fixture_reset` is never called without the
- * explicit O13 confirmation, and that no billing/Stripe/checkout surface is
- * ever touched from this page.
+ * O13 + RW-2 integration: rendering OwnerQaCenter legitimately invokes exactly
+ * two READ-ONLY rpcs on mount — the fixture reset preview and the relationship
+ * scenario state read. Assert that mere render / persona-switch / end-QA flows
+ * call nothing outside that exact set, that no destructive/mutating Owner QA
+ * rpc runs without explicit confirmation, and that no billing/Stripe/checkout
+ * surface is ever touched from this page.
  */
+const APPROVED_MOUNT_RPCS = [
+  'owner_qa_fixture_reset_preview',
+  'owner_qa_relationship_scenario_state',
+] as const;
+
+const FORBIDDEN_PASSIVE_RPCS = [
+  'owner_qa_fixture_reset',
+  'owner_qa_apply_relationship_scenario',
+  'owner_qa_clear_relationship_scenario',
+] as const;
+
 function expectOnlyAuthorizedResetRpc() {
   expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview');
+  expect(rpc).toHaveBeenCalledWith('owner_qa_relationship_scenario_state');
   for (const call of rpc.mock.calls) {
-    expect(call[0]).toBe('owner_qa_fixture_reset_preview');
+    expect(APPROVED_MOUNT_RPCS).toContain(call[0] as never);
   }
-  expect(rpc).not.toHaveBeenCalledWith('owner_qa_fixture_reset');
+  for (const forbidden of FORBIDDEN_PASSIVE_RPCS) {
+    expect(rpc).not.toHaveBeenCalledWith(forbidden);
+  }
   for (const call of rpc.mock.calls) {
     expect(String(call[0])).not.toMatch(
       /checkout|stripe|billing|portal|subscription|customer|payment|invoice/i,
