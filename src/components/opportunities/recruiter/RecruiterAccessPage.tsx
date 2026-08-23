@@ -234,7 +234,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       {/* Page header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
-          Recruiter Access
+          Recruiter Command Center
         </h1>
         <p className="text-sm text-muted-foreground">
           Post structured opportunities and connect with professional drivers.
