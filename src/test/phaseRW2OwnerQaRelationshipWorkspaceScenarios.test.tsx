@@ -107,6 +107,19 @@ const rw2MigrationFile = readdirSync(migrationsDir)
 expect(rw2MigrationFile.length).toBe(1);
 const sql = rw2MigrationFile[0].sql;
 
+/** Exact body of one function definition in the RW-2 migration. */
+function fnBody(name: string): string {
+  const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
+  if (start < 0) throw new Error(`RW-2 migration is missing public.${name}`);
+  const end = sql.indexOf('$function$;', start);
+  return sql.slice(start, end);
+}
+
+/** Hook source with comments stripped, so prose never satisfies a contract. */
+const hookCode = () =>
+  hookSource.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+
 const SCENARIOS = [
   'assistant_none',
   'assistant_one',
