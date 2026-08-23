@@ -101,7 +101,7 @@ const Docs = () => {
             </h1>
           </div>
           <p className="max-w-3xl text-base sm:text-lg text-muted-foreground leading-relaxed">
-            Guides are organized by role — <strong>drivers</strong>,{' '}
+            Guides are organized by workspace and audience — <strong>drivers</strong>,{' '}
             <strong>recruiters</strong>, <strong>driver assistants</strong> and{' '}
             <strong>agencies</strong> — plus billing, account, AI/OCR,{' '}
             <strong>settlement statements and reconciliation</strong>, and opportunity topics.
