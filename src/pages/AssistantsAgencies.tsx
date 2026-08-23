@@ -116,7 +116,7 @@ export default function AssistantsAgencies() {
                 <Building2 className="h-5 w-5" /> Create Agency Workspace
               </Button>
               <Button onClick={handleAssistantCTA} size="lg" variant="outline" className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent" style={{ borderColor: AMBER, color: AMBER_BRIGHT, background: 'transparent', borderWidth: 2 }}>
-                <Users className="h-5 w-5" /> Sign in to become a Driver Assistant
+                <Users className="h-5 w-5" /> {assistantCtaLabel}
               </Button>
             </div>
             <p className="mt-5 text-xs" style={{ color: TEXT_DIM }}>
