@@ -55,16 +55,23 @@ describe('Access integrity — direct assistant limits in panel UI', () => {
   });
 });
 
-describe('Access integrity — agency dashboard role gating', () => {
+describe('Access integrity — agency dashboard workspace-permission gating', () => {
   const agency = read('src/pages/AgencyDashboard.tsx');
 
-  it('hides Packages/Requests/Clients tabs from agency members', () => {
-    expect(agency).toMatch(/isOwnerOrAdmin/);
-    expect(agency).toMatch(/show: isOwnerOrAdmin/);
+  it('gates Packages/Requests tabs on granular workspace permissions, never on role', () => {
+    expect(agency).toMatch(/const showPackages = canViewPackages \|\| canManagePackages;/);
+    expect(agency).toMatch(/const showRequests = canViewClientRequests \|\| canManageClientRequests;/);
+    expect(agency).toMatch(/label: 'Packages', show: showPackages/);
+    expect(agency).toMatch(/label: 'Requests', show: showRequests/);
+    // Durable anti-shortcut: role labels are never workspace authority here.
+    expect(agency).not.toMatch(/isOwnerOrAdmin/);
   });
 
-  it('hides Activity audit log from non-owners', () => {
-    expect(agency).toMatch(/'activity', label: 'Activity', show: isOwner/);
+  it('gates Clients and Activity on exact read permissions', () => {
+    expect(agency).toMatch(/label: 'Clients', show: canViewClients/);
+    expect(agency).toMatch(/label: 'Activity', show: canViewAudit/);
+    expect(agency).not.toMatch(/show: isOwnerOrAdmin/);
+    expect(agency).not.toMatch(/'activity', label: 'Activity', show: isOwner\b/);
   });
 
   it('hides plan limits card from non-owners and explains billing ownership', () => {
@@ -72,6 +79,7 @@ describe('Access integrity — agency dashboard role gating', () => {
     expect(agency).toMatch(/Billing and plan limits are managed by the agency owner/);
   });
 });
+
 
 describe('Access integrity — migration: explicit agency delegation link', () => {
   it('adds agency_delegation_id column with FK', () => {

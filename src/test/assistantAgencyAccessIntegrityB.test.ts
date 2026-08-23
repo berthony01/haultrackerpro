@@ -42,30 +42,35 @@ describe('Cleanup B — accept_assistant_invite Pro re-check', () => {
   });
 });
 
-describe('Cleanup B — WorkQueueSection role-aware UI', () => {
+describe('Cleanup B — WorkQueueSection permission-aware UI', () => {
   const wq = read('src/components/agency/WorkQueueSection.tsx');
   const dash = read('src/pages/AgencyDashboard.tsx');
 
-  it('accepts a canManage prop', () => {
-    expect(wq).toMatch(/canManage\?:\s*boolean/);
+  it('requires exact granular permission props, not a generic canManage flag', () => {
+    expect(wq).toMatch(/canViewAllWorkItems:\s*boolean/);
+    expect(wq).toMatch(/canManageWorkItems:\s*boolean/);
+    expect(wq).not.toMatch(/canManage\?:\s*boolean/);
   });
-  it('gates New task button behind canManage', () => {
-    expect(wq).toMatch(/\{canManage && \(\s*<Button[\s\S]+New task/);
+  it('gates New task button behind canManageWorkItems', () => {
+    expect(wq).toMatch(/\{canManageWorkItems && \(\s*<Button[\s\S]+New task/);
   });
-  it('gates the create dialog behind canManage', () => {
-    expect(wq).toMatch(/\{canManage && \(\s*<CreateWorkItemDialog/);
+  it('gates the create dialog behind canManageWorkItems', () => {
+    expect(wq).toMatch(/\{canManageWorkItems && \(\s*<CreateWorkItemDialog/);
   });
-  it('gates driver and member filters behind canManage', () => {
-    // The two extra Selects only render inside a {canManage && (<>...</>)} block.
-    expect(wq).toMatch(/\{canManage && \(\s*<>[\s\S]+All drivers[\s\S]+All members[\s\S]+<\/>/);
+  it('gates driver and member filters behind canViewAllWorkItems, not the manage gate', () => {
+    expect(wq).toMatch(/\{canViewAllWorkItems && \(\s*<>[\s\S]+All drivers[\s\S]+All members[\s\S]+<\/>/);
   });
-  it('shows member-facing copy when canManage is false', () => {
+  it('shows member-facing copy when canViewAllWorkItems is false', () => {
     expect(wq).toMatch(/You'll only see work items assigned to you\. Driver account access still requires driver-approved delegation\./);
   });
-  it('AgencyDashboard wires canManage = isOwnerOrAdmin', () => {
-    expect(dash).toMatch(/<WorkQueueSection[\s\S]+canManage=\{isOwnerOrAdmin\}/);
+  it('AgencyDashboard wires the exact granular work-item permissions', () => {
+    expect(dash).toMatch(/<WorkQueueSection[\s\S]+canViewAllWorkItems=\{canViewAllWorkItems\}/);
+    expect(dash).toMatch(/<WorkQueueSection[\s\S]+canManageWorkItems=\{canManageWorkItems\}/);
+    expect(dash).not.toMatch(/canManage=\{isOwnerOrAdmin\}/);
+    expect(dash).not.toMatch(/isOwnerOrAdmin/);
   });
 });
+
 
 describe('Cleanup B — CreateAgencyCard copy', () => {
   const dash = read('src/pages/AgencyDashboard.tsx');
