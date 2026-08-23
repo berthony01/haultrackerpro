@@ -184,7 +184,7 @@ describe('TG-2E3-O13 — QA Data Reset card', () => {
     expect(rpc).not.toHaveBeenCalledWith('owner_qa_fixture_reset');
   });
 
-  it('confirming invokes only the reset RPC, then refreshes the preview', async () => {
+  it('confirming (scenario inactive) invokes only the approved reset RPCs, then refreshes', async () => {
     previewQueue = [{ ...previewPayload }];
     renderPage();
     await waitFor(() => screen.getByTestId('owner-qa-reset-button'));
@@ -209,14 +209,14 @@ describe('TG-2E3-O13 — QA Data Reset card', () => {
     );
     // Never any edge function / billing / Telegram call.
     expect(invoke).not.toHaveBeenCalled();
-    const rpcNames = rpc.mock.calls.map((c) => c[0]);
+    const rpcNames = rpc.mock.calls.map((c) => String(c[0]));
     expect(
-      rpcNames.every((n) =>
-        ['owner_qa_fixture_reset_preview', 'owner_qa_fixture_reset'].includes(
-          String(n),
-        ),
-      ),
+      rpcNames.every((n) => (APPROVED_O13_RPCS as readonly string[]).includes(n)),
     ).toBe(true);
+    // Scenario is INACTIVE: no relationship mutation may occur on an ordinary reset.
+    for (const forbidden of FORBIDDEN_O13_RPCS) {
+      expect(rpc).not.toHaveBeenCalledWith(forbidden);
+    }
   });
 
   it('zero preview disables the destructive action and shows the reset state', async () => {
