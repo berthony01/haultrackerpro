@@ -76,11 +76,11 @@ export default function RecruiterFeatures() {
             Ready to reach profit-focused drivers?
           </h2>
           <p className="text-sm mb-6 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Apply for recruiter access, get verified, and start posting structured opportunities.
+            Add the recruiter workspace, complete the required profile details, and accept the current posting terms. Complete, active recruiter workspaces can post standard opportunities without admin approval; Verified Recruiter badge review is separate and optional.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button onClick={() => navigate('/auth?intent=recruiter')} className="rounded-xl font-bold gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)' }}>
-              Apply for Recruiter Access
+              Add Recruiter Workspace
             </Button>
             <Button onClick={() => navigate('/recruiter/faq')} variant="outline" className="rounded-xl font-bold" style={{ borderColor: 'hsl(220, 16%, 22%)', color: 'hsl(220, 10%, 70%)', background: 'transparent' }}>
               Recruiter FAQ
