@@ -31,7 +31,8 @@ const lowerExecutable = lower
   .map((line) => line.replace(/--.*$/, ""))
   .join("\n");
 
-const EXPECTED_KEYS = [
+/** The 21 keys declared by the historical RC-1B candidate migration. */
+const HISTORICAL_RC1B_KEYS = [
   "opportunities_view",
   "opportunities_create",
   "opportunities_edit",
@@ -54,6 +55,15 @@ const EXPECTED_KEYS = [
   "team_view",
   "team_manage",
 ];
+
+/** Keys appended by later accepted phases, after the historical 21. */
+const APPENDED_LOAD_KEYS = ["loads_view", "loads_dispatch", "loads_update_status"];
+
+/** The current authoritative vocabulary (live enum + TS mirror). */
+const CURRENT_KEYS = [...HISTORICAL_RC1B_KEYS, ...APPENDED_LOAD_KEYS];
+
+/** Retained for the prohibited-scope scan below. */
+const EXPECTED_KEYS = CURRENT_KEYS;
 
 function functionSlice(name: string): string {
   const start = lowerExecutable.indexOf(`create or replace function public.${name}`);
