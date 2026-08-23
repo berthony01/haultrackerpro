@@ -159,7 +159,7 @@ export function BottomNav(props: BottomNavProps) {
   ].filter(Boolean) as MoreItem[];
 
   const recruiterActiveMoreItems: MoreItem[] = [
-    { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
+    { label: 'Recruiter Command Center', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },
     { label: 'Reports', icon: BarChart3, onClick: () => go('recruiter-access:reports'), description: 'Activity & Pipeline reports (PDF + CSV).' },
@@ -170,7 +170,7 @@ export function BottomNav(props: BottomNavProps) {
   ];
 
   const recruiterHubOnlyMoreItems: MoreItem[] = [
-    { label: 'Recruiter Dashboard', icon: Handshake, onClick: () => go('recruiter-access') },
+    { label: 'Recruiter Command Center', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Switch Workspace', icon: ArrowLeftRight, onClick: () => goHref('/start'), description: 'Choose a different workspace on this account.' },
     { label: 'Sign Out', icon: LogOut, onClick: () => { setMoreOpen(false); signOut(); } },
   ];
