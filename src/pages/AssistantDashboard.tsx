@@ -74,6 +74,15 @@ export default function AssistantDashboard() {
             they granted you. This isn't a separate dashboard or analytics workspace.
           </p>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="assistant-switch-workspace"
+          onClick={() => navigate('/start')}
+        >
+          <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
+          Switch Workspace
+        </Button>
       </header>
 
       {/* Lightweight access summary — intentionally not dashboard-like. */}
