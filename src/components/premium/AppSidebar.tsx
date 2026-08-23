@@ -50,7 +50,7 @@ const driverItems: NavItem[] = [
 ];
 
 const recruiterActiveItems: NavItem[] = [
-  { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+  { id: 'recruiter-access', label: 'Recruiter Command Center', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
   { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },
