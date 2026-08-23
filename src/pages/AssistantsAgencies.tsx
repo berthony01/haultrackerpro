@@ -73,6 +73,8 @@ export default function AssistantsAgencies() {
     if (user) navigate('/assistant');
     else navigate('/auth?next=%2Fassistant');
   };
+  // Display text only — does not affect access, handlers, or routing.
+  const assistantCtaLabel = user ? 'Open Assistant Access Center' : 'Sign in for Assistant Access';
 
   return (
     <div className="min-h-screen" style={{ background: NAVY_BG }}>
