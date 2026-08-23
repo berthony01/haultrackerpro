@@ -91,6 +91,48 @@ const TEST_SURFACES: ReadonlyArray<{ to: string; label: string; hint: string }> 
   { to: '/driver/assistant-control', label: 'Driver Assistant Control', hint: 'Driver-side permission enforcement' },
 ];
 
+/** RW-2 — the locked scenario vocabulary, grouped for the owner surface. */
+const SCENARIO_GROUPS: ReadonlyArray<{
+  key: string;
+  title: string;
+  scenarios: ReadonlyArray<{ key: OwnerQaRelationshipScenario; label: string }>;
+}> = [
+  {
+    key: 'assistant',
+    title: 'Driver Assistant',
+    scenarios: [
+      { key: 'assistant_none', label: 'No drivers' },
+      { key: 'assistant_one', label: 'One driver' },
+      { key: 'assistant_many', label: 'Two drivers — mixed permissions' },
+    ],
+  },
+  {
+    key: 'agency',
+    title: 'Agency',
+    scenarios: [
+      { key: 'agency_owner_populated', label: 'Owner — populated' },
+      { key: 'agency_admin', label: 'Admin' },
+      { key: 'agency_member', label: 'Member' },
+    ],
+  },
+  {
+    key: 'recruiter',
+    title: 'Recruiter',
+    scenarios: [
+      { key: 'recruiter_staff_one', label: 'Staff — one workspace' },
+      { key: 'recruiter_admin_multi', label: 'Admin — two workspaces' },
+    ],
+  },
+];
+
+const SCENARIO_LABELS: Record<string, string> = Object.fromEntries(
+  SCENARIO_GROUPS.flatMap((g) =>
+    g.scenarios.map((s) => [s.key, `${g.title} · ${s.label}`]),
+  ),
+);
+
+
+
 function remainingCopy(expiresAt: string | null): string | null {
   if (!expiresAt) return null;
   const ms = new Date(expiresAt).getTime() - Date.now();
