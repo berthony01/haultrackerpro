@@ -157,6 +157,9 @@ describe('O12 — inactive owner state', () => {
     expect(invoke).not.toHaveBeenCalled();
     // O13: the reset preview rpc is authorized on mount; await its resolution.
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview'));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith('owner_qa_relationship_scenario_state'),
+    );
     expectOnlyAuthorizedResetRpc();
     // No billing invocation surface: no edge-function names, no billing hooks.
     expect(pageSource).not.toMatch(
