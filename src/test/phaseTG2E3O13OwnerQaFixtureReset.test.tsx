@@ -66,6 +66,28 @@ const emptyPayload = Object.fromEntries(
   ),
 );
 
+const INACTIVE_SCENARIO_STATE = {
+  active: false,
+  scenario: null,
+  assistant_driver_count: 0,
+  agency_role: null,
+  agency_permission_count: 0,
+  recruiter_workspace_count: 0,
+  recruiter_roles: [] as string[],
+};
+
+/** Exact set of RPCs this O13 flow may reach. */
+const APPROVED_O13_RPCS = [
+  'owner_qa_fixture_reset_preview',
+  'owner_qa_fixture_reset',
+  'owner_qa_relationship_scenario_state',
+] as const;
+
+const FORBIDDEN_O13_RPCS = [
+  'owner_qa_apply_relationship_scenario',
+  'owner_qa_clear_relationship_scenario',
+] as const;
+
 let previewQueue: unknown[] = [];
 const invoke = vi.fn(async () => ({ data: null, error: null }));
 const rpc = vi.fn(async (fn: string) => {
@@ -74,6 +96,9 @@ const rpc = vi.fn(async (fn: string) => {
   }
   if (fn === 'owner_qa_fixture_reset') {
     return { data: { ...previewPayload }, error: null };
+  }
+  if (fn === 'owner_qa_relationship_scenario_state') {
+    return { data: { ...INACTIVE_SCENARIO_STATE }, error: null };
   }
   return { data: null, error: null };
 });
