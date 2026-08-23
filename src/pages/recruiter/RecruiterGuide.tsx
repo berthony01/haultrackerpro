@@ -69,7 +69,7 @@ export default function RecruiterGuide() {
             Recruiter <span className="text-primary">User Guide</span>
           </h1>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-            From application to hired driver — a clear walkthrough of how to use HaulTrackerPro as a recruiter.
+            From workspace setup to hired driver — a clear walkthrough of how to use HaulTrackerPro as a recruiter.
           </p>
         </div>
       </section>
