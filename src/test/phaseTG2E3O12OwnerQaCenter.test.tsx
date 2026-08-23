@@ -39,9 +39,25 @@ vi.mock('sonner', () => ({
 }));
 
 // Supabase must never be reached by this page for billing/Stripe flows.
-// (O13: the reset preview rpc is the only authorized call on mount.)
+// (O13/RW-2: only the read-only preview + relationship-state rpcs run on mount.)
 const invoke = vi.fn(async () => ({ data: null, error: null }));
-const rpc = vi.fn(async (fn: string) => ({ data: null, error: null }));
+const rpc = vi.fn(async (fn: string) => {
+  if (fn === 'owner_qa_relationship_scenario_state') {
+    return {
+      data: {
+        active: false,
+        scenario: null,
+        assistant_driver_count: 0,
+        agency_role: null,
+        agency_permission_count: 0,
+        recruiter_workspace_count: 0,
+        recruiter_roles: [],
+      },
+      error: null,
+    };
+  }
+  return { data: null, error: null };
+});
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: { functions: { invoke }, rpc },
 }));
