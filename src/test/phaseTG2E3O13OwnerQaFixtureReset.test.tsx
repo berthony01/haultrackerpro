@@ -66,6 +66,28 @@ const emptyPayload = Object.fromEntries(
   ),
 );
 
+const INACTIVE_SCENARIO_STATE = {
+  active: false,
+  scenario: null,
+  assistant_driver_count: 0,
+  agency_role: null,
+  agency_permission_count: 0,
+  recruiter_workspace_count: 0,
+  recruiter_roles: [] as string[],
+};
+
+/** Exact set of RPCs this O13 flow may reach. */
+const APPROVED_O13_RPCS = [
+  'owner_qa_fixture_reset_preview',
+  'owner_qa_fixture_reset',
+  'owner_qa_relationship_scenario_state',
+] as const;
+
+const FORBIDDEN_O13_RPCS = [
+  'owner_qa_apply_relationship_scenario',
+  'owner_qa_clear_relationship_scenario',
+] as const;
+
 let previewQueue: unknown[] = [];
 const invoke = vi.fn(async () => ({ data: null, error: null }));
 const rpc = vi.fn(async (fn: string) => {
@@ -74,6 +96,9 @@ const rpc = vi.fn(async (fn: string) => {
   }
   if (fn === 'owner_qa_fixture_reset') {
     return { data: { ...previewPayload }, error: null };
+  }
+  if (fn === 'owner_qa_relationship_scenario_state') {
+    return { data: { ...INACTIVE_SCENARIO_STATE }, error: null };
   }
   return { data: null, error: null };
 });
@@ -159,7 +184,7 @@ describe('TG-2E3-O13 — QA Data Reset card', () => {
     expect(rpc).not.toHaveBeenCalledWith('owner_qa_fixture_reset');
   });
 
-  it('confirming invokes only the reset RPC, then refreshes the preview', async () => {
+  it('confirming (scenario inactive) invokes only the approved reset RPCs, then refreshes', async () => {
     previewQueue = [{ ...previewPayload }];
     renderPage();
     await waitFor(() => screen.getByTestId('owner-qa-reset-button'));
@@ -184,14 +209,14 @@ describe('TG-2E3-O13 — QA Data Reset card', () => {
     );
     // Never any edge function / billing / Telegram call.
     expect(invoke).not.toHaveBeenCalled();
-    const rpcNames = rpc.mock.calls.map((c) => c[0]);
+    const rpcNames = rpc.mock.calls.map((c) => String(c[0]));
     expect(
-      rpcNames.every((n) =>
-        ['owner_qa_fixture_reset_preview', 'owner_qa_fixture_reset'].includes(
-          String(n),
-        ),
-      ),
+      rpcNames.every((n) => (APPROVED_O13_RPCS as readonly string[]).includes(n)),
     ).toBe(true);
+    // Scenario is INACTIVE: no relationship mutation may occur on an ordinary reset.
+    for (const forbidden of FORBIDDEN_O13_RPCS) {
+      expect(rpc).not.toHaveBeenCalledWith(forbidden);
+    }
   });
 
   it('zero preview disables the destructive action and shows the reset state', async () => {

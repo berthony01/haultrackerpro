@@ -31,7 +31,8 @@ const lowerExecutable = lower
   .map((line) => line.replace(/--.*$/, ""))
   .join("\n");
 
-const EXPECTED_KEYS = [
+/** The 21 keys declared by the historical RC-1B candidate migration. */
+const HISTORICAL_RC1B_KEYS = [
   "opportunities_view",
   "opportunities_create",
   "opportunities_edit",
@@ -55,6 +56,15 @@ const EXPECTED_KEYS = [
   "team_manage",
 ];
 
+/** Keys appended by later accepted phases, after the historical 21. */
+const APPENDED_LOAD_KEYS = ["loads_view", "loads_dispatch", "loads_update_status"];
+
+/** The current authoritative vocabulary (live enum + TS mirror). */
+const CURRENT_KEYS = [...HISTORICAL_RC1B_KEYS, ...APPENDED_LOAD_KEYS];
+
+/** Retained for the prohibited-scope scan below. */
+const EXPECTED_KEYS = CURRENT_KEYS;
+
 function functionSlice(name: string): string {
   const start = lowerExecutable.indexOf(`create or replace function public.${name}`);
   expect(start).toBeGreaterThan(-1);
@@ -77,26 +87,37 @@ describe("RC-1B — permission vocabulary", () => {
     expect(lowerExecutable).toContain("exception when duplicate_object then null");
   });
 
-  it("2b. declares exactly the 21 expected enum keys in order", () => {
+  it("2b. the historical candidate declares exactly the original 21 keys in order", () => {
     const start = lowerExecutable.indexOf("create type public.recruiter_workspace_permission as enum");
     const block = lowerExecutable.slice(start, lowerExecutable.indexOf(");", start));
     const found = Array.from(block.matchAll(/'([a-z_]+)'/g)).map((m) => m[1]);
-    expect(found).toEqual(EXPECTED_KEYS);
+    expect(found).toEqual(HISTORICAL_RC1B_KEYS);
   });
 
-  it("2c. TypeScript mirror matches the enum keys exactly and in order", () => {
-    expect([...RECRUITER_STAFF_PERMISSION_KEYS]).toEqual(EXPECTED_KEYS);
-    expect(new Set(RECRUITER_STAFF_PERMISSION_KEYS).size).toBe(21);
+  it("2b2. the later load keys are appended after the historical 21 and absent from the candidate enum", () => {
+    const start = lowerExecutable.indexOf("create type public.recruiter_workspace_permission as enum");
+    const block = lowerExecutable.slice(start, lowerExecutable.indexOf(");", start));
+    for (const key of APPENDED_LOAD_KEYS) {
+      expect(block).not.toContain(key);
+    }
+    expect(CURRENT_KEYS.slice(0, HISTORICAL_RC1B_KEYS.length)).toEqual(HISTORICAL_RC1B_KEYS);
+    expect(CURRENT_KEYS.slice(HISTORICAL_RC1B_KEYS.length)).toEqual(APPENDED_LOAD_KEYS);
+    expect([...RECRUITER_STAFF_PERMISSION_KEYS].slice(-3)).toEqual(APPENDED_LOAD_KEYS);
   });
 
-  it("2d. every key has a concise label", () => {
+  it("2c. TypeScript mirror matches the CURRENT vocabulary exactly and in order", () => {
+    expect([...RECRUITER_STAFF_PERMISSION_KEYS]).toEqual(CURRENT_KEYS);
+    expect(new Set(RECRUITER_STAFF_PERMISSION_KEYS).size).toBe(24);
+  });
+
+  it("2d. every current key has a concise label", () => {
     for (const key of RECRUITER_STAFF_PERMISSION_KEYS) {
       expect(RECRUITER_STAFF_PERMISSION_LABELS[key].length).toBeGreaterThan(0);
     }
-    expect(Object.keys(RECRUITER_STAFF_PERMISSION_LABELS).sort()).toEqual([...EXPECTED_KEYS].sort());
+    expect(Object.keys(RECRUITER_STAFF_PERMISSION_LABELS).sort()).toEqual([...CURRENT_KEYS].sort());
   });
 
-  it("2e. owner-only areas are listed and are not permission keys", () => {
+  it("2e. owner-only areas are listed and are not current permission keys", () => {
     for (const area of [
       "billing",
       "subscription",
@@ -107,7 +128,7 @@ describe("RC-1B — permission vocabulary", () => {
       "platform_role_changes",
     ]) {
       expect(RECRUITER_OWNER_ONLY_AREAS).toContain(area as never);
-      expect(EXPECTED_KEYS).not.toContain(area);
+      expect(CURRENT_KEYS).not.toContain(area);
     }
   });
 
