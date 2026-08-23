@@ -140,7 +140,7 @@ export default function AssistantDashboard() {
               <div className="flex flex-wrap justify-center gap-2 pt-1">
                 <Button size="sm" variant="outline" onClick={() => navigate('/dashboard')}>
                   <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
-                  Go to my Dashboard
+                  Open Driver Dashboard
                 </Button>
                 <Button size="sm" onClick={() => navigate('/agency')}>
                   <Building2 className="mr-1.5 h-3.5 w-3.5" />
@@ -297,7 +297,7 @@ export default function AssistantDashboard() {
             </p>
           </div>
           <Button size="sm" variant="outline" onClick={() => navigate('/agency')}>
-            {agency ? 'Open agency workspace' : 'Create Agency Workspace'}
+            {agency ? 'Open Agency Console' : 'Create Agency Workspace'}
             <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
           </Button>
         </CardContent>
