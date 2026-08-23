@@ -120,11 +120,9 @@ export function AppSidebar(props: AppSidebarProps) {
 
   const consoleLabel = loading
     ? 'Loading…'
-    : isAssistant
-      ? 'Assistant Console'
-      : isRecruiterConsole
-        ? 'Recruiter Console'
-        : 'Load & Pay Manager';
+    : isRecruiterConsole
+      ? 'Recruiter Command Center'
+      : 'Driver Dashboard';
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 bg-card/40 backdrop-blur-md sticky top-0 h-screen">
