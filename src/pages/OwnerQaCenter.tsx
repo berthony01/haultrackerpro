@@ -9,7 +9,7 @@
 
 import { useMemo, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink, Trash2 } from 'lucide-react';
+import { ArrowLeft, FlaskConical, ShieldCheck, ExternalLink, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +31,10 @@ import {
   OWNER_QA_RESET_CATEGORIES,
 } from '@/hooks/useOwnerQaFixtureReset';
 import {
+  useOwnerQaRelationshipScenario,
+  type OwnerQaRelationshipScenario,
+} from '@/hooks/useOwnerQaRelationshipScenario';
+import {
   OWNER_QA_AGENCY_PERSONAS,
   OWNER_QA_DRIVER_PERSONAS,
   OWNER_QA_PERSONA_LABELS,
@@ -38,6 +42,7 @@ import {
   type OwnerQaDomain,
   type OwnerQaPersona,
 } from '@/lib/billing/ownerQaPersona';
+
 
 const CATEGORY_LABELS: Record<string, string> = {
   carrier_relationships: 'Carrier relationships',
