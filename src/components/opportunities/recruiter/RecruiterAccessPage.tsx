@@ -204,7 +204,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+          <ArrowLeft className="h-4 w-4" /> Back to Driver Dashboard
         </Button>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => scrollTo(howRef)}>
