@@ -18,6 +18,7 @@ import {
   Settings2,
   LayoutDashboard,
   Building2,
+  ArrowLeftRight,
 } from 'lucide-react';
 import {
   PERMISSION_LABELS,
