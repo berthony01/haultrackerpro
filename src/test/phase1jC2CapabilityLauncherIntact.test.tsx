@@ -33,16 +33,20 @@ function clickTile(container: HTMLElement, id: string) {
 }
 
 describe('Phase 1J-C2B — CapabilityLauncher tiles intact', () => {
-  it('renders all four capability tiles', () => {
+  // Phase RW-3 — the four tiles now carry the canonical workspace names as
+  // their PRIMARY labels. Tile count, ids, and routes are unchanged.
+  it('renders all four capability tiles with canonical workspace names', () => {
     renderLauncher();
-    expect(screen.getByText(/Track my trucking business/i)).toBeInTheDocument();
-    expect(screen.getByText(/Post driver opportunities/i)).toBeInTheDocument();
-    expect(screen.getByText(/Help drivers as an assistant/i)).toBeInTheDocument();
-    expect(screen.getByText(/Build a back-office agency/i)).toBeInTheDocument();
+    expect(screen.getByText('Driver Dashboard')).toBeInTheDocument();
+    expect(screen.getByText('Recruiter Command Center')).toBeInTheDocument();
+    expect(screen.getByText('Assistant Access Center')).toBeInTheDocument();
+    expect(screen.getByText('Agency Console')).toBeInTheDocument();
   });
 
   it('exposes all four capability data attributes', () => {
     const { container } = renderLauncher();
+    const tiles = container.querySelectorAll('[data-capability]');
+    expect(tiles).toHaveLength(4);
     for (const id of ['driver', 'recruiter', 'assistant', 'agency']) {
       expect(container.querySelector(`[data-capability="${id}"]`)).not.toBeNull();
     }
