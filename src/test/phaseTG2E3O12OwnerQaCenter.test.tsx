@@ -204,6 +204,10 @@ describe('O12 — active owner state', () => {
     fireEvent.click(screen.getByTestId('owner-qa-end'));
     await waitFor(() => expect(disable).toHaveBeenCalledTimes(1));
     expect(invoke).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith('owner_qa_relationship_scenario_state'),
+    );
+    expectOnlyAuthorizedResetRpc();
   });
 });
 
@@ -215,6 +219,9 @@ describe('O12 — persona switching', () => {
     expect(setPersona).toHaveBeenCalledWith('agency', 'agency_team');
     expect(invoke).not.toHaveBeenCalled();
     await waitFor(() => expect(rpc).toHaveBeenCalledWith('owner_qa_fixture_reset_preview'));
+    await waitFor(() =>
+      expect(rpc).toHaveBeenCalledWith('owner_qa_relationship_scenario_state'),
+    );
     expectOnlyAuthorizedResetRpc();
   });
 
