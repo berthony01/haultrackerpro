@@ -119,7 +119,7 @@ const Docs = () => {
             <Input
               id="docs-search"
               type="search"
-              placeholder="Search guides by title, topic or role…"
+              placeholder="Search guides by title, topic or workspace…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-9"
