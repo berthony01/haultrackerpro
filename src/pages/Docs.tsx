@@ -101,7 +101,7 @@ const Docs = () => {
             </h1>
           </div>
           <p className="max-w-3xl text-base sm:text-lg text-muted-foreground leading-relaxed">
-            Guides are organized by role — <strong>drivers</strong>,{' '}
+            Guides are organized by workspace and audience — <strong>drivers</strong>,{' '}
             <strong>recruiters</strong>, <strong>driver assistants</strong> and{' '}
             <strong>agencies</strong> — plus billing, account, AI/OCR,{' '}
             <strong>settlement statements and reconciliation</strong>, and opportunity topics.
@@ -119,7 +119,7 @@ const Docs = () => {
             <Input
               id="docs-search"
               type="search"
-              placeholder="Search guides by title, topic or role…"
+              placeholder="Search guides by title, topic or workspace…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="pl-9"

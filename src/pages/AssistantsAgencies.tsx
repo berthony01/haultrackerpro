@@ -73,6 +73,8 @@ export default function AssistantsAgencies() {
     if (user) navigate('/assistant');
     else navigate('/auth?next=%2Fassistant');
   };
+  // Display text only — does not affect access, handlers, or routing.
+  const assistantCtaLabel = user ? 'Open Assistant Access Center' : 'Sign in for Assistant Access';
 
   return (
     <div className="min-h-screen" style={{ background: NAVY_BG }}>
@@ -114,7 +116,7 @@ export default function AssistantsAgencies() {
                 <Building2 className="h-5 w-5" /> Create Agency Workspace
               </Button>
               <Button onClick={handleAssistantCTA} size="lg" variant="outline" className="text-base font-bold rounded-xl h-13 px-7 gap-2 hover:bg-transparent" style={{ borderColor: AMBER, color: AMBER_BRIGHT, background: 'transparent', borderWidth: 2 }}>
-                <Users className="h-5 w-5" /> Sign in to become a Driver Assistant
+                <Users className="h-5 w-5" /> {assistantCtaLabel}
               </Button>
             </div>
             <p className="mt-5 text-xs" style={{ color: TEXT_DIM }}>
@@ -138,7 +140,7 @@ export default function AssistantsAgencies() {
                     'Every action is audit-logged on the driver\'s account',
                     'Settlements only with the matching permission: settlement view to view, settlement-management to manage, settlement-finalize to finalize',
                   ],
-                  cta: 'Become a Driver Assistant',
+                  cta: assistantCtaLabel,
                   onClick: handleAssistantCTA,
                 },
                 {
@@ -255,7 +257,7 @@ export default function AssistantsAgencies() {
                   <Building2 className="h-4 w-4" /> Create Agency Workspace
                 </Button>
                 <Button onClick={handleAssistantCTA} variant="outline" className="rounded-xl font-bold gap-2 hover:bg-transparent" style={{ borderColor: AMBER, color: AMBER_BRIGHT, borderWidth: 2, background: 'transparent' }}>
-                  <Users className="h-4 w-4" /> Sign in to become a Driver Assistant
+                  <Users className="h-4 w-4" /> {assistantCtaLabel}
                 </Button>
               </div>
             </div>

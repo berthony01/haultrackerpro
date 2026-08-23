@@ -69,13 +69,13 @@ export default function RecruiterGuide() {
             Recruiter <span className="text-primary">User Guide</span>
           </h1>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-            From application to hired driver — a clear walkthrough of how to use HaulTrackerPro as a recruiter.
+            From workspace setup to hired driver — a clear walkthrough of how to use HaulTrackerPro as a recruiter.
           </p>
         </div>
       </section>
 
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-14 sm:py-20">
-        <h2 className="text-2xl sm:text-3xl font-black font-heading text-center mb-10">The 7-step flow</h2>
+        <h2 className="text-2xl sm:text-3xl font-black font-heading text-center mb-10">The 8-step flow</h2>
         <div className="space-y-4">
           {steps.map((s) => (
             <Card key={s.num} className="shadow-card border-border">

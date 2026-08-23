@@ -41,6 +41,9 @@ const FILES_TO_SCAN = [
   'src/pages/recruiter/RecruiterGuide.tsx',
   'src/pages/resources/RecruiterToolsGuide.tsx',
   'src/lib/recruiterFeatureList.ts',
+  // Phase RW-4 corrected recruiter surfaces (now protected by the same guard)
+  'src/pages/Auth.tsx',
+  'src/pages/recruiter/RecruiterFeatures.tsx',
 ];
 
 const FORBIDDEN: RegExp[] = [
