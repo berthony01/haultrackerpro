@@ -84,11 +84,11 @@ export default function CapabilityLauncher() {
         </button>
 
         <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-          What do you want to do?
+          Choose a workspace
         </h1>
         <p className="mt-2 text-sm" style={{ color: TEXT_MUTED }}>
-          A single HaulTrackerPro account can be a driver, recruiter, driver assistant, or back-office agency.
-          Pick the capability you want right now — you can switch any time.
+          A single HaulTrackerPro account can hold multiple workspaces. Open the one you
+          need right now — you can switch at any time.
         </p>
 
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
