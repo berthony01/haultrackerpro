@@ -584,7 +584,7 @@ const faqs: Faq[] = [
   {
     id: 'what-are-opportunities',
     question: 'What are HaulTrackerPro Opportunities?',
-    answer: 'Opportunities are trucking opportunities submitted by approved recruiters and carriers. Drivers can review estimated pay, RPM, deadhead, deductions, and request more information.',
+    answer: 'Opportunities are structured trucking listings submitted by recruiters and carriers whose workspaces meet the current posting requirements. Drivers can review estimated pay, RPM, deadhead, deductions, and request more information.',
   },
   {
     id: 'opportunity-earnings-guaranteed',
