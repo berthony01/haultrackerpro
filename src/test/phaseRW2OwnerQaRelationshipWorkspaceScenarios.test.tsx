@@ -271,7 +271,7 @@ describe('RW-2 — state exposes no sensitive identifiers', () => {
   });
 
   it('never persists scenario authority in browser storage', () => {
-    expect(hookSource).not.toMatch(/localStorage|sessionStorage/);
+    expect(hookCode()).not.toMatch(/localStorage|sessionStorage/);
     expect(hookSource).toContain('useOwnerQaPersona');
   });
 });
@@ -305,7 +305,7 @@ describe('RW-2 — no schema or billing mutation', () => {
 
 describe('RW-2 — synthetic auxiliary identity', () => {
   it('creates a generated-uuid, .invalid, non-login-capable, banned user', () => {
-    const body = sql.split('_owner_qa_rw2_ensure_aux_user()')[2] ?? sql;
+    const body = fnBody('_owner_qa_rw2_ensure_aux_user');
     expect(body).toContain('gen_random_uuid()');
     expect(body).toContain('@haultrackerpro.invalid');
     expect(body).toMatch(/banned_until/);
@@ -371,7 +371,7 @@ describe('RW-2 — assistant scenarios', () => {
 
 describe('RW-2 — agency scenarios', () => {
   it('derives COMPLETE 11-key permission maps from the live enum', () => {
-    const helper = sql.split('_owner_qa_rw2_perm_map')[2] ?? '';
+    const helper = fnBody('_owner_qa_rw2_perm_map');
     expect(helper).toContain('FROM pg_enum e');
     expect(helper).toContain('jsonb_object_agg');
     expect(helper).toContain("t.typname = _enum");
@@ -489,8 +489,7 @@ describe('RW-2 — recruiter team seat limit QA overlay', () => {
 });
 
 describe('RW-2 — clear restores the BASE topology', () => {
-  const clear = () =>
-    sql.split('owner_qa_clear_relationship_scenario()')[3] ?? sql;
+  const clear = () => fnBody('owner_qa_clear_relationship_scenario');
 
   it('restores canonical agency and recruiter ownership for the QA owner', () => {
     const body = clear();
