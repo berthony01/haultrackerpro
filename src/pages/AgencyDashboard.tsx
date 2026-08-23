@@ -114,12 +114,12 @@ export default function AgencyDashboard() {
         </div>
         <p className="text-sm text-muted-foreground">
           Back-office workspace for managing client drivers. This is a separate
-          workspace from your driver Dashboard and recruiter Console — nothing
+          workspace from your Driver Dashboard and Recruiter Command Center — nothing
           you do here touches your own loads, expenses, or fuel logs.
         </p>
         <div className="flex flex-wrap gap-2 pt-1">
           <Button variant="outline" size="sm" onClick={() => navigate('/start')}>
-            Switch workspace
+            Switch Workspace
           </Button>
         </div>
       </header>

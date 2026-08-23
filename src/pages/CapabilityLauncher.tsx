@@ -20,29 +20,29 @@ type Tile = {
 const TILES: Tile[] = [
   {
     id: 'driver',
-    label: 'Track my trucking business',
+    label: 'Driver Dashboard',
     blurb: 'Loads, expenses, fuel logs, reports, and real profit.',
     Icon: Truck,
     to: '/dashboard',
   },
   {
     id: 'recruiter',
-    label: 'Post driver opportunities',
-    blurb: 'Recruit drivers with structured, transparent listings.',
+    label: 'Recruiter Command Center',
+    blurb: 'Post structured driver opportunities and manage your hiring workflow.',
     Icon: Briefcase,
     to: '/recruiter',
   },
   {
     id: 'assistant',
-    label: 'Help drivers as an assistant',
-    blurb: 'Manage trucking records for drivers who invite you.',
+    label: 'Assistant Access Center',
+    blurb: 'Manage records for drivers who invited and approved you.',
     Icon: Users,
     to: '/assistant',
   },
   {
     id: 'agency',
-    label: 'Build a back-office agency',
-    blurb: 'Create a workspace and manage approved driver clients.',
+    label: 'Agency Console',
+    blurb: 'Manage approved driver clients, service packages, and your team.',
     Icon: Building2,
     to: '/agency',
   },
@@ -84,11 +84,11 @@ export default function CapabilityLauncher() {
         </button>
 
         <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-          What do you want to do?
+          Choose a workspace
         </h1>
         <p className="mt-2 text-sm" style={{ color: TEXT_MUTED }}>
-          A single HaulTrackerPro account can be a driver, recruiter, driver assistant, or back-office agency.
-          Pick the capability you want right now — you can switch any time.
+          A single HaulTrackerPro account can hold multiple workspaces. Open the one you
+          need right now — you can switch at any time.
         </p>
 
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">

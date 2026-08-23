@@ -204,7 +204,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       {/* Top bar */}
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="sm" onClick={onBack} className="-ml-2">
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+          <ArrowLeft className="h-4 w-4" /> Back to Driver Dashboard
         </Button>
         <div className="ml-auto flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={() => scrollTo(howRef)}>
@@ -234,7 +234,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
       {/* Page header */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground mb-1">
-          Recruiter Access
+          Recruiter Command Center
         </h1>
         <p className="text-sm text-muted-foreground">
           Post structured opportunities and connect with professional drivers.

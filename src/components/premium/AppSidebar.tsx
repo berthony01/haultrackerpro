@@ -50,7 +50,7 @@ const driverItems: NavItem[] = [
 ];
 
 const recruiterActiveItems: NavItem[] = [
-  { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+  { id: 'recruiter-access', label: 'Recruiter Command Center', icon: Handshake },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
   { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },
@@ -60,7 +60,7 @@ const recruiterActiveItems: NavItem[] = [
 ];
 
 const recruiterHubOnlyItems: NavItem[] = [
-  { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+  { id: 'recruiter-access', label: 'Recruiter Command Center', icon: Handshake },
   { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
@@ -120,11 +120,9 @@ export function AppSidebar(props: AppSidebarProps) {
 
   const consoleLabel = loading
     ? 'Loading…'
-    : isAssistant
-      ? 'Assistant Console'
-      : isRecruiterConsole
-        ? 'Recruiter Console'
-        : 'Load & Pay Manager';
+    : isRecruiterConsole
+      ? 'Recruiter Command Center'
+      : 'Driver Dashboard';
 
   return (
     <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/60 bg-card/40 backdrop-blur-md sticky top-0 h-screen">

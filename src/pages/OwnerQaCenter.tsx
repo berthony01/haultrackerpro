@@ -85,8 +85,8 @@ const PERSONA_GROUPS: ReadonlyArray<{
 const TEST_SURFACES: ReadonlyArray<{ to: string; label: string; hint: string }> = [
   { to: '/dashboard', label: 'Driver Dashboard', hint: 'Driver limits, insights and Pro gates' },
   { to: '/dashboard?page=opportunities', label: 'Opportunities', hint: 'Driver apply flow and saved opportunities' },
-  { to: '/recruiter', label: 'Recruiter Hub', hint: 'Recruiter plan limits and posting gates' },
-  { to: '/assistant', label: 'Assistant Dashboard', hint: 'Delegated driver access boundaries' },
+  { to: '/recruiter', label: 'Recruiter Command Center', hint: 'Recruiter plan limits and posting gates' },
+  { to: '/assistant', label: 'Assistant Access Center', hint: 'Delegated driver access boundaries' },
   { to: '/agency', label: 'Agency Console', hint: 'Agency plan limits, members and clients' },
   { to: '/driver/assistant-control', label: 'Driver Assistant Control', hint: 'Driver-side permission enforcement' },
 ];
