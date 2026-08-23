@@ -235,14 +235,14 @@ export default function Auth() {
   const titles: Record<Capability, { login: string; signup: string }> = {
     driver: { login: 'Welcome back, driver', signup: 'Create your driver account' },
     recruiter: { login: 'Welcome back, recruiter', signup: 'Create your recruiter account' },
-    assistant: { login: 'Continue to assistant dashboard', signup: 'Create your account to assist drivers' },
-    agency: { login: 'Continue to agency workspace', signup: 'Create your agency workspace account' },
+    assistant: { login: 'Continue to Assistant Access Center', signup: 'Create your account for Assistant Access' },
+    agency: { login: 'Continue to Agency Console', signup: 'Create your account to start an agency workspace' },
   };
   const title = titles[capability][mode];
 
   const helpers: Record<Capability, string> = {
     driver: 'Track your real profit, manage loads, compare opportunities, and get a guided setup after sign up.',
-    recruiter: 'Apply for recruiter access, post structured opportunities, and manage driver requests. Recruiter accounts require approval before posting.',
+    recruiter: 'Add the recruiter workspace, complete the required recruiter details, and accept the current posting terms. Complete, active recruiter workspaces can post standard opportunities without admin approval; Verified Recruiter badge review is separate and optional.',
     assistant: 'Driver Assistant access begins through a driver invite or approved delegation. Create an account, then ask a driver to invite you. We do not auto-grant access to any driver account.',
     agency: 'Create a personal agency workspace, publish service packages, share your private agency request link, and manage approved driver clients. We do not process service payments or guarantee income.',
   };
