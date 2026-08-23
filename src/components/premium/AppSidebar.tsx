@@ -60,7 +60,7 @@ const recruiterActiveItems: NavItem[] = [
 ];
 
 const recruiterHubOnlyItems: NavItem[] = [
-  { id: 'recruiter-access', label: 'Recruiter Dashboard', icon: Handshake },
+  { id: 'recruiter-access', label: 'Recruiter Command Center', icon: Handshake },
   { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
 ];
 
