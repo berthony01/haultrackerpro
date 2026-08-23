@@ -164,12 +164,25 @@ export default function OwnerQaCenter() {
     error: resetError,
   } = useOwnerQaFixtureReset();
 
+  const {
+    state: scenarioState,
+    isLoading: scenarioLoading,
+    isApplying: scenarioApplying,
+    error: scenarioError,
+    apply: applyScenario,
+    clear: clearScenario,
+    refetch: refetchScenario,
+  } = useOwnerQaRelationshipScenario();
+
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingScenario, setPendingScenario] =
+    useState<OwnerQaRelationshipScenario | null>(null);
 
   const remaining = useMemo(() => remainingCopy(expiresAt), [expiresAt]);
 
   const totalRows = preview?.totalRows ?? 0;
-  const nothingToReset = !resetLoading && totalRows === 0;
+  const scenarioActive = scenarioState?.active === true;
+  const nothingToReset = !resetLoading && totalRows === 0 && !scenarioActive;
 
   // Owner-only. Non-owners follow the app's established redirect behavior.
   if (isLoading) return null;
@@ -196,12 +209,41 @@ export default function OwnerQaCenter() {
   const handleReset = async () => {
     setConfirmOpen(false);
     try {
+      // RW-2: auxiliaries must be deactivated before the existing operational
+      // reset runs, so an active relationship scenario is cleared first.
+      if (scenarioActive) {
+        await clearScenario();
+      }
       const result = await reset();
+      refetchScenario();
       toast.success(`QA test data reset — ${result?.totalRows ?? 0} rows removed`);
     } catch {
       toast.error('Could not reset QA test data.');
     }
   };
+
+  const handleApplyScenario = async () => {
+    const next = pendingScenario;
+    setPendingScenario(null);
+    if (!next) return;
+    try {
+      await applyScenario(next);
+      toast.success(`Scenario applied — ${SCENARIO_LABELS[next] ?? next}`);
+    } catch {
+      toast.error('Could not apply the relationship scenario.');
+    }
+  };
+
+  const handleClearScenario = async () => {
+    try {
+      await clearScenario();
+      toast.success('Relationship scenario cleared');
+    } catch {
+      toast.error('Could not clear the relationship scenario.');
+    }
+  };
+
+
 
 
   return (
