@@ -140,7 +140,7 @@ export default function AssistantsAgencies() {
                     'Every action is audit-logged on the driver\'s account',
                     'Settlements only with the matching permission: settlement view to view, settlement-management to manage, settlement-finalize to finalize',
                   ],
-                  cta: 'Become a Driver Assistant',
+                  cta: assistantCtaLabel,
                   onClick: handleAssistantCTA,
                 },
                 {
