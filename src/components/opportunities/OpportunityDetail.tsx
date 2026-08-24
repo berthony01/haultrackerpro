@@ -535,7 +535,7 @@ export function OpportunityDetail({
 
       {/* 2 + 3. Pay & Route surface */}
       {(hasPaySection || hasCoverageSection) && (
-        <Surface>
+        <Surface desktopColumns={2}>
           {hasPaySection && (
             <Section icon={DollarSign} title="Pay & Compensation">
               {payKVs.length > 0 && (
