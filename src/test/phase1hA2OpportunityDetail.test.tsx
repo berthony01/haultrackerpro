@@ -74,7 +74,9 @@ const driverProfile: any = {
   contact_preference: 'in_app',
 };
 
-function renderPage(overrides: { isPro?: boolean; apps?: any[] } = {}) {
+function renderPage(
+  overrides: { isPro?: boolean; apps?: any[]; profile?: any } = {},
+) {
   driverApplicationsRef.current = overrides.apps ?? [];
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -84,7 +86,7 @@ function renderPage(overrides: { isPro?: boolean; apps?: any[] } = {}) {
         onBack={vi.fn()}
         isPro={overrides.isPro ?? false}
         onUpgrade={vi.fn()}
-        driverProfile={driverProfile}
+        driverProfile={'profile' in overrides ? overrides.profile : driverProfile}
         onOpenPreferencesForApply={vi.fn()}
       />
     </QueryClientProvider>,
