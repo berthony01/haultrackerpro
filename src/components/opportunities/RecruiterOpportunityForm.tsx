@@ -782,6 +782,9 @@ function RecruiterOpportunityFormCore({
             {state.pay_model === 'cpm' && (
               <div className="mt-4">
                 <NumField label="CPM Rate ($/mi)" value={state.cpm} onChange={(v) => set('cpm', v)} />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enter dollars per mile as a decimal: 75 cents = 0.75.
+                </p>
               </div>
             )}
             {state.pay_model === 'percentage' && (
