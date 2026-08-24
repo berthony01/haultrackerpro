@@ -462,56 +462,56 @@ export function OpportunityDetail({
       </Card>
 
 
-      {/* Match Insights (secondary rationale — kept for driver context) */}
+      {/* Match Insights — compact secondary panel */}
       {match ? (
-        <Card className="p-5 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <Card className="p-4 border-primary/25 bg-primary/[0.04]" data-testid="opportunity-match-panel">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-primary/15 p-1.5">
-                <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden />
-              </div>
-              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Your Match</h3>
+              <CheckCircle2 className="h-4 w-4 text-primary shrink-0" aria-hidden />
+              <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Your Match</h3>
             </div>
             <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} size="md" />
           </div>
-          {match.reasons.length > 0 && (
-            <div className="mb-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Why This Matches You
-              </p>
-              <ul className="space-y-1.5">
-                {match.reasons.map((r) => (
-                  <li key={r} className="flex items-start gap-2 text-sm text-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden />
-                    <span>{r}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {match.warnings.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Potential Concerns
-              </p>
-              <ul className="space-y-1.5">
-                {match.warnings.map((w) => (
-                  <li key={w} className="flex items-start gap-2 text-sm text-foreground">
-                    <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden />
-                    <span>{w}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {match.reasons.length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
+                  Why This Matches You
+                </p>
+                <ul className="space-y-1">
+                  {match.reasons.map((r) => (
+                    <li key={r} className="flex items-start gap-2 text-xs text-foreground">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" aria-hidden />
+                      <span className="break-words">{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {match.warnings.length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
+                  Potential Concerns
+                </p>
+                <ul className="space-y-1">
+                  {match.warnings.map((w) => (
+                    <li key={w} className="flex items-start gap-2 text-xs text-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" aria-hidden />
+                      <span className="break-words">{w}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </Card>
       ) : (
-        <Card className="p-5 border-border/60 bg-muted/20">
+        <Card className="p-4 border-border/60 bg-muted/20" data-testid="opportunity-match-panel">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" aria-hidden />
-            <div>
+            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" aria-hidden />
+            <div className="min-w-0">
               <h3 className="text-sm font-bold text-foreground mb-1">Improve Your Match Insights</h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground break-words">
                 Add a few Opportunity Preferences to see how well this opportunity fits your pay goals, route preference, and equipment.
               </p>
             </div>
@@ -521,134 +521,130 @@ export function OpportunityDetail({
 
       {/* 1. Opportunity Overview */}
       {overviewContent && (
-        <Section icon={FileText} title="Opportunity Overview">
-          <p className="text-sm text-foreground whitespace-pre-line">{overviewContent}</p>
-        </Section>
+        <Surface>
+          <Section icon={FileText} title="Opportunity Overview">
+            <p className="text-sm text-foreground whitespace-pre-line break-words">{overviewContent}</p>
+          </Section>
+        </Surface>
       )}
 
-      {/* 2. Pay & Compensation */}
-      {hasPaySection && (
-        <Section icon={DollarSign} title="Pay & Compensation">
-          {payKVs.length > 0 && (
-            <Grid>
-              {payKVs.map(([label, value]) => (
-                <KV
-                  key={label}
-                  label={label}
-                  value={value}
-                  highlight={label === grossLabel}
-                />
-              ))}
-            </Grid>
+      {/* 2 + 3. Pay & Route surface */}
+      {(hasPaySection || hasCoverageSection) && (
+        <Surface>
+          {hasPaySection && (
+            <Section icon={DollarSign} title="Pay & Compensation">
+              {payKVs.length > 0 && (
+                <Grid>
+                  {payKVs.map(([label, value]) => (
+                    <KV
+                      key={label}
+                      label={label}
+                      value={value}
+                      highlight={label === grossLabel}
+                    />
+                  ))}
+                </Grid>
+              )}
+              {mixedComponents.length > 0 && (
+                <div className="mt-3 rounded-lg bg-muted/30 p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                    Mixed pay components
+                  </p>
+                  <ul className="space-y-1">
+                    {mixedComponents.map((c, i) => (
+                      <li key={i} className="text-sm text-foreground flex justify-between gap-2">
+                        <span className="break-words">{c.label || 'Component'}</span>
+                        <span className="font-semibold whitespace-nowrap">
+                          {c.amount.state === 'provided'
+                            ? `${fmtMoney(c.amount.value.amount)}${
+                                c.amount.value.frequency ? ` ${c.amount.value.frequency}` : ''
+                              }`
+                            : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {signOnAmount != null && (
+                <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-3">
+                  <Gift className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">
+                      One-time incentive · separate from weekly pay
+                    </p>
+                    <p className="text-sm font-bold text-foreground break-words">
+                      Sign-on bonus: {fmtMoney(signOnAmount)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </Section>
           )}
-          {mixedComponents.length > 0 && (
-            <div className="mt-3 rounded-lg bg-muted/30 p-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Mixed pay components
-              </p>
-              <ul className="space-y-1">
-                {mixedComponents.map((c, i) => (
-                  <li key={i} className="text-sm text-foreground flex justify-between gap-2">
-                    <span>{c.label || 'Component'}</span>
-                    <span className="font-semibold">
-                      {c.amount.state === 'provided'
-                        ? `${fmtMoney(c.amount.value.amount)}${
-                            c.amount.value.frequency ? ` ${c.amount.value.frequency}` : ''
-                          }`
-                        : ''}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+
+          {hasCoverageSection && (
+            <Section icon={MapPin} title="Hiring Coverage & Route">
+              {mileageKVs.length > 0 && (
+                <Grid>
+                  {mileageKVs.map(([label, value, warn]) => (
+                    <KV key={label} label={label} value={value} warn={warn} />
+                  ))}
+                </Grid>
+              )}
+              {typicalLanes && (
+                <div className={mileageKVs.length > 0 ? 'mt-3' : ''}>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                    Typical Lanes
+                  </p>
+                  <p className="text-sm text-foreground whitespace-pre-line break-words">{typicalLanes}</p>
+                </div>
+              )}
+            </Section>
           )}
-          {signOnAmount != null && (
-            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-3">
-              <Gift className="h-4 w-4 text-primary shrink-0" aria-hidden />
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">
-                  One-time incentive · separate from weekly pay
-                </p>
-                <p className="text-sm font-bold text-foreground">
-                  Sign-on bonus: {fmtMoney(signOnAmount)}
-                </p>
-              </div>
-            </div>
-          )}
-        </Section>
+        </Surface>
       )}
 
-      {/* 3. Hiring Coverage & Route */}
-      {hasCoverageSection && (
-        <Section icon={MapPin} title="Hiring Coverage & Route">
-          {coverageKVs.length > 0 && (
-            <Grid>
-              {coverageKVs.map(([label, value]) => (
-                <KV key={label} label={label} value={value} />
-              ))}
-            </Grid>
-          )}
-          {mileageKVs.length > 0 && (
-            <div className="mt-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Mileage & deadhead
-              </p>
+      {/* 4 + 5 + 6. Lifestyle & Benefits surface */}
+      {(lifestyleKVs.length > 0 || benefits || requirements) && (
+        <Surface>
+          {lifestyleKVs.length > 0 && (
+            <Section icon={Home} title="Home Time & Lifestyle">
               <Grid>
-                {mileageKVs.map(([label, value, warn]) => (
-                  <KV key={label} label={label} value={value} warn={warn} />
+                {lifestyleKVs.map(([label, value]) => (
+                  <KV key={label} label={label} value={value} />
                 ))}
               </Grid>
-            </div>
+            </Section>
           )}
-          {typicalLanes && (
-            <div className="mt-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Typical Lanes
-              </p>
-              <p className="text-sm text-foreground whitespace-pre-line">{typicalLanes}</p>
-            </div>
+          {benefits && (
+            <Section icon={ShieldCheck} title="Benefits & Equipment">
+              <p className="text-sm text-foreground whitespace-pre-line break-words">{benefits}</p>
+            </Section>
           )}
-        </Section>
-      )}
-
-      {/* 4. Home Time & Lifestyle */}
-      {lifestyleKVs.length > 0 && (
-        <Section icon={Home} title="Home Time & Lifestyle">
-          <Grid>
-            {lifestyleKVs.map(([label, value]) => (
-              <KV key={label} label={label} value={value} />
-            ))}
-          </Grid>
-        </Section>
-      )}
-
-      {/* 5. Benefits & Equipment */}
-      {benefits && (
-        <Section icon={ShieldCheck} title="Benefits & Equipment">
-          <p className="text-sm text-foreground whitespace-pre-line">{benefits}</p>
-        </Section>
-      )}
-
-      {/* 6. Requirements */}
-      {requirements && (
-        <Section icon={ClipboardList} title="Requirements">
-          <p className="text-sm text-foreground whitespace-pre-line">{requirements}</p>
-        </Section>
+          {requirements && (
+            <Section icon={ClipboardList} title="Requirements">
+              <p className="text-sm text-foreground whitespace-pre-line break-words">{requirements}</p>
+            </Section>
+          )}
+        </Surface>
       )}
 
       {/* 7. Costs & Operating Terms (cost-bearing employment only) */}
       {hasCostsSection && (
-        <Section icon={Wallet} title="Costs & Operating Terms">
-          <Grid>
-            {costsKVs.map(([label, value]) => (
-              <KV key={label} label={label} value={value} />
-            ))}
-          </Grid>
-        </Section>
+        <Surface>
+          <Section icon={Wallet} title="Costs & Operating Terms">
+            <Grid>
+              {costsKVs.map(([label, value]) => (
+                <KV key={label} label={label} value={value} />
+              ))}
+            </Grid>
+          </Section>
+        </Surface>
       )}
 
-      {/* 8. Transparency & Financial Disclosure (secondary) */}
-      <OpportunityProfitBreakdown canonical={canonical} isPro={isPro} onUpgrade={onUpgrade} />
+      {/* 8. Transparency & Financial Disclosure (secondary, merged surface) */}
+      <OpportunityProfitBreakdown canonical={canonical} isPro={isPro} onUpgrade={onUpgrade} compact />
+
 
       <div aria-hidden className="h-32 lg:h-28" />
 
