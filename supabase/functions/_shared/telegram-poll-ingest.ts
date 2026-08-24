@@ -21,9 +21,13 @@ export type TelegramIgnoredResultCode =
 
 export type TelegramStartResultCode = "link_success" | "link_rejected";
 
+/** Phase TG-2F-C — dispatch group `/bind` terminal outcomes. */
+export type TelegramBindResultCode = "bind_success" | "bind_rejected";
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
-  | TelegramStartResultCode;
+  | TelegramStartResultCode
+  | TelegramBindResultCode;
 
 export interface TelegramPollLease {
   leaseToken: string;
@@ -50,6 +54,16 @@ export interface TelegramPollLedger {
     resultCode: TelegramIgnoredResultCode;
   }): Promise<TelegramTerminalResult>;
   processStartUpdate(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    rawToken: string;
+  }): Promise<TelegramTerminalResult>;
+  /** TG-2F-C. Atomic: consume + terminal receipt in one DB transaction. */
+  processBindUpdate(input: {
     leaseToken: string;
     updateId: number;
     payloadHash: string;
@@ -120,7 +134,22 @@ export const TELEGRAM_LINK_SUCCESS_MESSAGE =
 export const TELEGRAM_LINK_FAILURE_MESSAGE =
   "That link is invalid or expired. Generate a new Telegram link in HaulTracker Pro and try again.";
 
+// TG-2F-C. Deliberately generic: no workspace name, no recruiter id, no
+// reason, no username, no echo of the submitted command.
+export const TELEGRAM_BIND_SUCCESS_MESSAGE =
+  "This Telegram group is now connected to your HaulTracker Pro recruiter workspace.";
+export const TELEGRAM_BIND_FAILURE_MESSAGE =
+  "That connection code could not be accepted. Generate a new code in HaulTracker Pro and check that your Telegram account is connected there.";
+
 const START_COMMAND_PATTERN = /^\/start ([0-9a-f]{64})$/;
+
+/** TG-2F-C. `/bind <64 lowercase hex>`, optionally addressed to the bot. The
+ *  bot username is a public, non-secret constant. */
+export const TELEGRAM_BOT_USERNAME = "HaulTrackerProDispatchBot";
+const BIND_COMMAND_PATTERN = new RegExp(
+  `^\\/bind(?:@${TELEGRAM_BOT_USERNAME})? ([0-9a-f]{64})$`,
+);
+const BIND_CHAT_TYPES = ["group", "supergroup"];
 
 /** Deterministic JSON serialisation: object keys sorted at every depth so the
  *  same logical update always hashes to the same digest regardless of the key
@@ -177,13 +206,29 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
 
 export type TelegramClassification =
   | { kind: "ignored"; resultCode: TelegramIgnoredResultCode }
-  | { kind: "start"; rawToken: string };
+  | { kind: "start"; rawToken: string }
+  | { kind: "bind"; rawToken: string; chatType: string };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
 export function classifyUpdate(identity: ParsedIdentity): TelegramClassification {
   if (identity.telegramUserId === null || identity.telegramChatId === null) {
     return { kind: "ignored", resultCode: "invalid_update_shape" };
+  }
+  // TG-2F-C. Checked BEFORE the private-chat gate because a dispatch bind is
+  // by definition a group action. Everything that is not an exactly-formed
+  // bind command in an exactly-allowed group chat falls straight through to
+  // the untouched TG-2D classification below, so `/start` in a group still
+  // resolves to `non_private_message`.
+  if (
+    identity.text !== null &&
+    identity.chatType !== null &&
+    BIND_CHAT_TYPES.includes(identity.chatType)
+  ) {
+    const bindMatch = BIND_COMMAND_PATTERN.exec(identity.text);
+    if (bindMatch) {
+      return { kind: "bind", rawToken: bindMatch[1], chatType: identity.chatType };
+    }
   }
   if (identity.chatType !== "private") {
     return { kind: "ignored", resultCode: "non_private_message" };
@@ -284,6 +329,16 @@ export async function runTelegramPoll(
             chatType: "private",
             rawToken: classification.rawToken,
           })
+        : classification.kind === "bind"
+        ? await ledger.processBindUpdate({
+            leaseToken: lease.leaseToken,
+            updateId,
+            payloadHash,
+            telegramUserId: identity.telegramUserId as number,
+            telegramChatId: identity.telegramChatId as number,
+            chatType: classification.chatType,
+            rawToken: classification.rawToken,
+          })
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
@@ -319,6 +374,10 @@ export async function runTelegramPoll(
         : terminal.resultCode === "link_rejected" ||
             terminal.resultCode === "invalid_start_command"
         ? TELEGRAM_LINK_FAILURE_MESSAGE
+        : terminal.resultCode === "bind_success"
+        ? TELEGRAM_BIND_SUCCESS_MESSAGE
+        : terminal.resultCode === "bind_rejected"
+        ? TELEGRAM_BIND_FAILURE_MESSAGE
         : null;
 
       if (feedback !== null) {

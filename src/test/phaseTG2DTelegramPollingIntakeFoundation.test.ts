@@ -430,6 +430,7 @@ interface FakeState {
 function makeLedger(options: {
   busy?: boolean;
   startResult?: TelegramTerminalResult;
+  bindResult?: TelegramTerminalResult;
   ignoredResult?: TelegramTerminalResult;
   failTerminalOn?: number;
   failAdvanceOn?: number;
@@ -479,6 +480,16 @@ function makeLedger(options: {
       }
       state.terminal.add(input.updateId);
       return options.startResult ?? { isNew: true, resultCode: "link_success" };
+    },
+    // TG-2F-C fixture addition: the shared ledger interface now requires the
+    // bind path. No TG-2D assertion depends on it.
+    async processBindUpdate(input) {
+      calls.push(`processBind:${input.updateId}`);
+      if (options.failTerminalOn === input.updateId) {
+        throw new Error("telegram_update_conflict");
+      }
+      state.terminal.add(input.updateId);
+      return options.bindResult ?? { isNew: true, resultCode: "bind_success" };
     },
   };
 
@@ -848,17 +859,19 @@ describe("TG-2D edge function shell", () => {
     expect(EDGE_SOURCE).not.toMatch(/console\.log\([^)]*body/);
   });
 
-  it("drives the shared orchestrator and only the five TG-2D RPCs", () => {
+  it("drives the shared orchestrator and only the five TG-2D RPCs plus the TG-2F-C bind RPC", () => {
     expect(EDGE_SOURCE).toContain("runTelegramPoll");
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\("(\w+)"/g)].map((m) => m[1]);
     expect(rpcs.sort()).toEqual([
       "telegram_advance_poll_cursor",
       "telegram_claim_poll_lease",
+      "telegram_process_bind_update",
       "telegram_process_start_update",
       "telegram_record_ignored_update",
       "telegram_release_poll_lease",
     ]);
   });
+
 
   it("implements no callback, chat-binding, load, or TG-2C dispatch behaviour", () => {
     for (const forbidden of [
