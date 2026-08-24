@@ -513,6 +513,23 @@ describe('TG-2F-A live — consume RPC behaviour', () => {
     return rows[0].token;
   }
 
+  /**
+   * Runs `run` inside a SAVEPOINT, asserts it rejects with `pattern`, then
+   * recovers the transaction with ROLLBACK TO SAVEPOINT so subsequent
+   * assertions execute in the SAME (non-aborted) outer transaction.
+   */
+  async function expectFailureWithRecovery(
+    c: pg.PoolClient,
+    savepoint: string,
+    run: (c: pg.PoolClient) => Promise<unknown>,
+    pattern: RegExp,
+  ) {
+    await c.query(`SAVEPOINT ${savepoint}`);
+    await expect(run(c)).rejects.toThrow(pattern);
+    await c.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+    await c.query(`RELEASE SAVEPOINT ${savepoint}`);
+  }
+
   const CHAT_ID = -1001234500001;
 
   it('rejects a malformed secret with the fixed generic error', async () => {
