@@ -258,8 +258,8 @@ describe('OpportunityDetail — post-success page state', () => {
     );
     const applyBtn = screen.getByRole('button', { name: /Application Submitted/i });
     expect(applyBtn).toBeDisabled();
-    // Request Info remains independently available (no request_info row exists).
-    expect(screen.getByRole('button', { name: /Request Info/ })).toBeEnabled();
+    // Phase OD-1 — no Request Info surface is rendered after submission either.
+    expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
   });
 });
 
