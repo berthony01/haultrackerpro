@@ -305,16 +305,21 @@ export function OpportunityDetail({
   const hasPaySection =
     payKVs.length > 0 || mixedComponents.length > 0 || signOnAmount != null;
 
-  const coverageKVs: [string, string][] = [];
-  if (coverage) coverageKVs.push(['Hiring coverage', coverage]);
-  if (routeLabel) coverageKVs.push(['Route type', routeLabel]);
-  if (trailerLabel) coverageKVs.push(['Trailer', trailerLabel]);
+  // Phase OD-2 — hiring coverage, route, trailer, home time, weekly mileage,
+  // and pay basis are promoted into the decision-first Quick Facts grid, so
+  // they are no longer repeated as KVs in the sections below.
+  const quickFacts: [string, string, typeof MapPin][] = [];
+  if (coverage) quickFacts.push(['Hiring', coverage, MapPin]);
+  if (payModelLabel) quickFacts.push(['Pay basis', payModelLabel, DollarSign]);
+  if (totalMiles) quickFacts.push(['Miles / week', totalMiles, Gauge]);
+  if (routeLabel) quickFacts.push(['Route', routeLabel, MapPin]);
+  if (trailerLabel) quickFacts.push(['Trailer', trailerLabel, Truck]);
+  if (homeTimeLabel) quickFacts.push(['Home time', homeTimeLabel, Home]);
+
   const typicalLanes = strOrNull(canonical.content.typicalLanes);
-  const hasCoverageSection =
-    coverageKVs.length > 0 || typicalLanes != null || mileageKVs.length > 0;
+  const hasCoverageSection = typicalLanes != null || mileageKVs.length > 0;
 
   const lifestyleKVs: [string, string][] = [];
-  if (homeTimeLabel) lifestyleKVs.push(['Home time', homeTimeLabel]);
   const forcedDispatch = boolYNOrNull(canonical.operatingTerms.forcedDispatch);
   if (forcedDispatch) lifestyleKVs.push(['Forced dispatch', forcedDispatch]);
   const pets = boolYNOrNull(canonical.operatingTerms.petsAllowed);
@@ -323,6 +328,7 @@ export function OpportunityDetail({
   if (riders) lifestyleKVs.push(['Riders allowed', riders]);
   const equipmentYear = strOrNull(canonical.operatingTerms.equipmentYear);
   if (equipmentYear) lifestyleKVs.push(['Equipment year', equipmentYear]);
+
 
   const benefits = strOrNull(canonical.content.actualBenefits);
   const requirements = strOrNull(canonical.content.requirements);
