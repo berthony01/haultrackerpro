@@ -391,9 +391,24 @@ export function OpportunityDetail({
               )}
             </div>
             {companyName && (
-              <p className="text-base font-semibold text-muted-foreground">{companyName}</p>
+              <p className="text-base font-semibold text-muted-foreground break-words">{companyName}</p>
+            )}
+            {(employmentLabel || teamLabel) && (
+              <div className="flex flex-wrap gap-2 text-xs mt-2">
+                {employmentLabel && (
+                  <Badge variant="outline" className="gap-1">
+                    <Briefcase className="h-3 w-3" aria-hidden /> {employmentLabel}
+                  </Badge>
+                )}
+                {teamLabel && (
+                  <Badge variant="outline" className="gap-1">
+                    <Users className="h-3 w-3" aria-hidden /> {teamLabel}
+                  </Badge>
+                )}
+              </div>
             )}
           </div>
+
 
           {/* Dominant pay + coverage */}
           {(grossValue || coverage) && (
