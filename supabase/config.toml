@@ -52,3 +52,5 @@ project_id = "pngptztxwbtozwxrtbwo"
     verify_jwt = false
   [functions.stripe-webhook]
     verify_jwt = false
+  [functions.telegram-poll]
+    verify_jwt = false
