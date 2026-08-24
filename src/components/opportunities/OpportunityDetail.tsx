@@ -306,15 +306,22 @@ export function OpportunityDetail({
     payKVs.length > 0 || mixedComponents.length > 0 || signOnAmount != null;
 
   // Phase OD-2 — hiring coverage, route, trailer, home time, weekly mileage,
-  // and pay basis are promoted into the decision-first Quick Facts grid, so
-  // they are no longer repeated as KVs in the sections below.
+  // and the headline pay value are promoted into the decision-first Quick Facts
+  // grid, so they are no longer repeated as KVs in the sections below.
+  // Pay quick fact reuses an existing displayed value only — never a new
+  // computation and never a vague pay-model name.
+  const quickPayValue =
+    pm === 'cpm' && rp.cpm.state === 'provided'
+      ? `$${Number(rp.cpm.value).toFixed(2)}/mi`
+      : grossValue;
   const quickFacts: [string, string, typeof MapPin][] = [];
-  if (coverage) quickFacts.push(['Hiring', coverage, MapPin]);
-  if (payModelLabel) quickFacts.push(['Pay basis', payModelLabel, DollarSign]);
+  if (quickPayValue) quickFacts.push(['Pay', quickPayValue, DollarSign]);
   if (totalMiles) quickFacts.push(['Miles / week', totalMiles, Gauge]);
   if (routeLabel) quickFacts.push(['Route', routeLabel, MapPin]);
-  if (trailerLabel) quickFacts.push(['Trailer', trailerLabel, Truck]);
   if (homeTimeLabel) quickFacts.push(['Home time', homeTimeLabel, Home]);
+  if (trailerLabel) quickFacts.push(['Trailer', trailerLabel, Truck]);
+  if (coverage) quickFacts.push(['Hiring', coverage, MapPin]);
+
 
   const typicalLanes = strOrNull(canonical.content.typicalLanes);
   const hasCoverageSection = typicalLanes != null || mileageKVs.length > 0;
@@ -371,7 +378,10 @@ export function OpportunityDetail({
       </Button>
 
       {/* ============= Top Summary ============= */}
-      <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+      <Card
+        data-testid="opportunity-decision-hero"
+        className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5"
+      >
         <div className="flex flex-col gap-4">
           {/* Title / company / verified */}
           <div>
@@ -433,7 +443,7 @@ export function OpportunityDetail({
           {/* Quick Facts — decision-first grid; unpopulated facts are omitted */}
           {quickFacts.length > 0 && (
             <div
-              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
               data-testid="opportunity-quick-facts"
             >
               {quickFacts.map(([label, value, Icon]) => (
@@ -525,7 +535,7 @@ export function OpportunityDetail({
 
       {/* 2 + 3. Pay & Route surface */}
       {(hasPaySection || hasCoverageSection) && (
-        <Surface>
+        <Surface desktopColumns={2}>
           {hasPaySection && (
             <Section icon={DollarSign} title="Pay & Compensation">
               {payKVs.length > 0 && (
@@ -601,7 +611,7 @@ export function OpportunityDetail({
 
       {/* 4 + 5 + 6. Lifestyle & Benefits surface */}
       {(lifestyleKVs.length > 0 || benefits || requirements) && (
-        <Surface>
+        <Surface desktopColumns={3}>
           {lifestyleKVs.length > 0 && (
             <Section icon={Home} title="Home Time & Lifestyle">
               <Grid>
@@ -726,13 +736,27 @@ export function OpportunityDetail({
 }
 
 /** Grouped surface — hosts one or more sections inside a single card. */
-function Surface({ children }: { children: React.ReactNode }) {
+function Surface({
+  children,
+  desktopColumns = 1,
+}: {
+  children: React.ReactNode;
+  desktopColumns?: 1 | 2 | 3;
+}) {
+  // Static class maps only — Tailwind cannot detect dynamically built strings.
+  const layout =
+    desktopColumns === 2
+      ? 'divide-y divide-border/60 lg:grid lg:grid-cols-2 lg:divide-y-0 lg:divide-x'
+      : desktopColumns === 3
+        ? 'divide-y divide-border/60 lg:grid lg:grid-cols-3 lg:divide-y-0 lg:divide-x'
+        : 'divide-y divide-border/60';
   return (
-    <Card className="border-border/60 divide-y divide-border/60 overflow-hidden">
+    <Card className={`border-border/60 overflow-hidden ${layout}`}>
       {children}
     </Card>
   );
 }
+
 
 function Section({
   icon: Icon,
