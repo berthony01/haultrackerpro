@@ -709,8 +709,14 @@ describe('TG-2F-A live — consume RPC behaviour', () => {
         WHERE n.nspname='public' AND p.proname='consume_telegram_dispatch_bind_token'`,
     );
     const def = rows[0].def;
-    expect(def).toContain('public.telegram_bind_dispatch_chat(');
-    expect(def).not.toMatch(/INSERT\s+INTO\s+public\.telegram_chat_bindings/i);
-    expect(def).not.toContain('loads_dispatch');
+    // `pg_get_functiondef` returns prose comments too. The contract below is
+    // about EXECUTABLE behaviour, so strip SQL line comments before asserting.
+    const executableDef = def.replace(/--.*$/gm, '');
+    expect(executableDef).toContain('public.telegram_bind_dispatch_chat(');
+    expect(executableDef).not.toMatch(
+      /INSERT\s+INTO\s+public\.telegram_chat_bindings/i,
+    );
+    expect(executableDef).not.toContain('current_user_has_recruiter_permission');
+    expect(executableDef).not.toContain('loads_dispatch');
   });
 });
