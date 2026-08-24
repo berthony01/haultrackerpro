@@ -710,7 +710,9 @@ export function OpportunityDetail({
                 ? 'Hired'
                 : formalState.kind === 'reapplyable'
                   ? 'Apply Again'
-                  : 'Apply Now'}
+                  : profileIncomplete
+                    ? 'Complete Preferences to Apply'
+                    : 'Apply Now'}
           </Button>
           <Button variant="outline" onClick={handleToggleSave} className="flex-1">
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
