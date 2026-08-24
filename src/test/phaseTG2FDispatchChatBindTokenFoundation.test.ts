@@ -321,7 +321,12 @@ describe("TG-2F-A candidate — issue RPC", () => {
     expect(body).toContain("_raw_token := encode(extensions.gen_random_bytes(32), 'hex')");
     expect(body).toContain("_token_hash := encode(extensions.digest(_raw_token, 'sha256'), 'hex')");
     expect(body).toContain("recruiter_id, issued_by_user_id, token_hash, expires_at");
-    expect(body).not.toMatch(/INSERT[\s\S]*_raw_token/);
+    // The INSERT statement itself must never carry the raw secret.
+    const insertStart = body.indexOf(`INSERT INTO ${TABLE}`);
+    expect(insertStart).toBeGreaterThan(-1);
+    const insertStatement = body.slice(insertStart, body.indexOf(";", insertStart) + 1);
+    expect(insertStatement).not.toContain("_raw_token");
+    expect(insertStatement).toContain("_token_hash");
   });
 
   it("uses a 15 minute TTL and returns the raw token exactly once", () => {
