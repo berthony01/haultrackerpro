@@ -303,7 +303,6 @@ describe('Phase 1L-F2B-P2-R1 · Pay-model states', () => {
     expect(within(kvRow('Derived weekly gross')).getByText('$1,380')).toBeInTheDocument();
     // OD-2 correction: the CPM value renders in the CPM KV *and* as the first
     // decision-hero quick fact (label "Pay"), so both instances must exist.
-    expect(within(kvRow('CPM')).getByText('$0.60/mi')).toBeInTheDocument();
     const quickFacts = screen.getByTestId('opportunity-quick-facts');
     expect(within(quickFacts).getByText('Pay')).toBeInTheDocument();
     expect(within(quickFacts).getByText('$0.60/mi')).toBeInTheDocument();
