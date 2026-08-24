@@ -378,7 +378,10 @@ export function OpportunityDetail({
       </Button>
 
       {/* ============= Top Summary ============= */}
-      <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
+      <Card
+        data-testid="opportunity-decision-hero"
+        className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5"
+      >
         <div className="flex flex-col gap-4">
           {/* Title / company / verified */}
           <div>
