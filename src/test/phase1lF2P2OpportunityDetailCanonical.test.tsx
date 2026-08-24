@@ -680,7 +680,8 @@ describe('Phase 1L-F2B-P2-R1 · Actions and Free CTA', () => {
     expect(screen.queryByText('Financial Disclosure')).toBeNull();
     expect(screen.getByRole('button', { name: /Back to Opportunities/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Save$/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Request Info/ })).toBeInTheDocument();
+    // Phase OD-1 — Request Info retired from the driver Opportunity Detail page.
+    expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
     expect(screen.getByRole('button', { name: /^Apply Now$/ })).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Refer a Driver — Pro feature' }),
