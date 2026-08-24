@@ -631,19 +631,40 @@ describe('TG-2F-A live — consume RPC behaviour', () => {
       const { userId, recruiterId } = await seedLinkedOwner(c, 900007);
       const token = await issueFor(c, userId, recruiterId);
 
-      await expect(
-        c.query(
-          `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'group',$3)`,
-          [999999, CHAT_ID, token],
-        ),
-      ).rejects.toThrow(/telegram_actor_not_linked/);
-    });
+      // Statement-level recovery: the failed consume is rolled back to the
+      // savepoint, so the assertions below observe the SAME outer transaction
+      // and prove the token survived the failed attempt itself — not merely
+      // that the whole test transaction was discarded afterwards.
+      await expectFailureWithRecovery(
+        c,
+        'tg2f_actor',
+        (t) =>
+          t.query(
+            `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'group',$3)`,
+            [999999, CHAT_ID, token],
+          ),
+        /telegram_actor_not_linked/,
+      );
 
-    // A fresh transaction proves the failed attempt rolled back entirely:
-    // nothing was bound and nothing persisted.
-    await inRollback(async (c) => {
+      const still = await c.query<{ token_hash: string }>(
+        `SELECT token_hash FROM public.telegram_dispatch_bind_tokens
+          WHERE recruiter_id = $1 AND issued_by_user_id = $2
+            AND consumed_at IS NULL AND invalidated_at IS NULL`,
+        [recruiterId, userId],
+      );
+      expect(still.rowCount).toBe(1);
+      expect(still.rows[0].token_hash).toBe(
+        (
+          await c.query<{ h: string }>(
+            `SELECT encode(extensions.digest($1,'sha256'),'hex') AS h`,
+            [token],
+          )
+        ).rows[0].h,
+      );
+
       const leftover = await c.query(
-        `SELECT 1 FROM public.telegram_chat_bindings WHERE telegram_chat_id = $1`,
+        `SELECT 1 FROM public.telegram_chat_bindings
+          WHERE telegram_chat_id = $1 AND status = 'active'`,
         [CHAT_ID],
       );
       expect(leftover.rowCount).toBe(0);
