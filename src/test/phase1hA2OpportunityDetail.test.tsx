@@ -100,17 +100,38 @@ beforeEach(() => {
 });
 
 describe('OpportunityDetail — Apply Now integration', () => {
-  it('renders Apply Now as primary action and Request Info as secondary', () => {
+  // Phase OD-1 — NEW driver-facing Request Info submission is retired from this
+  // page. Formal Apply is the only submission CTA; Save/Refer stay secondary.
+  it('renders Apply Now as primary action and does NOT render Request Info', () => {
     renderPage();
     const apply = screen.getByRole('button', { name: /^Apply Now$/ });
-    const req = screen.getByRole('button', { name: /Request Info/ });
     expect(apply).toBeInTheDocument();
-    expect(req).toBeInTheDocument();
     // Apply Now is the primary variant (no `variant="outline"` -> default primary styling)
     expect(apply.className).not.toMatch(/border-input/);
-    // Request Info is outline (secondary)
-    expect(req.className).toMatch(/border/);
+    expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Info Requested/i })).toBeNull();
+    // Secondary actions remain intact.
+    expect(screen.getByRole('button', { name: /^Save$/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refer a Driver/i })).toBeInTheDocument();
   });
+
+  it('renders "Complete Preferences to Apply" when preferences are incomplete, still enabled', async () => {
+    renderPage({ profile: null });
+    const btn = screen.getByRole('button', { name: /Complete Preferences to Apply/i });
+    expect(btn).toBeEnabled();
+    expect(
+      screen.getByText(/Complete your Opportunity Preferences to apply/i),
+    ).toBeInTheDocument();
+    // Existing dialog / preferences-required path remains reachable.
+    await userEvent.click(btn);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('does not show the incomplete-preferences label once preferences are complete', () => {
+    renderPage();
+    expect(screen.queryByRole('button', { name: /Complete Preferences to Apply/i })).toBeNull();
+  });
+
 
   it('is available to a non-Pro driver without upgrade gating', () => {
     renderPage({ isPro: false });
