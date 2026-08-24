@@ -652,58 +652,63 @@ export function OpportunityDetail({
 
       <div aria-hidden className="h-32 lg:h-28" />
 
-      {/* Sticky action bar — Apply Now dominant, everything else secondary */}
-      <div className="fixed left-0 right-0 lg:left-[calc(15rem+1.5rem)] lg:right-6 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30 space-y-2">
-        {profileIncomplete && formalState.kind === 'none' && (
-          <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
-            <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" aria-hidden />
-            <span>Complete your Opportunity Preferences to apply and improve your match score.</span>
-          </div>
-        )}
-        <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
-          <Button
-            onClick={() => setShowApply(true)}
-            disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
-            className="flex-1 sm:flex-[2]"
-            size="lg"
-          >
-            <Send className="h-4 w-4" />
-            {formalState.kind === 'active'
-              ? 'Application Submitted'
-              : formalState.kind === 'completed'
-                ? 'Hired'
-                : formalState.kind === 'reapplyable'
-                  ? 'Apply Again'
-                  : profileIncomplete
-                    ? 'Complete Preferences to Apply'
-                    : 'Apply Now'}
-          </Button>
-          <Button variant="outline" onClick={handleToggleSave} className="flex-1">
-            {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-            {isSaved ? 'Saved' : 'Save'}
-          </Button>
-          {isPro ? (
-            <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
-              <UserPlus className="h-4 w-4" /> Refer a Driver
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              onClick={() => {
-                toast.message('Driver referrals are a Pro feature.', {
-                  description:
-                    'Upgrade to Pro to refer drivers to recruiter opportunities and track referral progress.',
-                });
-                onUpgrade();
-              }}
-              className="flex-1"
-              aria-label="Refer a Driver — Pro feature"
-            >
-              <Lock className="h-4 w-4" /> Refer a Driver — Pro
-            </Button>
+      {/* Sticky decision bar — Apply dominant, everything else secondary */}
+      <div className="fixed left-0 right-0 lg:left-[calc(15rem+1.5rem)] lg:right-6 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30">
+        <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-border/60 bg-card/95 backdrop-blur-md shadow-elevated">
+          {profileIncomplete && formalState.kind === 'none' && (
+            <div className="flex items-start gap-2 border-b border-border/60 bg-primary/10 px-4 py-2.5 text-xs text-foreground">
+              <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" aria-hidden />
+              <span className="break-words">
+                Complete your Opportunity Preferences to apply and improve your match score.
+              </span>
+            </div>
           )}
+          <div className="flex flex-col sm:flex-row gap-2.5 p-3">
+            <Button
+              onClick={() => setShowApply(true)}
+              disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
+              className="flex-1 sm:flex-[2] whitespace-normal"
+              size="lg"
+            >
+              <Send className="h-4 w-4" />
+              {formalState.kind === 'active'
+                ? 'Application Submitted'
+                : formalState.kind === 'completed'
+                  ? 'Hired'
+                  : formalState.kind === 'reapplyable'
+                    ? 'Apply Again'
+                    : profileIncomplete
+                      ? 'Complete Preferences to Apply'
+                      : 'Apply Now'}
+            </Button>
+            <Button variant="outline" onClick={handleToggleSave} className="flex-1">
+              {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+              {isSaved ? 'Saved' : 'Save'}
+            </Button>
+            {isPro ? (
+              <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
+                <UserPlus className="h-4 w-4" /> Refer a Driver
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  toast.message('Driver referrals are a Pro feature.', {
+                    description:
+                      'Upgrade to Pro to refer drivers to recruiter opportunities and track referral progress.',
+                  });
+                  onUpgrade();
+                }}
+                className="flex-1 whitespace-normal"
+                aria-label="Refer a Driver — Pro feature"
+              >
+                <Lock className="h-4 w-4" /> Refer a Driver — Pro
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+
 
       <ReferDriverDialog
         open={showRefer && isPro}
