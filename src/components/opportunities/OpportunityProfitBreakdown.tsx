@@ -118,7 +118,12 @@ function humanize(key: string): string {
   return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
 }
 
-export function OpportunityProfitBreakdown({ canonical, isPro, onUpgrade }: Props) {
+export function OpportunityProfitBreakdown({
+  canonical,
+  isPro,
+  onUpgrade,
+  compact = false,
+}: Props) {
   const t = canonical.derived.transparencyScore;
   const fe = canonical.derived.financialEstimate;
   const em = canonical.classification.employmentModel;
@@ -131,171 +136,211 @@ export function OpportunityProfitBreakdown({ canonical, isPro, onUpgrade }: Prop
   const conflictCount = t.conflicts.length;
   const transparencyDescriptor = `Listing transparency: ${t.score} out of 100, ${BAND_LABEL[t.band]}. Measures disclosure completeness and consistency, not profitability.`;
 
-  return (
-    <div className="space-y-4">
-      {/* Listing Transparency — always visible, free + pro */}
-      <Card className="p-5 border-border/60">
-        <div className="flex flex-wrap items-center gap-2 mb-3">
-          <div className="rounded-lg bg-primary/10 p-1.5">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-          </div>
-          <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
-            Listing Transparency
-          </h3>
-          <Badge
-            variant="outline"
-            className={`ml-auto gap-1 ${BAND_CLASS[t.band]}`}
-            title={transparencyDescriptor}
-            aria-label={transparencyDescriptor}
-          >
-            <Info className="h-3 w-3" aria-hidden /> Transparency {t.score} · {BAND_LABEL[t.band]}
-          </Badge>
+  const transparencyBody = (
+    <>
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <div className="rounded-lg bg-primary/10 p-1.5">
+          <ShieldCheck className="h-4 w-4 text-primary" />
         </div>
-        <div className="flex items-baseline gap-2 mb-2">
-          <p className="font-mono text-2xl font-black text-foreground">{t.score}</p>
-          <p className="text-xs text-muted-foreground">/100</p>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
+          Listing Transparency
+        </h3>
+        <Badge
+          variant="outline"
+          className={`ml-auto gap-1 ${BAND_CLASS[t.band]}`}
+          title={transparencyDescriptor}
+          aria-label={transparencyDescriptor}
+        >
+          <Info className="h-3 w-3" aria-hidden /> Transparency {t.score} · {BAND_LABEL[t.band]}
+        </Badge>
+      </div>
+      <div className="flex items-baseline gap-2 mb-2">
+        <p className="font-mono text-2xl font-black text-foreground">{t.score}</p>
+        <p className="text-xs text-muted-foreground">/100</p>
+      </div>
+      <Progress value={t.score} className="h-2 mb-3" />
+      <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+        <div>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+            Missing disclosures
+          </p>
+          <p className="text-sm font-semibold text-foreground">{missingCount}</p>
         </div>
-        <Progress value={t.score} className="h-2 mb-3" />
-        <div className="grid grid-cols-2 gap-3 text-sm mb-2">
+        {conflictCount > 0 && (
           <div>
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-              Missing disclosures
+              Conflicts
             </p>
-            <p className="text-sm font-semibold text-foreground">{missingCount}</p>
+            <p className="text-sm font-semibold text-destructive">{conflictCount}</p>
           </div>
-          {conflictCount > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                Conflicts
-              </p>
-              <p className="text-sm font-semibold text-destructive">{conflictCount}</p>
-            </div>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground">
-          Listing Transparency measures disclosure completeness and consistency, not profitability.
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground break-words">
+        Listing Transparency measures disclosure completeness and consistency, not profitability.
+      </p>
+    </>
+  );
+
+  const upgradeBody = (
+    <div className="flex items-start gap-3">
+      <div className="rounded-xl bg-primary/15 p-2">
+        <Lock className="h-5 w-5 text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <h3 className="text-base font-bold text-foreground mb-1 break-words">
+          Unlock detailed financial disclosures
+        </h3>
+        <p className="text-sm text-muted-foreground mb-3 break-words">
+          See the disclosed recurring gross and, for cost-bearing employment models,
+          the estimated weekly net calculated from the recruiter's disclosed weekly costs.
+          Estimates never present as guaranteed pay.
         </p>
-      </Card>
+        <Button onClick={onUpgrade}>Upgrade to Pro</Button>
+      </div>
+    </div>
+  );
 
-      {!isPro ? (
-        <Card className="p-6 border-primary/30 bg-primary/5">
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-primary/15 p-2">
-              <Lock className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-base font-bold text-foreground mb-1">
-                Unlock detailed financial disclosures
-              </h3>
-              <p className="text-sm text-muted-foreground mb-3">
-                See the disclosed recurring gross and, for cost-bearing employment models,
-                the estimated weekly net calculated from the recruiter's disclosed weekly costs.
-                Estimates never present as guaranteed pay.
-              </p>
-              <Button onClick={onUpgrade}>Upgrade to Pro</Button>
-            </div>
-          </div>
-        </Card>
-      ) : (
-        <Card className="p-5 border-border/60">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="rounded-lg bg-primary/10 p-1.5">
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </div>
-            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
-              Financial Disclosure
-            </h3>
-            <Badge variant="outline" className="ml-auto">{STATUS_LABEL[fe.status]}</Badge>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-            <KV icon={DollarSign} label={grossLabel(fe.grossSource)} value={grossValue(fe)} highlight />
-            <KV icon={Gauge} label="Gross per total mile" value={fmtRpm(fe.effectiveRpm)} />
-            <KV
-              icon={AlertTriangle}
-              label="Deadhead %"
-              value={fmtPct(fe.deadheadPercentage)}
-              warn={(fe.deadheadPercentage ?? 0) > 30}
-            />
-            {isCostBearing && (
-              <>
-                <KV
-                  icon={DollarSign}
-                  label="Known weekly costs"
-                  value={fmtMoneyN(fe.totalKnownWeeklyCosts)}
-                />
-                <KV
-                  icon={TrendingUp}
-                  label="Estimated weekly net"
-                  value={fmtMoneyN(fe.estimatedWeeklyNet)}
-                  highlight
-                />
-                <KV icon={Gauge} label="Net per total mile" value={fmtRpm(fe.netRpm)} />
-              </>
+  const secondaryDetail = (
+    <>
+      {isCostBearing && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+          <KV label="Fuel paid by" value={fmtStr(canonical.costs.fuelPaidBy)} />
+          <KV label="Insurance" value={fmtRecurring(canonical.costs.insurance)} />
+          <KV label="Maintenance" value={fmtRecurring(canonical.costs.maintenance)} />
+          <KV label="Other recurring cost" value={fmtRecurring(canonical.costs.otherRecurringCost)} />
+          {em === 'lease_purchase' && (
+            <KV label="Lease payment" value={fmtRecurring(canonical.costs.lease)} />
+          )}
+          <KV label="Escrow required" value={fmtBoolYN(canonical.costs.escrowRequired)} />
+          {canonical.costs.escrowRequired.state === 'provided' &&
+            canonical.costs.escrowRequired.value === true && (
+              <KV label="Escrow amount" value={fmtRecurring(canonical.costs.escrowAmount)} />
             )}
-          </div>
+        </div>
+      )}
 
-          {isCompanyDriver && (
-            <p className="text-xs text-muted-foreground mb-3">
-              Company driver: employer-borne operating costs are excluded.
-            </p>
-          )}
-          {isUnknownEm && (
-            <p className="text-xs text-muted-foreground mb-3">
-              Employment arrangement must be disclosed before ownership-cost net can be estimated.
-            </p>
-          )}
+      {fe.missingInputs.length > 0 && (
+        <DiagBlock
+          title="Missing disclosures"
+          items={fe.missingInputs.map(humanize)}
+          tone="warn"
+        />
+      )}
+      {fe.invalidInputs.length > 0 && (
+        <DiagBlock
+          title="Invalid disclosures"
+          items={fe.invalidInputs.map(humanize)}
+          tone="destructive"
+        />
+      )}
+      {fe.conflicts.length > 0 && (
+        <DiagBlock title="Conflicts" items={fe.conflicts} tone="destructive" />
+      )}
+      {fe.assumptions.length > 0 && (
+        <DiagBlock title="Calculation assumptions" items={fe.assumptions} tone="muted" />
+      )}
+    </>
+  );
 
-          {isCostBearing && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
-              <KV label="Fuel paid by" value={fmtStr(canonical.costs.fuelPaidBy)} />
-              <KV label="Insurance" value={fmtRecurring(canonical.costs.insurance)} />
-              <KV label="Maintenance" value={fmtRecurring(canonical.costs.maintenance)} />
-              <KV label="Other recurring cost" value={fmtRecurring(canonical.costs.otherRecurringCost)} />
-              {em === 'lease_purchase' && (
-                <KV label="Lease payment" value={fmtRecurring(canonical.costs.lease)} />
-              )}
-              <KV label="Escrow required" value={fmtBoolYN(canonical.costs.escrowRequired)} />
-              {canonical.costs.escrowRequired.state === 'provided' &&
-                canonical.costs.escrowRequired.value === true && (
-                  <KV label="Escrow amount" value={fmtRecurring(canonical.costs.escrowAmount)} />
-                )}
-            </div>
-          )}
+  const financialBody = (
+    <>
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <div className="rounded-lg bg-primary/10 p-1.5">
+          <TrendingUp className="h-4 w-4 text-primary" />
+        </div>
+        <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">
+          Financial Disclosure
+        </h3>
+        <Badge variant="outline" className="ml-auto">{STATUS_LABEL[fe.status]}</Badge>
+      </div>
 
-          {fe.missingInputs.length > 0 && (
-            <DiagBlock
-              title="Missing disclosures"
-              items={fe.missingInputs.map(humanize)}
-              tone="warn"
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+        <KV icon={DollarSign} label={grossLabel(fe.grossSource)} value={grossValue(fe)} highlight />
+        <KV icon={Gauge} label="Gross per total mile" value={fmtRpm(fe.effectiveRpm)} />
+        <KV
+          icon={AlertTriangle}
+          label="Deadhead %"
+          value={fmtPct(fe.deadheadPercentage)}
+          warn={(fe.deadheadPercentage ?? 0) > 30}
+        />
+        {isCostBearing && (
+          <>
+            <KV
+              icon={DollarSign}
+              label="Known weekly costs"
+              value={fmtMoneyN(fe.totalKnownWeeklyCosts)}
             />
-          )}
-          {fe.invalidInputs.length > 0 && (
-            <DiagBlock
-              title="Invalid disclosures"
-              items={fe.invalidInputs.map(humanize)}
-              tone="destructive"
+            <KV
+              icon={TrendingUp}
+              label="Estimated weekly net"
+              value={fmtMoneyN(fe.estimatedWeeklyNet)}
+              highlight
             />
-          )}
-          {fe.conflicts.length > 0 && (
-            <DiagBlock title="Conflicts" items={fe.conflicts} tone="destructive" />
-          )}
-          {fe.assumptions.length > 0 && (
-            <DiagBlock title="Calculation assumptions" items={fe.assumptions} tone="muted" />
-          )}
+            <KV icon={Gauge} label="Net per total mile" value={fmtRpm(fe.netRpm)} />
+          </>
+        )}
+      </div>
 
-          <div className="flex items-start gap-2 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground mt-3">
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>
-              Estimates use disclosed recurring compensation and relevant recurring costs.
-              They are not guaranteed pay.
-            </span>
-          </div>
-        </Card>
+      {isCompanyDriver && (
+        <p className="text-xs text-muted-foreground mb-3 break-words">
+          Company driver: employer-borne operating costs are excluded.
+        </p>
+      )}
+      {isUnknownEm && (
+        <p className="text-xs text-muted-foreground mb-3 break-words">
+          Employment arrangement must be disclosed before ownership-cost net can be estimated.
+        </p>
+      )}
+
+      {compact ? (
+        <details className="group mb-3 rounded-lg border border-border/60 bg-muted/20">
+          <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-foreground">
+            Show full disclosure details
+          </summary>
+          <div className="px-3 pt-3">{secondaryDetail}</div>
+        </details>
+      ) : (
+        secondaryDetail
+      )}
+
+      <div className="flex items-start gap-2 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+        <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+        <span className="break-words">
+          Estimates use disclosed recurring compensation and relevant recurring costs.
+          They are not guaranteed pay.
+        </span>
+      </div>
+    </>
+  );
+
+  if (compact) {
+    return (
+      <Card
+        className="border-border/60 divide-y divide-border/60 overflow-hidden"
+        data-testid="opportunity-disclosure-surface"
+      >
+        <div className="p-5">{transparencyBody}</div>
+        {isPro ? (
+          <div className="p-5">{financialBody}</div>
+        ) : (
+          <div className="p-6 bg-primary/5">{upgradeBody}</div>
+        )}
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card className="p-5 border-border/60">{transparencyBody}</Card>
+      {!isPro ? (
+        <Card className="p-6 border-primary/30 bg-primary/5">{upgradeBody}</Card>
+      ) : (
+        <Card className="p-5 border-border/60">{financialBody}</Card>
       )}
     </div>
   );
 }
+
 
 function KV({
   icon: Icon,
