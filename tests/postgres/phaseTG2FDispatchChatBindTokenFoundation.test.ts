@@ -539,21 +539,35 @@ describe('TG-2F-A live — consume RPC behaviour', () => {
 
   it('rejects a non-group chat type before touching the token', async () => {
     await inRollback(async (c) => {
+      // Token is seeded OUTSIDE the savepoint so it survives the recovery.
       const { userId, recruiterId } = await seedLinkedOwner(c, 900003);
       const token = await issueFor(c, userId, recruiterId);
-      await expect(
-        c.query(
-          `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'private',$3)`,
-          [900003, CHAT_ID, token],
-        ),
-      ).rejects.toThrow(/telegram_dispatch_bind_invalid_input/);
+
+      await expectFailureWithRecovery(
+        c,
+        'tg2f_chat_type',
+        (t) =>
+          t.query(
+            `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'private',$3)`,
+            [900003, CHAT_ID, token],
+          ),
+        /telegram_dispatch_bind_invalid_input/,
+      );
 
       const still = await c.query(
         `SELECT 1 FROM public.telegram_dispatch_bind_tokens
-          WHERE recruiter_id = $1 AND consumed_at IS NULL AND invalidated_at IS NULL`,
-        [recruiterId],
+          WHERE recruiter_id = $1 AND issued_by_user_id = $2
+            AND consumed_at IS NULL AND invalidated_at IS NULL`,
+        [recruiterId, userId],
       );
       expect(still.rowCount).toBe(1);
+
+      const leftover = await c.query(
+        `SELECT 1 FROM public.telegram_chat_bindings
+          WHERE telegram_chat_id = $1 AND status = 'active'`,
+        [CHAT_ID],
+      );
+      expect(leftover.rowCount).toBe(0);
     });
   });
 
