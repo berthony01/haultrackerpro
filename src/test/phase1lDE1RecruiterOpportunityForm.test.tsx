@@ -433,22 +433,22 @@ describe('Phase 1O-A — employment-driven cost visibility (Optional Details)', 
     chooseChip('employment-arrangement', '1099 Contractor');
     gotoOptional();
     expandGroup("group-costs");
-    expect(screen.queryByLabelText("Escrow Amount ($)")).toBeNull();
+    expect(screen.queryByLabelText("Escrow Deduction Amount ($ per period)")).toBeNull();
 
     fireEvent.click(screen.getByLabelText('Escrow Required?'));
     fireEvent.click(screen.getByRole('option', { name: 'Required' }));
-    expect(screen.getByLabelText('Escrow Amount ($)')).toBeInTheDocument();
-    expect(screen.getByLabelText('Escrow Frequency')).toBeInTheDocument();
+    expect(screen.getByLabelText('Escrow Deduction Amount ($ per period)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Escrow Deduction Frequency')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('Escrow Required?'));
     fireEvent.click(screen.getByRole('option', { name: 'Not required' }));
-    expect(screen.queryByLabelText('Escrow Amount ($)')).toBeNull();
-    expect(screen.queryByLabelText('Escrow Frequency')).toBeNull();
+    expect(screen.queryByLabelText('Escrow Deduction Amount ($ per period)')).toBeNull();
+    expect(screen.queryByLabelText('Escrow Deduction Frequency')).toBeNull();
 
     fireEvent.click(screen.getByLabelText('Escrow Required?'));
     fireEvent.click(screen.getByRole('option', { name: 'Explicitly not disclosed' }));
-    expect(screen.queryByLabelText('Escrow Amount ($)')).toBeNull();
-    expect(screen.queryByLabelText('Escrow Frequency')).toBeNull();
+    expect(screen.queryByLabelText('Escrow Deduction Amount ($ per period)')).toBeNull();
+    expect(screen.queryByLabelText('Escrow Deduction Frequency')).toBeNull();
   });
 });
 
