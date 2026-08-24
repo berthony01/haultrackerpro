@@ -13,7 +13,7 @@
 //   6. Requirements               (requirements)
 //   7. Costs & Operating Terms    (cost-bearing employment only)
 //   8. Transparency & Financial Disclosure (secondary — Listing transparency + calc breakdown)
-//   9. Sticky action bar          (Apply Now dominant, Save + Refer + Request Info secondary)
+//   9. Sticky action bar          (Apply Now dominant, Save + Refer secondary)
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -53,11 +53,7 @@ import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ReferDriverDialog } from './ReferDriverDialog';
 import { ApplyNowDialog } from './ApplyNowDialog';
 import { displayHiringCoverage } from './OpportunityCard';
-import {
-  classifyFormalApply,
-  classifyRequestInfo,
-  submissionErrorMessage,
-} from '@/lib/opportunities/applicationSubmission';
+import { classifyFormalApply } from '@/lib/opportunities/applicationSubmission';
 import {
   normalizeOpportunity,
   type OpportunitySourceRow,
@@ -162,18 +158,16 @@ export function OpportunityDetail({
   );
 
   const { saved, save, unsave } = useSavedOpportunities();
-  const { driverApplications, createApplication } = useOpportunityApplications();
-  const [submitting, setSubmitting] = useState(false);
+  // Phase OD-1 — NEW driver-facing Request Info submission is retired from this
+  // page. Only the formal apply classification is read here; request_info
+  // backend support, history, and recruiter-side handling are unchanged.
+  const { driverApplications } = useOpportunityApplications();
   const [showRefer, setShowRefer] = useState(false);
   const [showApply, setShowApply] = useState(false);
 
   const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
   const formalState = useMemo(
     () => classifyFormalApply(driverApplications as any[], o.id),
-    [driverApplications, o.id],
-  );
-  const requestInfoState = useMemo(
-    () => classifyRequestInfo(driverApplications as any[], o.id),
     [driverApplications, o.id],
   );
 
@@ -206,36 +200,6 @@ export function OpportunityDetail({
 
   const profileIncomplete = !driverProfile || !driverProfile.profile_completed;
 
-  const handleRequestInfo = async () => {
-    if (requestInfoState.exists) return;
-    setSubmitting(true);
-    const consent = !!driverProfile?.allow_verified_recruiter_contact;
-    const pref = driverProfile?.contact_preference ?? 'in_app';
-    const phoneSnap = consent && pref === 'phone' ? (driverProfile?.phone ?? null) : null;
-    const emailSnap = consent && pref === 'email' ? (driverProfile?.email ?? null) : null;
-    createApplication.mutate(
-      {
-        opportunity_id: o.id,
-        recruiter_id: o.recruiter_id,
-        application_type: 'request_info',
-        driver_profile_id: driverProfile?.id ?? null,
-        preferred_contact_method: pref,
-        driver_phone_snapshot: phoneSnap,
-        driver_email_snapshot: emailSnap,
-        message: "I'm interested in learning more about this opportunity.",
-      },
-      {
-        onSuccess: () => {
-          toast.success('Request sent to recruiter');
-          setSubmitting(false);
-        },
-        onError: (e: Error) => {
-          toast.error(submissionErrorMessage(e));
-          setSubmitting(false);
-        },
-      },
-    );
-  };
 
   const displayTitle = canonical.identity.title;
   const companyName =
@@ -710,20 +674,13 @@ export function OpportunityDetail({
                 ? 'Hired'
                 : formalState.kind === 'reapplyable'
                   ? 'Apply Again'
-                  : 'Apply Now'}
+                  : profileIncomplete
+                    ? 'Complete Preferences to Apply'
+                    : 'Apply Now'}
           </Button>
           <Button variant="outline" onClick={handleToggleSave} className="flex-1">
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {isSaved ? 'Saved' : 'Save'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleRequestInfo}
-            disabled={requestInfoState.exists || submitting}
-            className="flex-1"
-          >
-            <Send className="h-4 w-4" />
-            {requestInfoState.exists ? 'Info Requested' : submitting ? 'Sending…' : 'Request Info'}
           </Button>
           {isPro ? (
             <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">

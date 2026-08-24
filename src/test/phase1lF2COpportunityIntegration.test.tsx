@@ -857,7 +857,7 @@ describe('Phase 1L-F2C · Apply-to-preferences integration smoke', () => {
     renderPage();
 
     await openDetailByTitle('Apply Row');
-    await userEvent.click(screen.getByRole('button', { name: /^Apply Now$/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Complete Preferences to Apply$/ }));
     const dialog = await screen.findByTestId('apply-dialog');
     expect(within(dialog).getByTestId('apply-dialog-id')).toHaveTextContent('opp-apply');
     expect(within(dialog).getByTestId('apply-dialog-title')).toHaveTextContent('Apply Row');

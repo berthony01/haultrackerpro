@@ -782,6 +782,9 @@ function RecruiterOpportunityFormCore({
             {state.pay_model === 'cpm' && (
               <div className="mt-4">
                 <NumField label="CPM Rate ($/mi)" value={state.cpm} onChange={(v) => set('cpm', v)} />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Enter dollars per mile as a decimal: 75 cents = 0.75.
+                </p>
               </div>
             )}
             {state.pay_model === 'percentage' && (
@@ -940,15 +943,20 @@ function RecruiterOpportunityFormCore({
                         </Field>
                         {state.escrow_required_state === 'required' && (
                           <>
-                            <NumField label="Escrow Amount ($)" value={state.escrow_amount}
+                            <NumField label="Escrow Deduction Amount ($ per period)" value={state.escrow_amount}
                               onChange={(v) => set('escrow_amount', v)} />
-                            <Field label="Escrow Frequency">
-                              <FreqSelect ariaLabel="Escrow Frequency" value={state.escrow_frequency}
+                            <Field label="Escrow Deduction Frequency">
+                              <FreqSelect ariaLabel="Escrow Deduction Frequency" value={state.escrow_frequency}
                                 onChange={(v) => set('escrow_frequency', v)} />
                             </Field>
                           </>
                         )}
                       </div>
+                      {state.escrow_required_state === 'required' && (
+                        <p className="text-xs text-muted-foreground">
+                          Enter the amount deducted each selected period, not the total escrow target.
+                        </p>
+                      )}
                     </div>
                   )}
 

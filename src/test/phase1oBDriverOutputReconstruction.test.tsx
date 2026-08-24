@@ -227,9 +227,14 @@ describe('Phase 1O-B · Card hierarchy', () => {
 });
 
 describe('Phase 1O-B · Detail sticky action bar', () => {
-  it('exposes exactly one Apply Now button and exactly one Save button across the whole view', () => {
+  it('exposes exactly one apply CTA and exactly one Save button across the whole view', () => {
     renderDetail(source({ pay_model: 'flat_weekly', flat_weekly_pay: 1600 }));
-    expect(screen.getAllByRole('button', { name: /^Apply Now$/ })).toHaveLength(1);
+    // Phase OD-1 — this fixture passes driverProfile={null}, so the single
+    // primary CTA truthfully reads "Complete Preferences to Apply".
+    expect(
+      screen.getAllByRole('button', { name: /^Complete Preferences to Apply$/ }),
+    ).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /^Apply Now$/ })).toBeNull();
     expect(screen.getAllByRole('button', { name: /^Save$/ })).toHaveLength(1);
   });
 });

@@ -74,7 +74,9 @@ const driverProfile: any = {
   contact_preference: 'in_app',
 };
 
-function renderPage(overrides: { isPro?: boolean; apps?: any[] } = {}) {
+function renderPage(
+  overrides: { isPro?: boolean; apps?: any[]; profile?: any } = {},
+) {
   driverApplicationsRef.current = overrides.apps ?? [];
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -84,7 +86,7 @@ function renderPage(overrides: { isPro?: boolean; apps?: any[] } = {}) {
         onBack={vi.fn()}
         isPro={overrides.isPro ?? false}
         onUpgrade={vi.fn()}
-        driverProfile={driverProfile}
+        driverProfile={'profile' in overrides ? overrides.profile : driverProfile}
         onOpenPreferencesForApply={vi.fn()}
       />
     </QueryClientProvider>,
@@ -98,17 +100,38 @@ beforeEach(() => {
 });
 
 describe('OpportunityDetail — Apply Now integration', () => {
-  it('renders Apply Now as primary action and Request Info as secondary', () => {
+  // Phase OD-1 — NEW driver-facing Request Info submission is retired from this
+  // page. Formal Apply is the only submission CTA; Save/Refer stay secondary.
+  it('renders Apply Now as primary action and does NOT render Request Info', () => {
     renderPage();
     const apply = screen.getByRole('button', { name: /^Apply Now$/ });
-    const req = screen.getByRole('button', { name: /Request Info/ });
     expect(apply).toBeInTheDocument();
-    expect(req).toBeInTheDocument();
     // Apply Now is the primary variant (no `variant="outline"` -> default primary styling)
     expect(apply.className).not.toMatch(/border-input/);
-    // Request Info is outline (secondary)
-    expect(req.className).toMatch(/border/);
+    expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Info Requested/i })).toBeNull();
+    // Secondary actions remain intact.
+    expect(screen.getByRole('button', { name: /^Save$/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Refer a Driver/i })).toBeInTheDocument();
   });
+
+  it('renders "Complete Preferences to Apply" when preferences are incomplete, still enabled', async () => {
+    renderPage({ profile: null });
+    const btn = screen.getByRole('button', { name: /Complete Preferences to Apply/i });
+    expect(btn).toBeEnabled();
+    expect(
+      screen.getByText(/Complete your Opportunity Preferences to apply/i),
+    ).toBeInTheDocument();
+    // Existing dialog / preferences-required path remains reachable.
+    await userEvent.click(btn);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('does not show the incomplete-preferences label once preferences are complete', () => {
+    renderPage();
+    expect(screen.queryByRole('button', { name: /Complete Preferences to Apply/i })).toBeNull();
+  });
+
 
   it('is available to a non-Pro driver without upgrade gating', () => {
     renderPage({ isPro: false });
@@ -132,19 +155,12 @@ describe('OpportunityDetail — Apply Now integration', () => {
     expect(screen.getByRole('button', { name: /^Apply Now$/ })).toBeEnabled();
   });
 
-  it('does NOT falsely mark Request Info as sent when only a formal apply exists', () => {
-    renderPage({
-      apps: [{ opportunity_id: 'opp-1', application_type: 'apply', status: 'new' }],
-    });
-    // Request Info button remains enabled/available (formal apply does not disable it)
-    expect(screen.getByRole('button', { name: /Request Info/ })).toBeEnabled();
-  });
-
-  it('disables Request Info when a request_info row already exists', () => {
+  it('renders no Request Info surface even when a historical request_info row exists', () => {
     renderPage({
       apps: [{ opportunity_id: 'opp-1', application_type: 'request_info', status: 'new' }],
     });
-    expect(screen.getByRole('button', { name: /Info Requested/i })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Info Requested/i })).toBeNull();
   });
 
   const ACTIVE_STATUSES = [
@@ -190,7 +206,7 @@ describe('OpportunityDetail — Apply Now integration', () => {
     expect(btn).toBeDisabled();
   });
 
-  it('allows formal apply and request_info to coexist independently', () => {
+  it('a historical request_info row never affects formal apply classification', () => {
     renderPage({
       apps: [
         { opportunity_id: 'opp-1', application_type: 'apply', status: 'rejected' },
@@ -198,7 +214,7 @@ describe('OpportunityDetail — Apply Now integration', () => {
       ],
     });
     expect(screen.getByRole('button', { name: /Apply Again/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Info Requested/i })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Info Requested/i })).toBeNull();
   });
 });
 
@@ -242,8 +258,8 @@ describe('OpportunityDetail — post-success page state', () => {
     );
     const applyBtn = screen.getByRole('button', { name: /Application Submitted/i });
     expect(applyBtn).toBeDisabled();
-    // Request Info remains independently available (no request_info row exists).
-    expect(screen.getByRole('button', { name: /Request Info/ })).toBeEnabled();
+    // Phase OD-1 — no Request Info surface is rendered after submission either.
+    expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
   });
 });
 
