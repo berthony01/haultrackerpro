@@ -32,7 +32,15 @@ interface Props {
   canonical: CanonicalOpportunity;
   isPro: boolean;
   onUpgrade: () => void;
+  /**
+   * Phase OD-2 — presentation-only. When true, Listing Transparency and the
+   * Financial Disclosure block are merged into a single surface and the
+   * secondary cost rows / diagnostics collapse behind an expander. No value,
+   * gating, or disclosure semantics change.
+   */
+  compact?: boolean;
 }
+
 
 const BAND_LABEL: Record<ListingTransparencyBand, string> = {
   complete: 'Complete',
