@@ -162,18 +162,16 @@ export function OpportunityDetail({
   );
 
   const { saved, save, unsave } = useSavedOpportunities();
-  const { driverApplications, createApplication } = useOpportunityApplications();
-  const [submitting, setSubmitting] = useState(false);
+  // Phase OD-1 — NEW driver-facing Request Info submission is retired from this
+  // page. Only the formal apply classification is read here; request_info
+  // backend support, history, and recruiter-side handling are unchanged.
+  const { driverApplications } = useOpportunityApplications();
   const [showRefer, setShowRefer] = useState(false);
   const [showApply, setShowApply] = useState(false);
 
   const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
   const formalState = useMemo(
     () => classifyFormalApply(driverApplications as any[], o.id),
-    [driverApplications, o.id],
-  );
-  const requestInfoState = useMemo(
-    () => classifyRequestInfo(driverApplications as any[], o.id),
     [driverApplications, o.id],
   );
 
