@@ -576,6 +576,10 @@ export function validateOpportunityReadiness(
   if (state.pay_model === 'cpm') {
     const cpm = parseNumStrict(state.cpm);
     if (cpm === null || !Number.isFinite(cpm) || cpm <= 0) blockers.add('CPM must be greater than zero.');
+    // Phase OD-1 — CPM is stored as dollars per mile. Values above $5.00/mi are
+    // almost always cents entered without the decimal (75 instead of 0.75).
+    // Reject rather than auto-convert: bad input must never be guessed.
+    else if (cpm > 5) blockers.add('CPM must be entered in dollars per mile (example: 75 cents = 0.75).');
     const total = parseNumStrict(state.estimated_weekly_miles);
     if (total === null || !Number.isFinite(total) || total <= 0) blockers.add('Total weekly miles must be greater than zero for CPM pay.');
     const loaded = parseNumStrict(state.estimated_loaded_miles);
