@@ -305,16 +305,21 @@ export function OpportunityDetail({
   const hasPaySection =
     payKVs.length > 0 || mixedComponents.length > 0 || signOnAmount != null;
 
-  const coverageKVs: [string, string][] = [];
-  if (coverage) coverageKVs.push(['Hiring coverage', coverage]);
-  if (routeLabel) coverageKVs.push(['Route type', routeLabel]);
-  if (trailerLabel) coverageKVs.push(['Trailer', trailerLabel]);
+  // Phase OD-2 — hiring coverage, route, trailer, home time, weekly mileage,
+  // and pay basis are promoted into the decision-first Quick Facts grid, so
+  // they are no longer repeated as KVs in the sections below.
+  const quickFacts: [string, string, typeof MapPin][] = [];
+  if (coverage) quickFacts.push(['Hiring', coverage, MapPin]);
+  if (payModelLabel) quickFacts.push(['Pay basis', payModelLabel, DollarSign]);
+  if (totalMiles) quickFacts.push(['Miles / week', totalMiles, Gauge]);
+  if (routeLabel) quickFacts.push(['Route', routeLabel, MapPin]);
+  if (trailerLabel) quickFacts.push(['Trailer', trailerLabel, Truck]);
+  if (homeTimeLabel) quickFacts.push(['Home time', homeTimeLabel, Home]);
+
   const typicalLanes = strOrNull(canonical.content.typicalLanes);
-  const hasCoverageSection =
-    coverageKVs.length > 0 || typicalLanes != null || mileageKVs.length > 0;
+  const hasCoverageSection = typicalLanes != null || mileageKVs.length > 0;
 
   const lifestyleKVs: [string, string][] = [];
-  if (homeTimeLabel) lifestyleKVs.push(['Home time', homeTimeLabel]);
   const forcedDispatch = boolYNOrNull(canonical.operatingTerms.forcedDispatch);
   if (forcedDispatch) lifestyleKVs.push(['Forced dispatch', forcedDispatch]);
   const pets = boolYNOrNull(canonical.operatingTerms.petsAllowed);
@@ -323,6 +328,7 @@ export function OpportunityDetail({
   if (riders) lifestyleKVs.push(['Riders allowed', riders]);
   const equipmentYear = strOrNull(canonical.operatingTerms.equipmentYear);
   if (equipmentYear) lifestyleKVs.push(['Equipment year', equipmentYear]);
+
 
   const benefits = strOrNull(canonical.content.actualBenefits);
   const requirements = strOrNull(canonical.content.requirements);
@@ -391,70 +397,59 @@ export function OpportunityDetail({
               )}
             </div>
             {companyName && (
-              <p className="text-base font-semibold text-muted-foreground">{companyName}</p>
+              <p className="text-base font-semibold text-muted-foreground break-words">{companyName}</p>
+            )}
+            {(employmentLabel || teamLabel) && (
+              <div className="flex flex-wrap gap-2 text-xs mt-2">
+                {employmentLabel && (
+                  <Badge variant="outline" className="gap-1">
+                    <Briefcase className="h-3 w-3" aria-hidden /> {employmentLabel}
+                  </Badge>
+                )}
+                {teamLabel && (
+                  <Badge variant="outline" className="gap-1">
+                    <Users className="h-3 w-3" aria-hidden /> {teamLabel}
+                  </Badge>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Dominant pay + coverage */}
-          {(grossValue || coverage) && (
-            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-              {grossValue && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                    Weekly pay
-                  </p>
-                  <p className="text-3xl sm:text-4xl font-black text-primary leading-none whitespace-nowrap">
-                    {grossValue}
-                  </p>
-                  <p className="text-[10px] font-semibold text-muted-foreground mt-1">
-                    per week
-                  </p>
-                </div>
-              )}
-              {coverage && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                    Hiring
-                  </p>
-                  <p className="text-base font-semibold text-foreground flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                    <span>{coverage}</span>
-                  </p>
-                </div>
-              )}
+
+          {/* Dominant pay headline */}
+          {grossValue && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Weekly pay
+              </p>
+              <p className="text-3xl sm:text-4xl font-black text-primary leading-none whitespace-nowrap">
+                {grossValue}
+              </p>
+              <p className="text-[10px] font-semibold text-muted-foreground mt-1">per week</p>
             </div>
           )}
 
-          {/* Compact facts row — hide unpopulated facts */}
-          {(employmentLabel || teamLabel || routeLabel || trailerLabel || homeTimeLabel) && (
-            <div className="flex flex-wrap gap-2 text-xs">
-              {employmentLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Briefcase className="h-3 w-3" aria-hidden /> {employmentLabel}
-                </Badge>
-              )}
-              {teamLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Users className="h-3 w-3" aria-hidden /> {teamLabel}
-                </Badge>
-              )}
-              {routeLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <MapPin className="h-3 w-3" aria-hidden /> {routeLabel}
-                </Badge>
-              )}
-              {trailerLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Truck className="h-3 w-3" aria-hidden /> {trailerLabel}
-                </Badge>
-              )}
-              {homeTimeLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Home className="h-3 w-3" aria-hidden /> {homeTimeLabel}
-                </Badge>
-              )}
+
+          {/* Quick Facts — decision-first grid; unpopulated facts are omitted */}
+          {quickFacts.length > 0 && (
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              data-testid="opportunity-quick-facts"
+            >
+              {quickFacts.map(([label, value, Icon]) => (
+                <div key={label} className="rounded-xl bg-muted/40 p-3 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Icon className="h-3 w-3 text-primary shrink-0" aria-hidden />
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      {label}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-foreground break-words">{value}</p>
+                </div>
+              ))}
             </div>
           )}
+
 
           {/* Primary actions live in the sticky action bar below to keep them
               always reachable without duplicating buttons on the page. */}
@@ -462,56 +457,56 @@ export function OpportunityDetail({
       </Card>
 
 
-      {/* Match Insights (secondary rationale — kept for driver context) */}
+      {/* Match Insights — compact secondary panel */}
       {match ? (
-        <Card className="p-5 border-primary/30 bg-gradient-to-br from-primary/5 via-card to-card">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <Card className="p-4 border-primary/25 bg-primary/[0.04]" data-testid="opportunity-match-panel">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
-              <div className="rounded-lg bg-primary/15 p-1.5">
-                <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden />
-              </div>
-              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">Your Match</h3>
+              <CheckCircle2 className="h-4 w-4 text-primary shrink-0" aria-hidden />
+              <h3 className="text-xs font-bold text-foreground uppercase tracking-wider">Your Match</h3>
             </div>
             <OpportunityMatchBadge score={match.matchScore} tier={match.matchTier} size="md" />
           </div>
-          {match.reasons.length > 0 && (
-            <div className="mb-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Why This Matches You
-              </p>
-              <ul className="space-y-1.5">
-                {match.reasons.map((r) => (
-                  <li key={r} className="flex items-start gap-2 text-sm text-foreground">
-                    <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" aria-hidden />
-                    <span>{r}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {match.warnings.length > 0 && (
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Potential Concerns
-              </p>
-              <ul className="space-y-1.5">
-                {match.warnings.map((w) => (
-                  <li key={w} className="flex items-start gap-2 text-sm text-foreground">
-                    <AlertTriangle className="h-4 w-4 text-destructive mt-0.5 shrink-0" aria-hidden />
-                    <span>{w}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {match.reasons.length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
+                  Why This Matches You
+                </p>
+                <ul className="space-y-1">
+                  {match.reasons.map((r) => (
+                    <li key={r} className="flex items-start gap-2 text-xs text-foreground">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-success mt-0.5 shrink-0" aria-hidden />
+                      <span className="break-words">{r}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {match.warnings.length > 0 && (
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1.5">
+                  Potential Concerns
+                </p>
+                <ul className="space-y-1">
+                  {match.warnings.map((w) => (
+                    <li key={w} className="flex items-start gap-2 text-xs text-foreground">
+                      <AlertTriangle className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" aria-hidden />
+                      <span className="break-words">{w}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </Card>
       ) : (
-        <Card className="p-5 border-border/60 bg-muted/20">
+        <Card className="p-4 border-border/60 bg-muted/20" data-testid="opportunity-match-panel">
           <div className="flex items-start gap-3">
-            <Info className="h-5 w-5 text-primary mt-0.5 shrink-0" aria-hidden />
-            <div>
+            <Info className="h-4 w-4 text-primary mt-0.5 shrink-0" aria-hidden />
+            <div className="min-w-0">
               <h3 className="text-sm font-bold text-foreground mb-1">Improve Your Match Insights</h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground break-words">
                 Add a few Opportunity Preferences to see how well this opportunity fits your pay goals, route preference, and equipment.
               </p>
             </div>
@@ -521,189 +516,190 @@ export function OpportunityDetail({
 
       {/* 1. Opportunity Overview */}
       {overviewContent && (
-        <Section icon={FileText} title="Opportunity Overview">
-          <p className="text-sm text-foreground whitespace-pre-line">{overviewContent}</p>
-        </Section>
+        <Surface>
+          <Section icon={FileText} title="Opportunity Overview">
+            <p className="text-sm text-foreground whitespace-pre-line break-words">{overviewContent}</p>
+          </Section>
+        </Surface>
       )}
 
-      {/* 2. Pay & Compensation */}
-      {hasPaySection && (
-        <Section icon={DollarSign} title="Pay & Compensation">
-          {payKVs.length > 0 && (
-            <Grid>
-              {payKVs.map(([label, value]) => (
-                <KV
-                  key={label}
-                  label={label}
-                  value={value}
-                  highlight={label === grossLabel}
-                />
-              ))}
-            </Grid>
+      {/* 2 + 3. Pay & Route surface */}
+      {(hasPaySection || hasCoverageSection) && (
+        <Surface>
+          {hasPaySection && (
+            <Section icon={DollarSign} title="Pay & Compensation">
+              {payKVs.length > 0 && (
+                <Grid>
+                  {payKVs.map(([label, value]) => (
+                    <KV
+                      key={label}
+                      label={label}
+                      value={value}
+                      highlight={label === grossLabel}
+                    />
+                  ))}
+                </Grid>
+              )}
+              {mixedComponents.length > 0 && (
+                <div className="mt-3 rounded-lg bg-muted/30 p-3">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                    Mixed pay components
+                  </p>
+                  <ul className="space-y-1">
+                    {mixedComponents.map((c, i) => (
+                      <li key={i} className="text-sm text-foreground flex justify-between gap-2">
+                        <span className="break-words">{c.label || 'Component'}</span>
+                        <span className="font-semibold whitespace-nowrap">
+                          {c.amount.state === 'provided'
+                            ? `${fmtMoney(c.amount.value.amount)}${
+                                c.amount.value.frequency ? ` ${c.amount.value.frequency}` : ''
+                              }`
+                            : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {signOnAmount != null && (
+                <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-3">
+                  <Gift className="h-4 w-4 text-primary shrink-0" aria-hidden />
+                  <div className="min-w-0">
+                    <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">
+                      One-time incentive · separate from weekly pay
+                    </p>
+                    <p className="text-sm font-bold text-foreground break-words">
+                      Sign-on bonus: {fmtMoney(signOnAmount)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </Section>
           )}
-          {mixedComponents.length > 0 && (
-            <div className="mt-3 rounded-lg bg-muted/30 p-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Mixed pay components
-              </p>
-              <ul className="space-y-1">
-                {mixedComponents.map((c, i) => (
-                  <li key={i} className="text-sm text-foreground flex justify-between gap-2">
-                    <span>{c.label || 'Component'}</span>
-                    <span className="font-semibold">
-                      {c.amount.state === 'provided'
-                        ? `${fmtMoney(c.amount.value.amount)}${
-                            c.amount.value.frequency ? ` ${c.amount.value.frequency}` : ''
-                          }`
-                        : ''}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+
+          {hasCoverageSection && (
+            <Section icon={MapPin} title="Hiring Coverage & Route">
+              {mileageKVs.length > 0 && (
+                <Grid>
+                  {mileageKVs.map(([label, value, warn]) => (
+                    <KV key={label} label={label} value={value} warn={warn} />
+                  ))}
+                </Grid>
+              )}
+              {typicalLanes && (
+                <div className={mileageKVs.length > 0 ? 'mt-3' : ''}>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
+                    Typical Lanes
+                  </p>
+                  <p className="text-sm text-foreground whitespace-pre-line break-words">{typicalLanes}</p>
+                </div>
+              )}
+            </Section>
           )}
-          {signOnAmount != null && (
-            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3 flex items-center gap-3">
-              <Gift className="h-4 w-4 text-primary shrink-0" aria-hidden />
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-primary font-semibold">
-                  One-time incentive · separate from weekly pay
-                </p>
-                <p className="text-sm font-bold text-foreground">
-                  Sign-on bonus: {fmtMoney(signOnAmount)}
-                </p>
-              </div>
-            </div>
-          )}
-        </Section>
+        </Surface>
       )}
 
-      {/* 3. Hiring Coverage & Route */}
-      {hasCoverageSection && (
-        <Section icon={MapPin} title="Hiring Coverage & Route">
-          {coverageKVs.length > 0 && (
-            <Grid>
-              {coverageKVs.map(([label, value]) => (
-                <KV key={label} label={label} value={value} />
-              ))}
-            </Grid>
-          )}
-          {mileageKVs.length > 0 && (
-            <div className="mt-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Mileage & deadhead
-              </p>
+      {/* 4 + 5 + 6. Lifestyle & Benefits surface */}
+      {(lifestyleKVs.length > 0 || benefits || requirements) && (
+        <Surface>
+          {lifestyleKVs.length > 0 && (
+            <Section icon={Home} title="Home Time & Lifestyle">
               <Grid>
-                {mileageKVs.map(([label, value, warn]) => (
-                  <KV key={label} label={label} value={value} warn={warn} />
+                {lifestyleKVs.map(([label, value]) => (
+                  <KV key={label} label={label} value={value} />
                 ))}
               </Grid>
-            </div>
+            </Section>
           )}
-          {typicalLanes && (
-            <div className="mt-3">
-              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-                Typical Lanes
-              </p>
-              <p className="text-sm text-foreground whitespace-pre-line">{typicalLanes}</p>
-            </div>
+          {benefits && (
+            <Section icon={ShieldCheck} title="Benefits & Equipment">
+              <p className="text-sm text-foreground whitespace-pre-line break-words">{benefits}</p>
+            </Section>
           )}
-        </Section>
-      )}
-
-      {/* 4. Home Time & Lifestyle */}
-      {lifestyleKVs.length > 0 && (
-        <Section icon={Home} title="Home Time & Lifestyle">
-          <Grid>
-            {lifestyleKVs.map(([label, value]) => (
-              <KV key={label} label={label} value={value} />
-            ))}
-          </Grid>
-        </Section>
-      )}
-
-      {/* 5. Benefits & Equipment */}
-      {benefits && (
-        <Section icon={ShieldCheck} title="Benefits & Equipment">
-          <p className="text-sm text-foreground whitespace-pre-line">{benefits}</p>
-        </Section>
-      )}
-
-      {/* 6. Requirements */}
-      {requirements && (
-        <Section icon={ClipboardList} title="Requirements">
-          <p className="text-sm text-foreground whitespace-pre-line">{requirements}</p>
-        </Section>
+          {requirements && (
+            <Section icon={ClipboardList} title="Requirements">
+              <p className="text-sm text-foreground whitespace-pre-line break-words">{requirements}</p>
+            </Section>
+          )}
+        </Surface>
       )}
 
       {/* 7. Costs & Operating Terms (cost-bearing employment only) */}
       {hasCostsSection && (
-        <Section icon={Wallet} title="Costs & Operating Terms">
-          <Grid>
-            {costsKVs.map(([label, value]) => (
-              <KV key={label} label={label} value={value} />
-            ))}
-          </Grid>
-        </Section>
+        <Surface>
+          <Section icon={Wallet} title="Costs & Operating Terms">
+            <Grid>
+              {costsKVs.map(([label, value]) => (
+                <KV key={label} label={label} value={value} />
+              ))}
+            </Grid>
+          </Section>
+        </Surface>
       )}
 
-      {/* 8. Transparency & Financial Disclosure (secondary) */}
-      <OpportunityProfitBreakdown canonical={canonical} isPro={isPro} onUpgrade={onUpgrade} />
+      {/* 8. Transparency & Financial Disclosure (secondary, merged surface) */}
+      <OpportunityProfitBreakdown canonical={canonical} isPro={isPro} onUpgrade={onUpgrade} compact />
+
 
       <div aria-hidden className="h-32 lg:h-28" />
 
-      {/* Sticky action bar — Apply Now dominant, everything else secondary */}
-      <div className="fixed left-0 right-0 lg:left-[calc(15rem+1.5rem)] lg:right-6 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30 space-y-2">
-        {profileIncomplete && formalState.kind === 'none' && (
-          <div className="flex items-start gap-2 rounded-lg bg-primary/10 border border-primary/30 p-3 text-xs text-foreground backdrop-blur-md">
-            <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" aria-hidden />
-            <span>Complete your Opportunity Preferences to apply and improve your match score.</span>
-          </div>
-        )}
-        <div className="flex flex-col sm:flex-row gap-3 bg-card/90 backdrop-blur-md p-3 rounded-xl border border-border/60 shadow-lg">
-          <Button
-            onClick={() => setShowApply(true)}
-            disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
-            className="flex-1 sm:flex-[2]"
-            size="lg"
-          >
-            <Send className="h-4 w-4" />
-            {formalState.kind === 'active'
-              ? 'Application Submitted'
-              : formalState.kind === 'completed'
-                ? 'Hired'
-                : formalState.kind === 'reapplyable'
-                  ? 'Apply Again'
-                  : profileIncomplete
-                    ? 'Complete Preferences to Apply'
-                    : 'Apply Now'}
-          </Button>
-          <Button variant="outline" onClick={handleToggleSave} className="flex-1">
-            {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-            {isSaved ? 'Saved' : 'Save'}
-          </Button>
-          {isPro ? (
-            <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
-              <UserPlus className="h-4 w-4" /> Refer a Driver
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              onClick={() => {
-                toast.message('Driver referrals are a Pro feature.', {
-                  description:
-                    'Upgrade to Pro to refer drivers to recruiter opportunities and track referral progress.',
-                });
-                onUpgrade();
-              }}
-              className="flex-1"
-              aria-label="Refer a Driver — Pro feature"
-            >
-              <Lock className="h-4 w-4" /> Refer a Driver — Pro
-            </Button>
+      {/* Sticky decision bar — Apply dominant, everything else secondary */}
+      <div className="fixed left-0 right-0 lg:left-[calc(15rem+1.5rem)] lg:right-6 bottom-[calc(72px+env(safe-area-inset-bottom))] lg:bottom-4 px-3 lg:px-0 z-30">
+        <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-border/60 bg-card/95 backdrop-blur-md shadow-elevated">
+          {profileIncomplete && formalState.kind === 'none' && (
+            <div className="flex items-start gap-2 border-b border-border/60 bg-primary/10 px-4 py-2.5 text-xs text-foreground">
+              <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary" aria-hidden />
+              <span className="break-words">
+                Complete your Opportunity Preferences to apply and improve your match score.
+              </span>
+            </div>
           )}
+          <div className="flex flex-col sm:flex-row gap-2.5 p-3">
+            <Button
+              onClick={() => setShowApply(true)}
+              disabled={formalState.kind === 'active' || formalState.kind === 'completed'}
+              className="flex-1 sm:flex-[2] whitespace-normal"
+              size="lg"
+            >
+              <Send className="h-4 w-4" />
+              {formalState.kind === 'active'
+                ? 'Application Submitted'
+                : formalState.kind === 'completed'
+                  ? 'Hired'
+                  : formalState.kind === 'reapplyable'
+                    ? 'Apply Again'
+                    : profileIncomplete
+                      ? 'Complete Preferences to Apply'
+                      : 'Apply Now'}
+            </Button>
+            <Button variant="outline" onClick={handleToggleSave} className="flex-1">
+              {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
+              {isSaved ? 'Saved' : 'Save'}
+            </Button>
+            {isPro ? (
+              <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
+                <UserPlus className="h-4 w-4" /> Refer a Driver
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  toast.message('Driver referrals are a Pro feature.', {
+                    description:
+                      'Upgrade to Pro to refer drivers to recruiter opportunities and track referral progress.',
+                  });
+                  onUpgrade();
+                }}
+                className="flex-1 whitespace-normal"
+                aria-label="Refer a Driver — Pro feature"
+              >
+                <Lock className="h-4 w-4" /> Refer a Driver — Pro
+              </Button>
+            )}
+          </div>
         </div>
       </div>
+
 
       <ReferDriverDialog
         open={showRefer && isPro}
@@ -729,6 +725,15 @@ export function OpportunityDetail({
   );
 }
 
+/** Grouped surface — hosts one or more sections inside a single card. */
+function Surface({ children }: { children: React.ReactNode }) {
+  return (
+    <Card className="border-border/60 divide-y divide-border/60 overflow-hidden">
+      {children}
+    </Card>
+  );
+}
+
 function Section({
   icon: Icon,
   title,
@@ -739,7 +744,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="p-5 border-border/60">
+    <div className="p-5">
       <div className="flex items-center gap-2 mb-4">
         <div className="rounded-lg bg-primary/10 p-1.5">
           <Icon className="h-4 w-4 text-primary" aria-hidden />
@@ -747,9 +752,10 @@ function Section({
         <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">{title}</h3>
       </div>
       {children}
-    </Card>
+    </div>
   );
 }
+
 
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{children}</div>;
