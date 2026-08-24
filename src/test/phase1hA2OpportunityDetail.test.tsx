@@ -206,7 +206,7 @@ describe('OpportunityDetail — Apply Now integration', () => {
     expect(btn).toBeDisabled();
   });
 
-  it('allows formal apply and request_info to coexist independently', () => {
+  it('a historical request_info row never affects formal apply classification', () => {
     renderPage({
       apps: [
         { opportunity_id: 'opp-1', application_type: 'apply', status: 'rejected' },
@@ -214,7 +214,7 @@ describe('OpportunityDetail — Apply Now integration', () => {
       ],
     });
     expect(screen.getByRole('button', { name: /Apply Again/i })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /Info Requested/i })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Info Requested/i })).toBeNull();
   });
 });
 
