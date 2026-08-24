@@ -513,6 +513,23 @@ describe('TG-2F-A live — consume RPC behaviour', () => {
     return rows[0].token;
   }
 
+  /**
+   * Runs `run` inside a SAVEPOINT, asserts it rejects with `pattern`, then
+   * recovers the transaction with ROLLBACK TO SAVEPOINT so subsequent
+   * assertions execute in the SAME (non-aborted) outer transaction.
+   */
+  async function expectFailureWithRecovery(
+    c: pg.PoolClient,
+    savepoint: string,
+    run: (c: pg.PoolClient) => Promise<unknown>,
+    pattern: RegExp,
+  ) {
+    await c.query(`SAVEPOINT ${savepoint}`);
+    await expect(run(c)).rejects.toThrow(pattern);
+    await c.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+    await c.query(`RELEASE SAVEPOINT ${savepoint}`);
+  }
+
   const CHAT_ID = -1001234500001;
 
   it('rejects a malformed secret with the fixed generic error', async () => {
@@ -539,21 +556,35 @@ describe('TG-2F-A live — consume RPC behaviour', () => {
 
   it('rejects a non-group chat type before touching the token', async () => {
     await inRollback(async (c) => {
+      // Token is seeded OUTSIDE the savepoint so it survives the recovery.
       const { userId, recruiterId } = await seedLinkedOwner(c, 900003);
       const token = await issueFor(c, userId, recruiterId);
-      await expect(
-        c.query(
-          `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'private',$3)`,
-          [900003, CHAT_ID, token],
-        ),
-      ).rejects.toThrow(/telegram_dispatch_bind_invalid_input/);
+
+      await expectFailureWithRecovery(
+        c,
+        'tg2f_chat_type',
+        (t) =>
+          t.query(
+            `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'private',$3)`,
+            [900003, CHAT_ID, token],
+          ),
+        /telegram_dispatch_bind_invalid_input/,
+      );
 
       const still = await c.query(
         `SELECT 1 FROM public.telegram_dispatch_bind_tokens
-          WHERE recruiter_id = $1 AND consumed_at IS NULL AND invalidated_at IS NULL`,
-        [recruiterId],
+          WHERE recruiter_id = $1 AND issued_by_user_id = $2
+            AND consumed_at IS NULL AND invalidated_at IS NULL`,
+        [recruiterId, userId],
       );
       expect(still.rowCount).toBe(1);
+
+      const leftover = await c.query(
+        `SELECT 1 FROM public.telegram_chat_bindings
+          WHERE telegram_chat_id = $1 AND status = 'active'`,
+        [CHAT_ID],
+      );
+      expect(leftover.rowCount).toBe(0);
     });
   });
 
@@ -631,19 +662,40 @@ describe('TG-2F-A live — consume RPC behaviour', () => {
       const { userId, recruiterId } = await seedLinkedOwner(c, 900007);
       const token = await issueFor(c, userId, recruiterId);
 
-      await expect(
-        c.query(
-          `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'group',$3)`,
-          [999999, CHAT_ID, token],
-        ),
-      ).rejects.toThrow(/telegram_actor_not_linked/);
-    });
+      // Statement-level recovery: the failed consume is rolled back to the
+      // savepoint, so the assertions below observe the SAME outer transaction
+      // and prove the token survived the failed attempt itself — not merely
+      // that the whole test transaction was discarded afterwards.
+      await expectFailureWithRecovery(
+        c,
+        'tg2f_actor',
+        (t) =>
+          t.query(
+            `SELECT public.consume_telegram_dispatch_bind_token($1,$2,'group',$3)`,
+            [999999, CHAT_ID, token],
+          ),
+        /telegram_actor_not_linked/,
+      );
 
-    // A fresh transaction proves the failed attempt rolled back entirely:
-    // nothing was bound and nothing persisted.
-    await inRollback(async (c) => {
+      const still = await c.query<{ token_hash: string }>(
+        `SELECT token_hash FROM public.telegram_dispatch_bind_tokens
+          WHERE recruiter_id = $1 AND issued_by_user_id = $2
+            AND consumed_at IS NULL AND invalidated_at IS NULL`,
+        [recruiterId, userId],
+      );
+      expect(still.rowCount).toBe(1);
+      expect(still.rows[0].token_hash).toBe(
+        (
+          await c.query<{ h: string }>(
+            `SELECT encode(extensions.digest($1,'sha256'),'hex') AS h`,
+            [token],
+          )
+        ).rows[0].h,
+      );
+
       const leftover = await c.query(
-        `SELECT 1 FROM public.telegram_chat_bindings WHERE telegram_chat_id = $1`,
+        `SELECT 1 FROM public.telegram_chat_bindings
+          WHERE telegram_chat_id = $1 AND status = 'active'`,
         [CHAT_ID],
       );
       expect(leftover.rowCount).toBe(0);
