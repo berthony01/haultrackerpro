@@ -443,7 +443,7 @@ export function OpportunityDetail({
           {/* Quick Facts — decision-first grid; unpopulated facts are omitted */}
           {quickFacts.length > 0 && (
             <div
-              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3"
               data-testid="opportunity-quick-facts"
             >
               {quickFacts.map(([label, value, Icon]) => (
