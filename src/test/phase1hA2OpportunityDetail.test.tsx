@@ -155,19 +155,12 @@ describe('OpportunityDetail — Apply Now integration', () => {
     expect(screen.getByRole('button', { name: /^Apply Now$/ })).toBeEnabled();
   });
 
-  it('does NOT falsely mark Request Info as sent when only a formal apply exists', () => {
-    renderPage({
-      apps: [{ opportunity_id: 'opp-1', application_type: 'apply', status: 'new' }],
-    });
-    // Request Info button remains enabled/available (formal apply does not disable it)
-    expect(screen.getByRole('button', { name: /Request Info/ })).toBeEnabled();
-  });
-
-  it('disables Request Info when a request_info row already exists', () => {
+  it('renders no Request Info surface even when a historical request_info row exists', () => {
     renderPage({
       apps: [{ opportunity_id: 'opp-1', application_type: 'request_info', status: 'new' }],
     });
-    expect(screen.getByRole('button', { name: /Info Requested/i })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Info Requested/i })).toBeNull();
   });
 
   const ACTIVE_STATUSES = [
