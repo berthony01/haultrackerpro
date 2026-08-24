@@ -661,6 +661,23 @@ describe('validateOpportunityReadiness — pay-model readiness matrix', () => {
     expect(r.blockingReasons).toEqual([]);
   });
 
+  // Phase OD-1 — CPM is stored as dollars per mile. Cents-shaped entry (75)
+  // must be blocked, never silently converted.
+  it('CPM above $5.00/mi blocks publish as cents-shaped entry', () => {
+    const r = validateOpportunityReadiness(publishableCpmState({ cpm: '75' }));
+    expect(r.canPublish).toBe(false);
+    expect(r.blockingReasons).toContain(
+      'CPM must be entered in dollars per mile (example: 75 cents = 0.75).',
+    );
+  });
+
+  it('CPM at the $5.00/mi boundary remains publishable', () => {
+    const r = validateOpportunityReadiness(publishableCpmState({ cpm: '5' }));
+    expect(r.blockingReasons).not.toContain(
+      'CPM must be entered in dollars per mile (example: 75 cents = 0.75).',
+    );
+  });
+
   it('CPM with zero loaded miles blocks publish with the specific message', () => {
     const r = validateOpportunityReadiness(publishableCpmState({ estimated_loaded_miles: '0' }));
     expect(r.blockingReasons).toContain('Loaded miles cannot be zero when provided.');
