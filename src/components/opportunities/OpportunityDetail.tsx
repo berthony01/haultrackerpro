@@ -410,35 +410,19 @@ export function OpportunityDetail({
           </div>
 
 
-          {/* Dominant pay + coverage */}
-          {(grossValue || coverage) && (
-            <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-              {grossValue && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                    Weekly pay
-                  </p>
-                  <p className="text-3xl sm:text-4xl font-black text-primary leading-none whitespace-nowrap">
-                    {grossValue}
-                  </p>
-                  <p className="text-[10px] font-semibold text-muted-foreground mt-1">
-                    per week
-                  </p>
-                </div>
-              )}
-              {coverage && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
-                    Hiring
-                  </p>
-                  <p className="text-base font-semibold text-foreground flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 text-primary shrink-0" aria-hidden />
-                    <span>{coverage}</span>
-                  </p>
-                </div>
-              )}
+          {/* Dominant pay headline */}
+          {grossValue && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                Weekly pay
+              </p>
+              <p className="text-3xl sm:text-4xl font-black text-primary leading-none whitespace-nowrap">
+                {grossValue}
+              </p>
+              <p className="text-[10px] font-semibold text-muted-foreground mt-1">per week</p>
             </div>
           )}
+
 
           {/* Quick Facts — decision-first grid; unpopulated facts are omitted */}
           {quickFacts.length > 0 && (
