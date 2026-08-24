@@ -425,36 +425,26 @@ export function OpportunityDetail({
             </div>
           )}
 
-          {/* Compact facts row — hide unpopulated facts */}
-          {(employmentLabel || teamLabel || routeLabel || trailerLabel || homeTimeLabel) && (
-            <div className="flex flex-wrap gap-2 text-xs">
-              {employmentLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Briefcase className="h-3 w-3" aria-hidden /> {employmentLabel}
-                </Badge>
-              )}
-              {teamLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Users className="h-3 w-3" aria-hidden /> {teamLabel}
-                </Badge>
-              )}
-              {routeLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <MapPin className="h-3 w-3" aria-hidden /> {routeLabel}
-                </Badge>
-              )}
-              {trailerLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Truck className="h-3 w-3" aria-hidden /> {trailerLabel}
-                </Badge>
-              )}
-              {homeTimeLabel && (
-                <Badge variant="outline" className="gap-1">
-                  <Home className="h-3 w-3" aria-hidden /> {homeTimeLabel}
-                </Badge>
-              )}
+          {/* Quick Facts — decision-first grid; unpopulated facts are omitted */}
+          {quickFacts.length > 0 && (
+            <div
+              className="grid grid-cols-2 sm:grid-cols-3 gap-3"
+              data-testid="opportunity-quick-facts"
+            >
+              {quickFacts.map(([label, value, Icon]) => (
+                <div key={label} className="rounded-xl bg-muted/40 p-3 min-w-0">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Icon className="h-3 w-3 text-primary shrink-0" aria-hidden />
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      {label}
+                    </p>
+                  </div>
+                  <p className="text-sm font-bold text-foreground break-words">{value}</p>
+                </div>
+              ))}
             </div>
           )}
+
 
           {/* Primary actions live in the sticky action bar below to keep them
               always reachable without duplicating buttons on the page. */}
