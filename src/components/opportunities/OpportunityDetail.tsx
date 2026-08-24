@@ -53,11 +53,7 @@ import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ReferDriverDialog } from './ReferDriverDialog';
 import { ApplyNowDialog } from './ApplyNowDialog';
 import { displayHiringCoverage } from './OpportunityCard';
-import {
-  classifyFormalApply,
-  classifyRequestInfo,
-  submissionErrorMessage,
-} from '@/lib/opportunities/applicationSubmission';
+import { classifyFormalApply } from '@/lib/opportunities/applicationSubmission';
 import {
   normalizeOpportunity,
   type OpportunitySourceRow,
