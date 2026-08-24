@@ -736,13 +736,27 @@ export function OpportunityDetail({
 }
 
 /** Grouped surface — hosts one or more sections inside a single card. */
-function Surface({ children }: { children: React.ReactNode }) {
+function Surface({
+  children,
+  desktopColumns = 1,
+}: {
+  children: React.ReactNode;
+  desktopColumns?: 1 | 2 | 3;
+}) {
+  // Static class maps only — Tailwind cannot detect dynamically built strings.
+  const layout =
+    desktopColumns === 2
+      ? 'divide-y divide-border/60 lg:grid lg:grid-cols-2 lg:divide-y-0 lg:divide-x'
+      : desktopColumns === 3
+        ? 'divide-y divide-border/60 lg:grid lg:grid-cols-3 lg:divide-y-0 lg:divide-x'
+        : 'divide-y divide-border/60';
   return (
-    <Card className="border-border/60 divide-y divide-border/60 overflow-hidden">
+    <Card className={`border-border/60 overflow-hidden ${layout}`}>
       {children}
     </Card>
   );
 }
+
 
 function Section({
   icon: Icon,
