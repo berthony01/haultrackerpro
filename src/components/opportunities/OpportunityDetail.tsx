@@ -13,7 +13,7 @@
 //   6. Requirements               (requirements)
 //   7. Costs & Operating Terms    (cost-bearing employment only)
 //   8. Transparency & Financial Disclosure (secondary — Listing transparency + calc breakdown)
-//   9. Sticky action bar          (Apply Now dominant, Save + Refer + Request Info secondary)
+//   9. Sticky action bar          (Apply Now dominant, Save + Refer secondary)
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
