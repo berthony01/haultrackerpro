@@ -4394,6 +4394,47 @@ export type Database = {
           },
         ]
       }
+      telegram_dispatch_bind_tokens: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          invalidated_at: string | null
+          issued_by_user_id: string
+          recruiter_id: string
+          token_hash: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          invalidated_at?: string | null
+          issued_by_user_id: string
+          recruiter_id: string
+          token_hash: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invalidated_at?: string | null
+          issued_by_user_id?: string
+          recruiter_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_dispatch_bind_tokens_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_link_tokens: {
         Row: {
           consumed_at: string | null
@@ -5140,6 +5181,30 @@ export type Database = {
           p_result_code: string
         }
         Returns: boolean
+      }
+      consume_telegram_dispatch_bind_token: {
+        Args: {
+          _chat_type: string
+          _raw_token: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+        }
+        Returns: {
+          bound_at: string
+          bound_by_user_id: string | null
+          chat_type: string
+          id: string
+          recruiter_id: string
+          revoked_at: string | null
+          status: string
+          telegram_chat_id: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "telegram_chat_bindings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       consume_telegram_link_token: {
         Args: { _raw_token: string; _telegram_user_id: number }
@@ -5910,6 +5975,10 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      issue_telegram_dispatch_bind_token: {
+        Args: { _recruiter_id: string }
+        Returns: string
+      }
       issue_telegram_link_token: { Args: never; Returns: string }
       list_agency_audit_log: {
         Args: { _agency_id: string; _limit?: number }
