@@ -206,36 +206,6 @@ export function OpportunityDetail({
 
   const profileIncomplete = !driverProfile || !driverProfile.profile_completed;
 
-  const handleRequestInfo = async () => {
-    if (requestInfoState.exists) return;
-    setSubmitting(true);
-    const consent = !!driverProfile?.allow_verified_recruiter_contact;
-    const pref = driverProfile?.contact_preference ?? 'in_app';
-    const phoneSnap = consent && pref === 'phone' ? (driverProfile?.phone ?? null) : null;
-    const emailSnap = consent && pref === 'email' ? (driverProfile?.email ?? null) : null;
-    createApplication.mutate(
-      {
-        opportunity_id: o.id,
-        recruiter_id: o.recruiter_id,
-        application_type: 'request_info',
-        driver_profile_id: driverProfile?.id ?? null,
-        preferred_contact_method: pref,
-        driver_phone_snapshot: phoneSnap,
-        driver_email_snapshot: emailSnap,
-        message: "I'm interested in learning more about this opportunity.",
-      },
-      {
-        onSuccess: () => {
-          toast.success('Request sent to recruiter');
-          setSubmitting(false);
-        },
-        onError: (e: Error) => {
-          toast.error(submissionErrorMessage(e));
-          setSubmitting(false);
-        },
-      },
-    );
-  };
 
   const displayTitle = canonical.identity.title;
   const companyName =
