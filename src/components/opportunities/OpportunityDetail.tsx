@@ -306,15 +306,22 @@ export function OpportunityDetail({
     payKVs.length > 0 || mixedComponents.length > 0 || signOnAmount != null;
 
   // Phase OD-2 — hiring coverage, route, trailer, home time, weekly mileage,
-  // and pay basis are promoted into the decision-first Quick Facts grid, so
-  // they are no longer repeated as KVs in the sections below.
+  // and the headline pay value are promoted into the decision-first Quick Facts
+  // grid, so they are no longer repeated as KVs in the sections below.
+  // Pay quick fact reuses an existing displayed value only — never a new
+  // computation and never a vague pay-model name.
+  const quickPayValue =
+    pm === 'cpm' && rp.cpm.state === 'provided'
+      ? `$${Number(rp.cpm.value).toFixed(2)}/mi`
+      : grossValue;
   const quickFacts: [string, string, typeof MapPin][] = [];
-  if (coverage) quickFacts.push(['Hiring', coverage, MapPin]);
-  if (payModelLabel) quickFacts.push(['Pay basis', payModelLabel, DollarSign]);
+  if (quickPayValue) quickFacts.push(['Pay', quickPayValue, DollarSign]);
   if (totalMiles) quickFacts.push(['Miles / week', totalMiles, Gauge]);
   if (routeLabel) quickFacts.push(['Route', routeLabel, MapPin]);
-  if (trailerLabel) quickFacts.push(['Trailer', trailerLabel, Truck]);
   if (homeTimeLabel) quickFacts.push(['Home time', homeTimeLabel, Home]);
+  if (trailerLabel) quickFacts.push(['Trailer', trailerLabel, Truck]);
+  if (coverage) quickFacts.push(['Hiring', coverage, MapPin]);
+
 
   const typicalLanes = strOrNull(canonical.content.typicalLanes);
   const hasCoverageSection = typicalLanes != null || mileageKVs.length > 0;
