@@ -17,6 +17,7 @@ import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { SendFeedbackModal } from '@/components/SendFeedbackModal';
 import { NotificationPreferencesPanel } from '@/components/notifications/NotificationPreferencesPanel';
 import { TelegramConnectionSection } from '@/components/TelegramConnectionSection';
+import { DispatchTelegramGroupSection } from '@/components/opportunities/recruiter/DispatchTelegramGroupSection';
 
 
 interface Props {
@@ -277,6 +278,8 @@ export function RecruiterSettingsView({ onBack, onOpenOnboarding, onOpenBilling 
       </Card>
 
       <TelegramConnectionSection />
+
+      <DispatchTelegramGroupSection recruiterId={profile?.id ?? null} />
 
       <NotificationPreferencesPanel />
 

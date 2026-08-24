@@ -203,6 +203,30 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       if (error) throw new Error(error.message);
       return unwrapTerminal(data);
     },
+    // TG-2F-C. Consumption and its terminal receipt are owned by the single
+    // database transaction behind this RPC. This adapter deliberately never
+    // calls the consume function itself.
+    async processBindUpdate(input: {
+      leaseToken: string;
+      updateId: number;
+      payloadHash: string;
+      telegramUserId: number;
+      telegramChatId: number;
+      chatType: string;
+      rawToken: string;
+    }): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc("telegram_process_bind_update", {
+        _lease_token: input.leaseToken,
+        _update_id: input.updateId,
+        _payload_hash: input.payloadHash,
+        _telegram_user_id: input.telegramUserId,
+        _telegram_chat_id: input.telegramChatId,
+        _chat_type: input.chatType,
+        _raw_token: input.rawToken,
+      });
+      if (error) throw new Error(error.message);
+      return unwrapTerminal(data);
+    },
   };
 }
 

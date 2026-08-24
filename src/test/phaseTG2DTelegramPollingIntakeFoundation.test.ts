@@ -430,6 +430,7 @@ interface FakeState {
 function makeLedger(options: {
   busy?: boolean;
   startResult?: TelegramTerminalResult;
+  bindResult?: TelegramTerminalResult;
   ignoredResult?: TelegramTerminalResult;
   failTerminalOn?: number;
   failAdvanceOn?: number;
@@ -479,6 +480,16 @@ function makeLedger(options: {
       }
       state.terminal.add(input.updateId);
       return options.startResult ?? { isNew: true, resultCode: "link_success" };
+    },
+    // TG-2F-C fixture addition: the shared ledger interface now requires the
+    // bind path. No TG-2D assertion depends on it.
+    async processBindUpdate(input) {
+      calls.push(`processBind:${input.updateId}`);
+      if (options.failTerminalOn === input.updateId) {
+        throw new Error("telegram_update_conflict");
+      }
+      state.terminal.add(input.updateId);
+      return options.bindResult ?? { isNew: true, resultCode: "bind_success" };
     },
   };
 
