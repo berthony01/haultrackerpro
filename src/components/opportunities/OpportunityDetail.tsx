@@ -730,6 +730,15 @@ export function OpportunityDetail({
   );
 }
 
+/** Grouped surface — hosts one or more sections inside a single card. */
+function Surface({ children }: { children: React.ReactNode }) {
+  return (
+    <Card className="border-border/60 divide-y divide-border/60 overflow-hidden">
+      {children}
+    </Card>
+  );
+}
+
 function Section({
   icon: Icon,
   title,
@@ -740,7 +749,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <Card className="p-5 border-border/60">
+    <div className="p-5">
       <div className="flex items-center gap-2 mb-4">
         <div className="rounded-lg bg-primary/10 p-1.5">
           <Icon className="h-4 w-4 text-primary" aria-hidden />
@@ -748,9 +757,10 @@ function Section({
         <h3 className="text-sm font-bold text-foreground uppercase tracking-wider">{title}</h3>
       </div>
       {children}
-    </Card>
+    </div>
   );
 }
+
 
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">{children}</div>;
