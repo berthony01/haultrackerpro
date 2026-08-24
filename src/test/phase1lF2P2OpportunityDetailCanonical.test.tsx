@@ -682,7 +682,11 @@ describe('Phase 1L-F2B-P2-R1 · Actions and Free CTA', () => {
     expect(screen.getByRole('button', { name: /^Save$/ })).toBeInTheDocument();
     // Phase OD-1 — Request Info retired from the driver Opportunity Detail page.
     expect(screen.queryByRole('button', { name: /Request Info/ })).toBeNull();
-    expect(screen.getByRole('button', { name: /^Apply Now$/ })).toBeInTheDocument();
+    // Phase OD-1 — this fixture renders with an incomplete driver profile, so the
+    // primary CTA truthfully reads "Complete Preferences to Apply".
+    expect(
+      screen.getByRole('button', { name: /Complete Preferences to Apply/i }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Refer a Driver — Pro feature' }),
     ).toBeInTheDocument();
