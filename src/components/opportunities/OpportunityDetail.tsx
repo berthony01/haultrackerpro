@@ -716,15 +716,6 @@ export function OpportunityDetail({
             {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
             {isSaved ? 'Saved' : 'Save'}
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleRequestInfo}
-            disabled={requestInfoState.exists || submitting}
-            className="flex-1"
-          >
-            <Send className="h-4 w-4" />
-            {requestInfoState.exists ? 'Info Requested' : submitting ? 'Sending…' : 'Request Info'}
-          </Button>
           {isPro ? (
             <Button variant="outline" onClick={() => setShowRefer(true)} className="flex-1">
               <UserPlus className="h-4 w-4" /> Refer a Driver
