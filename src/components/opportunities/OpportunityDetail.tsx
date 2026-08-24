@@ -611,7 +611,7 @@ export function OpportunityDetail({
 
       {/* 4 + 5 + 6. Lifestyle & Benefits surface */}
       {(lifestyleKVs.length > 0 || benefits || requirements) && (
-        <Surface>
+        <Surface desktopColumns={3}>
           {lifestyleKVs.length > 0 && (
             <Section icon={Home} title="Home Time & Lifestyle">
               <Grid>
