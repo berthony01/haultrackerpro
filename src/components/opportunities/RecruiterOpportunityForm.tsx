@@ -354,6 +354,25 @@ export function mergePasteIntoState(current: State, data: ExtractedOpportunity):
     next.escrow_required_state = 'required';
   }
 
+  // Structured qualification criteria — fill only when the recruiter left the
+  // field neutral, and only from explicitly extracted values.
+  if (
+    !next.min_years_experience.trim()
+    && typeof data.min_years_experience === 'number'
+    && Number.isFinite(data.min_years_experience)
+    && data.min_years_experience >= 0
+  ) {
+    next.min_years_experience = String(data.min_years_experience);
+  }
+  if (!next.required_cdl_class.trim()) {
+    const cls = normalizeAuthoringCdlClass(data.required_cdl_class);
+    if (cls) next.required_cdl_class = cls;
+  }
+  if (next.required_endorsements.length === 0) {
+    const codes = normalizeAuthoringEndorsements(data.required_endorsements);
+    if (codes.length > 0) next.required_endorsements = codes;
+  }
+
   return next;
 }
 
