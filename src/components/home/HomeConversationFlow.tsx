@@ -195,10 +195,23 @@ export default function HomeConversationFlow({
   }, []);
 
   const restart = useCallback(() => {
-    setState(INITIAL_STATE);
+    setState(makeInitialState(openingNote));
     setHistory([]);
     setDraft('');
-  }, []);
+  }, [openingNote]);
+
+  /**
+   * HP-3C — the listing context resolves asynchronously. Refresh the opening
+   * line only while the conversation is still untouched; never mid-conversation.
+   */
+  useEffect(() => {
+    setState((prev) =>
+      prev.bubbles.length === 1 && prev.current === INTAKE_STEPS[0]
+        ? makeInitialState(openingNote)
+        : prev,
+    );
+  }, [openingNote]);
+
 
   const bubbleStyle = (role: Bubble['role']) =>
     role === 'assistant'
