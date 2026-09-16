@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { ArrowRight, MessageSquare, RotateCcw, Undo2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import HomeOpportunityPreview from '@/components/home/HomeOpportunityPreview';
 import {
   INTAKE_STEPS,
   INTAKE_OPENING_PROMPT,
@@ -390,6 +391,7 @@ export default function HomeConversationFlow({
               You’re ready to continue to real HaulTracker opportunities. We’ll use these answers to
               prefill your Driver Work Profile so you don’t have to start over.
             </p>
+            <HomeOpportunityPreview answers={answers} />
             <Button
               data-testid="home-conversation-continue"
               onClick={() => onContinue(answers)}
