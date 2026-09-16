@@ -269,6 +269,99 @@ export const AUTHORING_ENDORSEMENT_OPTIONS: ReadonlyArray<{ code: string; label:
   { code: 'P', label: 'P — Passenger' },
 ];
 
+/**
+ * Optional structured criteria HaulTracker can compare against Driver Work
+ * Profiles. Purely presentational — nothing here blocks publication.
+ */
+function StructuredQualificationCriteria({
+  state, set,
+}: {
+  state: State;
+  set: <K extends keyof State>(k: K, v: State[K]) => void;
+}) {
+  const toggleEndorsement = (code: string) => {
+    const on = state.required_endorsements.includes(code);
+    const next = on
+      ? state.required_endorsements.filter((c) => c !== code)
+      : [...state.required_endorsements, code];
+    set('required_endorsements', normalizeAuthoringEndorsements(next));
+  };
+
+  return (
+    <div
+      className="space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4"
+      data-testid="structured-qualification-criteria"
+    >
+      <div>
+        <p className="text-xs font-black uppercase tracking-wider text-primary">
+          Structured Criteria (optional)
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          HaulTracker compares these against Driver Work Profiles. Leave anything blank if you
+          have no hard requirement. Every other rule belongs in Requirements below.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Minimum CDL experience (years)" helper="Blank means no structured minimum.">
+          <Input
+            type="number"
+            min={0}
+            step="0.5"
+            inputMode="decimal"
+            value={state.min_years_experience}
+            onChange={(e) => set('min_years_experience', e.target.value)}
+            placeholder="2"
+            aria-label="Minimum CDL experience (years)"
+            data-testid="criteria-min-years"
+          />
+        </Field>
+        <Field label="Required CDL class">
+          <Select
+            value={state.required_cdl_class || 'none'}
+            onValueChange={(v) => set('required_cdl_class', v === 'none' ? '' : normalizeAuthoringCdlClass(v))}
+          >
+            <SelectTrigger aria-label="Required CDL class" data-testid="criteria-cdl-class">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {AUTHORING_CDL_CLASS_VALUES.map((c) => (
+                <SelectItem key={c} value={c}>{`Class ${c}`}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <Field label="Required endorsements" helper="Select only endorsements a driver must already hold.">
+        <div className="flex flex-wrap gap-2" data-testid="criteria-endorsements">
+          {AUTHORING_ENDORSEMENT_OPTIONS.map((o) => {
+            const on = state.required_endorsements.includes(o.code);
+            return (
+              <button
+                key={o.code}
+                type="button"
+                onClick={() => toggleEndorsement(o.code)}
+                aria-pressed={on}
+                aria-label={`Required endorsement ${o.code}`}
+                data-testid={`criteria-endorsement-${o.code}`}
+                className={`min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                  on
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
+                }`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+    </div>
+  );
+}
+
 /* ---------------- paste merge ---------------- */
 
 /**
