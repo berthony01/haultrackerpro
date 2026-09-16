@@ -504,6 +504,9 @@ export default function Landing() {
                     <a
                       key={link.href}
                       href={link.href}
+                      onClick={() => {
+                        if ((link as { track?: boolean }).track) trackStarterKitCTAClicked('footer');
+                      }}
                       className="block text-xs font-medium hover:underline"
                       style={{ color: 'hsl(220, 10%, 50%)' }}
                     >
