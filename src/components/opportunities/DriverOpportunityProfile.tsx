@@ -28,6 +28,11 @@ import {
   type DriverOpportunityProfileUpsert,
 } from '@/hooks/opportunities/useDriverOpportunityProfile';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  readIntakeSnapshot,
+  clearIntakeSnapshot,
+  toDriverProfileSeed,
+} from '@/lib/home/conversationIntake';
 
 interface Props {
   onBack: () => void;
