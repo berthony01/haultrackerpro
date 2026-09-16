@@ -69,6 +69,20 @@ export default function Landing() {
 
   const goToDriver = () => navigate('/auth?intent=driver');
 
+  // Hands the driver's own words to the existing auth flow, which lands on the real
+  // driver opportunities workspace where the CF-1B conversation surface takes over.
+  const startHomeConversation = useCallback(() => {
+    navigate(`/auth?intent=driver&next=${encodeURIComponent(HOME_CONVERSATION_NEXT_PATH)}`);
+  }, [navigate]);
+
+  const focusConversation = useCallback(() => {
+    const el = document.getElementById('home-conversation-input');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    (el as HTMLTextAreaElement).focus();
+  }, []);
+
+
   const scrollToSolutions = useCallback(() => {
     const el = document.getElementById('solutions');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
