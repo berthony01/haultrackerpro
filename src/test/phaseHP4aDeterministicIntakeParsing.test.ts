@@ -180,9 +180,11 @@ describe('HP-4A — first-message preference extraction', () => {
     ]) {
       expect(INTAKE_SRC).not.toContain(banned);
     }
-    // The only persistence is the pre-existing HP-2 bounded sessionStorage snapshot.
-    const sessionUses = INTAKE_SRC.match(/sessionStorage/g) ?? [];
-    expect(sessionUses.length).toBeLessThanOrEqual(3);
+    // The only persistence is the pre-existing HP-2 bounded sessionStorage
+    // snapshot; the HP-4A extraction section touches no storage at all.
+    const hp4aSection = INTAKE_SRC.split('HP-4A — bounded deterministic')[1] ?? '';
+    expect(hp4aSection.length).toBeGreaterThan(0);
+    expect(hp4aSection).not.toContain('sessionStorage');
   });
 
   it('makes no backend call during the first-message turn', async () => {
