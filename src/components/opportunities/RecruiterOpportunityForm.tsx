@@ -33,8 +33,11 @@ import {
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
 import {
+  AUTHORING_CDL_CLASS_VALUES,
   buildOpportunityPersistencePayload,
   EMPTY_AUTHORING_STATE,
+  normalizeAuthoringCdlClass,
+  normalizeAuthoringEndorsements,
   normalizeOpportunityForAuthoring,
   projectLegacyDriverType,
   projectLegacyPayModel,
