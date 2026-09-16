@@ -18,7 +18,7 @@ import { join } from 'path';
 
 const rpcMock = vi.fn(async () => ({ data: [], error: null }));
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
+  supabase: { rpc: () => rpcMock() },
 }));
 
 import HomeConversationFlow from '@/components/home/HomeConversationFlow';
