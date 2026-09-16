@@ -25,7 +25,7 @@ describe('CF-1C-A structured qualification candidate migration', () => {
     expect(sql().split('\n')[0]).toBe('-- CANDIDATE MIGRATION — NOT APPLIED LIVE.');
   });
 
-  it('2) is not recorded as a production migration in this phase', () => {
+  it('2) is now recorded as a promoted production migration', () => {
     expect(
       existsSync(
         resolve(
@@ -33,7 +33,7 @@ describe('CF-1C-A structured qualification candidate migration', () => {
           'supabase/migrations/20260916070000_phase_cf1c_a_structured_qualification_foundation.sql',
         ),
       ),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('3) is exactly one transaction', () => {

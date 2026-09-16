@@ -68,6 +68,9 @@ function makeRecruiterProfile(overrides: Partial<RecruiterProfile> = {}): Recrui
 
 function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
   return {
+    min_years_experience: null,
+    required_cdl_class: null,
+    required_endorsements: [],
     actual_benefits: null, admin_review_status: 'approved', benefits: null,
     canonical_version: 1, company_name: 'Acme Trucking', cpm: 0.65,
     created_at: '2026-07-01T00:00:00Z', deadhead_paid: false,
