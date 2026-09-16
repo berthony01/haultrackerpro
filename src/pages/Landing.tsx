@@ -264,6 +264,16 @@ export default function Landing() {
             </p>
 
             <div className="mt-5">
+              {deepLink.jobId && (
+                <HomeTargetedJobContext
+                  jobId={deepLink.jobId}
+                  amber={AMBER}
+                  surface={NAVY_SURFACE}
+                  border={NAVY_BORDER}
+                  textMuted={TEXT_MUTED}
+                  onResolved={setTargetedJob}
+                />
+              )}
               <HomeConversationHero
                 onContinue={continueToOpportunities}
                 amber={AMBER}
@@ -271,8 +281,10 @@ export default function Landing() {
                 border={NAVY_BORDER}
                 textMuted={TEXT_MUTED}
                 textDim={TEXT_DIM}
+                openingNote={openingNote}
               />
             </div>
+
 
             {/* 2 — Three compact paths */}
             <div
