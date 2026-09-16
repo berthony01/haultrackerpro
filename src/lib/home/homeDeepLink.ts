@@ -35,11 +35,14 @@ export const UNAVAILABLE_JOB_COPY =
   "That listing isn't available right now — let's find what fits you.";
 
 export interface HomeDeepLink {
+  /** True when a `job` param was present at all, valid or not. */
+  jobRequested: boolean;
   /** A canonical UUID, or null when absent/invalid. Only this value may reach the RPC. */
   jobId: string | null;
   /** Sanitized, bounded, in-memory only. */
   campaign: Partial<Record<CampaignKey, string>>;
 }
+
 
 export function isValidJobId(value: string | null | undefined): value is string {
   return typeof value === 'string' && UUID_PATTERN.test(value.trim());
@@ -61,6 +64,7 @@ export function readHomeDeepLink(search: string | null | undefined): HomeDeepLin
   const params = new URLSearchParams(raw.startsWith('?') ? raw.slice(1) : raw);
 
   const job = params.get('job');
+  const jobRequested = job !== null;
   const jobId = isValidJobId(job) ? job.trim().toLowerCase() : null;
 
   const campaign: Partial<Record<CampaignKey, string>> = {};
@@ -69,7 +73,8 @@ export function readHomeDeepLink(search: string | null | undefined): HomeDeepLin
     if (clean) campaign[key] = clean;
   }
 
-  return { jobId, campaign };
+  return { jobRequested, jobId, campaign };
+
 }
 
 /**
