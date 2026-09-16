@@ -70,8 +70,9 @@ describe('CF-1B-R1 suspension guard migration promotion', () => {
     const sql = readFileSync(PRODUCTION, 'utf8');
     expect(sql).toContain('public.recruiter_profile_can_manage_opportunities(_t.recruiter_id)');
     expect(sql).toContain('IF NOT _recruiter_available THEN');
-    const availabilityIndex = sql.indexOf('IF NOT _recruiter_available THEN');
-    const permissionIndex = sql.indexOf('current_user_has_recruiter_permission');
+    const body = executableLines(sql).join('\n');
+    const availabilityIndex = body.indexOf('IF NOT _recruiter_available THEN');
+    const permissionIndex = body.indexOf('current_user_has_recruiter_permission');
     expect(availabilityIndex).toBeGreaterThan(-1);
     expect(availabilityIndex).toBeLessThan(permissionIndex);
   });
