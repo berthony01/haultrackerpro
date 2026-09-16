@@ -23,6 +23,7 @@ import HomeConversationHero, {
 } from '@/components/home/HomeConversationHero';
 import { saveIntakeSnapshot, type IntakeAnswers } from '@/lib/home/conversationIntake';
 import SEOHead from '@/components/SEOHead';
+import { trackStarterKitCTAClicked } from '@/lib/analytics';
 
 const NAVY_BG = 'hsl(220, 20%, 8%)';
 const NAVY_SURFACE = 'hsl(220, 20%, 11%)';
