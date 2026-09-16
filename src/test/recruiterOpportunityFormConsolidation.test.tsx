@@ -95,6 +95,9 @@ function makeProfile(overrides: Partial<Profile> = {}): Profile {
 
 function makeOpportunity(overrides: Partial<Opportunity> = {}): Opportunity {
   return {
+    min_years_experience: null,
+    required_cdl_class: null,
+    required_endorsements: [],
     actual_benefits: null,
     admin_review_status: 'approved',
     benefits: null,

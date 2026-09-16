@@ -31,6 +31,9 @@ type OpportunityRow = Tables<'opportunities'>;
  *  default. Tests supply targeted overrides. No casts. */
 function makeOpportunityRow(overrides: Partial<OpportunityRow> = {}): OpportunityRow {
   return {
+    min_years_experience: null,
+    required_cdl_class: null,
+    required_endorsements: [],
     actual_benefits: null,
     admin_review_status: 'pending',
     benefits: null,
