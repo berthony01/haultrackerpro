@@ -116,6 +116,10 @@ export interface CanonicalOpportunityAuthoringState {
   escrow_required_state: EscrowRequiredState | 'unspecified';
   escrow_amount: string;
   escrow_frequency: RecurringFrequency | null;
+  // structured qualification criteria (CF-1C-B) — optional, never publication blockers
+  min_years_experience: string;
+  required_cdl_class: string;
+  required_endorsements: string[];
   // content
   typical_lanes: string;
   requirements: string;
@@ -173,6 +177,9 @@ export const EMPTY_AUTHORING_STATE: CanonicalOpportunityAuthoringState = {
   escrow_required_state: 'unspecified',
   escrow_amount: '',
   escrow_frequency: null,
+  min_years_experience: '',
+  required_cdl_class: '',
+  required_endorsements: [],
   typical_lanes: '',
   requirements: '',
   actual_benefits: '',
@@ -194,6 +201,47 @@ const isFreq = (v: unknown): v is RecurringFrequency => typeof v === 'string' &&
 const isEmployment = (v: unknown): v is CanonicalEmploymentModel => typeof v === 'string' && (EMPLOYMENT_VALUES as readonly string[]).includes(v);
 const isTeam = (v: unknown): v is CanonicalTeamConfiguration => typeof v === 'string' && (TEAM_VALUES as readonly string[]).includes(v);
 const isPay = (v: unknown): v is CanonicalPayModel => typeof v === 'string' && (PAY_VALUES as readonly string[]).includes(v);
+
+/* ---------------- CF-1C-B structured qualification criteria ---------------- */
+
+/** CDL classes a recruiter may declare as a structured requirement. */
+export const AUTHORING_CDL_CLASS_VALUES = ['A', 'B', 'C'] as const;
+
+/**
+ * Endorsement codes surfaced in recruiter authoring for this phase.
+ * `S` (School bus) is intentionally excluded because the Driver Work Profile
+ * cannot record it yet — declaring it would be unmatchable.
+ */
+export const AUTHORING_ENDORSEMENT_CODES = ['H', 'N', 'P', 'T', 'X'] as const;
+
+/** A/B/C only; anything else fails closed to neutral (''). */
+export function normalizeAuthoringCdlClass(v: unknown): string {
+  const t = typeof v === 'string' ? v.trim().toUpperCase() : '';
+  return (AUTHORING_CDL_CLASS_VALUES as readonly string[]).includes(t) ? t : '';
+}
+
+/** Unique, uppercase, supported codes only. Never null. */
+export function normalizeAuthoringEndorsements(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const raw of v) {
+    if (typeof raw !== 'string') continue;
+    const code = raw.trim().toUpperCase();
+    if (!(AUTHORING_ENDORSEMENT_CODES as readonly string[]).includes(code)) continue;
+    if (!out.includes(code)) out.push(code);
+  }
+  return out;
+}
+
+/** Blank -> null. Finite and >= 0 -> number. Anything else fails closed to null. */
+function minYearsOrNull(v: string): number | null {
+  const t = v.trim();
+  if (!t) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 
 /* ---------------- legacy → canonical projections ---------------- */
 
@@ -355,6 +403,12 @@ export function normalizeOpportunityForAuthoring(
   base.typical_lanes = !isEmptyStr(canonLanes) ? canonLanes : split.typical_lanes;
   base.requirements = !isEmptyStr(canonReqs) ? canonReqs : split.requirements;
   base.actual_benefits = canonBenefits;
+
+  // Structured qualification criteria — independent of the free-text
+  // `requirements` field, which is never rewritten from these values.
+  base.min_years_experience = numToStr(row.min_years_experience);
+  base.required_cdl_class = normalizeAuthoringCdlClass(row.required_cdl_class);
+  base.required_endorsements = normalizeAuthoringEndorsements(row.required_endorsements);
 
   return base;
 }
@@ -786,6 +840,9 @@ export function buildOpportunityPersistencePayload(
       : null,
     escrow_amount: costBearing && state.escrow_required_state === 'required' ? nOrNull(state.escrow_amount) : null,
     escrow_amount_frequency: costBearing && state.escrow_required_state === 'required' ? state.escrow_frequency : null,
+    min_years_experience: minYearsOrNull(state.min_years_experience),
+    required_cdl_class: normalizeAuthoringCdlClass(state.required_cdl_class) || null,
+    required_endorsements: normalizeAuthoringEndorsements(state.required_endorsements),
     typical_lanes: state.typical_lanes.trim() || null,
     requirements: state.requirements.trim() || null,
     actual_benefits: state.actual_benefits.trim() || null,

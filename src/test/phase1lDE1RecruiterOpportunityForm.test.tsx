@@ -832,3 +832,76 @@ describe('Phase 1O-A — source integrity', () => {
     }
   });
 });
+
+/* ---------------- CF-1C-B structured qualification criteria ---------------- */
+
+describe('CF-1C-B structured qualification criteria in the recruiter form', () => {
+  it('renders the optional structured controls inside Driver Requirements without S', () => {
+    renderForm();
+    gotoOptional();
+    expandGroup('group-requirements');
+    const section = screen.getByTestId('structured-qualification-criteria');
+    expect(within(section).getByLabelText('Minimum CDL experience (years)')).toBeInTheDocument();
+    expect(within(section).getByLabelText('Required CDL class')).toBeInTheDocument();
+    const chips = within(screen.getByTestId('criteria-endorsements')).getAllByRole('button');
+    expect(chips.map((c) => c.getAttribute('data-testid'))).toEqual([
+      'criteria-endorsement-H',
+      'criteria-endorsement-N',
+      'criteria-endorsement-X',
+      'criteria-endorsement-T',
+      'criteria-endorsement-P',
+    ]);
+    expect(screen.queryByTestId('criteria-endorsement-S')).toBeNull();
+    expect(screen.getByLabelText('Requirements')).toBeInTheDocument();
+  });
+
+  it('persists recruiter-entered structured criteria on save', () => {
+    renderForm();
+    gotoEssentials();
+    fireEvent.change(screen.getByLabelText('Opportunity Title'), { target: { value: 'Regional Dry Van' } });
+    fireEvent.change(screen.getByLabelText('Company Name'), { target: { value: 'Acme Trucking' } });
+    gotoOptional();
+    expandGroup('group-requirements');
+    fireEvent.change(screen.getByTestId('criteria-min-years'), { target: { value: '2' } });
+    fireEvent.click(screen.getByTestId('criteria-endorsement-H'));
+    clickSaveDraft();
+    const payload = payloadOf(h.createMutate);
+    expect(payload.min_years_experience).toBe(2);
+    expect(payload.required_endorsements).toEqual(['H']);
+    expect(payload.required_cdl_class).toBeNull();
+  });
+
+  it('extraction fills structured criteria only when neutral and never infers them', () => {
+    renderForm();
+    h.pastePayload = {
+      min_years_experience: 2,
+      required_cdl_class: 'A',
+      required_endorsements: ['H'],
+    } as ExtractedOpportunity;
+    fireEvent.click(screen.getByRole('button', { name: 'Paste to auto-fill' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply extracted opportunity' }));
+    gotoOptional();
+    expandGroup('group-requirements');
+    expect(screen.getByTestId('criteria-min-years')).toHaveValue(2);
+    expect(screen.getByTestId('criteria-endorsement-H')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('extraction never derives structured criteria from trailer, route, or title', () => {
+    renderForm();
+    h.pastePayload = {
+      title: 'Class A Hazmat Tanker Driver',
+      trailer_type: 'Tanker',
+      route_type: 'OTR',
+      requirements: 'Class A CDL with hazmat and tanker endorsements required',
+    } as ExtractedOpportunity;
+    fireEvent.click(screen.getByRole('button', { name: 'Paste to auto-fill' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Apply extracted opportunity' }));
+    gotoOptional();
+    expandGroup('group-requirements');
+    expect(screen.getByTestId('criteria-min-years')).toHaveValue(null);
+    expect(screen.getByTestId('criteria-endorsement-H')).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText('Requirements')).toHaveValue(
+      'Class A CDL with hazmat and tanker endorsements required',
+    );
+  });
+});

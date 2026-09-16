@@ -33,8 +33,11 @@ import {
 import { useRecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
 
 import {
+  AUTHORING_CDL_CLASS_VALUES,
   buildOpportunityPersistencePayload,
   EMPTY_AUTHORING_STATE,
+  normalizeAuthoringCdlClass,
+  normalizeAuthoringEndorsements,
   normalizeOpportunityForAuthoring,
   projectLegacyDriverType,
   projectLegacyPayModel,
@@ -252,9 +255,122 @@ function applyPayModelChange(state: State, next: CanonicalPayModel): State {
   };
 }
 
+/* ---------------- structured qualification criteria (CF-1C-B) ---------------- */
+
+/**
+ * Recruiter-visible endorsement chips. `S` is deliberately absent — the Driver
+ * Work Profile cannot record it, so it could never be matched.
+ */
+export const AUTHORING_ENDORSEMENT_OPTIONS: ReadonlyArray<{ code: string; label: string }> = [
+  { code: 'H', label: 'H — Hazmat' },
+  { code: 'N', label: 'N — Tanker' },
+  { code: 'X', label: 'X — Hazmat + Tanker' },
+  { code: 'T', label: 'T — Doubles/Triples' },
+  { code: 'P', label: 'P — Passenger' },
+];
+
+/**
+ * Optional structured criteria HaulTracker can compare against Driver Work
+ * Profiles. Purely presentational — nothing here blocks publication.
+ */
+function StructuredQualificationCriteria({
+  state, set,
+}: {
+  state: State;
+  set: <K extends keyof State>(k: K, v: State[K]) => void;
+}) {
+  const toggleEndorsement = (code: string) => {
+    const on = state.required_endorsements.includes(code);
+    const next = on
+      ? state.required_endorsements.filter((c) => c !== code)
+      : [...state.required_endorsements, code];
+    set('required_endorsements', normalizeAuthoringEndorsements(next));
+  };
+
+  return (
+    <div
+      className="space-y-4 rounded-lg border border-border/60 bg-muted/20 p-4"
+      data-testid="structured-qualification-criteria"
+    >
+      <div>
+        <p className="text-xs font-black uppercase tracking-wider text-primary">
+          Structured Criteria (optional)
+        </p>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          HaulTracker compares these against Driver Work Profiles. Leave anything blank if you
+          have no hard requirement. Every other rule belongs in Requirements below.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="Minimum CDL experience (years)" helper="Blank means no structured minimum.">
+          <Input
+            type="number"
+            min={0}
+            step="0.5"
+            inputMode="decimal"
+            value={state.min_years_experience}
+            onChange={(e) => set('min_years_experience', e.target.value)}
+            placeholder="2"
+            aria-label="Minimum CDL experience (years)"
+            data-testid="criteria-min-years"
+          />
+        </Field>
+        <Field label="Required CDL class">
+          <Select
+            value={state.required_cdl_class || 'none'}
+            onValueChange={(v) => set('required_cdl_class', v === 'none' ? '' : normalizeAuthoringCdlClass(v))}
+          >
+            <SelectTrigger aria-label="Required CDL class" data-testid="criteria-cdl-class">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">None</SelectItem>
+              {AUTHORING_CDL_CLASS_VALUES.map((c) => (
+                <SelectItem key={c} value={c}>{`Class ${c}`}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
+
+      <Field label="Required endorsements" helper="Select only endorsements a driver must already hold.">
+        <div className="flex flex-wrap gap-2" data-testid="criteria-endorsements">
+          {AUTHORING_ENDORSEMENT_OPTIONS.map((o) => {
+            const on = state.required_endorsements.includes(o.code);
+            return (
+              <button
+                key={o.code}
+                type="button"
+                onClick={() => toggleEndorsement(o.code)}
+                aria-pressed={on}
+                aria-label={`Required endorsement ${o.code}`}
+                data-testid={`criteria-endorsement-${o.code}`}
+                className={`min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-semibold border transition-colors ${
+                  on
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-muted-foreground border-border/60 hover:border-primary/40 hover:text-foreground'
+                }`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+    </div>
+  );
+}
+
 /* ---------------- paste merge ---------------- */
 
-function mergePasteIntoState(current: State, data: ExtractedOpportunity): State {
+/**
+ * Pure extractor merge. Extracted values only ever fill fields the recruiter
+ * has left neutral; a recruiter-entered value is never overwritten. Nothing is
+ * inferred locally from route/trailer/driver type, title, description, or the
+ * free-text requirements.
+ */
+export function mergePasteIntoState(current: State, data: ExtractedOpportunity): State {
   const next = { ...current };
   const strFill = (key: keyof State, value?: string) => {
     if (typeof value !== 'string' || !value.trim()) return;
@@ -329,6 +445,25 @@ function mergePasteIntoState(current: State, data: ExtractedOpportunity): State 
   }
   if (data.escrow_required === true && next.escrow_required_state === 'unspecified') {
     next.escrow_required_state = 'required';
+  }
+
+  // Structured qualification criteria — fill only when the recruiter left the
+  // field neutral, and only from explicitly extracted values.
+  if (
+    !next.min_years_experience.trim()
+    && typeof data.min_years_experience === 'number'
+    && Number.isFinite(data.min_years_experience)
+    && data.min_years_experience >= 0
+  ) {
+    next.min_years_experience = String(data.min_years_experience);
+  }
+  if (!next.required_cdl_class.trim()) {
+    const cls = normalizeAuthoringCdlClass(data.required_cdl_class);
+    if (cls) next.required_cdl_class = cls;
+  }
+  if (next.required_endorsements.length === 0) {
+    const codes = normalizeAuthoringEndorsements(data.required_endorsements);
+    if (codes.length > 0) next.required_endorsements = codes;
   }
 
   return next;
@@ -1014,6 +1149,7 @@ function RecruiterOpportunityFormCore({
                       placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
                       aria-label="Typical Lanes" />
                   </Field>
+                  <StructuredQualificationCriteria state={state} set={set} />
                   <Field label="Requirements" helper="Experience, CDL class, endorsements, MVR/drug test.">
                     <Textarea rows={4} value={state.requirements}
                       onChange={(e) => set('requirements', e.target.value)}
@@ -1387,6 +1523,18 @@ function DriverPreview({
   if (state.route_type) rows.push({ label: 'Route type', value: state.route_type });
   if (state.trailer_type) rows.push({ label: 'Trailer type', value: state.trailer_type });
   if (state.home_time.trim()) rows.push({ label: 'Home time', value: state.home_time.trim() });
+
+  // Structured qualification criteria — rendered only when actually declared.
+  const minYears = Number(state.min_years_experience.trim());
+  if (state.min_years_experience.trim() && Number.isFinite(minYears) && minYears >= 0) {
+    rows.push({ label: 'Minimum experience', value: `${minYears}+ years` });
+  }
+  const criteriaClass = normalizeAuthoringCdlClass(state.required_cdl_class);
+  if (criteriaClass) rows.push({ label: 'Required CDL class', value: `Class ${criteriaClass}` });
+  const criteriaEndorsements = normalizeAuthoringEndorsements(state.required_endorsements);
+  if (criteriaEndorsements.length > 0) {
+    rows.push({ label: 'Required endorsements', value: criteriaEndorsements.join(', ') });
+  }
 
   // Optional recurring net — only when actually available and applicable.
   if (fe.netStatus === 'available' && fe.estimatedWeeklyNet != null) {

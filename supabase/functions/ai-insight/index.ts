@@ -47,7 +47,12 @@ const SYSTEM_PROMPTS: Record<string, string> = {
 (12) requirements: experience, CDL class, endorsements, MVR rules, drug test, age requirements, etc.
 (13) description: a clean 1-3 sentence summary of the opportunity.
 (14) Never invent numbers. Omit any field not clearly supported by the text.
-(15) Strip recruiter contact info (phone numbers, emails) from all extracted text fields.`,
+(15) Strip recruiter contact info (phone numbers, emails) from all extracted text fields.
+(16) STRUCTURED QUALIFICATION CRITERIA — explicit statements only, never inference. These are additive: keep extracting experience, CDL, endorsement, MVR, DUI, SAP, road test, drug test and age rules into the free-text \`requirements\` field exactly as before. Never strip them from \`requirements\` just because a structured field was also emitted.
+(17) min_years_experience: emit a number ONLY when the posting explicitly states a minimum or required amount of driving experience (e.g. "2 years experience required", "minimum 18 months" → 1.5). Decimal years are allowed when clearly stated. Do NOT emit for "preferred", "ideal", "a plus", or recruiter wish-list wording. Omit when no explicit minimum is stated.
+(18) required_cdl_class: emit A, B, or C ONLY when the posting explicitly states that CDL class as required. Do NOT infer a class from route type, trailer type, vehicle, job title, or generic "CDL required" wording. Omit when not explicitly stated.
+(19) required_endorsements: emit only endorsement codes the posting explicitly requires, from H (Hazmat), N (Tanker), P (Passenger), T (Doubles/Triples), X (combined Hazmat + Tanker). Never emit S. Emit X only when the posting explicitly requires the combined X / Hazmat+Tanker endorsement — do NOT convert a separately stated H and N into X. Do NOT infer N from a tanker trailer, nor H from hazmat freight, unless the posting states the endorsement itself is required. Omit the field entirely when no endorsement is explicitly required.
+(20) Never invent qualification criteria. When in doubt, omit the structured field and leave the wording in \`requirements\`.`,
 };
 
 // ── Tool definitions for structured extraction ───────────────────────
@@ -175,6 +180,21 @@ const PARSE_OPPORTUNITY_TOOL = {
         equipment_year: { type: "string" },
         typical_lanes: { type: "string", description: "Multi-line lane pairs" },
         requirements: { type: "string", description: "Experience, CDL, endorsements, MVR, etc." },
+        min_years_experience: {
+          type: "number",
+          minimum: 0,
+          description: "Explicitly required minimum years of driving experience. Omit unless stated as required/minimum — never for 'preferred'.",
+        },
+        required_cdl_class: {
+          type: "string",
+          enum: ["A", "B", "C"],
+          description: "Explicitly required CDL class only. Never inferred from route, trailer, vehicle, or job title.",
+        },
+        required_endorsements: {
+          type: "array",
+          items: { type: "string", enum: ["H", "N", "P", "T", "X"] },
+          description: "Explicitly required endorsement codes only. Never S. X only when the combined Hazmat+Tanker endorsement is explicitly required.",
+        },
       },
     },
   },

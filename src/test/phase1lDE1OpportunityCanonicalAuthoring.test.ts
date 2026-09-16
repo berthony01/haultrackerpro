@@ -1172,3 +1172,82 @@ describe('buildOpportunityPersistencePayload — content, benefits, transparency
     expect(TRAILER_TYPE_VALUES).toEqual(['Dry Van', 'Reefer', 'Flatbed', 'Tanker', 'Car Hauler', 'Intermodal', 'Other']);
   });
 });
+
+/* ---------------- CF-1C-B structured qualification criteria ---------------- */
+
+describe('CF-1C-B structured qualification criteria in canonical authoring', () => {
+  it('EMPTY_AUTHORING_STATE carries neutral structured criteria', () => {
+    expect(EMPTY_AUTHORING_STATE.min_years_experience).toBe('');
+    expect(EMPTY_AUTHORING_STATE.required_cdl_class).toBe('');
+    expect(EMPTY_AUTHORING_STATE.required_endorsements).toEqual([]);
+  });
+
+  it('normalizes populated structured criteria and fails closed on unsupported values', () => {
+    const ok = normalizeOpportunityForAuthoring({
+      min_years_experience: 3,
+      required_cdl_class: 'b',
+      required_endorsements: ['h', 'H', 'x'],
+    });
+    expect(ok.min_years_experience).toBe('3');
+    expect(ok.required_cdl_class).toBe('B');
+    expect(ok.required_endorsements).toEqual(['H', 'X']);
+
+    const bad = normalizeOpportunityForAuthoring({
+      required_cdl_class: 'D',
+      required_endorsements: ['S', 'Q'],
+    });
+    expect(bad.required_cdl_class).toBe('');
+    expect(bad.required_endorsements).toEqual([]);
+  });
+
+  it('persists blank criteria as null/null/[] and populated criteria exactly', () => {
+    const neutral = buildOpportunityPersistencePayload(
+      state({ title: 'T', company_name: 'C' }),
+      'draft',
+    );
+    expect(neutral.min_years_experience).toBeNull();
+    expect(neutral.required_cdl_class).toBeNull();
+    expect(neutral.required_endorsements).toEqual([]);
+
+    const populated = buildOpportunityPersistencePayload(
+      state({
+        title: 'T',
+        company_name: 'C',
+        min_years_experience: '1.5',
+        required_cdl_class: 'A',
+        required_endorsements: ['N'],
+      }),
+      'draft',
+    );
+    expect(populated.min_years_experience).toBe(1.5);
+    expect(populated.required_cdl_class).toBe('A');
+    expect(populated.required_endorsements).toEqual(['N']);
+  });
+
+  it('never rewrites free-text requirements from structured criteria', () => {
+    const text = 'Clean MVR, no DUI in 5 years.';
+    const payload = buildOpportunityPersistencePayload(
+      state({
+        title: 'T',
+        company_name: 'C',
+        requirements: text,
+        min_years_experience: '2',
+        required_cdl_class: 'A',
+        required_endorsements: ['H'],
+      }),
+      'draft',
+    );
+    expect(payload.requirements).toBe(text);
+  });
+
+  it('invalid structured criteria never block publication readiness', () => {
+    const baseline = validateOpportunityReadiness(publishableCpmState());
+    const withBadCriteria = validateOpportunityReadiness(publishableCpmState({
+      min_years_experience: 'abc',
+      required_cdl_class: 'D',
+      required_endorsements: ['S'],
+    }));
+    expect(withBadCriteria.blockingReasons).toEqual(baseline.blockingReasons);
+    expect(withBadCriteria.canPublish).toBe(baseline.canPublish);
+  });
+});
