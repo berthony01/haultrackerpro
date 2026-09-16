@@ -2925,6 +2925,7 @@ export type Database = {
           lease_payment_frequency: string | null
           maintenance_deduction_frequency: string | null
           maintenance_deductions: number | null
+          min_years_experience: number | null
           mixed_pay_components: Json
           other_deduction_frequency: string | null
           other_deductions: number | null
@@ -2937,6 +2938,8 @@ export type Database = {
           pets_allowed: boolean | null
           published_at: string | null
           recruiter_id: string
+          required_cdl_class: string | null
+          required_endorsements: string[]
           requirements: string | null
           riders_allowed: boolean | null
           route_type: string | null
@@ -2990,6 +2993,7 @@ export type Database = {
           lease_payment_frequency?: string | null
           maintenance_deduction_frequency?: string | null
           maintenance_deductions?: number | null
+          min_years_experience?: number | null
           mixed_pay_components?: Json
           other_deduction_frequency?: string | null
           other_deductions?: number | null
@@ -3002,6 +3006,8 @@ export type Database = {
           pets_allowed?: boolean | null
           published_at?: string | null
           recruiter_id: string
+          required_cdl_class?: string | null
+          required_endorsements?: string[]
           requirements?: string | null
           riders_allowed?: boolean | null
           route_type?: string | null
@@ -3055,6 +3061,7 @@ export type Database = {
           lease_payment_frequency?: string | null
           maintenance_deduction_frequency?: string | null
           maintenance_deductions?: number | null
+          min_years_experience?: number | null
           mixed_pay_components?: Json
           other_deduction_frequency?: string | null
           other_deductions?: number | null
@@ -3067,6 +3074,8 @@ export type Database = {
           pets_allowed?: boolean | null
           published_at?: string | null
           recruiter_id?: string
+          required_cdl_class?: string | null
+          required_endorsements?: string[]
           requirements?: string | null
           riders_allowed?: boolean | null
           route_type?: string | null
@@ -6387,6 +6396,7 @@ export type Database = {
           lease_payment_frequency: string | null
           maintenance_deduction_frequency: string | null
           maintenance_deductions: number | null
+          min_years_experience: number | null
           mixed_pay_components: Json
           other_deduction_frequency: string | null
           other_deductions: number | null
@@ -6399,6 +6409,8 @@ export type Database = {
           pets_allowed: boolean | null
           published_at: string | null
           recruiter_id: string
+          required_cdl_class: string | null
+          required_endorsements: string[]
           requirements: string | null
           riders_allowed: boolean | null
           route_type: string | null
