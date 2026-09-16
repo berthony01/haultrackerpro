@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, MessageSquare, RotateCcw, Undo2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import HomeOpportunityPreview from '@/components/home/HomeOpportunityPreview';
@@ -53,12 +53,23 @@ const ACKS: Record<IntakeStepId, string> = {
   'pay-goal': 'Thanks.',
 };
 
-const INITIAL_STATE: FlowState = {
-  answers: {},
-  bubbles: [{ id: 0, role: 'assistant', text: INTAKE_OPENING_PROMPT }],
-  skipped: [],
-  current: INTAKE_STEPS[0],
-};
+/**
+ * HP-3C — only the FIRST assistant line may be prefixed with verified public
+ * listing context. The script, order, chips and completion behavior are
+ * untouched.
+ */
+function makeInitialState(openingNote?: string): FlowState {
+  const opening = openingNote?.trim()
+    ? `${openingNote.trim()} ${INTAKE_OPENING_PROMPT}`
+    : INTAKE_OPENING_PROMPT;
+  return {
+    answers: {},
+    bubbles: [{ id: 0, role: 'assistant', text: opening }],
+    skipped: [],
+    current: INTAKE_STEPS[0],
+  };
+}
+
 
 // HP-2R1 — warm off-white conversation canvas + premium chat palette.
 const CANVAS_BG = 'hsl(36, 45%, 97%)';
@@ -87,6 +98,8 @@ export interface HomeConversationFlowProps {
   border: string;
   textMuted: string;
   textDim: string;
+  /** HP-3C — optional verified listing context prefixed to the first assistant line only. */
+  openingNote?: string;
 }
 
 export default function HomeConversationFlow({
@@ -96,8 +109,10 @@ export default function HomeConversationFlow({
   border,
   textMuted,
   textDim,
+  openingNote,
 }: HomeConversationFlowProps) {
-  const [state, setState] = useState<FlowState>(INITIAL_STATE);
+  const [state, setState] = useState<FlowState>(() => makeInitialState(openingNote));
+
   const [history, setHistory] = useState<FlowState[]>([]);
   const [draft, setDraft] = useState('');
   const bubbleId = useRef(1);
@@ -180,10 +195,23 @@ export default function HomeConversationFlow({
   }, []);
 
   const restart = useCallback(() => {
-    setState(INITIAL_STATE);
+    setState(makeInitialState(openingNote));
     setHistory([]);
     setDraft('');
-  }, []);
+  }, [openingNote]);
+
+  /**
+   * HP-3C — the listing context resolves asynchronously. Refresh the opening
+   * line only while the conversation is still untouched; never mid-conversation.
+   */
+  useEffect(() => {
+    setState((prev) =>
+      prev.bubbles.length === 1 && prev.current === INTAKE_STEPS[0]
+        ? makeInitialState(openingNote)
+        : prev,
+    );
+  }, [openingNote]);
+
 
   const bubbleStyle = (role: Bubble['role']) =>
     role === 'assistant'

@@ -21,9 +21,13 @@ import dashboardMockup from '@/assets/dashboard-mockup.png';
 import HomeConversationHero, {
   HOME_CONVERSATION_NEXT_PATH,
 } from '@/components/home/HomeConversationHero';
+import HomeTargetedJobContext from '@/components/home/HomeTargetedJobContext';
+import { buildTargetedOpeningNote, readHomeDeepLink } from '@/lib/home/homeDeepLink';
+import type { PublicTeaserRow } from '@/lib/home/publicTeaserPresentation';
 import { saveIntakeSnapshot, type IntakeAnswers } from '@/lib/home/conversationIntake';
 import SEOHead from '@/components/SEOHead';
 import { trackStarterKitCTAClicked } from '@/lib/analytics';
+
 
 const NAVY_BG = 'hsl(220, 20%, 8%)';
 const NAVY_SURFACE = 'hsl(220, 20%, 11%)';
@@ -37,7 +41,21 @@ export default function Landing() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  /**
+   * HP-3C — bounded deep-link context. `jobId` is a canonical UUID or null;
+   * campaign values stay in memory only and are never persisted, sent to the
+   * server, or added to the auth handoff in this phase.
+   */
+  const [deepLink] = useState(() =>
+    readHomeDeepLink(typeof window === 'undefined' ? '' : window.location.search),
+  );
+  const [targetedJob, setTargetedJob] = useState<PublicTeaserRow | null>(null);
+  const openingNote = targetedJob
+    ? buildTargetedOpeningNote(targetedJob.title, targetedJob.company_name)
+    : undefined;
+
   const goToDriver = () => navigate('/auth?intent=driver');
+
 
   const focusConversation = useCallback(() => {
     const el = document.getElementById('home-conversation-input');
@@ -246,6 +264,16 @@ export default function Landing() {
             </p>
 
             <div className="mt-5">
+              {deepLink.jobId && (
+                <HomeTargetedJobContext
+                  jobId={deepLink.jobId}
+                  amber={AMBER}
+                  surface={NAVY_SURFACE}
+                  border={NAVY_BORDER}
+                  textMuted={TEXT_MUTED}
+                  onResolved={setTargetedJob}
+                />
+              )}
               <HomeConversationHero
                 onContinue={continueToOpportunities}
                 amber={AMBER}
@@ -253,8 +281,10 @@ export default function Landing() {
                 border={NAVY_BORDER}
                 textMuted={TEXT_MUTED}
                 textDim={TEXT_DIM}
+                openingNote={openingNote}
               />
             </div>
+
 
             {/* 2 — Three compact paths */}
             <div
