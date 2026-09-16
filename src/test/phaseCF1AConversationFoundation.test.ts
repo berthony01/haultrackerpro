@@ -210,6 +210,25 @@ describe("CF-1A / migration B (schema, RLS, RPC)", () => {
     expect(schemaExec).not.toMatch(/to anon/);
   });
 
+  it("4d2. explicitly revokes inherited/default table privileges before granting", () => {
+    for (const table of TABLES) {
+      const revoke = `revoke all on public.${table} from public, anon, authenticated;`;
+      expect(schemaExec).toContain(revoke);
+      // the revoke must precede both grants for that table
+      const revokeIdx = schemaExec.indexOf(revoke);
+      const grantIdx = schemaExec.indexOf(`grant select on public.${table} to authenticated`);
+      const serviceIdx = schemaExec.indexOf(`grant all on public.${table} to service_role`);
+      expect(revokeIdx).toBeGreaterThan(-1);
+      expect(grantIdx).toBeGreaterThan(revokeIdx);
+      expect(serviceIdx).toBeGreaterThan(revokeIdx);
+    }
+    expect(
+      (schemaExec.match(/revoke all on public\.conversation_\w+ from public, anon, authenticated;/g) ?? [])
+        .length,
+    ).toBe(TABLES.length);
+  });
+
+
   it("4e. defines SELECT-only policies routed through the authorization helper", () => {
     const policies = [...schemaExec.matchAll(/create policy "[^"]+"\s+on public\.(\w+)\s+for (\w+)/g)];
     expect(policies.length).toBe(4);

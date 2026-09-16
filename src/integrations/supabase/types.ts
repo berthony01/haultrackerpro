@@ -1195,6 +1195,183 @@ export type Database = {
           },
         ]
       }
+      conversation_events: {
+        Row: {
+          actor_type: string
+          actor_user_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          metadata: Json
+          thread_id: string
+        }
+        Insert: {
+          actor_type: string
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          metadata?: Json
+          thread_id: string
+        }
+        Update: {
+          actor_type?: string
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          metadata?: Json
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_events_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_messages: {
+        Row: {
+          body: string
+          client_message_id: string
+          created_at: string
+          id: string
+          message_type: string
+          sender_actor_type: string
+          sender_user_id: string
+          source: string
+          thread_id: string
+        }
+        Insert: {
+          body: string
+          client_message_id: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          sender_actor_type: string
+          sender_user_id: string
+          source?: string
+          thread_id: string
+        }
+        Update: {
+          body?: string
+          client_message_id?: string
+          created_at?: string
+          id?: string
+          message_type?: string
+          sender_actor_type?: string
+          sender_user_id?: string
+          source?: string
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_participants: {
+        Row: {
+          id: string
+          joined_at: string
+          left_at: string | null
+          participant_role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          joined_at?: string
+          left_at?: string | null
+          participant_role: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          joined_at?: string
+          left_at?: string | null
+          participant_role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_participants_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_threads: {
+        Row: {
+          accepted_at: string | null
+          closed_at: string | null
+          closed_by_user_id: string | null
+          created_at: string
+          declined_at: string | null
+          driver_user_id: string
+          id: string
+          initiated_by_user_id: string
+          opportunity_id: string | null
+          recruiter_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          closed_at?: string | null
+          closed_by_user_id?: string | null
+          created_at?: string
+          declined_at?: string | null
+          driver_user_id: string
+          id?: string
+          initiated_by_user_id: string
+          opportunity_id?: string | null
+          recruiter_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          closed_at?: string | null
+          closed_by_user_id?: string | null
+          created_at?: string
+          declined_at?: string | null
+          driver_user_id?: string
+          id?: string
+          initiated_by_user_id?: string
+          opportunity_id?: string | null
+          recruiter_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_threads_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_threads_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cost_profile: {
         Row: {
           avg_mpg: number | null
@@ -4954,6 +5131,10 @@ export type Database = {
         }
       }
       accept_assistant_invite: { Args: { _token: string }; Returns: Json }
+      accept_conversation_thread: {
+        Args: { _thread_id: string }
+        Returns: string
+      }
       accept_recruiter_member_invite: {
         Args: { _token: string }
         Returns: Json
@@ -5147,6 +5328,10 @@ export type Database = {
         }[]
       }
       clean_assistant_permissions: { Args: { _p: Json }; Returns: Json }
+      close_conversation_thread: {
+        Args: { _thread_id: string }
+        Returns: string
+      }
       complete_business_checkout_claim: {
         Args: {
           _checkout_expires_at: string
@@ -5222,6 +5407,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      conversation_post_message: {
+        Args: { _body: string; _client_message_id: string; _thread_id: string }
+        Returns: string
       }
       create_agency: {
         Args: { _contact_email?: string; _description?: string; _name: string }
@@ -5369,6 +5558,10 @@ export type Database = {
           persona: string
         }[]
       }
+      current_user_can_conversation_action: {
+        Args: { _action: string; _thread_id: string }
+        Returns: boolean
+      }
       current_user_can_dispatch_load_action: {
         Args: {
           _driver_user_id: string
@@ -5441,6 +5634,10 @@ export type Database = {
           _recruiter_id: string
         }
         Returns: boolean
+      }
+      decline_conversation_thread: {
+        Args: { _thread_id: string }
+        Returns: string
       }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -7282,6 +7479,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      start_opportunity_conversation: {
+        Args: {
+          _client_message_id: string
+          _initial_message: string
+          _opportunity_id: string
+        }
+        Returns: string
+      }
       submit_agency_client_request: {
         Args: {
           _agency_id: string
@@ -7722,6 +7927,10 @@ export type Database = {
         }
         Returns: Json
       }
+      user_has_blocking_messaging_restriction: {
+        Args: { _user_id: string }
+        Returns: boolean
+      }
       user_is_marketplace_blocked: {
         Args: { _scope: string; _user_id: string }
         Returns: boolean
@@ -7817,6 +8026,8 @@ export type Database = {
         | "loads_view"
         | "loads_dispatch"
         | "loads_update_status"
+        | "conversations_view"
+        | "conversations_reply"
       user_capability_status: "setup" | "active" | "suspended" | "revoked"
       user_capability_type: "driver" | "recruiter"
     }
@@ -8038,6 +8249,8 @@ export const Constants = {
         "loads_view",
         "loads_dispatch",
         "loads_update_status",
+        "conversations_view",
+        "conversations_reply",
       ],
       user_capability_status: ["setup", "active", "suspended", "revoked"],
       user_capability_type: ["driver", "recruiter"],
