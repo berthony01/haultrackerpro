@@ -78,7 +78,9 @@ export default function Landing() {
   const focusConversation = useCallback(() => {
     const el = document.getElementById('home-conversation-input');
     if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     (el as HTMLTextAreaElement).focus();
   }, []);
 
