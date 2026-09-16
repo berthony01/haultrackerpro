@@ -316,6 +316,15 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         </p>
       </Card>
 
+      {seedApplied && (
+        <p
+          data-testid="driver-profile-homepage-seed-note"
+          className="text-xs text-muted-foreground rounded-lg border border-border/60 bg-muted/20 px-3 py-2"
+        >
+          We prefilled this from your homepage conversation. Review before saving.
+        </p>
+      )}
+
       <Section icon={User} title="Recruiter Contact Information">
         <p className="text-xs text-muted-foreground -mt-1">
           These are the contact details used for opportunity applications and recruiter sharing according to your privacy choices below. Changing them does not change your sign-in email or your Leaderboard Identity.
