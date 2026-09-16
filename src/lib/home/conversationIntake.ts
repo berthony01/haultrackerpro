@@ -531,3 +531,142 @@ export function toDriverProfileSeed(snapshot: HomeIntakeSnapshot): DriverProfile
   }
   return seed;
 }
+
+/* ------------------------------------------------------------------ */
+/* HP-4A — bounded deterministic multi-field first-message extraction  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * HP-4A hard rules:
+ *  - Pure. No network, no storage, no AI, no inference beyond literal evidence.
+ *  - PREFERENCE dimensions only. Facts (cdl_class, years_experience,
+ *    endorsements) are NEVER derived here; they stay explicit-step questions.
+ *  - Ambiguity fails closed: if a dimension carries more than one distinct
+ *    recognized value, the dimension stays unset and the normal step asks it.
+ */
+
+/** The only fields this pass may ever populate. */
+export const FIRST_MESSAGE_PREFERENCE_FIELDS = [
+  'preferred_route_type',
+  'preferred_driver_type',
+  'preferred_home_time',
+  'trailer_experience',
+  'city',
+  'state',
+  'min_weekly_gross',
+] as const;
+
+const ROUTE_PATTERNS: Record<RouteTypeChoice, RegExp> = {
+  Local: /\blocal\b/,
+  Regional: /\bregional\b/,
+  OTR: /\botr\b|\bover[- ]the[- ]road\b|\blong haul\b/,
+  Dedicated: /\bdedicated\b/,
+};
+
+const DRIVER_TYPE_PATTERNS: Record<DriverTypeChoice, RegExp> = {
+  'Owner Operator': /\bowner[- ]operator\b|\bowner op\b|\bo\/o\b/,
+  Team: /\bteam driver\b|\bteam driving\b|\bteams?\b/,
+};
+
+const BIWEEKLY_PATTERN = /bi-?weekly|every other week|every 2 weeks|every two weeks/g;
+
+/** Returns the single matching value, or undefined when zero or 2+ distinct values match. */
+function soleMatch<T extends string>(text: string, patterns: Record<T, RegExp>): T | undefined {
+  const hits = (Object.keys(patterns) as T[]).filter((key) => patterns[key].test(text));
+  return hits.length === 1 ? hits[0] : undefined;
+}
+
+/** Distinct home-time values literally present. Bi-weekly phrases never also count as Weekly. */
+function homeTimeMatches(text: string): string[] {
+  const withoutBiweekly = text.replace(BIWEEKLY_PATTERN, ' ');
+  const hits: string[] = [];
+  if (BIWEEKLY_PATTERN.test(text)) hits.push('Bi-weekly');
+  BIWEEKLY_PATTERN.lastIndex = 0;
+  if (/daily|every ?night|every day|home each night/.test(withoutBiweekly)) hits.push('Daily');
+  if (/\bweekly\b|weekend/.test(withoutBiweekly)) hits.push('Weekly');
+  if (/2-3 weeks|three weeks|3 weeks|weeks out/.test(withoutBiweekly)) hits.push('2-3 weeks out');
+  return hits;
+}
+
+/** Only an explicit "City, ST" fragment counts — never a whole sentence. */
+function firstMessageLocation(text: string): { city?: string; state?: string } {
+  const matches = [...text.matchAll(/\b([A-Za-z][A-Za-z.'\- ]{1,40}),\s*([A-Za-z]{2})\b/g)];
+  const resolved = matches
+    .map((m) => extractLocation(`${m[1].trim()}, ${m[2]}`))
+    .filter((loc) => Boolean(loc.state));
+  const distinct = new Set(resolved.map((loc) => `${loc.city ?? ''}|${loc.state ?? ''}`));
+  return distinct.size === 1 ? resolved[0] : {};
+}
+
+/** Only a number with explicit money or per-week context counts. */
+function firstMessagePayGoal(text: string): number | undefined {
+  const candidates = new Set<number>();
+  for (const m of text.matchAll(/\$\s?(\d[\d,]{2,6})/g)) {
+    const n = extractPayGoal(m[1]);
+    if (n !== undefined) candidates.add(n);
+  }
+  for (const m of text.matchAll(
+    /\b(\d[\d,]{2,6})\s*(?:\/\s*wk|\/\s*week|a week|per week|weekly)\b/gi,
+  )) {
+    const n = extractPayGoal(m[1]);
+    if (n !== undefined) candidates.add(n);
+  }
+  return candidates.size === 1 ? [...candidates][0] : undefined;
+}
+
+/**
+ * Bounded multi-field extraction for the driver's FIRST free-text reply only.
+ * Returns only the fields with unambiguous literal evidence.
+ */
+export function extractFirstMessagePreferences(text: string): IntakeAnswers {
+  const value = typeof text === 'string' ? text.trim() : '';
+  if (!value) return {};
+  const t = ` ${value.toLowerCase()} `;
+  const out: IntakeAnswers = {};
+
+  const route = soleMatch(t, ROUTE_PATTERNS);
+  if (route) out.preferred_route_type = route;
+
+  const driverType = soleMatch(t, DRIVER_TYPE_PATTERNS);
+  if (driverType) out.preferred_driver_type = driverType;
+
+  const homeTimes = homeTimeMatches(t);
+  if (homeTimes.length === 1) {
+    out.preferred_home_time = homeTimes[0] as IntakeAnswers['preferred_home_time'];
+  }
+
+  const trailers = extractTrailers(value);
+  if (trailers.length) out.trailer_experience = trailers;
+
+  const loc = firstMessageLocation(value);
+  if (loc.state) out.state = loc.state;
+  if (loc.city) out.city = loc.city;
+
+  const pay = firstMessagePayGoal(value);
+  if (pay !== undefined) out.min_weekly_gross = pay;
+
+  return out;
+}
+
+/**
+ * Human-readable labels for what the first message captured, reusing the single
+ * existing summary vocabulary. Never a claim of understanding, matching, or
+ * qualification — just an echo of the driver's own words.
+ */
+export function describeCapturedPreferences(captured: IntakeAnswers): string[] {
+  return summarizeIntake(captured);
+}
+
+/**
+ * True when the first message captured at least one field BEYOND the work-type
+ * dimension the step itself asked for. Only then is a disclosure line warranted.
+ */
+export function hasExtraCapturedPreferences(captured: IntakeAnswers): boolean {
+  return (
+    Boolean(captured.preferred_home_time) ||
+    Boolean(captured.trailer_experience?.length) ||
+    Boolean(captured.state) ||
+    Boolean(captured.city) ||
+    captured.min_weekly_gross !== undefined
+  );
+}
