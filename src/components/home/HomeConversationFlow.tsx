@@ -98,6 +98,8 @@ export interface HomeConversationFlowProps {
   border: string;
   textMuted: string;
   textDim: string;
+  /** HP-3C — optional verified listing context prefixed to the first assistant line only. */
+  openingNote?: string;
 }
 
 export default function HomeConversationFlow({
@@ -107,8 +109,10 @@ export default function HomeConversationFlow({
   border,
   textMuted,
   textDim,
+  openingNote,
 }: HomeConversationFlowProps) {
-  const [state, setState] = useState<FlowState>(INITIAL_STATE);
+  const [state, setState] = useState<FlowState>(() => makeInitialState(openingNote));
+
   const [history, setHistory] = useState<FlowState[]>([]);
   const [draft, setDraft] = useState('');
   const bubbleId = useRef(1);
