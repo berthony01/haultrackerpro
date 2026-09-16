@@ -248,8 +248,11 @@ describe('CF-1C-A structured qualification evaluator', () => {
       {
         min_years_experience: 1,
         // extra fields must be ignored entirely
-        ...({ cpm: 0.75, route_type: 'OTR', trailer_type: 'Reefer', matchScore: 99 } as never),
-      },
+        cpm: 0.75,
+        route_type: 'OTR',
+        trailer_type: 'Reefer',
+        matchScore: 99,
+      } as never,
       { years_experience: 2 },
     );
     expect(r.evaluated.map((c) => c.key)).toEqual(['experience']);
