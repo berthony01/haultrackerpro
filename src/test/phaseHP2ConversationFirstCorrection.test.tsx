@@ -271,7 +271,7 @@ describe('HP-2 — snapshot contract fails closed', () => {
         allow_verified_recruiter_contact: true,
         phone: '555-555-5555',
       }),
-    ) as Record<string, unknown>;
+    ) as unknown as Record<string, unknown>;
     expect(parsed.preferred_route_type).toBe('Regional');
     expect(parsed.visibility).toBeUndefined();
     expect(parsed.allow_verified_recruiter_contact).toBeUndefined();
@@ -298,7 +298,7 @@ describe('HP-2 — snapshot contract fails closed', () => {
         trailer_experience: ['Flatbed'],
         min_weekly_gross: 1800,
       }),
-    ) as Record<string, unknown>;
+    ) as unknown as Record<string, unknown>;
     expect(Object.keys(seed).sort()).toEqual([
       'cdl_class',
       'city',
