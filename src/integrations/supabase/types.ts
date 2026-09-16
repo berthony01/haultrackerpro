@@ -6543,6 +6543,50 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_public_opportunity_teasers: {
+        Args: {
+          _driver_type?: string
+          _limit?: number
+          _opportunity_id?: string
+          _route_type?: string
+          _state?: string
+        }
+        Returns: {
+          company_name: string
+          cpm: number
+          deadhead_paid: boolean
+          driver_type: string
+          employment_model: string
+          estimated_deadhead_miles: number
+          estimated_loaded_miles: number
+          estimated_weekly_gross: number
+          estimated_weekly_miles: number
+          featured: boolean
+          flat_weekly_pay: number
+          has_additional_requirements: boolean
+          hiring_city: string
+          hiring_state: string
+          hiring_states: string[]
+          home_time: string
+          id: string
+          min_years_experience: number
+          other_pay_method_label: string
+          pay_model: string
+          percentage_basis_label: string
+          percentage_pay: number
+          published_at: string
+          required_cdl_class: string
+          required_endorsements: string[]
+          route_type: string
+          salary_amount: number
+          salary_frequency: string
+          sign_on_bonus: number
+          team_configuration: string
+          title: string
+          trailer_type: string
+          typical_lanes: string
+        }[]
+      }
       list_public_resource_articles: {
         Args: { _limit?: number }
         Returns: {
