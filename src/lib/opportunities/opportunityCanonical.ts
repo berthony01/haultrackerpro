@@ -116,6 +116,10 @@ export interface CanonicalOpportunityAuthoringState {
   escrow_required_state: EscrowRequiredState | 'unspecified';
   escrow_amount: string;
   escrow_frequency: RecurringFrequency | null;
+  // structured qualification criteria (CF-1C-B) — optional, never publication blockers
+  min_years_experience: string;
+  required_cdl_class: string;
+  required_endorsements: string[];
   // content
   typical_lanes: string;
   requirements: string;
@@ -173,6 +177,9 @@ export const EMPTY_AUTHORING_STATE: CanonicalOpportunityAuthoringState = {
   escrow_required_state: 'unspecified',
   escrow_amount: '',
   escrow_frequency: null,
+  min_years_experience: '',
+  required_cdl_class: '',
+  required_endorsements: [],
   typical_lanes: '',
   requirements: '',
   actual_benefits: '',
