@@ -8,6 +8,9 @@ import {
   WORK_TYPE_CHOICES,
   applyStepAnswer,
   applyWorkTypeChoice,
+  describeCapturedPreferences,
+  extractFirstMessagePreferences,
+  hasExtraCapturedPreferences,
   isStepAnswered,
   nextStep,
   summarizeIntake,
@@ -16,6 +19,7 @@ import {
   type IntakeStepId,
   type WorkTypeChoice,
 } from '@/lib/home/conversationIntake';
+
 
 /**
  * HP-2 — the signed-out homepage conversation.
@@ -166,14 +170,34 @@ export default function HomeConversationFlow({
   const submitText = useCallback(() => {
     const text = draft.trim();
     if (!text || !current) return;
-    let nextAnswers = applyStepAnswer(answers, current.id, text);
+
+    /**
+     * HP-4A — the driver's FIRST free-text reply may safely carry several
+     * unambiguous PREFERENCE fields at once. Facts (CDL class, years of
+     * experience, endorsements) are never inferred here; ambiguous dimensions
+     * stay unset so the normal step still asks them.
+     */
     if (current.id === 'work-type' && !answers.initialMessage) {
-      // Preserve the driver's own words verbatim.
-      nextAnswers = { ...nextAnswers, initialMessage: text.slice(0, 500) };
+      const captured = extractFirstMessagePreferences(text);
+      const nextAnswers: IntakeAnswers = {
+        ...answers,
+        ...captured,
+        // Preserve the driver's own words verbatim.
+        initialMessage: text.slice(0, 500),
+      };
+      const disclosure = hasExtraCapturedPreferences(captured)
+        ? `I also picked up: ${describeCapturedPreferences(captured).join(' • ')}.`
+        : undefined;
+      setDraft('');
+      advance(text, nextAnswers, current, false, disclosure);
+      return;
     }
+
+    const nextAnswers = applyStepAnswer(answers, current.id, text);
     setDraft('');
     advance(text, nextAnswers, current, false);
   }, [draft, current, answers, advance]);
+
 
   const submitChip = useCallback(
     (chip: string) => {
