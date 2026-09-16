@@ -101,15 +101,18 @@ beforeEach(() => {
 });
 
 describe('HP-3C — pure deep-link parsing', () => {
-  it('accepts only canonical UUIDs for job', () => {
+  it('accepts only canonical UUIDs for job and flags an invalid job param', () => {
     expect(isValidJobId(JOB_ID)).toBe(true);
     expect(isValidJobId('not-a-uuid')).toBe(false);
     expect(isValidJobId('')).toBe(false);
     expect(isValidJobId(null)).toBe(false);
-    expect(readHomeDeepLink(`?job=${JOB_ID}`).jobId).toBe(JOB_ID);
-    expect(readHomeDeepLink('?job=not-a-uuid').jobId).toBeNull();
-    expect(readHomeDeepLink('').jobId).toBeNull();
+
+    expect(readHomeDeepLink(`?job=${JOB_ID}`)).toMatchObject({ jobRequested: true, jobId: JOB_ID });
+    expect(readHomeDeepLink('?job=not-a-uuid')).toMatchObject({ jobRequested: true, jobId: null });
+    expect(readHomeDeepLink('?job=')).toMatchObject({ jobRequested: true, jobId: null });
+    expect(readHomeDeepLink('')).toMatchObject({ jobRequested: false, jobId: null });
   });
+
 
   it('sanitizes and clamps campaign values, dropping anything invalid', () => {
     const long = 'a'.repeat(CAMPAIGN_VALUE_MAX_LENGTH + 1);
