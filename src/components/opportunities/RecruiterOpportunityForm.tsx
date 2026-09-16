@@ -1056,6 +1056,7 @@ function RecruiterOpportunityFormCore({
                       placeholder={'Dallas, TX → Houston, TX\nMidwest → Southeast'}
                       aria-label="Typical Lanes" />
                   </Field>
+                  <StructuredQualificationCriteria state={state} set={set} />
                   <Field label="Requirements" helper="Experience, CDL class, endorsements, MVR/drug test.">
                     <Textarea rows={4} value={state.requirements}
                       onChange={(e) => set('requirements', e.target.value)}
