@@ -86,9 +86,18 @@ const ANSWERS: IntakeAnswers = {
   cdl_class: 'A',
   years_experience: 5,
   preferred_route_type: 'OTR',
-  preferred_home_time: 'Every 2 weeks',
+  preferred_home_time: 'Weekly',
   trailer_experience: ['Dry Van'],
   min_weekly_gross: 1800,
+};
+
+const FLOW_PROPS = {
+  onContinue: () => {},
+  amber: 'hsl(25, 95%, 53%)',
+  surface: 'hsl(220, 22%, 10%)',
+  border: 'hsl(220, 16%, 24%)',
+  textMuted: 'hsl(220, 10%, 70%)',
+  textDim: 'hsl(220, 10%, 55%)',
 };
 
 beforeEach(() => {
@@ -97,7 +106,7 @@ beforeEach(() => {
 
 describe('HP-3B — fetch discipline', () => {
   it('issues no RPC while the conversation is still in progress', () => {
-    render(<HomeConversationFlow onContinue={() => {}} />);
+    render(<HomeConversationFlow {...FLOW_PROPS} />);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('home-teaser-preview')).toBeNull();
   });
@@ -246,7 +255,7 @@ describe('HP-3B — failure handling', () => {
 
   it('keeps the Continue button enabled while listings load', () => {
     rpcMock.mockReturnValue(new Promise(() => {}));
-    const flow = render(<HomeConversationFlow onContinue={() => {}} />);
+    const flow = render(<HomeConversationFlow {...FLOW_PROPS} />);
     flow.unmount();
     expect(FLOW_SRC).toContain('onClick={() => onContinue(answers)}');
     expect(FLOW_SRC).not.toContain('disabled={');
