@@ -29,15 +29,16 @@ function renderLanding() {
 }
 
 describe('Phase 1M-B — Homepage information architecture', () => {
-  it('renders the exact new hero headline', () => {
+  it('renders the conversation-first hero headline and keeps the platform tagline', () => {
     renderLanding();
     const hero = screen.getByTestId('landing-hero');
     expect(
       within(hero).getByRole('heading', {
         level: 1,
-        name: 'The business platform behind every truck.',
+        name: /Talk about the work you want\./i,
       }),
     ).toBeInTheDocument();
+    expect(hero).toHaveTextContent('The business platform behind every truck.');
   });
 
   it('contains none of the forbidden phrases anywhere on the page', () => {
@@ -48,23 +49,22 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     expect(/side hustle/i.test(text)).toBe(false);
   });
 
-  it('renders three compact hero audience paths with correct destinations', () => {
+  it('renders the three primary hero paths in conversation-first order', () => {
     renderLanding();
     const paths = screen.getByTestId('hero-audience-paths');
-    const driver = within(paths).getByTestId('hero-path-driver');
-    const recruiter = within(paths).getByTestId('hero-path-recruiter');
-    const backoffice = within(paths).getByTestId('hero-path-backoffice');
-    expect(driver).toHaveTextContent(/Drivers/);
-    expect(recruiter).toHaveTextContent(/Recruiters & Carriers/);
-    expect(backoffice).toHaveTextContent(/Back-Office Businesses/);
+    const findWork = within(paths).getByTestId('hero-path-find-work');
+    const myTrucking = within(paths).getByTestId('hero-path-my-trucking');
+    const hire = within(paths).getByTestId('hero-path-hire-drivers');
+    expect(findWork).toHaveTextContent(/Find Work/);
+    expect(myTrucking).toHaveTextContent(/My Trucking/);
+    expect(hire).toHaveTextContent(/Hire Drivers/);
 
-    fireEvent.click(driver);
+    fireEvent.click(myTrucking);
     expect(navigateSpy).toHaveBeenLastCalledWith('/auth?intent=driver');
-    fireEvent.click(recruiter);
+    fireEvent.click(hire);
     expect(navigateSpy).toHaveBeenLastCalledWith('/recruiters');
-    fireEvent.click(backoffice);
-    expect(navigateSpy).toHaveBeenLastCalledWith('/assistants-agencies');
   });
+
 
   it('renders a workspace tablist with three tabs, Driver selected by default', () => {
     renderLanding();

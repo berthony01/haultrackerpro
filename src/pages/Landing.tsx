@@ -16,11 +16,15 @@ import {
   Fuel,
   Receipt,
   BarChart3,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
+import HomeConversationHero, {
+  HOME_CONVERSATION_NEXT_PATH,
+} from '@/components/home/HomeConversationHero';
 import SEOHead from '@/components/SEOHead';
 import { trackStarterKitCTAClicked } from '@/lib/analytics';
 import { ASSISTANT_AGENCY_PLANS } from '@/lib/agencyPlans';
@@ -64,6 +68,22 @@ export default function Landing() {
   const [workspace, setWorkspace] = useState<WorkspaceKey>('driver');
 
   const goToDriver = () => navigate('/auth?intent=driver');
+
+  // Hands the driver's own words to the existing auth flow, which lands on the real
+  // driver opportunities workspace where the CF-1B conversation surface takes over.
+  const startHomeConversation = useCallback(() => {
+    navigate(`/auth?intent=driver&next=${encodeURIComponent(HOME_CONVERSATION_NEXT_PATH)}`);
+  }, [navigate]);
+
+  const focusConversation = useCallback(() => {
+    const el = document.getElementById('home-conversation-input');
+    if (!el) return;
+    if (typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    (el as HTMLTextAreaElement).focus();
+  }, []);
+
 
   const scrollToSolutions = useCallback(() => {
     const el = document.getElementById('solutions');
@@ -231,96 +251,81 @@ export default function Landing() {
       </nav>
 
       <main>
-        {/* HERO */}
+        {/* HERO — conversation first */}
         <section className="relative overflow-hidden" data-testid="landing-hero">
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                'radial-gradient(ellipse 70% 50% at 50% 0%, hsl(25, 95%, 53%, 0.10) 0%, transparent 70%)',
+                'radial-gradient(ellipse 80% 55% at 50% -5%, hsl(25, 95%, 53%, 0.20) 0%, transparent 65%), radial-gradient(ellipse 60% 40% at 15% 20%, hsl(25, 95%, 53%, 0.07) 0%, transparent 70%)',
             }}
           />
-          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-12 sm:pb-16 text-center">
+          <div
+            className="absolute inset-x-0 top-0 h-px pointer-events-none"
+            style={{ background: 'linear-gradient(90deg, transparent, hsl(25, 95%, 53%, 0.5), transparent)' }}
+          />
+          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-12 sm:pb-16 text-center">
             <div
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-5"
               style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
             >
-              <Sparkles className="h-3.5 w-3.5" /> One platform for drivers, recruiters &amp; back-office pros
+              <Sparkles className="h-3.5 w-3.5" /> Conversation-first trucking platform
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.05] text-white max-w-4xl mx-auto">
-              The business platform behind every truck.
+            <h1 className="text-[2.1rem] leading-[1.06] sm:text-5xl lg:text-6xl font-black tracking-tight text-white max-w-3xl mx-auto">
+              Talk about the work you want. <span style={{ color: AMBER_BRIGHT }}>Not paperwork.</span>
             </h1>
             <p
-              className="mt-6 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto"
+              className="mt-4 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto"
               style={{ color: TEXT_MUTED }}
             >
-              Drivers track real profit on every load. Recruiters post verified opportunities and
-              manage applicants. Back-office professionals — driver assistants and agencies —
-              support approved driver accounts through permission-based access and audit records.
+              Say it in your own words — lanes, home time, equipment, pay. HaulTracker Pro takes it
+              from there: real conversations with recruiters, and the business tools behind every truck.
             </p>
 
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-              <Button
-                onClick={goToDriver}
-                size="lg"
-                className="text-base sm:text-lg font-bold rounded-xl h-14 px-8 gap-2 w-full sm:w-auto"
-                style={{
-                  background: AMBER,
-                  color: 'white',
-                  boxShadow: '0 4px 24px -4px hsl(25, 95%, 53%, 0.55)',
-                }}
-              >
-                <Truck className="h-5 w-5" /> Start Free as a Driver
-              </Button>
-              <Button
-                onClick={scrollToSolutions}
-                size="lg"
-                variant="outline"
-                className="text-base sm:text-lg font-bold rounded-xl h-14 px-8 gap-2 w-full sm:w-auto hover:bg-transparent"
-                style={{
-                  borderColor: AMBER,
-                  color: AMBER_BRIGHT,
-                  background: 'transparent',
-                  borderWidth: 2,
-                }}
-              >
-                Explore Solutions <ArrowRight className="h-5 w-5" />
-              </Button>
+            <div className="mt-7">
+              <HomeConversationHero
+                onStart={startHomeConversation}
+                amber={AMBER}
+                surface={NAVY_SURFACE}
+                border={NAVY_BORDER}
+                textMuted={TEXT_MUTED}
+                textDim={TEXT_DIM}
+              />
             </div>
 
-            {/* Compact audience-path chips */}
+            {/* Primary paths: Find Work → My Trucking → Hire Drivers */}
             <div
-              className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl mx-auto"
+              className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3 max-w-4xl mx-auto"
               data-testid="hero-audience-paths"
             >
               {[
                 {
-                  key: 'driver',
+                  key: 'find-work',
+                  icon: MessageSquare,
+                  label: 'Find Work',
+                  outcome: 'Start a conversation about the freight and home time you want.',
+                  action: focusConversation,
+                },
+                {
+                  key: 'my-trucking',
                   icon: Truck,
-                  label: 'Drivers',
-                  outcome: 'Know real profit on every load.',
-                  href: '/auth?intent=driver',
+                  label: 'My Trucking',
+                  outcome: 'Track loads, expenses, fuel and real profit on every mile.',
+                  action: goToDriver,
                 },
                 {
-                  key: 'recruiter',
+                  key: 'hire-drivers',
                   icon: Users,
-                  label: 'Recruiters & Carriers',
-                  outcome: 'Post verified opportunities and manage applicants.',
-                  href: '/recruiters',
-                },
-                {
-                  key: 'backoffice',
-                  icon: Briefcase,
-                  label: 'Back-Office Businesses',
-                  outcome: 'Support approved driver clients with audited access.',
-                  href: '/assistants-agencies',
+                  label: 'Hire Drivers',
+                  outcome: 'Verified recruiters post opportunities and reply to drivers.',
+                  action: () => navigate('/recruiters'),
                 },
               ].map((p) => (
                 <button
                   key={p.key}
                   data-testid={`hero-path-${p.key}`}
-                  onClick={() => navigate(p.href)}
-                  className="text-left rounded-xl border p-4 hover:border-[hsl(25,95%,53%)] transition-colors"
+                  onClick={p.action}
+                  className="text-left rounded-2xl border p-4 min-h-[44px] hover:border-[hsl(25,95%,53%)] transition-colors"
                   style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
                 >
                   <div className="flex items-center gap-2">
@@ -335,11 +340,46 @@ export default function Landing() {
             </div>
 
             <p className="mt-6 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
-              Drivers start free — no credit card. Verified recruiters post standard opportunities free.
-              Driver Assistant access is free after a driver approves it.
+              The business platform behind every truck. Drivers start free — no credit card. Verified
+              recruiters post standard opportunities free. Driver Assistant access is free after a
+              driver approves it.
             </p>
           </div>
         </section>
+
+        {/* SECONDARY SUPPORTING TOOLS */}
+        <section
+          className="border-t"
+          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          data-testid="secondary-tools-section"
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+            <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: TEXT_DIM }}>
+              Also inside HaulTracker Pro
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-2 sm:gap-3">
+              {[
+                { key: 'assistants', icon: Briefcase, label: 'Assistants & Agencies', href: '/assistants-agencies' },
+                { key: 'parking', icon: Truck, label: 'Truck Parking', href: '/features#parking' },
+                { key: 'calculators', icon: BarChart3, label: 'Calculators', href: '/trucking-profit-calculator' },
+                { key: 'reports', icon: Receipt, label: 'Reports & Taxes', href: '/features' },
+                { key: 'resources', icon: ClipboardList, label: 'Resources', href: '/resources' },
+              ].map((s) => (
+                <button
+                  key={s.key}
+                  data-testid={`secondary-tool-${s.key}`}
+                  onClick={() => navigate(s.href)}
+                  className="flex items-center gap-2 rounded-xl border px-3 py-3 min-h-[44px] text-left hover:border-[hsl(25,95%,53%)] transition-colors"
+                  style={{ background: 'transparent', borderColor: NAVY_BORDER }}
+                >
+                  <s.icon className="h-4 w-4 shrink-0" style={{ color: TEXT_DIM }} />
+                  <span className="text-xs font-semibold" style={{ color: TEXT_MUTED }}>{s.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
 
         {/* PRODUCT PROOF — Workspaces */}
         <section
