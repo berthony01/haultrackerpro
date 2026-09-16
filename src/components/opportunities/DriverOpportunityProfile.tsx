@@ -275,6 +275,9 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
     upsertProfile.mutate(payload, {
       onSuccess: () => {
+        // The homepage seed has now been persisted by the driver's own action.
+        clearIntakeSnapshot();
+        setSeedApplied(false);
         if (completed) toast.success('Your Opportunity Preferences are ready.');
         else
           toast.success('Preferences saved. Add a few more details later to improve your match quality.');
