@@ -440,15 +440,45 @@ describe('CF-1B / RecruiterConversationInbox', () => {
     expect(screen.queryByTestId('conversation-thread-list')).toBeNull();
   });
 
-  it('4c peer identity is neutral — no driver name/PII rendering', async () => {
+  it('4c peer identity is a stable neutral label — no driver name/PII rendering', async () => {
     const user = userEvent.setup();
     tableResults.conversation_threads = { data: [thread({ status: 'active' })], error: null };
     tableResults.conversation_messages = { data: [message()], error: null };
     render(<RecruiterConversationInbox recruiterId="rec-1" canView canReply />);
     const item = await screen.findByTestId('conversation-thread-item');
-    expect(within(item).getByText('Driver')).toBeTruthy();
+    const label = within(item).getByTestId('conversation-peer-label').textContent ?? '';
+    expect(label.startsWith('Driver •')).toBe(true);
+    expect(label).toBe('Driver • EAD1');
     expect(item.textContent).not.toContain('driver-1');
+    expect(item.textContent).not.toContain('thread-1');
     await user.click(item);
+  });
+
+  it('4d two threads render distinct stable labels derived only from thread id', async () => {
+    tableResults.conversation_threads = {
+      data: [thread({ id: 'aaaa-bbbb-1111' }), thread({ id: 'cccc-dddd-2222' })],
+      error: null,
+    };
+    tableResults.conversation_messages = { data: [], error: null };
+    render(<RecruiterConversationInbox recruiterId="rec-1" canView canReply />);
+    const labels = (await screen.findAllByTestId('conversation-peer-label')).map(
+      (n) => n.textContent,
+    );
+    expect(labels).toEqual(['Driver • 1111', 'Driver • 2222']);
+    expect(new Set(labels).size).toBe(2);
+  });
+
+  it('4e inbox performs no driver PII lookup for the label', () => {
+    const src = readCode(INBOX_PATH);
+    for (const forbidden of [
+      'driver_opportunity_profiles',
+      'from(\'profiles\')',
+      'auth.users',
+      'opportunity_applications',
+      'recruiter_contact_requests',
+    ]) {
+      expect(src).not.toContain(forbidden);
+    }
   });
 });
 
