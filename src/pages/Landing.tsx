@@ -467,6 +467,7 @@ export default function Landing() {
                   { label: 'Profit Calculator', href: '/trucking-profit-calculator' },
                   { label: 'Cost Per Mile', href: '/trucking-cost-per-mile' },
                   { label: 'Tax Deductions', href: '/truck-driver-tax-deductions' },
+                  { label: 'Starter Kit', href: '/starter-kit', track: true },
                 ],
               },
               {
