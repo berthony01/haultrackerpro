@@ -16,11 +16,15 @@ import {
   Fuel,
   Receipt,
   BarChart3,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
 import dashboardMockup from '@/assets/dashboard-mockup.png';
+import HomeConversationHero, {
+  HOME_CONVERSATION_NEXT_PATH,
+} from '@/components/home/HomeConversationHero';
 import SEOHead from '@/components/SEOHead';
 import { trackStarterKitCTAClicked } from '@/lib/analytics';
 import { ASSISTANT_AGENCY_PLANS } from '@/lib/agencyPlans';
