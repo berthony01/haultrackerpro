@@ -53,12 +53,23 @@ const ACKS: Record<IntakeStepId, string> = {
   'pay-goal': 'Thanks.',
 };
 
-const INITIAL_STATE: FlowState = {
-  answers: {},
-  bubbles: [{ id: 0, role: 'assistant', text: INTAKE_OPENING_PROMPT }],
-  skipped: [],
-  current: INTAKE_STEPS[0],
-};
+/**
+ * HP-3C — only the FIRST assistant line may be prefixed with verified public
+ * listing context. The script, order, chips and completion behavior are
+ * untouched.
+ */
+function makeInitialState(openingNote?: string): FlowState {
+  const opening = openingNote?.trim()
+    ? `${openingNote.trim()} ${INTAKE_OPENING_PROMPT}`
+    : INTAKE_OPENING_PROMPT;
+  return {
+    answers: {},
+    bubbles: [{ id: 0, role: 'assistant', text: opening }],
+    skipped: [],
+    current: INTAKE_STEPS[0],
+  };
+}
+
 
 // HP-2R1 — warm off-white conversation canvas + premium chat palette.
 const CANVAS_BG = 'hsl(36, 45%, 97%)';
