@@ -21,9 +21,13 @@ import dashboardMockup from '@/assets/dashboard-mockup.png';
 import HomeConversationHero, {
   HOME_CONVERSATION_NEXT_PATH,
 } from '@/components/home/HomeConversationHero';
+import HomeTargetedJobContext from '@/components/home/HomeTargetedJobContext';
+import { buildTargetedOpeningNote, readHomeDeepLink } from '@/lib/home/homeDeepLink';
+import type { PublicTeaserRow } from '@/lib/home/publicTeaserPresentation';
 import { saveIntakeSnapshot, type IntakeAnswers } from '@/lib/home/conversationIntake';
 import SEOHead from '@/components/SEOHead';
 import { trackStarterKitCTAClicked } from '@/lib/analytics';
+
 
 const NAVY_BG = 'hsl(220, 20%, 8%)';
 const NAVY_SURFACE = 'hsl(220, 20%, 11%)';
