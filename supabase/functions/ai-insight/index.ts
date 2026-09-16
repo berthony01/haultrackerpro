@@ -180,6 +180,21 @@ const PARSE_OPPORTUNITY_TOOL = {
         equipment_year: { type: "string" },
         typical_lanes: { type: "string", description: "Multi-line lane pairs" },
         requirements: { type: "string", description: "Experience, CDL, endorsements, MVR, etc." },
+        min_years_experience: {
+          type: "number",
+          minimum: 0,
+          description: "Explicitly required minimum years of driving experience. Omit unless stated as required/minimum — never for 'preferred'.",
+        },
+        required_cdl_class: {
+          type: "string",
+          enum: ["A", "B", "C"],
+          description: "Explicitly required CDL class only. Never inferred from route, trailer, vehicle, or job title.",
+        },
+        required_endorsements: {
+          type: "array",
+          items: { type: "string", enum: ["H", "N", "P", "T", "X"] },
+          description: "Explicitly required endorsement codes only. Never S. X only when the combined Hazmat+Tanker endorsement is explicitly required.",
+        },
       },
     },
   },
