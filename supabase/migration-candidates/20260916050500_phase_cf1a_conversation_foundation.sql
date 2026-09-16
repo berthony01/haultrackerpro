@@ -202,7 +202,10 @@ BEGIN
     RETURN false;
   END IF;
 
-  IF public.is_admin(_uid) THEN
+  -- Admin shortcut is READ/MODERATION ONLY. Admin status alone never
+  -- authorizes reply/accept/decline/close; those fall through to the
+  -- normal driver / recruiter authority checks below.
+  IF _action = 'view' AND public.is_admin(_uid) THEN
     RETURN true;
   END IF;
 
