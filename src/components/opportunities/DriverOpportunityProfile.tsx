@@ -178,6 +178,43 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
     }
   }, [profile, user]);
 
+  /**
+   * HP-2 — review-only prefill from the signed-out homepage conversation.
+   *
+   * A saved profile always wins: the seed is applied only when no row exists yet,
+   * and only into fields the driver has not already filled. It can never set
+   * visibility, contact preference, recruiter-contact consent, or completion —
+   * and nothing is persisted until the driver presses Save Preferences.
+   */
+  const seedConsumedRef = useRef(false);
+  const [seedApplied, setSeedApplied] = useState(false);
+
+  useEffect(() => {
+    if (isLoading || seedConsumedRef.current) return;
+    seedConsumedRef.current = true;
+    if (profile) return; // existing saved data wins — never overwritten
+    const snapshot = readIntakeSnapshot(); // invalid/expired fails closed and self-clears
+    if (!snapshot) return;
+    const seed = toDriverProfileSeed(snapshot);
+    setForm((p) => ({
+      ...p,
+      city: p.city || seed.city || '',
+      state: p.state || seed.state || '',
+      cdl_class: p.cdl_class || seed.cdl_class || '',
+      years_experience: p.years_experience || seed.years_experience || '',
+      trailer_experience: p.trailer_experience.length
+        ? p.trailer_experience
+        : (seed.trailer_experience ?? []),
+      preferred_driver_type: p.preferred_driver_type || seed.preferred_driver_type || '',
+      preferred_route_type: p.preferred_route_type || seed.preferred_route_type || '',
+      preferred_home_time: p.preferred_home_time || seed.preferred_home_time || '',
+      min_weekly_gross: p.min_weekly_gross || seed.min_weekly_gross || '',
+    }));
+    setSeedApplied(true);
+  }, [isLoading, profile]);
+
+
+
   const changeVisibility = (v: FormState['visibility']) =>
     setForm((p) => ({
       ...p,
