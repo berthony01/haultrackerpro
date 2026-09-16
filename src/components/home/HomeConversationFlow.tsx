@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, MessageSquare, RotateCcw, Undo2, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import HomeOpportunityPreview from '@/components/home/HomeOpportunityPreview';
