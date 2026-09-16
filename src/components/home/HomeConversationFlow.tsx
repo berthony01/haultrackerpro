@@ -122,7 +122,13 @@ export default function HomeConversationFlow({
   const complete = current === null;
 
   const advance = useCallback(
-    (spoken: string, nextAnswers: IntakeAnswers, step: IntakeStep, skippedStep: boolean) => {
+    (
+      spoken: string,
+      nextAnswers: IntakeAnswers,
+      step: IntakeStep,
+      skippedStep: boolean,
+      disclosure?: string,
+    ) => {
       setState((prev) => {
         setHistory((h) => [...h, prev]);
         const skipped = skippedStep ? [...prev.skipped, step.id] : prev.skipped;
@@ -130,6 +136,9 @@ export default function HomeConversationFlow({
         const added: Bubble[] = [
           { id: bubbleId.current++, role: 'driver', text: spoken },
         ];
+        if (disclosure) {
+          added.push({ id: bubbleId.current++, role: 'assistant', text: disclosure });
+        }
 
         if (!progressed) {
           added.push({
@@ -137,7 +146,7 @@ export default function HomeConversationFlow({
             role: 'assistant',
             text: `I did not catch that one. ${step.prompt}`,
           });
-          return { ...prev, bubbles: [...prev.bubbles, ...added] };
+          return { ...prev, answers: nextAnswers, bubbles: [...prev.bubbles, ...added] };
         }
 
         const upcoming = nextStep(nextAnswers, skipped);
