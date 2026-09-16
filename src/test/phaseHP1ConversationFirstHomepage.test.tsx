@@ -137,6 +137,6 @@ describe('Homepage — conversation-first front door', () => {
     }
     // The homepage reuses the existing auth route; it never invents a second identity system.
     expect(LANDING_SRC).toContain('/auth?intent=driver');
-    expect(LANDING_SRC).toContain('/dashboard?page=opportunities');
+    expect(HERO_SRC).toContain('/dashboard?page=opportunities');
   });
 });
