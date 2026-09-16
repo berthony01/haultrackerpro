@@ -59,8 +59,15 @@ const HISTORICAL_RC1B_KEYS = [
 /** Keys appended by later accepted phases, after the historical 21. */
 const APPENDED_LOAD_KEYS = ["loads_view", "loads_dispatch", "loads_update_status"];
 
+/** Keys appended by Phase CF-1A, after the load keys. */
+const APPENDED_CONVERSATION_KEYS = ["conversations_view", "conversations_reply"];
+
 /** The current authoritative vocabulary (live enum + TS mirror). */
-const CURRENT_KEYS = [...HISTORICAL_RC1B_KEYS, ...APPENDED_LOAD_KEYS];
+const CURRENT_KEYS = [
+  ...HISTORICAL_RC1B_KEYS,
+  ...APPENDED_LOAD_KEYS,
+  ...APPENDED_CONVERSATION_KEYS,
+];
 
 /** Retained for the prohibited-scope scan below. */
 const EXPECTED_KEYS = CURRENT_KEYS;
