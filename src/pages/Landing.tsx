@@ -264,9 +264,10 @@ export default function Landing() {
             </p>
 
             <div className="mt-5">
-              {deepLink.jobId && (
+              {deepLink.jobRequested && (
                 <HomeTargetedJobContext
                   jobId={deepLink.jobId}
+
                   amber={AMBER}
                   surface={NAVY_SURFACE}
                   border={NAVY_BORDER}

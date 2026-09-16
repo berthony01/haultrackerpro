@@ -101,15 +101,18 @@ beforeEach(() => {
 });
 
 describe('HP-3C — pure deep-link parsing', () => {
-  it('accepts only canonical UUIDs for job', () => {
+  it('accepts only canonical UUIDs for job and flags an invalid job param', () => {
     expect(isValidJobId(JOB_ID)).toBe(true);
     expect(isValidJobId('not-a-uuid')).toBe(false);
     expect(isValidJobId('')).toBe(false);
     expect(isValidJobId(null)).toBe(false);
-    expect(readHomeDeepLink(`?job=${JOB_ID}`).jobId).toBe(JOB_ID);
-    expect(readHomeDeepLink('?job=not-a-uuid').jobId).toBeNull();
-    expect(readHomeDeepLink('').jobId).toBeNull();
+
+    expect(readHomeDeepLink(`?job=${JOB_ID}`)).toMatchObject({ jobRequested: true, jobId: JOB_ID });
+    expect(readHomeDeepLink('?job=not-a-uuid')).toMatchObject({ jobRequested: true, jobId: null });
+    expect(readHomeDeepLink('?job=')).toMatchObject({ jobRequested: true, jobId: null });
+    expect(readHomeDeepLink('')).toMatchObject({ jobRequested: false, jobId: null });
   });
+
 
   it('sanitizes and clamps campaign values, dropping anything invalid', () => {
     const long = 'a'.repeat(CAMPAIGN_VALUE_MAX_LENGTH + 1);
@@ -141,20 +144,29 @@ describe('HP-3C — pure deep-link parsing', () => {
 });
 
 describe('HP-3C — targeted job lookup', () => {
-  it('makes no targeted-job RPC when there is no job param', async () => {
+  it('with no job param: no RPC, no card, and no unavailable line at all', async () => {
     renderLanding();
     await waitFor(() => expect(screen.getByTestId('home-conversation-transcript')).toBeInTheDocument());
     expect(rpcMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('home-targeted-job-card')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('home-targeted-job-unavailable')).not.toBeInTheDocument();
   });
 
-  it('never calls the RPC for a malformed job value and shows the generic line is absent', async () => {
-    setSearch('?job=not-a-uuid');
+  it.each([
+    ['malformed', '?job=not-a-uuid'],
+    ['blank', '?job='],
+  ])('a %s job value shows the identical unavailable line with zero RPC calls', async (_l, search) => {
+    setSearch(search);
     renderLanding();
-    await waitFor(() => expect(screen.getByTestId('home-conversation-transcript')).toBeInTheDocument());
+    const line = await screen.findByTestId('home-targeted-job-unavailable');
+    expect(line).toHaveTextContent(UNAVAILABLE_JOB_COPY);
     expect(rpcMock).not.toHaveBeenCalled();
     expect(screen.queryByTestId('home-targeted-job-card')).not.toBeInTheDocument();
+    expect(screen.getByTestId('home-conversation-transcript')).toHaveTextContent(
+      'What kind of trucking work are you looking for?',
+    );
   });
+
 
   it('makes exactly one call with only _opportunity_id and _limit: 1 for a valid UUID', async () => {
     setSearch(`?job=${JOB_ID}`);
