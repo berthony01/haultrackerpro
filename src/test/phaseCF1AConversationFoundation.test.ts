@@ -237,10 +237,15 @@ describe("CF-1A / migration B (schema, RLS, RPC)", () => {
   });
 
   it("4g. every function is SECURITY DEFINER with a pinned search_path", () => {
-    const defs = schemaExec.match(/create or replace function public\.\w+/g) ?? [];
+    const defs = [...schemaExec.matchAll(/create or replace function public\.(\w+)/g)].map(
+      (m) => m[1],
+    );
     expect(defs.length).toBe(7); // 2 helpers + 5 RPCs
-    expect((schemaExec.match(/security definer/g) ?? []).length).toBe(7);
-    expect((schemaExec.match(/set search_path = public/g) ?? []).length).toBe(7);
+    for (const fn of defs) {
+      const slice = fnSlice(fn);
+      expect(slice, `${fn} must be SECURITY DEFINER`).toContain("security definer");
+      expect(slice, `${fn} must pin search_path`).toContain("set search_path = public");
+    }
   });
 
   it("4h. every function revokes PUBLIC and anon", () => {
