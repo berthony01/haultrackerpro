@@ -562,6 +562,14 @@ export function OpportunityDetail({
         </Card>
       )}
 
+      {/* Listed criteria — advisory comparison, never a gate. */}
+      <OpportunityQualificationPanel
+        result={qualification}
+        onOpenPreferences={onOpenPreferencesForApply}
+      />
+
+
+
       {/* 1. Opportunity Overview */}
       {overviewContent && (
         <Surface>
