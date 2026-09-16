@@ -591,20 +591,47 @@ function homeTimeMatches(text: string): string[] {
 /**
  * Only an explicit "City, ST" fragment counts — never a whole sentence. The
  * city segment must start the message or follow a clause break / locational
- * preposition, and is bounded to three words, so surrounding sentence words
- * can never be absorbed into the city name.
+ * preposition, is bounded to three words, and has known sentence lead-ins
+ * stripped, so surrounding words can never be absorbed into the city name.
+ * Two or more distinct state codes anywhere in the message fail closed.
  */
 const FIRST_MESSAGE_LOCATION_PATTERN =
   /(?:^|[,.;:]|\b(?:in|from|near|around|based in|out of)\s)\s*([A-Za-z][A-Za-z.'-]*(?:\s[A-Za-z][A-Za-z.'-]*){0,2}),\s*([A-Za-z]{2})\b/g;
 
+/** Any "…, ST" occurrence, used only to detect multiple locations. */
+const ANY_COMMA_STATE_PATTERN = /,\s*([A-Za-z]{2})\b/g;
+
+const LOCATION_LEAD_INS = new Set([
+  'running','run','driving','drive','hauling','haul','based','live','living','located',
+  'looking','want','need','prefer','im',"i'm",'i','am','out','of','or','and','the','a',
+  'work','working','stay','staying','currently','also','me','my','home',
+]);
+
+function stripLocationLeadIns(segment: string): string {
+  const words = segment.trim().split(/\s+/).filter(Boolean);
+  while (words.length > 1 && LOCATION_LEAD_INS.has(words[0].toLowerCase())) words.shift();
+  return words.length && LOCATION_LEAD_INS.has(words[0].toLowerCase()) ? '' : words.join(' ');
+}
+
 function firstMessageLocation(text: string): { city?: string; state?: string } {
+  const stateTokens = new Set(
+    [...text.matchAll(ANY_COMMA_STATE_PATTERN)]
+      .map((m) => m[1].toUpperCase())
+      .filter((code) => STATE_ABBREVIATIONS.has(code)),
+  );
+  if (stateTokens.size > 1) return {};
+
   const matches = [...text.matchAll(FIRST_MESSAGE_LOCATION_PATTERN)];
   const resolved = matches
-    .map((m) => extractLocation(`${m[1].trim()}, ${m[2]}`))
+    .map((m) => {
+      const city = stripLocationLeadIns(m[1]);
+      return city ? extractLocation(`${city}, ${m[2]}`) : extractLocation(m[2]);
+    })
     .filter((loc) => Boolean(loc.state));
   const distinct = new Set(resolved.map((loc) => `${loc.city ?? ''}|${loc.state ?? ''}`));
   return distinct.size === 1 ? resolved[0] : {};
 }
+
 
 
 /** Only a number with explicit money or per-week context counts. */
