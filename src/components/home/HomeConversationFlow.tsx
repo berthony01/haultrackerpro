@@ -8,6 +8,9 @@ import {
   WORK_TYPE_CHOICES,
   applyStepAnswer,
   applyWorkTypeChoice,
+  describeCapturedPreferences,
+  extractFirstMessagePreferences,
+  hasExtraCapturedPreferences,
   isStepAnswered,
   nextStep,
   summarizeIntake,
@@ -16,6 +19,7 @@ import {
   type IntakeStepId,
   type WorkTypeChoice,
 } from '@/lib/home/conversationIntake';
+
 
 /**
  * HP-2 — the signed-out homepage conversation.
