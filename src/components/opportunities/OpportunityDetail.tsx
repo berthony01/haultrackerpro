@@ -55,6 +55,10 @@ import { ReferDriverDialog } from './ReferDriverDialog';
 import { ApplyNowDialog } from './ApplyNowDialog';
 // Phase CF-1B — additive conversation entry point. Apply flow unchanged.
 import { DriverConversationDialog } from '@/components/conversations/DriverConversationDialog';
+// Phase CF-1C-C — presentational surface for the pure structured-criteria
+// evaluator. Advisory only: it never gates Apply or Talk to Recruiter.
+import { OpportunityQualificationPanel } from './OpportunityQualificationPanel';
+import { evaluateKnownOpportunityQualification } from '@/lib/opportunities/opportunityQualification';
 import { displayHiringCoverage } from './OpportunityCard';
 import { classifyFormalApply } from '@/lib/opportunities/applicationSubmission';
 import {
@@ -194,6 +198,35 @@ export function OpportunityDetail({
         opportunityFinancials: calculateOpportunityFinancials(o),
       })
     : null;
+
+  // Phase CF-1C-C — deterministic comparison of the recruiter's recorded
+  // structured criteria against the driver's recorded Work Profile. Pure
+  // computation over data already in scope; it never blocks any action.
+  const qualification = useMemo(
+    () =>
+      evaluateKnownOpportunityQualification(
+        {
+          min_years_experience: o.min_years_experience,
+          required_cdl_class: o.required_cdl_class,
+          required_endorsements: o.required_endorsements,
+          requirements: o.requirements,
+        },
+        driverProfile
+          ? {
+              years_experience: driverProfile.years_experience,
+              cdl_class: driverProfile.cdl_class,
+              endorsements: driverProfile.endorsements,
+            }
+          : null,
+      ),
+    [
+      o.min_years_experience,
+      o.required_cdl_class,
+      o.required_endorsements,
+      o.requirements,
+      driverProfile,
+    ],
+  );
 
   const handleToggleSave = () => {
     const m = isSaved ? unsave : save;
@@ -528,6 +561,14 @@ export function OpportunityDetail({
           </div>
         </Card>
       )}
+
+      {/* Listed criteria — advisory comparison, never a gate. */}
+      <OpportunityQualificationPanel
+        result={qualification}
+        onOpenPreferences={onOpenPreferencesForApply}
+      />
+
+
 
       {/* 1. Opportunity Overview */}
       {overviewContent && (
