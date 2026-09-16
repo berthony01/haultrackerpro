@@ -181,7 +181,12 @@ export function RecruiterConversationInbox({
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-foreground">Driver</span>
+                      <span
+                        className="text-sm font-bold text-foreground"
+                        data-testid="conversation-peer-label"
+                      >
+                        {conversationLabel(t.id)}
+                      </span>
                       <Badge
                         variant={t.status === 'requested' ? 'default' : 'outline'}
                         className="text-[10px]"
@@ -190,6 +195,11 @@ export function RecruiterConversationInbox({
                       </Badge>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground break-words">{title}</p>
+                    {startedLabel(t.created_at) && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Started {startedLabel(t.created_at)}
+                      </p>
+                    )}
                   </button>
                 </li>
               );
