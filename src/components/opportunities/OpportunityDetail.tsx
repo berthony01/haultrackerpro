@@ -40,6 +40,7 @@ import {
   Briefcase,
   Users,
   Wallet,
+  MessageSquare,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Opportunity } from '@/hooks/opportunities/useOpportunities';
@@ -52,6 +53,8 @@ import { calculateOpportunityMatch } from '@/lib/opportunities/opportunityMatch'
 import { OpportunityMatchBadge } from './OpportunityMatchBadge';
 import { ReferDriverDialog } from './ReferDriverDialog';
 import { ApplyNowDialog } from './ApplyNowDialog';
+// Phase CF-1B — additive conversation entry point. Apply flow unchanged.
+import { DriverConversationDialog } from '@/components/conversations/DriverConversationDialog';
 import { displayHiringCoverage } from './OpportunityCard';
 import { classifyFormalApply } from '@/lib/opportunities/applicationSubmission';
 import {
@@ -164,6 +167,8 @@ export function OpportunityDetail({
   const { driverApplications } = useOpportunityApplications();
   const [showRefer, setShowRefer] = useState(false);
   const [showApply, setShowApply] = useState(false);
+  // Phase CF-1B — conversation dialog mounts only from the sticky bar action.
+  const [showConversation, setShowConversation] = useState(false);
 
   const isSaved = useMemo(() => saved.some((s) => s.opportunity_id === o.id), [saved, o.id]);
   const formalState = useMemo(
@@ -682,6 +687,15 @@ export function OpportunityDetail({
                       ? 'Complete Preferences to Apply'
                       : 'Apply Now'}
             </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowConversation(true)}
+              className="flex-1 whitespace-normal"
+              size="lg"
+              data-testid="opportunity-talk-to-recruiter"
+            >
+              <MessageSquare className="h-4 w-4" /> Talk to Recruiter
+            </Button>
             <Button variant="outline" onClick={handleToggleSave} className="flex-1">
               {isSaved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
               {isSaved ? 'Saved' : 'Save'}
@@ -730,6 +744,14 @@ export function OpportunityDetail({
         companyName={dialogCompanyName}
         driverProfile={driverProfile ?? null}
         onOpenPreferences={onOpenPreferencesForApply}
+      />
+
+      <DriverConversationDialog
+        open={showConversation}
+        onOpenChange={setShowConversation}
+        opportunityId={o.id}
+        opportunityTitle={displayTitle}
+        companyName={dialogCompanyName}
       />
     </div>
   );

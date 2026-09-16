@@ -31,6 +31,8 @@ import { RecruiterStaffContractsView } from '@/components/contracts/RecruiterSta
 import { RecruiterStaffReportsPanel } from '@/components/recruiter/RecruiterStaffReportsPanel';
 import { RecruiterStaffSettlementsPanel } from '@/components/settlements/RecruiterStaffSettlementsPanel';
 import { RecruiterTeamPanel } from '@/components/recruiter/RecruiterTeamPanel';
+// Phase CF-1B — shared conversation inbox, permission-gated for staff.
+import { RecruiterConversationInbox } from '@/components/conversations/RecruiterConversationInbox';
 
 
 
@@ -87,6 +89,7 @@ function StaffWorkspaceRoute({
     | 'reports'
     | 'settlements'
     | 'team'
+    | 'conversations'
   >('home');
 
 
@@ -122,6 +125,11 @@ function StaffWorkspaceRoute({
   // `team_manage` does NOT open the surface on its own.
   const canOpenTeam =
     !perms.isLoading && !perms.error && perms.canViewTeam;
+  // Phase CF-1B — conversation inbox entry point, same fail-closed contract.
+  // `conversations_reply` alone NEVER opens the surface: the hook's
+  // canViewConversations requires conversations_view.
+  const canOpenConversations =
+    !perms.isLoading && !perms.error && perms.canViewConversations;
 
 
 
@@ -215,6 +223,18 @@ function StaffWorkspaceRoute({
         canManageTeam={perms.canManageTeam}
         isOwnerActor={false}
         actorPermissions={perms.permissions}
+        onBack={() => setStaffView('home')}
+      />
+    );
+  }
+
+  if (staffView === 'conversations' && canOpenConversations) {
+    return (
+      <RecruiterConversationInbox
+        recruiterId={workspace.recruiterId}
+        companyName={workspace.companyName}
+        canView={perms.canViewConversations}
+        canReply={perms.canReplyConversations}
         onBack={() => setStaffView('home')}
       />
     );
@@ -314,6 +334,16 @@ function StaffWorkspaceRoute({
             className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
           >
             {perms.canManageTeam ? 'Manage Team' : 'View Team'}
+          </button>
+        )}
+        {canOpenConversations && (
+          <button
+            type="button"
+            onClick={() => setStaffView('conversations')}
+            data-testid="staff-open-conversations"
+            className="mt-4 ml-0 inline-flex min-h-[44px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 sm:ml-3"
+          >
+            {perms.canReplyConversations ? 'Manage Conversations' : 'View Conversations'}
           </button>
         )}
 
