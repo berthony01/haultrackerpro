@@ -41,7 +41,21 @@ export default function Landing() {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  /**
+   * HP-3C — bounded deep-link context. `jobId` is a canonical UUID or null;
+   * campaign values stay in memory only and are never persisted, sent to the
+   * server, or added to the auth handoff in this phase.
+   */
+  const [deepLink] = useState(() =>
+    readHomeDeepLink(typeof window === 'undefined' ? '' : window.location.search),
+  );
+  const [targetedJob, setTargetedJob] = useState<PublicTeaserRow | null>(null);
+  const openingNote = targetedJob
+    ? buildTargetedOpeningNote(targetedJob.title, targetedJob.company_name)
+    : undefined;
+
   const goToDriver = () => navigate('/auth?intent=driver');
+
 
   const focusConversation = useCallback(() => {
     const el = document.getElementById('home-conversation-input');
