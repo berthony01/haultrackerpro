@@ -1524,6 +1524,18 @@ function DriverPreview({
   if (state.trailer_type) rows.push({ label: 'Trailer type', value: state.trailer_type });
   if (state.home_time.trim()) rows.push({ label: 'Home time', value: state.home_time.trim() });
 
+  // Structured qualification criteria — rendered only when actually declared.
+  const minYears = Number(state.min_years_experience.trim());
+  if (state.min_years_experience.trim() && Number.isFinite(minYears) && minYears >= 0) {
+    rows.push({ label: 'Minimum experience', value: `${minYears}+ years` });
+  }
+  const criteriaClass = normalizeAuthoringCdlClass(state.required_cdl_class);
+  if (criteriaClass) rows.push({ label: 'Required CDL class', value: `Class ${criteriaClass}` });
+  const criteriaEndorsements = normalizeAuthoringEndorsements(state.required_endorsements);
+  if (criteriaEndorsements.length > 0) {
+    rows.push({ label: 'Required endorsements', value: criteriaEndorsements.join(', ') });
+  }
+
   // Optional recurring net — only when actually available and applicable.
   if (fe.netStatus === 'available' && fe.estimatedWeeklyNet != null) {
     rows.push({
