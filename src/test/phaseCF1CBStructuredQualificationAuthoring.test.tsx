@@ -618,7 +618,7 @@ describe('CF-1C-B 12) ai-insight parse_opportunity extraction contract', () => {
   it('12g) free-text requirements extraction behavior is preserved and additive', () => {
     expect(edge).toMatch(/requirements: experience, CDL class, endorsements, MVR rules, drug test, age requirements/i);
     expect(edge).toMatch(/MVR, DUI, SAP, road test, drug test/);
-    expect(edge).toMatch(/Never strip them from `requirements`/);
+    expect(edge).toMatch(/Never strip them from \\`requirements\\`/);
   });
 
   it('12h) model, auth, Pro gating and cache logic are untouched', () => {
