@@ -346,6 +346,38 @@ describe("CF-1A / marketplace messaging restrictions", () => {
   });
 });
 
+// ── 7bis. Admin shortcut is view-only ──────────────────────────────────────
+describe("CF-1A / admin authorization is read-only", () => {
+  const action = fnSlice("current_user_can_conversation_action");
+
+  it("7d. contains no blanket admin bypass", () => {
+    expect(action).not.toMatch(/if\s+public\.is_admin\(_uid\)\s+then\s+return true;/);
+  });
+
+  it("7e. admin shortcut is conditioned on _action = 'view'", () => {
+    expect(action).toMatch(
+      /if\s+_action\s*=\s*'view'\s+and\s+public\.is_admin\(_uid\)\s+then\s+return true;\s+end if;/,
+    );
+    // is_admin is referenced exactly once, inside that view-only guard.
+    expect((action.match(/public\.is_admin\(/g) ?? []).length).toBe(1);
+  });
+
+  it("7f. admin status alone does not authorize reply/accept/decline/close", () => {
+    const adminIdx = action.search(/_action\s*=\s*'view'\s+and\s+public\.is_admin\(_uid\)/);
+    expect(adminIdx).toBeGreaterThan(-1);
+    const afterAdmin = action.slice(adminIdx);
+    // normal driver + recruiter authority logic still follows the admin shortcut
+    expect(afterAdmin).toContain("if _t.driver_user_id = _uid then");
+    expect(afterAdmin).toContain("'conversations_view'::public.recruiter_workspace_permission");
+    expect(afterAdmin).toContain("'conversations_reply'::public.recruiter_workspace_permission");
+    expect(afterAdmin).toContain("_action in ('accept','decline','close')");
+    // no non-view action is ever decided by admin status
+    expect(action).not.toMatch(/is_admin\(_uid\)[\s\S]{0,200}?_action\s+in\s+\('accept'/);
+  });
+});
+
+
+
 // ── 8. Recruiter authority semantics ───────────────────────────────────────
 describe("CF-1A / recruiter authority", () => {
   const action = fnSlice("current_user_can_conversation_action");
