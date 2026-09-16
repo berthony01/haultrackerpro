@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS public.conversation_threads (
 );
 
 -- Writes happen exclusively through the SECURITY DEFINER RPCs below.
+-- Do not rely on CREATE TABLE defaults or inherited default privileges.
+REVOKE ALL ON public.conversation_threads FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.conversation_threads TO authenticated;
 GRANT ALL ON public.conversation_threads TO service_role;
 ALTER TABLE public.conversation_threads ENABLE ROW LEVEL SECURITY;
@@ -58,6 +60,8 @@ CREATE TABLE IF NOT EXISTS public.conversation_participants (
   CONSTRAINT conversation_participants_thread_user_key UNIQUE (thread_id, user_id)
 );
 
+-- Do not rely on CREATE TABLE defaults or inherited default privileges.
+REVOKE ALL ON public.conversation_participants FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.conversation_participants TO authenticated;
 GRANT ALL ON public.conversation_participants TO service_role;
 ALTER TABLE public.conversation_participants ENABLE ROW LEVEL SECURITY;
@@ -84,6 +88,8 @@ CREATE TABLE IF NOT EXISTS public.conversation_messages (
     UNIQUE (thread_id, sender_user_id, client_message_id)
 );
 
+-- Do not rely on CREATE TABLE defaults or inherited default privileges.
+REVOKE ALL ON public.conversation_messages FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.conversation_messages TO authenticated;
 GRANT ALL ON public.conversation_messages TO service_role;
 ALTER TABLE public.conversation_messages ENABLE ROW LEVEL SECURITY;
@@ -104,6 +110,8 @@ CREATE TABLE IF NOT EXISTS public.conversation_events (
     CHECK (jsonb_typeof(metadata) = 'object')
 );
 
+-- Do not rely on CREATE TABLE defaults or inherited default privileges.
+REVOKE ALL ON public.conversation_events FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.conversation_events TO authenticated;
 GRANT ALL ON public.conversation_events TO service_role;
 ALTER TABLE public.conversation_events ENABLE ROW LEVEL SECURITY;
