@@ -202,6 +202,47 @@ const isEmployment = (v: unknown): v is CanonicalEmploymentModel => typeof v ===
 const isTeam = (v: unknown): v is CanonicalTeamConfiguration => typeof v === 'string' && (TEAM_VALUES as readonly string[]).includes(v);
 const isPay = (v: unknown): v is CanonicalPayModel => typeof v === 'string' && (PAY_VALUES as readonly string[]).includes(v);
 
+/* ---------------- CF-1C-B structured qualification criteria ---------------- */
+
+/** CDL classes a recruiter may declare as a structured requirement. */
+export const AUTHORING_CDL_CLASS_VALUES = ['A', 'B', 'C'] as const;
+
+/**
+ * Endorsement codes surfaced in recruiter authoring for this phase.
+ * `S` (School bus) is intentionally excluded because the Driver Work Profile
+ * cannot record it yet — declaring it would be unmatchable.
+ */
+export const AUTHORING_ENDORSEMENT_CODES = ['H', 'N', 'P', 'T', 'X'] as const;
+
+/** A/B/C only; anything else fails closed to neutral (''). */
+export function normalizeAuthoringCdlClass(v: unknown): string {
+  const t = typeof v === 'string' ? v.trim().toUpperCase() : '';
+  return (AUTHORING_CDL_CLASS_VALUES as readonly string[]).includes(t) ? t : '';
+}
+
+/** Unique, uppercase, supported codes only. Never null. */
+export function normalizeAuthoringEndorsements(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const out: string[] = [];
+  for (const raw of v) {
+    if (typeof raw !== 'string') continue;
+    const code = raw.trim().toUpperCase();
+    if (!(AUTHORING_ENDORSEMENT_CODES as readonly string[]).includes(code)) continue;
+    if (!out.includes(code)) out.push(code);
+  }
+  return out;
+}
+
+/** Blank -> null. Finite and >= 0 -> number. Anything else fails closed to null. */
+function minYearsOrNull(v: string): number | null {
+  const t = v.trim();
+  if (!t) return null;
+  const n = Number(t);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
+
 /* ---------------- legacy → canonical projections ---------------- */
 
 interface LegacyProjection {
