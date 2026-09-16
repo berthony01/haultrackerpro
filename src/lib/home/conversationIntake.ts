@@ -588,15 +588,24 @@ function homeTimeMatches(text: string): string[] {
   return hits;
 }
 
-/** Only an explicit "City, ST" fragment counts — never a whole sentence. */
+/**
+ * Only an explicit "City, ST" fragment counts — never a whole sentence. The
+ * city segment must start the message or follow a clause break / locational
+ * preposition, and is bounded to three words, so surrounding sentence words
+ * can never be absorbed into the city name.
+ */
+const FIRST_MESSAGE_LOCATION_PATTERN =
+  /(?:^|[,.;:]|\b(?:in|from|near|around|based in|out of)\s)\s*([A-Za-z][A-Za-z.'-]*(?:\s[A-Za-z][A-Za-z.'-]*){0,2}),\s*([A-Za-z]{2})\b/g;
+
 function firstMessageLocation(text: string): { city?: string; state?: string } {
-  const matches = [...text.matchAll(/\b([A-Za-z][A-Za-z.'\- ]{1,40}),\s*([A-Za-z]{2})\b/g)];
+  const matches = [...text.matchAll(FIRST_MESSAGE_LOCATION_PATTERN)];
   const resolved = matches
     .map((m) => extractLocation(`${m[1].trim()}, ${m[2]}`))
     .filter((loc) => Boolean(loc.state));
   const distinct = new Set(resolved.map((loc) => `${loc.city ?? ''}|${loc.state ?? ''}`));
   return distinct.size === 1 ? resolved[0] : {};
 }
+
 
 /** Only a number with explicit money or per-week context counts. */
 function firstMessagePayGoal(text: string): number | undefined {
