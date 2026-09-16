@@ -75,6 +75,13 @@ export interface RecruiterStaffPermissionsState {
   canViewLoads: boolean;
   canDispatchLoads: boolean;
   canUpdateLoadStatus: boolean;
+  /**
+   * Phase CF-1A — conversation authorization booleans (UX only).
+   * `canReplyConversations` requires BOTH conversations_view and
+   * conversations_reply; reply never implies view.
+   */
+  canViewConversations: boolean;
+  canReplyConversations: boolean;
 
 
 
@@ -186,6 +193,11 @@ export function useRecruiterStaffPermissions(
     canViewLoads: granted && permissions.loads_view === true,
     canDispatchLoads: granted && permissions.loads_dispatch === true,
     canUpdateLoadStatus: granted && permissions.loads_update_status === true,
+    canViewConversations: granted && permissions.conversations_view === true,
+    canReplyConversations:
+      granted &&
+      permissions.conversations_view === true &&
+      permissions.conversations_reply === true,
 
 
 
