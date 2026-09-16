@@ -24,6 +24,11 @@ beforeAll(() => {
 
 const ROOT = resolve(__dirname, '../..');
 const read = (p: string) => readFileSync(resolve(ROOT, p), 'utf8');
+/** Executable source only — documentation comments are not behavior. */
+const readCode = (p: string) =>
+  read(p)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|\s)\/\/.*$/gm, '$1');
 
 const HOOK_PATH = 'src/hooks/conversations/useConversations.ts';
 const DIALOG_PATH = 'src/components/conversations/DriverConversationDialog.tsx';
@@ -458,13 +463,15 @@ describe('CF-1B / staff gating', () => {
 
   function renderStaff() {
     return render(
-      <RecruiterAccessRoute
-        onBack={() => {}}
-        recruiterHubAllowed
-        recruiterAccessKind="staff"
-        recruiterCapabilityStatus={null}
-        selectedStaffWorkspace={workspace as never}
-      />,
+      <MemoryRouter>
+        <RecruiterAccessRoute
+          onBack={() => {}}
+          recruiterHubAllowed
+          recruiterAccessKind="staff"
+          recruiterCapabilityStatus={null}
+          selectedStaffWorkspace={workspace as never}
+        />
+      </MemoryRouter>,
     );
   }
 
