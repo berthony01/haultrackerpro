@@ -30,6 +30,27 @@ interface Props {
   onBack?: () => void;
 }
 
+/**
+ * Stable, privacy-safe conversation label derived ONLY from the thread row that
+ * is already readable here. No lookup of any kind is performed for a name, and
+ * the full identifier is never rendered.
+ */
+function conversationLabel(threadId: string) {
+  const compact = threadId.replace(/-/g, '').toUpperCase();
+  return `Driver • ${compact.slice(-4)}`;
+}
+
+function startedLabel(createdAt?: string | null) {
+  if (!createdAt) return null;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 function MessageRow({ message }: { message: ConversationMessage }) {
   const fromRecruiter = message.sender_actor_type === 'recruiter';
   return (
@@ -160,7 +181,12 @@ export function RecruiterConversationInbox({
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-foreground">Driver</span>
+                      <span
+                        className="text-sm font-bold text-foreground"
+                        data-testid="conversation-peer-label"
+                      >
+                        {conversationLabel(t.id)}
+                      </span>
                       <Badge
                         variant={t.status === 'requested' ? 'default' : 'outline'}
                         className="text-[10px]"
@@ -169,6 +195,11 @@ export function RecruiterConversationInbox({
                       </Badge>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground break-words">{title}</p>
+                    {startedLabel(t.created_at) && (
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Started {startedLabel(t.created_at)}
+                      </p>
+                    )}
                   </button>
                 </li>
               );
