@@ -132,7 +132,7 @@ describe('CF-1C-B 3) populated normalization', () => {
 
   it('3b) unsupported class and unsupported codes fail closed to neutral', () => {
     const result = normalizeOpportunityForAuthoring({
-      min_years_experience: 'not-a-number',
+      min_years_experience: 'not-a-number' as unknown as number,
       required_cdl_class: 'D',
       required_endorsements: ['S', 'Z', '', 'n'],
     });
