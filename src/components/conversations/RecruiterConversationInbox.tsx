@@ -30,6 +30,27 @@ interface Props {
   onBack?: () => void;
 }
 
+/**
+ * Stable, privacy-safe conversation label derived ONLY from the thread row that
+ * is already readable here. No lookup of any kind is performed for a name, and
+ * the full identifier is never rendered.
+ */
+function conversationLabel(threadId: string) {
+  const compact = threadId.replace(/-/g, '').toUpperCase();
+  return `Driver • ${compact.slice(-4)}`;
+}
+
+function startedLabel(createdAt?: string | null) {
+  if (!createdAt) return null;
+  const d = new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 function MessageRow({ message }: { message: ConversationMessage }) {
   const fromRecruiter = message.sender_actor_type === 'recruiter';
   return (
