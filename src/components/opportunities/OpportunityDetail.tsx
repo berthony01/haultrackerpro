@@ -55,6 +55,10 @@ import { ReferDriverDialog } from './ReferDriverDialog';
 import { ApplyNowDialog } from './ApplyNowDialog';
 // Phase CF-1B — additive conversation entry point. Apply flow unchanged.
 import { DriverConversationDialog } from '@/components/conversations/DriverConversationDialog';
+// Phase CF-1C-C — presentational surface for the pure structured-criteria
+// evaluator. Advisory only: it never gates Apply or Talk to Recruiter.
+import { OpportunityQualificationPanel } from './OpportunityQualificationPanel';
+import { evaluateKnownOpportunityQualification } from '@/lib/opportunities/opportunityQualification';
 import { displayHiringCoverage } from './OpportunityCard';
 import { classifyFormalApply } from '@/lib/opportunities/applicationSubmission';
 import {
