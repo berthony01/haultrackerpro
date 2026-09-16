@@ -255,9 +255,29 @@ function applyPayModelChange(state: State, next: CanonicalPayModel): State {
   };
 }
 
+/* ---------------- structured qualification criteria (CF-1C-B) ---------------- */
+
+/**
+ * Recruiter-visible endorsement chips. `S` is deliberately absent — the Driver
+ * Work Profile cannot record it, so it could never be matched.
+ */
+export const AUTHORING_ENDORSEMENT_OPTIONS: ReadonlyArray<{ code: string; label: string }> = [
+  { code: 'H', label: 'H — Hazmat' },
+  { code: 'N', label: 'N — Tanker' },
+  { code: 'X', label: 'X — Hazmat + Tanker' },
+  { code: 'T', label: 'T — Doubles/Triples' },
+  { code: 'P', label: 'P — Passenger' },
+];
+
 /* ---------------- paste merge ---------------- */
 
-function mergePasteIntoState(current: State, data: ExtractedOpportunity): State {
+/**
+ * Pure extractor merge. Extracted values only ever fill fields the recruiter
+ * has left neutral; a recruiter-entered value is never overwritten. Nothing is
+ * inferred locally from route/trailer/driver type, title, description, or the
+ * free-text requirements.
+ */
+export function mergePasteIntoState(current: State, data: ExtractedOpportunity): State {
   const next = { ...current };
   const strFill = (key: keyof State, value?: string) => {
     if (typeof value !== 'string' || !value.trim()) return;
