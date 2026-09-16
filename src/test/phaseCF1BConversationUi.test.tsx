@@ -372,13 +372,13 @@ describe('CF-1B / DriverConversationDialog', () => {
 
   it('2d no direct insert/update/delete/upsert on conversation tables anywhere in CF-1B', () => {
     for (const path of CF1B_FILES) {
-      const src = read(path);
+      const src = readCode(path);
       expect(src).not.toMatch(/\.insert\(/);
       expect(src).not.toMatch(/\.update\(/);
       expect(src).not.toMatch(/\.delete\(/);
       expect(src).not.toMatch(/\.upsert\(/);
     }
-    const hook = read(HOOK_PATH);
+    const hook = readCode(HOOK_PATH);
     for (const fn of [
       'start_opportunity_conversation',
       'accept_conversation_thread',
@@ -513,7 +513,7 @@ describe('CF-1B / staff gating', () => {
 describe('CF-1B / scope guards', () => {
   it('6 admin status is never used as client mutation authority', () => {
     for (const path of CF1B_FILES) {
-      const src = read(path);
+      const src = readCode(path);
       expect(src).not.toMatch(/is_admin/);
       expect(src).not.toMatch(/useAdmin\b/);
       expect(src).not.toMatch(/isAdmin/);
@@ -524,7 +524,7 @@ describe('CF-1B / scope guards', () => {
 
   it('7 no profile / auth user / driver profile PII lookup is introduced', () => {
     for (const path of CF1B_FILES) {
-      const src = read(path);
+      const src = readCode(path);
       expect(src).not.toMatch(/driver_opportunity_profiles/);
       expect(src).not.toMatch(/from\('profiles'\)/);
       expect(src).not.toMatch(/auth\.users/);
@@ -532,7 +532,7 @@ describe('CF-1B / scope guards', () => {
       expect(src).not.toMatch(/recruiter_contact_requests/);
     }
     // Reads are limited to conversation tables plus opportunity title context.
-    const hook = read(HOOK_PATH);
+    const hook = readCode(HOOK_PATH);
     const tables = Array.from(hook.matchAll(/\.from\('([a-z_]+)'\)/g)).map((m) => m[1]);
     expect(new Set(tables)).toEqual(
       new Set(['conversation_threads', 'conversation_messages', 'opportunities']),
@@ -549,7 +549,7 @@ describe('CF-1B / scope guards', () => {
 
   it('9 no Telegram, Stripe, billing, application mutation, or migration code in CF-1B files', () => {
     for (const path of CF1B_FILES) {
-      const src = read(path);
+      const src = readCode(path);
       for (const forbidden of [
         'telegram',
         'stripe',
@@ -579,7 +579,7 @@ describe('CF-1B / scope guards', () => {
   });
 
   it('9c polling timers are cleared and the cadence stays modest', () => {
-    const hook = read(HOOK_PATH);
+    const hook = readCode(HOOK_PATH);
     expect(hook).toContain('CONVERSATION_POLL_MS = 5000');
     expect(hook).toContain('clearInterval(id)');
   });
