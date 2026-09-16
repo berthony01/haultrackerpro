@@ -47,10 +47,12 @@ function fnSlice(name: string): string {
 describe("TG-1 / permission mirror", () => {
   const NEW_KEYS = ["loads_view", "loads_dispatch", "loads_update_status"] as const;
 
-  it("appends exactly the three new keys at the end, in order", () => {
-    expect(RECRUITER_STAFF_PERMISSION_KEYS.slice(-3)).toEqual(NEW_KEYS);
-    expect(RECRUITER_STAFF_PERMISSION_KEYS.length).toBe(24);
-    expect(new Set(RECRUITER_STAFF_PERMISSION_KEYS).size).toBe(24);
+  it("appends exactly the three TG-1 keys in position 21..23, in order", () => {
+    // CF-1A later appended conversations_view / conversations_reply at the end,
+    // so the TG-1 keys are pinned by absolute position, not by slice(-3).
+    expect(RECRUITER_STAFF_PERMISSION_KEYS.slice(21, 24)).toEqual(NEW_KEYS);
+    expect(RECRUITER_STAFF_PERMISSION_KEYS.length).toBe(26);
+    expect(new Set(RECRUITER_STAFF_PERMISSION_KEYS).size).toBe(26);
   });
 
   it("keeps the pre-existing keys unchanged and in order", () => {
