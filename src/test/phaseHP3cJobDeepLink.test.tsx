@@ -124,8 +124,13 @@ describe('HP-3C — pure deep-link parsing', () => {
   });
 
   it('is pure — no network, storage, router or analytics', () => {
-    expect(DEEP_LINK_SRC).not.toMatch(/supabase|\.rpc\(|fetch\(|localStorage|sessionStorage|document\.cookie|analytics/);
+    const code = DEEP_LINK_SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+    expect(code).not.toMatch(
+      /supabase|\.rpc\(|fetch\(|localStorage|sessionStorage|document\.cookie|analytics|react-router/i,
+    );
+    expect(code).not.toMatch(/^import /m);
   });
+
 
   it('builds public-safe opening context only from listing fields', () => {
     expect(buildTargetedOpeningNote('OTR Dry Van Driver', 'NEW WAY Freight INC')).toBe(
