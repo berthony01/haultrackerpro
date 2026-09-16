@@ -20,12 +20,20 @@ describe('Phase 4 cleanup — assistant/agency showcase wiring', () => {
   it('Landing positions all three trucking-business audiences professionally', () => {
     expect(landing).toContain('The business platform behind every truck.');
     expect(landing).toMatch(/Drivers/);
-    expect(landing).toMatch(/Recruiters & Carriers/);
-    expect(landing).toMatch(/Back-Office Businesses/);
+    expect(landing).toMatch(/Recruiters/);
+    expect(landing).toMatch(/Assistants & Agencies/);
     expect(landing).toMatch(/\/assistants-agencies/);
     expect(landing).not.toMatch(/side hustle/i);
     expect(landing).not.toMatch(/pick your side/i);
     expect(landing).not.toMatch(/two sides/i);
+  });
+
+  // HP-2 re-pin: the homepage no longer carries role sales cards or a pricing
+  // preview. The exact audience labels now live on the dedicated pricing route,
+  // which remains the system of record for audience-specific plans.
+  it('dedicated pricing route still labels all three audiences explicitly', () => {
+    expect(pricing).toMatch(/Recruiters & Carriers/);
+    expect(pricing).toMatch(/Back-Office Businesses/);
   });
 
   it('Landing nav exposes Assistants & Agencies', () => {
