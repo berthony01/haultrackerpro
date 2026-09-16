@@ -214,14 +214,30 @@ describe('HP-2 — signed-out homepage conversation', () => {
     fireEvent.click(screen.getByTestId('home-conversation-chip-a'));
     reply('3');
     fireEvent.click(screen.getByTestId('home-conversation-chip-weekly'));
+
+    // HP-4A: the first message already answered equipment (Flatbed), so the
+    // optional trailer step is legitimately skipped as already answered. Only
+    // the pay-goal step remains skippable.
+    const transcript = screen.getByTestId('home-conversation-transcript');
+    expect(transcript).not.toHaveTextContent('What equipment do you run?');
+    expect(screen.getAllByTestId('home-conversation-skip')).toHaveLength(1);
+
     fireEvent.click(screen.getByTestId('home-conversation-skip'));
-    fireEvent.click(screen.getByTestId('home-conversation-skip'));
+    expect(screen.queryByTestId('home-conversation-skip')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('home-conversation-continue'));
 
     const snap = JSON.parse(sessionStorage.getItem(HOME_INTAKE_SNAPSHOT_KEY) as string);
     expect(snap.initialMessage).toBe('I run flatbed and want regional work out of Georgia');
     expect(snap.preferred_route_type).toBe('Regional');
+    expect(snap.trailer_experience).toEqual(['Flatbed']);
+    expect(snap.city).toBe('Atlanta');
+    expect(snap.state).toBe('GA');
+    expect(snap.cdl_class).toBe('A');
+    expect(snap.years_experience).toBe(3);
+    expect(snap.preferred_home_time).toBe('Weekly');
+    expect(snap.min_weekly_gross).toBeUndefined();
   });
+
 
   it('lets the driver correct answers with Back and Start over', () => {
     renderLanding();
