@@ -43,6 +43,10 @@ export interface ExtractedOpportunity {
   benefits?: string;
   typical_lanes?: string;
   requirements?: string;
+  /** CF-1C-B structured qualification criteria — explicitly stated only. */
+  min_years_experience?: number;
+  required_cdl_class?: 'A' | 'B' | 'C' | string;
+  required_endorsements?: string[];
 }
 
 /**
