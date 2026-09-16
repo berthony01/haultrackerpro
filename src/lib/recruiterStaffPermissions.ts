@@ -32,6 +32,8 @@ export const RECRUITER_STAFF_PERMISSION_KEYS = [
   "loads_view",
   "loads_dispatch",
   "loads_update_status",
+  "conversations_view",
+  "conversations_reply",
 ] as const;
 
 export type RecruiterStaffPermissionKey = (typeof RECRUITER_STAFF_PERMISSION_KEYS)[number];
@@ -63,6 +65,8 @@ export const RECRUITER_STAFF_PERMISSION_LABELS: Record<RecruiterStaffPermissionK
   loads_view: "View driver loads",
   loads_dispatch: "Dispatch driver loads",
   loads_update_status: "Update driver load status",
+  conversations_view: "View conversations",
+  conversations_reply: "Reply to conversations",
 };
 
 /**
