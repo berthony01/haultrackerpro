@@ -404,6 +404,12 @@ export function normalizeOpportunityForAuthoring(
   base.requirements = !isEmptyStr(canonReqs) ? canonReqs : split.requirements;
   base.actual_benefits = canonBenefits;
 
+  // Structured qualification criteria — independent of the free-text
+  // `requirements` field, which is never rewritten from these values.
+  base.min_years_experience = numToStr(row.min_years_experience);
+  base.required_cdl_class = normalizeAuthoringCdlClass(row.required_cdl_class);
+  base.required_endorsements = normalizeAuthoringEndorsements(row.required_endorsements);
+
   return base;
 }
 
