@@ -657,10 +657,12 @@ describe('CF-1C-B 13) scope guard', () => {
     expect(src).not.toMatch(/ALTER TABLE/i);
   });
 
-  it('13d) the canonical module remains pure — no database or network I/O', () => {
+  it('13d) the canonical module remains pure — types only, no client or network I/O', () => {
     const src = readSource(CANONICAL_SRC);
-    expect(src).not.toMatch(/supabase/);
+    expect(src).not.toMatch(/integrations\/supabase\/client/);
     expect(src).not.toMatch(/\bfetch\(/);
+    // The only permitted backend coupling is the generated type surface.
+    expect(src).toMatch(/from '@\/integrations\/supabase\/types'/);
   });
 
   it('13e) extraction still funnels through the single centralized invocation', () => {
