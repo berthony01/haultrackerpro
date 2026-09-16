@@ -5,7 +5,7 @@
  * Hard rules encoded here:
  *  - No network, no Supabase, no auth. This module is pure and deterministic.
  *  - No computed pay: every money value rendered is a verbatim recruiter-authored
- *    field. No net, take-home, per-mile derivation, deduction, or RPM math.
+ *    field. No derived, combined, or converted money values.
  *  - Ranking is coarse and never surfaced as a number to the driver.
  *  - Qualification wording describes ONLY the structured criteria the recruiter
  *    listed, compared against what the driver told the conversation.

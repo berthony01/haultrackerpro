@@ -185,7 +185,7 @@ describe('HP-3B — rendering', () => {
     rpcMock.mockResolvedValue({
       data: [
         teaser({ min_years_experience: 2, required_cdl_class: 'A' }),
-        teaser({ required_endorsements: ['hazmat'] }),
+        teaser({ required_endorsements: ['H'] }),
         teaser({ min_years_experience: 20 }),
       ],
       error: null,
@@ -257,8 +257,10 @@ describe('HP-3B — failure handling', () => {
     rpcMock.mockReturnValue(new Promise(() => {}));
     const flow = render(<HomeConversationFlow {...FLOW_PROPS} />);
     flow.unmount();
-    expect(FLOW_SRC).toContain('onClick={() => onContinue(answers)}');
-    expect(FLOW_SRC).not.toContain('disabled={');
+    const continueIdx = FLOW_SRC.indexOf('home-conversation-continue');
+    const continueBlock = FLOW_SRC.slice(continueIdx, continueIdx + 400);
+    expect(continueBlock).toContain('onClick={() => onContinue(answers)}');
+    expect(continueBlock).not.toContain('disabled');
   });
 });
 
