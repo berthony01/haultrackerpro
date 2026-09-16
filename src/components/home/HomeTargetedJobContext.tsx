@@ -24,7 +24,12 @@ import {
 import { UNAVAILABLE_JOB_COPY } from '@/lib/home/homeDeepLink';
 
 export interface HomeTargetedJobContextProps {
-  jobId: string;
+  /**
+   * A canonical UUID, or null when the link carried a `job` value that failed
+   * strict validation. A null id renders the same unavailable line WITHOUT any
+   * lookup, so a malformed value never reaches the backend.
+   */
+  jobId: string | null;
   amber: string;
   surface: string;
   border: string;
@@ -44,12 +49,13 @@ export default function HomeTargetedJobContext({
   onResolved,
 }: HomeTargetedJobContextProps) {
   const [row, setRow] = useState<PublicTeaserRow | null>(null);
-  const [status, setStatus] = useState<LoadState>('loading');
+  const [status, setStatus] = useState<LoadState>(jobId ? 'loading' : 'unavailable');
   const started = useRef(false);
   const resolvedRef = useRef(onResolved);
   resolvedRef.current = onResolved;
 
   useEffect(() => {
+    if (!jobId) return;
     if (started.current) return;
     started.current = true;
     let cancelled = false;
@@ -78,6 +84,7 @@ export default function HomeTargetedJobContext({
       cancelled = true;
     };
   }, [jobId]);
+
 
   if (status === 'loading') {
     return (
