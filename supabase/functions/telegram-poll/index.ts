@@ -488,13 +488,35 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  const gateway = buildGateway(lovableApiKey, telegramConnectionKey);
+
+  // RB-2A. Outbound alerts are drained AFTER inbound polling has finished and
+  // released its lease, in its own isolated scope. It cannot throw, cannot
+  // change the inbound outcome, and therefore cannot stall the cursor.
+  const drainAlerts = async (): Promise<void> => {
+    try {
+      await runTelegramAlertDrain({
+        outbox: buildAlertOutbox(supabase),
+        gateway,
+        conversationsUrl: URL_CONVERSATIONS,
+        log,
+      });
+    } catch (error) {
+      log("alert_drain_unhandled_error", { code: sanitizeErrorCode(error) });
+    }
+  };
+
   try {
     const result = await runTelegramPoll({
       ledger: buildLedger(supabase),
-      gateway: buildGateway(lovableApiKey, telegramConnectionKey),
+      gateway,
       sha256: sha256Hex,
       log,
     });
+
+    await drainAlerts();
+
+
 
     if (result.kind === "busy") {
       return json({ status: "busy" }, 200);
