@@ -58,6 +58,7 @@ const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const HowToUseHaulTrackerPro = lazy(() => import("./pages/HowToUseHaulTrackerPro"));
 const Parking = lazy(() => import("./pages/Parking"));
+const FindWork = lazy(() => import("./pages/FindWork"));
 const StarterKit = lazy(() => import("./pages/StarterKit"));
 const StarterKitThanks = lazy(() => import("./pages/StarterKitThanks"));
 const Updates = lazy(() => import("./pages/Updates"));
