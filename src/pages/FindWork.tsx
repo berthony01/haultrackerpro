@@ -5,8 +5,8 @@
  * Profile read path (own-row RLS), and the existing real teaser preview.
  *
  * Hard rules for this phase:
- *  - READ ONLY. No profile insert/update/delete. No snapshot / sessionStorage
- *    write. No backend, RLS, auth or billing change.
+ *  - READ ONLY. No profile write of any kind, and no browser-storage write.
+ *    No backend, RLS, auth or billing change.
  *  - Employment fields only: identity, contact, visibility, recruiter-contact
  *    consent and every My Trucking financial surface are never read or shown.
  *  - Non-drivers get a neutral not-available state and no profile data.
