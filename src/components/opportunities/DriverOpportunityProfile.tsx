@@ -144,6 +144,23 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
     return typeof v === 'string' && v.trim() ? v.trim() : '';
   })();
 
+  /**
+   * HP-4B2 — unsaved answers handed over in memory by the authenticated Find
+   * Work conversation. They are overlaid on top of the stored profile and the
+   * account prefill, and re-applied if the profile query refetches, so a late
+   * re-render can never silently erase what the driver is reviewing. Nothing
+   * here writes to the database: `handleSave` remains the only mutation.
+   */
+  const pendingOverlayRef = useRef<Partial<FormState> | null>(null);
+  const pendingConsumedRef = useRef(false);
+  const [pendingFields, setPendingFields] = useState<string[]>([]);
+  const isPending = (k: keyof FormState) => pendingFields.includes(k);
+  const clearPendingReview = () => {
+    clearPendingProfileAnswers();
+    pendingOverlayRef.current = null;
+    setPendingFields([]);
+  };
+
   useEffect(() => {
     if (profile) {
       const loadedVisibility = (profile.visibility as FormState['visibility']) ?? 'private';
