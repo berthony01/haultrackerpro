@@ -390,3 +390,129 @@ describe("RB-2A C — runtime wiring stays inside the RB-2A cone", () => {
     expect(adapter).not.toContain("driver");
   });
 });
+
+// ───────────── D. RB-2A.1 — ambiguous delivery outcome is fail-closed ─────────────
+//
+// Defect: the original claim RPC also re-claimed rows stuck in 'claimed' for
+// >10 minutes. Telegram may already have delivered those, so an automatic
+// re-claim could DUPLICATE a confirmed delivery. The corrective migration is
+// the authoritative final definition of the claim RPC.
+
+describe("RB-2A.1 D — unknown delivery outcome never auto-resends", () => {
+  it("1) is a single narrow transaction that replaces only the claim RPC", () => {
+    const lines = RB2A1_CODE.split("\n").map((l) => l.trim()).filter(Boolean);
+    expect(lines[0]).toBe("BEGIN;");
+    expect(lines[lines.length - 1]).toBe("COMMIT;");
+    expect(lines.filter((l) => l === "BEGIN;")).toHaveLength(1);
+    const created = RB2A1_CODE.match(/CREATE OR REPLACE FUNCTION public\.(\w+)/g) ?? [];
+    expect(created).toEqual([
+      "CREATE OR REPLACE FUNCTION public.telegram_claim_conversation_alerts",
+    ]);
+    for (const forbidden of [
+      "CREATE TABLE",
+      "ALTER TABLE",
+      "CREATE POLICY",
+      "DROP POLICY",
+      "DROP TABLE",
+      "conversation_threads SET",
+      "conversation_messages",
+      "recruiter_members",
+      "telegram_user_links SET",
+    ]) {
+      expect(RB2A1_CODE).not.toContain(forbidden);
+    }
+  });
+
+  it("2) the final claim RPC selects ONLY pending rows", () => {
+    const loop = RB2A1_CODE.split("FOR _row IN")[1] ?? "";
+    expect(loop).toContain("WHERE p.status = 'pending'");
+    expect(loop).not.toContain("'claimed'");
+  });
+
+  it("3) the stale-claimed reclaim window is gone and cannot return", () => {
+    expect(RB2A_CODE).toContain("interval '10 minutes'"); // the original defect
+    expect(RB2A1_CODE).not.toContain("interval");
+    expect(RB2A1_CODE).not.toMatch(/status\s*=\s*'claimed'\s*AND\s*claimed_at/);
+    expect(RB2A1_CODE).not.toMatch(/claimed_at\s*<\s*now\(\)/);
+  });
+
+  it("4) reconciliation neither sends nor rewrites an ambiguous row", () => {
+    // No resolver function is introduced, and nothing downgrades 'claimed'
+    // back to a deliverable state outside the explicit failure RPC.
+    expect(RB2A1_CODE).not.toContain("reconcile");
+    expect(RB2A1_CODE).not.toMatch(/SET status = 'pending'/);
+    expect(RB2A1_CODE).not.toMatch(/SET status = 'sent'/);
+    expect(RB2A1_CODE).not.toContain("sendMessage");
+  });
+
+  it("5) known failure stays retryable and confirmed success stays terminal", () => {
+    // Untouched by RB-2A.1 — still owned by the RB-2A mark RPCs.
+    expect(RB2A1_CODE).not.toContain("telegram_mark_conversation_alert_sent(uuid)");
+    expect(RB2A1_CODE).not.toContain("telegram_mark_conversation_alert_failed(uuid");
+    expect(RB2A_CODE).toContain(
+      "SET status = CASE WHEN attempts >= 5 THEN 'failed' ELSE 'pending' END",
+    );
+    expect(RB2A_CODE).toMatch(
+      /SET status = 'sent'[\s\S]*?WHERE id = _alert_id\s*AND status = 'claimed'/,
+    );
+  });
+
+  it("6) authorization, privacy and ACLs are unchanged by the correction", () => {
+    expect(RB2A1_CODE).toContain("public.telegram_user_can_receive_conversation_alert(");
+    expect(RB2A1_CODE).toContain("l.user_id <> _thread.driver_user_id");
+    expect(RB2A1_CODE).toContain("FOR UPDATE SKIP LOCKED");
+    expect(RB2A1_CODE).toContain("SECURITY DEFINER");
+    expect(RB2A1_CODE).toContain(
+      "GRANT EXECUTE ON FUNCTION public.telegram_claim_conversation_alerts(integer) TO service_role",
+    );
+    for (const role of ["PUBLIC", "anon", "authenticated"]) {
+      expect(RB2A1_CODE).toContain(
+        `REVOKE ALL ON FUNCTION public.telegram_claim_conversation_alerts(integer) FROM ${role}`,
+      );
+    }
+    expect(RB2A1_CODE).not.toMatch(/GRANT EXECUTE ON FUNCTION[^;]*TO (anon|authenticated)/);
+  });
+
+  it("7) an unresolved send is never re-sent by the drain itself", async () => {
+    // mark_sent throws AFTER a successful Telegram send: the row is left
+    // ambiguous. The drain must not retry it, and the next drain gets nothing
+    // back from the claim RPC because 'claimed' is no longer send-eligible.
+    const claim: TelegramAlertClaim = {
+      alertId: "a1",
+      telegramChatId: 111,
+      opportunityTitle: null,
+    };
+    let claimCalls = 0;
+    const sends: number[] = [];
+    const outbox: TelegramAlertOutbox = {
+      claimConversationAlerts: async () => (claimCalls++ === 0 ? [claim] : []),
+      markConversationAlertSent: async () => {
+        throw new Error("connection_lost");
+      },
+      markConversationAlertFailed: async () => {
+        throw new Error("must_not_be_called");
+      },
+    };
+    const gateway: TelegramGateway = {
+      sendMessage: async (m) => {
+        sends.push(m.chatId);
+        return { ok: true };
+      },
+    } as unknown as TelegramGateway;
+
+    const first = await runTelegramAlertDrain({
+      outbox,
+      gateway,
+      conversationsUrl: CONVERSATIONS_URL,
+    });
+    const second = await runTelegramAlertDrain({
+      outbox,
+      gateway,
+      conversationsUrl: CONVERSATIONS_URL,
+    });
+
+    expect(first).toEqual({ claimed: 1, sent: 0, failed: 0 });
+    expect(second).toEqual({ claimed: 0, sent: 0, failed: 0 });
+    expect(sends).toEqual([111]); // sent exactly once, never duplicated
+  });
+});
