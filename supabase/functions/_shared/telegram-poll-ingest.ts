@@ -570,6 +570,25 @@ export async function runTelegramPoll(
                 command: classification.command,
               })
             : Promise.reject(new Error("telegram_menu_processor_unavailable")))
+        // RB-2B. The database performs actor derivation, private-chat and
+        // tenant re-authorization, the canonical CF-1 transition and the
+        // terminal receipt in ONE transaction. Fail CLOSED when the processor
+        // is unavailable: no receipt, no action, no cursor advance.
+        : classification.kind === "conversation_action"
+        ? await (ledger.processConversationActionUpdate
+            ? ledger.processConversationActionUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: classification.chatType,
+                action: classification.action,
+                threadId: classification.threadId,
+              })
+            : Promise.reject(
+                new Error("telegram_conversation_action_processor_unavailable"),
+              ))
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
@@ -599,7 +618,31 @@ export async function runTelegramPoll(
     // Best-effort user feedback. Deliberately AFTER the terminal receipt and
     // deliberately outside cursor correctness: a failed send must never make
     // the update look unprocessed.
-    if (terminal.isNew && identity.telegramChatId !== null) {
+    // RB-2B. A button tap is resolved by ANSWERING the callback, never by a
+    // new message. Answering is not a state mutation, so it runs even for a
+    // duplicate delivery (which reports the already-recorded outcome) and a
+    // failure here can never re-apply or roll back the database action.
+    if (identity.callbackQueryId !== null) {
+      if (gateway.answerCallbackQuery) {
+        try {
+          const answered = await gateway.answerCallbackQuery({
+            callbackQueryId: identity.callbackQueryId,
+            text: composeConversationActionAnswer(terminal.resultCode),
+          });
+          if (!answered.ok) {
+            log("answer_callback_failed", {
+              updateId,
+              code: answered.errorCode ?? "telegram_gateway_error",
+            });
+          }
+        } catch (error) {
+          log("answer_callback_failed", {
+            updateId,
+            code: sanitizeErrorCode(error),
+          });
+        }
+      }
+    } else if (terminal.isNew && identity.telegramChatId !== null) {
       const feedback = terminal.resultCode === "link_success"
         ? TELEGRAM_LINK_SUCCESS_MESSAGE
         : terminal.resultCode === "link_rejected" ||
@@ -681,6 +724,9 @@ export async function runTelegramPoll(
 /** One claimed outbound alert, as returned by the claim RPC. */
 export interface TelegramAlertClaim {
   alertId: string;
+  /** RB-2B. Conversation locator for the Accept / Pass buttons. An opaque id
+   *  only — possession confers nothing; every tap is re-authorized. */
+  threadId: string;
   /** Private chat id of the linked recruiter. Never a group chat. */
   telegramChatId: number;
   /** Recruiter-visible opportunity title, or null. Never driver data. */
@@ -713,6 +759,8 @@ export const TELEGRAM_ALERT_HEADER = "HaulTracker Pro — new driver conversatio
 export const TELEGRAM_ALERT_GENERIC_BODY =
   "A driver started a conversation with your workspace. Open HaulTracker Pro to read it and reply.";
 export const TELEGRAM_ALERT_BUTTON_LABEL = "Open Conversations";
+export const TELEGRAM_ALERT_ACCEPT_LABEL = "✅ Accept";
+export const TELEGRAM_ALERT_PASS_LABEL = "❌ Pass";
 
 /** Privacy-safe copy. The opportunity title is the ONLY variable element. */
 export function composeConversationAlertText(
@@ -725,10 +773,52 @@ export function composeConversationAlertText(
   return `${TELEGRAM_ALERT_HEADER}\n\nOpportunity: ${title.slice(0, 120)}\n\n${TELEGRAM_ALERT_GENERIC_BODY}`;
 }
 
+/** RB-2B. Accept / Pass carry compact versioned callback data; Open
+ *  Conversations stays URL-only. No driver data is representable in either. */
 export function composeConversationAlertButtons(
   conversationsUrl: string,
-): TelegramInlineUrlButton[][] {
-  return [[{ text: TELEGRAM_ALERT_BUTTON_LABEL, url: conversationsUrl }]];
+  threadId: string,
+): TelegramInlineButton[][] {
+  return [
+    [
+      {
+        text: TELEGRAM_ALERT_ACCEPT_LABEL,
+        callbackData: composeConversationActionData("accept", threadId),
+      },
+      {
+        text: TELEGRAM_ALERT_PASS_LABEL,
+        callbackData: composeConversationActionData("pass", threadId),
+      },
+    ],
+    [{ text: TELEGRAM_ALERT_BUTTON_LABEL, url: conversationsUrl }],
+  ];
+}
+
+// RB-2B. Bounded, privacy-safe callback answers. One fixed string per terminal
+// outcome — never an error detail, a driver name or any workspace data.
+export const TELEGRAM_CONVERSATION_ACTION_ANSWERS: Record<
+  TelegramConversationActionResultCode,
+  string
+> = {
+  conversation_accepted: "Accepted — conversation is now active.",
+  conversation_passed: "Passed — conversation closed.",
+  conversation_already_handled: "This conversation was already handled.",
+  conversation_action_unavailable: "This conversation is no longer available.",
+  conversation_action_denied: "You can't act on this conversation.",
+  conversation_action_invalid: "This action is no longer valid.",
+};
+
+export function composeConversationActionAnswer(
+  resultCode: TelegramResultCode,
+): string {
+  return Object.prototype.hasOwnProperty.call(
+      TELEGRAM_CONVERSATION_ACTION_ANSWERS,
+      resultCode,
+    )
+    ? TELEGRAM_CONVERSATION_ACTION_ANSWERS[
+        resultCode as TelegramConversationActionResultCode
+      ]
+    : TELEGRAM_CONVERSATION_ACTION_ANSWERS.conversation_action_invalid;
 }
 
 /** Drains claimed outbound alerts. Never throws. */
@@ -755,7 +845,10 @@ export async function runTelegramAlertDrain(
       const sent = await deps.gateway.sendMessage({
         chatId: claim.telegramChatId,
         text: composeConversationAlertText(claim.opportunityTitle),
-        buttons: composeConversationAlertButtons(deps.conversationsUrl),
+        buttons: composeConversationAlertButtons(
+          deps.conversationsUrl,
+          claim.threadId,
+        ),
       });
       if (!sent.ok) errorCode = sent.errorCode ?? "telegram_gateway_error";
     } catch (error) {
