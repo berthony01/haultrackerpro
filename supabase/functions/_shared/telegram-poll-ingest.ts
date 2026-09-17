@@ -69,6 +69,10 @@ export interface TelegramTerminalResult {
   /** RB-1A. Fully composed plain-text menu reply, supplied by the adapter for
    *  menu outcomes only. Never a template, never raw update data. */
   menuText?: string | null;
+  /** RB-1B. URL-only inline buttons for menu outcomes, supplied by the
+   *  adapter. Every destination is a route that already exists in the web
+   *  app; there is no callback button and no callback data. */
+  menuButtons?: TelegramInlineUrlButton[][] | null;
 }
 
 /** Database side. Implemented by the Edge Function over the TG-2D RPCs, and
