@@ -24,11 +24,33 @@ export type TelegramStartResultCode = "link_success" | "link_rejected";
 /** Phase TG-2F-C — dispatch group `/bind` terminal outcomes. */
 export type TelegramBindResultCode = "bind_success" | "bind_rejected";
 
-/** Phase RB-1A — private-chat read-only menu/status terminal outcomes. */
+/** Phase RB-1A / RB-1B — private-chat read-only menu/status terminal
+ *  outcomes. RB-1B adds the driver, multi-capability and linked-unsupported
+ *  outcomes; the three RB-1A codes keep their exact meaning. */
 export type TelegramMenuResultCode =
   | "menu_recruiter"
   | "menu_linked_no_workspace"
-  | "menu_unlinked";
+  | "menu_unlinked"
+  | "menu_driver"
+  | "menu_multi_role"
+  | "menu_linked_unsupported";
+
+export const TELEGRAM_MENU_RESULT_CODES: readonly TelegramMenuResultCode[] = [
+  "menu_recruiter",
+  "menu_linked_no_workspace",
+  "menu_unlinked",
+  "menu_driver",
+  "menu_multi_role",
+  "menu_linked_unsupported",
+];
+
+export function isMenuResultCode(code: TelegramResultCode): code is TelegramMenuResultCode {
+  return (TELEGRAM_MENU_RESULT_CODES as readonly string[]).includes(code);
+}
+
+/** RB-1B. Which bare private command produced a menu update. Used ONLY to
+ *  choose copy in the adapter — never to widen data access or authority. */
+export type TelegramMenuCommand = "start" | "menu" | "status";
 
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
@@ -47,6 +69,10 @@ export interface TelegramTerminalResult {
   /** RB-1A. Fully composed plain-text menu reply, supplied by the adapter for
    *  menu outcomes only. Never a template, never raw update data. */
   menuText?: string | null;
+  /** RB-1B. URL-only inline buttons for menu outcomes, supplied by the
+   *  adapter. Every destination is a route that already exists in the web
+   *  app; there is no callback button and no callback data. */
+  menuButtons?: TelegramInlineUrlButton[][] | null;
 }
 
 /** Database side. Implemented by the Edge Function over the TG-2D RPCs, and
@@ -95,6 +121,9 @@ export interface TelegramPollLedger {
     telegramUserId: number;
     telegramChatId: number;
     chatType: string;
+    /** RB-1B. Copy selector only. Never forwarded to the database and never
+     *  an authorization input. */
+    command: TelegramMenuCommand;
   }): Promise<TelegramTerminalResult>;
 }
 
@@ -103,6 +132,14 @@ export interface TelegramGatewayResponse<T> {
   status: number;
   errorCode?: string;
   result?: T;
+}
+
+/** RB-1B. A Telegram inline keyboard button that carries a URL ONLY.
+ *  URL buttons need no `callback_query`, so the poller keeps
+ *  `allowed_updates = ['message']` and grows no callback surface. */
+export interface TelegramInlineUrlButton {
+  text: string;
+  url: string;
 }
 
 /** Lovable connector gateway side. The implementation never receives, holds,
@@ -117,6 +154,9 @@ export interface TelegramGateway {
   sendMessage(input: {
     chatId: number;
     text: string;
+    /** RB-1B. URL-only inline keyboard rows. Absent for every non-menu
+     *  outcome, exactly as before. */
+    buttons?: TelegramInlineUrlButton[][] | null;
   }): Promise<TelegramGatewayResponse<unknown>>;
 }
 
@@ -175,9 +215,14 @@ const BIND_COMMAND_PATTERN = new RegExp(
 );
 const BIND_CHAT_TYPES = ["group", "supergroup"];
 
-/** RB-1A. Bare private-chat menu commands ONLY. Deliberately exact: any
- *  suffixed or addressed variant keeps its existing TG-2D classification. */
-const MENU_COMMANDS = ["/start", "/status"];
+/** RB-1A / RB-1B. Bare private-chat menu commands ONLY. Deliberately exact:
+ *  any suffixed or addressed variant keeps its existing TG-2D
+ *  classification. RB-1B adds `/menu` alongside the existing two. */
+const MENU_COMMANDS: Record<string, TelegramMenuCommand> = {
+  "/start": "start",
+  "/menu": "menu",
+  "/status": "status",
+};
 
 /** Deterministic JSON serialisation: object keys sorted at every depth so the
  *  same logical update always hashes to the same digest regardless of the key
@@ -236,7 +281,7 @@ export type TelegramClassification =
   | { kind: "ignored"; resultCode: TelegramIgnoredResultCode }
   | { kind: "start"; rawToken: string }
   | { kind: "bind"; rawToken: string; chatType: string }
-  | { kind: "menu" };
+  | { kind: "menu"; command: TelegramMenuCommand };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
@@ -272,8 +317,11 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   // RB-1A. Strictly AFTER the link-token pattern, so `/start <64hex>` keeps
   // its TG-2B/TG-2D meaning, and strictly exact, so `/start ` prefixes and
   // `/start@…` variants keep their existing `invalid_start_command` outcome.
-  if (MENU_COMMANDS.includes(identity.text)) {
-    return { kind: "menu" };
+  const menuCommand = Object.prototype.hasOwnProperty.call(MENU_COMMANDS, identity.text)
+    ? MENU_COMMANDS[identity.text]
+    : undefined;
+  if (menuCommand) {
+    return { kind: "menu", command: menuCommand };
   }
   if (identity.text === "/start" || identity.text.startsWith("/start ") || identity.text.startsWith("/start@")) {
     return { kind: "ignored", resultCode: "invalid_start_command" };
@@ -383,6 +431,7 @@ export async function runTelegramPoll(
                 telegramUserId: identity.telegramUserId as number,
                 telegramChatId: identity.telegramChatId as number,
                 chatType: "private",
+                command: classification.command,
               })
             : Promise.reject(new Error("telegram_menu_processor_unavailable")))
         : await ledger.recordIgnoredUpdate({
@@ -424,21 +473,27 @@ export async function runTelegramPoll(
         ? TELEGRAM_BIND_SUCCESS_MESSAGE
         : terminal.resultCode === "bind_rejected"
         ? TELEGRAM_BIND_FAILURE_MESSAGE
-        // RB-1A. The adapter composes the menu text from the bounded
-        // descriptor; the orchestrator only transports it.
-        : (terminal.resultCode === "menu_recruiter" ||
-            terminal.resultCode === "menu_linked_no_workspace" ||
-            terminal.resultCode === "menu_unlinked") &&
+        // RB-1A / RB-1B. The adapter composes the menu text (and its URL-only
+        // buttons) from the bounded descriptor; the orchestrator only
+        // transports them.
+        : isMenuResultCode(terminal.resultCode) &&
             typeof terminal.menuText === "string" &&
             terminal.menuText.length > 0
         ? terminal.menuText
         : null;
+
+      const feedbackButtons =
+        feedback !== null && isMenuResultCode(terminal.resultCode) &&
+          Array.isArray(terminal.menuButtons) && terminal.menuButtons.length > 0
+          ? terminal.menuButtons
+          : null;
 
       if (feedback !== null) {
         try {
           const sent = await gateway.sendMessage({
             chatId: identity.telegramChatId,
             text: feedback,
+            buttons: feedbackButtons,
           });
           if (!sent.ok) {
             log("send_message_failed", {
