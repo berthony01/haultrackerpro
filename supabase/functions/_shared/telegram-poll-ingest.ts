@@ -493,6 +493,7 @@ export async function runTelegramPoll(
           const sent = await gateway.sendMessage({
             chatId: identity.telegramChatId,
             text: feedback,
+            buttons: feedbackButtons,
           });
           if (!sent.ok) {
             log("send_message_failed", {
