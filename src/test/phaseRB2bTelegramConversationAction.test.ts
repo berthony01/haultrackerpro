@@ -517,9 +517,10 @@ describe("RB-2B D — the database owns authority, CF-1 owns the transition", ()
     expect(RB2B_CODE).toContain("public.accept_conversation_thread(_thread_id)");
     expect(RB2B_CODE).toContain("public.decline_conversation_thread(_thread_id)");
     expect(RB2B_CODE).toContain("public.current_user_can_conversation_action(");
-    // No parallel state machine: the migration never writes a thread status.
-    expect(RB2B_CODE).not.toMatch(/status\s*=\s*'active'/);
-    expect(RB2B_CODE).not.toMatch(/status\s*=\s*'declined'/);
+    // No parallel state machine: the migration never writes a thread status
+    // and never touches a conversation table directly.
+    expect(RB2B_CODE).not.toMatch(/conversation_threads\s+SET/);
+    expect(RB2B_CODE).not.toMatch(/SET\s+status\s*=\s*'(active|declined|closed)'/);
   });
 
   it("4) derives the actor and never accepts one from Telegram", () => {
