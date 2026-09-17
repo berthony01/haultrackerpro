@@ -24,11 +24,33 @@ export type TelegramStartResultCode = "link_success" | "link_rejected";
 /** Phase TG-2F-C — dispatch group `/bind` terminal outcomes. */
 export type TelegramBindResultCode = "bind_success" | "bind_rejected";
 
-/** Phase RB-1A — private-chat read-only menu/status terminal outcomes. */
+/** Phase RB-1A / RB-1B — private-chat read-only menu/status terminal
+ *  outcomes. RB-1B adds the driver, multi-capability and linked-unsupported
+ *  outcomes; the three RB-1A codes keep their exact meaning. */
 export type TelegramMenuResultCode =
   | "menu_recruiter"
   | "menu_linked_no_workspace"
-  | "menu_unlinked";
+  | "menu_unlinked"
+  | "menu_driver"
+  | "menu_multi_role"
+  | "menu_linked_unsupported";
+
+export const TELEGRAM_MENU_RESULT_CODES: readonly TelegramMenuResultCode[] = [
+  "menu_recruiter",
+  "menu_linked_no_workspace",
+  "menu_unlinked",
+  "menu_driver",
+  "menu_multi_role",
+  "menu_linked_unsupported",
+];
+
+export function isMenuResultCode(code: TelegramResultCode): code is TelegramMenuResultCode {
+  return (TELEGRAM_MENU_RESULT_CODES as readonly string[]).includes(code);
+}
+
+/** RB-1B. Which bare private command produced a menu update. Used ONLY to
+ *  choose copy in the adapter — never to widen data access or authority. */
+export type TelegramMenuCommand = "start" | "menu" | "status";
 
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
