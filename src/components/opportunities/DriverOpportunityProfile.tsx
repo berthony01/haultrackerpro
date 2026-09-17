@@ -245,6 +245,42 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
     setSeedApplied(true);
   }, [isLoading, profile]);
 
+  /**
+   * HP-4B2 — consume the in-memory Find Work handoff exactly once, after the
+   * stored profile / account defaults have been established, and overlay it as
+   * UNSAVED form values. A stored row does NOT block this: the driver asked for
+   * these changes in the conversation and must now review and save them.
+   */
+  useEffect(() => {
+    if (isLoading || pendingConsumedRef.current) return;
+    pendingConsumedRef.current = true;
+    const pending = consumePendingProfileAnswers();
+    if (!pending) return;
+
+    const overlay: Partial<FormState> = {};
+    if (pending.city !== undefined) overlay.city = pending.city;
+    if (pending.state !== undefined) overlay.state = pending.state;
+    if (pending.cdl_class !== undefined) overlay.cdl_class = pending.cdl_class;
+    if (pending.years_experience !== undefined)
+      overlay.years_experience = String(pending.years_experience);
+    if (pending.preferred_route_type !== undefined)
+      overlay.preferred_route_type = pending.preferred_route_type;
+    if (pending.preferred_driver_type !== undefined)
+      overlay.preferred_driver_type = pending.preferred_driver_type;
+    if (pending.preferred_home_time !== undefined)
+      overlay.preferred_home_time = pending.preferred_home_time;
+    if (pending.trailer_experience !== undefined)
+      overlay.trailer_experience = [...pending.trailer_experience];
+    if (pending.min_weekly_gross !== undefined)
+      overlay.min_weekly_gross = String(pending.min_weekly_gross);
+
+    const keys = Object.keys(overlay);
+    if (!keys.length) return;
+    pendingOverlayRef.current = overlay;
+    setForm((p) => ({ ...p, ...overlay }));
+    setPendingFields(keys);
+  }, [isLoading]);
+
 
 
   const changeVisibility = (v: FormState['visibility']) =>
