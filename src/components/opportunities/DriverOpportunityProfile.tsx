@@ -33,6 +33,17 @@ import {
   clearIntakeSnapshot,
   toDriverProfileSeed,
 } from '@/lib/home/conversationIntake';
+import {
+  consumePendingProfileAnswers,
+  clearPendingProfileAnswers,
+} from '@/lib/home/pendingProfileHandoff';
+
+/**
+ * HP-4B2 — copy shown when the Find Work conversation handed unsaved answers
+ * to this form. The stored row stays source of truth until Save is pressed.
+ */
+export const PENDING_REVIEW_BANNER =
+  'These updates came from your Find Work conversation and are not saved yet. Review them, then press Save Preferences.';
 
 interface Props {
   onBack: () => void;
