@@ -298,7 +298,14 @@ export default function HomeConversationFlow({
             role: 'assistant',
             text: `I did not catch that one. ${step.prompt}`,
           });
-          return { ...prev, answers: nextAnswers, bubbles: [...prev.bubbles, ...added] };
+          // HP-4B1 — an unaccepted review reply must leave the seeded/current
+          // answers exactly as they were and re-ask the same step.
+          return {
+            ...prev,
+            answers: prev.reviewing ? prev.answers : nextAnswers,
+            bubbles: [...prev.bubbles, ...added],
+          };
+
         }
 
         const upcoming = prev.reviewing
