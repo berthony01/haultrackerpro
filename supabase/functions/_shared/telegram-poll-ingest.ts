@@ -215,9 +215,14 @@ const BIND_COMMAND_PATTERN = new RegExp(
 );
 const BIND_CHAT_TYPES = ["group", "supergroup"];
 
-/** RB-1A. Bare private-chat menu commands ONLY. Deliberately exact: any
- *  suffixed or addressed variant keeps its existing TG-2D classification. */
-const MENU_COMMANDS = ["/start", "/status"];
+/** RB-1A / RB-1B. Bare private-chat menu commands ONLY. Deliberately exact:
+ *  any suffixed or addressed variant keeps its existing TG-2D
+ *  classification. RB-1B adds `/menu` alongside the existing two. */
+const MENU_COMMANDS: Record<string, TelegramMenuCommand> = {
+  "/start": "start",
+  "/menu": "menu",
+  "/status": "status",
+};
 
 /** Deterministic JSON serialisation: object keys sorted at every depth so the
  *  same logical update always hashes to the same digest regardless of the key
@@ -276,7 +281,7 @@ export type TelegramClassification =
   | { kind: "ignored"; resultCode: TelegramIgnoredResultCode }
   | { kind: "start"; rawToken: string }
   | { kind: "bind"; rawToken: string; chatType: string }
-  | { kind: "menu" };
+  | { kind: "menu"; command: TelegramMenuCommand };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
@@ -312,8 +317,11 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   // RB-1A. Strictly AFTER the link-token pattern, so `/start <64hex>` keeps
   // its TG-2B/TG-2D meaning, and strictly exact, so `/start ` prefixes and
   // `/start@…` variants keep their existing `invalid_start_command` outcome.
-  if (MENU_COMMANDS.includes(identity.text)) {
-    return { kind: "menu" };
+  const menuCommand = Object.prototype.hasOwnProperty.call(MENU_COMMANDS, identity.text)
+    ? MENU_COMMANDS[identity.text]
+    : undefined;
+  if (menuCommand) {
+    return { kind: "menu", command: menuCommand };
   }
   if (identity.text === "/start" || identity.text.startsWith("/start ") || identity.text.startsWith("/start@")) {
     return { kind: "ignored", resultCode: "invalid_start_command" };
