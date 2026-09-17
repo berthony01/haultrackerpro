@@ -13,7 +13,9 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  TELEGRAM_ALERT_ACCEPT_LABEL,
   TELEGRAM_ALERT_BUTTON_LABEL,
+  TELEGRAM_ALERT_PASS_LABEL,
   TELEGRAM_ALERT_DRAIN_LIMIT,
   TELEGRAM_ALERT_GENERIC_BODY,
   TELEGRAM_ALERT_HEADER,
@@ -228,8 +230,11 @@ function makeGateway(
   };
 }
 
+const THREAD_ID = "22222222-2222-4222-8222-222222222222";
+
 const CLAIM: TelegramAlertClaim = {
   alertId: "11111111-1111-4111-8111-111111111111",
+  threadId: THREAD_ID,
   telegramChatId: 4242,
   opportunityTitle: "Regional Dry Van — Midwest",
 };
@@ -308,7 +313,13 @@ describe("RB-2A B — outbound drain semantics", () => {
     expect(state.sent).toEqual([CLAIM.alertId]);
   });
 
-  it("6) copy is privacy-safe and the button is URL-only to the proven inbox", async () => {
+  // RB-2B re-pin. RB-2A shipped a URL-ONLY keyboard, so this asserted the
+  // absence of any callback button. RB-2B legitimately adds Accept / Pass
+  // callback buttons. The assertion is re-pinned EXACTLY to the new keyboard —
+  // not loosened — and the protected property (no driver data, no identifier
+  // other than the opaque conversation locator, Open Conversations still
+  // URL-only) is now asserted more strictly than before.
+  it("6) copy is privacy-safe and the keyboard is exactly the RB-2B shape", async () => {
     const state: FakeState = { sent: [], failed: [], messages: [] };
     await runTelegramAlertDrain({
       outbox: makeOutbox([CLAIM], state),
@@ -319,20 +330,27 @@ describe("RB-2A B — outbound drain semantics", () => {
     expect(msg.text).toContain(TELEGRAM_ALERT_HEADER);
     expect(msg.text).toContain("Regional Dry Van — Midwest");
     expect(msg.text).not.toContain(CLAIM.alertId);
+    expect(msg.text).not.toContain(THREAD_ID);
     expect(msg.text).not.toMatch(/@|\+1|http/);
     expect(msg.buttons).toEqual([
+      [
+        { text: TELEGRAM_ALERT_ACCEPT_LABEL, callbackData: `c1:a:${THREAD_ID}` },
+        { text: TELEGRAM_ALERT_PASS_LABEL, callbackData: `c1:p:${THREAD_ID}` },
+      ],
       [{ text: TELEGRAM_ALERT_BUTTON_LABEL, url: CONVERSATIONS_URL }],
     ]);
-    expect(JSON.stringify(msg.buttons)).not.toContain("callback");
+    // Open Conversations stays URL-only, and the only identifier anywhere in
+    // the keyboard is the opaque conversation locator.
+    expect(msg.buttons?.[1][0]).not.toHaveProperty("callbackData");
+    expect(JSON.stringify(msg.buttons)).not.toContain(CLAIM.alertId);
   });
 
   it("7) falls back to generic copy when no opportunity title is available", () => {
     const text = composeConversationAlertText(null);
     expect(text).toBe(`${TELEGRAM_ALERT_HEADER}\n\n${TELEGRAM_ALERT_GENERIC_BODY}`);
     expect(composeConversationAlertText("   ")).toBe(text);
-    expect(composeConversationAlertButtons(CONVERSATIONS_URL)[0][0].url).toBe(
-      CONVERSATIONS_URL,
-    );
+    const rows = composeConversationAlertButtons(CONVERSATIONS_URL, THREAD_ID);
+    expect((rows[1][0] as { url: string }).url).toBe(CONVERSATIONS_URL);
   });
 });
 
@@ -363,13 +381,17 @@ describe("RB-2A C — runtime wiring stays inside the RB-2A cone", () => {
     }
   });
 
-  it("3) no callback surface is introduced anywhere", () => {
+  // RB-2B re-pin. RB-2A forbade any callback surface because it shipped none.
+  // RB-2B legitimately adds ONE, inside the SAME single poller. Re-pinned to
+  // the exact new shape, still exhaustive: no webhook, no second poller, and
+  // allowed_updates widened by exactly one entry and no more.
+  it("3) the only callback surface is the single-poller RB-2B one", () => {
     for (const source of [ORCHESTRATOR_CODE, EDGE_CODE]) {
-      expect(source).not.toContain("callback_query");
-      expect(source).not.toContain("callback_data");
-      expect(source).not.toContain("setWebhook");
+      expect(source).not.toMatch(/setWebhook|deleteWebhook/i);
     }
-    expect(ORCHESTRATOR_CODE).toContain('TELEGRAM_ALLOWED_UPDATES = ["message"]');
+    expect(ORCHESTRATOR_CODE).toContain(
+      'TELEGRAM_ALLOWED_UPDATES = ["message", "callback_query"]',
+    );
   });
 
   it("4) the alert destination is the proven recruiter conversations inbox", () => {
@@ -482,6 +504,7 @@ describe("RB-2A.1 D — unknown delivery outcome never auto-resends", () => {
     // back from the claim RPC because 'claimed' is no longer send-eligible.
     const claim: TelegramAlertClaim = {
       alertId: "a1",
+      threadId: THREAD_ID,
       telegramChatId: 111,
       opportunityTitle: null,
     };

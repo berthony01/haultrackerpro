@@ -20,7 +20,7 @@ import {
   runTelegramPoll,
   type TelegramClassification,
   type TelegramGateway,
-  type TelegramInlineUrlButton,
+  type TelegramInlineButton,
   type TelegramMenuCommand,
   type TelegramPollLedger,
   type TelegramResultCode,
@@ -282,11 +282,14 @@ describe("RB-1B B — the three bare private commands are distinguished", () => 
     });
   });
 
-  it("keeps allowed_updates at message only and grows no callback surface", () => {
-    expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message"]);
+  // RB-2B re-pin. RB-1B forbade any callback surface because it shipped none.
+  // RB-2B legitimately adds exactly one, inside the SAME single poller. The
+  // assertion is re-pinned to the exact new allowed_updates tuple — still
+  // exhaustive, so a third update type fails by design — and the webhook /
+  // second-poller prohibition is unchanged.
+  it("keeps one poller with exactly message + callback_query and no webhook", () => {
+    expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message", "callback_query"]);
     for (const source of [ORCHESTRATOR_CODE, EDGE_CODE]) {
-      expect(source).not.toContain("callback_query");
-      expect(source).not.toContain("callback_data");
       expect(source).not.toMatch(/setWebhook|deleteWebhook/i);
     }
   });
@@ -321,7 +324,10 @@ function buildDeps(options: {
   const sent: Array<{
     chatId: number;
     text: string;
-    buttons?: TelegramInlineUrlButton[][] | null;
+    // RB-2B. The gateway signature widened to allow callback rows. RB-1B menu
+    // keyboards are still asserted to be URL-only below; this only lets the
+    // fake accept the same input the real gateway does.
+    buttons?: TelegramInlineButton[][] | null;
   }> = [];
 
   const ledger: TelegramPollLedger = {
@@ -410,8 +416,9 @@ describe("RB-1B C — orchestration carries the command and the buttons", () => 
     expect(deps.sent[0].buttons).toHaveLength(2);
     for (const row of deps.sent[0].buttons!) {
       for (const button of row) {
-        expect(button.url).toMatch(/^https:\/\//);
+        // Unchanged strictness: a menu button is URL-only, exactly two keys.
         expect(Object.keys(button).sort()).toEqual(["text", "url"]);
+        expect((button as { url: string }).url).toMatch(/^https:\/\//);
       }
     }
   });

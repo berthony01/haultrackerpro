@@ -569,7 +569,8 @@ describe("TG-2D orchestrator — lease and gateway discipline", () => {
     });
     expect(TELEGRAM_GET_UPDATES_LIMIT).toBe(25);
     expect(TELEGRAM_GET_UPDATES_TIMEOUT_SECONDS).toBe(20);
-    expect(TELEGRAM_ALLOWED_UPDATES).toEqual(["message"]);
+    // RB-2B re-pin — exact, still exhaustive: one poller, exactly these two.
+    expect(TELEGRAM_ALLOWED_UPDATES).toEqual(["message", "callback_query"]);
     expect(result).toEqual({
       kind: "ok",
       processed: 0,
@@ -864,9 +865,11 @@ describe("TG-2D edge function shell", () => {
   // set and kept exhaustive, so an unauthorised RPC still fails by design.
   // RB-2A re-pin. The three outbound conversation-alert RPCs were legitimately
   // added by RB-2A. Re-pinned exactly — not loosened — and still exhaustive.
-  it("drives the shared orchestrator and only the TG-2D RPCs plus the bind, menu and RB-2A alert RPCs", () => {
+  // RB-2B re-pin. The single conversation-action RPC was legitimately added by
+  // RB-2B. Re-pinned exactly, still exhaustive.
+  it("drives the shared orchestrator and only the TG-2D RPCs plus the bind, menu, RB-2A alert and RB-2B action RPCs", () => {
     expect(EDGE_SOURCE).toContain("runTelegramPoll");
-    const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\("(\w+)"/g)].map((m) => m[1]);
+    const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\(\s*"(\w+)"/g)].map((m) => m[1]);
     expect([...new Set(rpcs)].sort()).toEqual([
       "telegram_advance_poll_cursor",
       "telegram_claim_conversation_alerts",
@@ -874,6 +877,7 @@ describe("TG-2D edge function shell", () => {
       "telegram_mark_conversation_alert_failed",
       "telegram_mark_conversation_alert_sent",
       "telegram_process_bind_update",
+      "telegram_process_conversation_action_update",
       "telegram_process_menu_update",
       "telegram_process_start_update",
       "telegram_record_ignored_update",
@@ -881,12 +885,13 @@ describe("TG-2D edge function shell", () => {
     ]);
   });
 
-
-
-  it("implements no callback, chat-binding, load, or TG-2C dispatch behaviour", () => {
+  // RB-2B re-pin. TG-2D forbade any callback surface because none existed.
+  // RB-2B adds exactly one, and ONLY for conversation Accept / Pass. The
+  // TG-2C dispatch and load prohibitions are unchanged and still exhaustive;
+  // the callback surface is now pinned to precisely one answer API and one
+  // action RPC, so any other callback behaviour fails by design.
+  it("implements no chat-binding, load, or TG-2C dispatch behaviour", () => {
     for (const forbidden of [
-      "callback_query",
-      "answerCallbackQuery",
       "telegram_bind_dispatch_chat",
       "telegram_dispatch_create_driver_load",
       "telegram_dispatch_update_driver_load_status",
@@ -895,5 +900,9 @@ describe("TG-2D edge function shell", () => {
     ]) {
       expect(EDGE_SOURCE).not.toContain(forbidden);
     }
+    expect(
+      [...EDGE_SOURCE.matchAll(/answerCallbackQuery/g)].length,
+    ).toBe(2);
+    expect(EDGE_SOURCE).not.toMatch(/editMessageReplyMarkup|setWebhook/i);
   });
 });
