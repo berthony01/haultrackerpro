@@ -190,6 +190,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         visibility: loadedVisibility,
         allow_verified_recruiter_contact: loadedAllow,
         contact_preference: (profile.contact_preference as FormState['contact_preference']) ?? 'in_app',
+        // Pending review values survive a profile refetch.
+        ...(pendingOverlayRef.current ?? {}),
       });
     } else if (user) {
       // No saved row yet — prefill blank fields from the HaulTrackerPro account
