@@ -393,14 +393,18 @@ describe("TG-2F-C D — bot feedback discloses nothing", () => {
 
 describe("TG-2F-C E — edge adapter delegates to the atomic RPC only", () => {
   // RB-1B re-pin. `telegram_process_menu_update` was legitimately added by
-  // RB-1A; this exhaustive list went stale at that commit, not at RB-1B. It is
-  // re-pinned to the current exact RPC set — still exhaustive, so any further
-  // unauthorised RPC still fails this assertion by design.
+  // RB-1A; this exhaustive list went stale at that commit, not at RB-1B.
+  // RB-2A.1 re-pin: RB-2A legitimately added the three outbound alert outbox
+  // RPCs below. The list stays exhaustive — any further unauthorised RPC still
+  // fails this assertion by design.
   it("calls telegram_process_bind_update and nothing else new", () => {
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\("(\w+)"/g)].map((m) => m[1]);
     expect([...new Set(rpcs)].sort()).toEqual([
       "telegram_advance_poll_cursor",
+      "telegram_claim_conversation_alerts",
       "telegram_claim_poll_lease",
+      "telegram_mark_conversation_alert_failed",
+      "telegram_mark_conversation_alert_sent",
       "telegram_process_bind_update",
       "telegram_process_menu_update",
       "telegram_process_start_update",
@@ -408,6 +412,7 @@ describe("TG-2F-C E — edge adapter delegates to the atomic RPC only", () => {
       "telegram_release_poll_lease",
     ]);
   });
+
 
   it("never calls the consume RPC directly", () => {
     expect(EDGE_SOURCE).not.toContain("consume_telegram_dispatch_bind_token");
