@@ -374,7 +374,7 @@ describe("RB-2A C — runtime wiring stays inside the RB-2A cone", () => {
 
   it("5) the adapter only transports ids and delivery outcomes", () => {
     const adapter = EDGE_CODE.split("function buildAlertOutbox")[1]?.split(
-      "\n// ",
+      "const APP_BASE_URL",
     )[0] ?? "";
     expect(adapter).toContain("telegram_claim_conversation_alerts");
     expect(adapter).toContain("telegram_mark_conversation_alert_sent");
