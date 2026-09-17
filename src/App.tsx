@@ -58,6 +58,7 @@ const OAuthConsent = lazy(() => import("./pages/OAuthConsent"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const HowToUseHaulTrackerPro = lazy(() => import("./pages/HowToUseHaulTrackerPro"));
 const Parking = lazy(() => import("./pages/Parking"));
+const FindWork = lazy(() => import("./pages/FindWork"));
 const StarterKit = lazy(() => import("./pages/StarterKit"));
 const StarterKitThanks = lazy(() => import("./pages/StarterKitThanks"));
 const Updates = lazy(() => import("./pages/Updates"));
@@ -272,6 +273,7 @@ const App = () => (
               <Route path="/ai-contract-review-for-truckers" element={<AiContractReviewForTruckers />} />
               <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
               <Route path="/parking" element={<ProtectedRoute><Parking /></ProtectedRoute>} />
+              <Route path="/find-work" element={<ProtectedRoute><FindWork /></ProtectedRoute>} />
               <Route path="/starter-kit" element={<StarterKit />} />
               <Route path="/starter-kit/thanks" element={<StarterKitThanks />} />
               <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
