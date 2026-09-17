@@ -119,8 +119,12 @@ export default function FindWork() {
         initialAnswers={hasSeed ? seed : undefined}
         profileReuseLabels={hasSeed ? reuseLabels : undefined}
         continueLabel={FIND_WORK_CONTINUE_LABEL}
-        // Navigation only — no write of any kind happens on continue.
-        onContinue={() => navigate(HOME_INTAKE_NEXT_PATH)}
+        // HP-4B2: hand the final answers to the review form in memory only,
+        // then navigate. No database write and no browser storage of any kind.
+        onContinue={(answers: IntakeAnswers) => {
+          setPendingProfileAnswers(answers);
+          navigate(HOME_INTAKE_NEXT_PATH);
+        }}
       />
     </Shell>
   );
