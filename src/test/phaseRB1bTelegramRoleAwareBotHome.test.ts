@@ -413,8 +413,9 @@ describe("RB-1B C — orchestration carries the command and the buttons", () => 
     expect(deps.sent[0].buttons).toHaveLength(2);
     for (const row of deps.sent[0].buttons!) {
       for (const button of row) {
-        expect(button.url).toMatch(/^https:\/\//);
+        // Unchanged strictness: a menu button is URL-only, exactly two keys.
         expect(Object.keys(button).sort()).toEqual(["text", "url"]);
+        expect((button as { url: string }).url).toMatch(/^https:\/\//);
       }
     }
   });
