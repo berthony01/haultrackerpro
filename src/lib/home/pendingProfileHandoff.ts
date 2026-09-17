@@ -4,9 +4,9 @@
  * review form.
  *
  * Hard rules encoded here:
- *  - MEMORY ONLY. No sessionStorage, no localStorage, no cookies, no network,
- *    no Supabase, no React. A hard refresh intentionally loses the handoff and
- *    the stored profile remains the only source of truth.
+ *  - MEMORY ONLY. No browser persistence of any kind, no network, no backend,
+ *    no React. A hard refresh intentionally loses the handoff and the stored
+ *    profile remains the only source of truth.
  *  - One shot. `consumePendingProfileAnswers` returns the value at most once
  *    and clears the store, so a later manual visit can never be seeded by a
  *    stale conversation.
