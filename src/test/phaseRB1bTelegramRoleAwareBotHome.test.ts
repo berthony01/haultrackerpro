@@ -20,7 +20,7 @@ import {
   runTelegramPoll,
   type TelegramClassification,
   type TelegramGateway,
-  type TelegramInlineUrlButton,
+  type TelegramInlineButton,
   type TelegramMenuCommand,
   type TelegramPollLedger,
   type TelegramResultCode,
@@ -321,7 +321,10 @@ function buildDeps(options: {
   const sent: Array<{
     chatId: number;
     text: string;
-    buttons?: TelegramInlineUrlButton[][] | null;
+    // RB-2B. The gateway signature widened to allow callback rows. RB-1B menu
+    // keyboards are still asserted to be URL-only below; this only lets the
+    // fake accept the same input the real gateway does.
+    buttons?: TelegramInlineButton[][] | null;
   }> = [];
 
   const ledger: TelegramPollLedger = {
