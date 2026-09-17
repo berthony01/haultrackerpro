@@ -191,6 +191,9 @@ BEGIN
     SELECT p.id, p.thread_id, p.recipient_user_id
       FROM public.telegram_conversation_alerts p
      WHERE p.status = 'pending'
+        -- Crash recovery only: a row abandoned mid-send is retried. A row that
+        -- reached 'sent' is never re-claimed, so success stays at-most-once.
+        OR (p.status = 'claimed' AND p.claimed_at < now() - interval '10 minutes')
      ORDER BY p.created_at
      FOR UPDATE SKIP LOCKED
      LIMIT _max

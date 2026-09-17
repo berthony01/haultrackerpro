@@ -638,7 +638,7 @@ export async function runTelegramAlertDrain(
     } catch (error) {
       // The row stays 'claimed' and is reconciled by its own attempt bound;
       // delivery is never falsely recorded.
-      result.failed += errorCode === null ? 0 : 0;
+      log("alert_mark_unresolved", { alertId: claim.alertId });
       log("alert_mark_failed", { code: sanitizeErrorCode(error) });
     }
   }
