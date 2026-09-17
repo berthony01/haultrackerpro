@@ -117,6 +117,9 @@ export interface TelegramPollLedger {
     telegramUserId: number;
     telegramChatId: number;
     chatType: string;
+    /** RB-1B. Copy selector only. Never forwarded to the database and never
+     *  an authorization input. */
+    command: TelegramMenuCommand;
   }): Promise<TelegramTerminalResult>;
 }
 
@@ -125,6 +128,14 @@ export interface TelegramGatewayResponse<T> {
   status: number;
   errorCode?: string;
   result?: T;
+}
+
+/** RB-1B. A Telegram inline keyboard button that carries a URL ONLY.
+ *  URL buttons need no `callback_query`, so the poller keeps
+ *  `allowed_updates = ['message']` and grows no callback surface. */
+export interface TelegramInlineUrlButton {
+  text: string;
+  url: string;
 }
 
 /** Lovable connector gateway side. The implementation never receives, holds,
@@ -139,6 +150,9 @@ export interface TelegramGateway {
   sendMessage(input: {
     chatId: number;
     text: string;
+    /** RB-1B. URL-only inline keyboard rows. Absent for every non-menu
+     *  outcome, exactly as before. */
+    buttons?: TelegramInlineUrlButton[][] | null;
   }): Promise<TelegramGatewayResponse<unknown>>;
 }
 
