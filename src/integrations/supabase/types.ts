@@ -4580,6 +4580,66 @@ export type Database = {
           },
         ]
       }
+      telegram_conversation_alerts: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          created_at: string
+          id: string
+          last_error_code: string | null
+          notification_kind: string
+          recipient_user_id: string
+          recruiter_id: string
+          sent_at: string | null
+          status: string
+          thread_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error_code?: string | null
+          notification_kind: string
+          recipient_user_id: string
+          recruiter_id: string
+          sent_at?: string | null
+          status?: string
+          thread_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          created_at?: string
+          id?: string
+          last_error_code?: string | null
+          notification_kind?: string
+          recipient_user_id?: string
+          recruiter_id?: string
+          sent_at?: string | null
+          status?: string
+          thread_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_conversation_alerts_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_conversation_alerts_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_dispatch_bind_tokens: {
         Row: {
           consumed_at: string | null
@@ -7650,6 +7710,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      telegram_claim_conversation_alerts: {
+        Args: { _limit?: number }
+        Returns: {
+          alert_id: string
+          opportunity_title: string
+          telegram_chat_id: number
+        }[]
+      }
       telegram_claim_poll_lease: {
         Args: never
         Returns: {
@@ -7788,6 +7856,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      telegram_mark_conversation_alert_failed: {
+        Args: { _alert_id: string; _error_code: string }
+        Returns: string
+      }
+      telegram_mark_conversation_alert_sent: {
+        Args: { _alert_id: string }
+        Returns: boolean
+      }
       telegram_process_bind_update: {
         Args: {
           _chat_type: string
@@ -7867,6 +7943,10 @@ export type Database = {
       }
       telegram_revoke_dispatch_chat: {
         Args: { _telegram_chat_id: number; _telegram_user_id: number }
+        Returns: boolean
+      }
+      telegram_user_can_receive_conversation_alert: {
+        Args: { _thread_id: string; _user_id: string }
         Returns: boolean
       }
       update_agency_package: {
