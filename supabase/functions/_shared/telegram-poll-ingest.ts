@@ -52,11 +52,32 @@ export function isMenuResultCode(code: TelegramResultCode): code is TelegramMenu
  *  choose copy in the adapter — never to widen data access or authority. */
 export type TelegramMenuCommand = "start" | "menu" | "status";
 
+/** Phase RB-2B — private-chat Accept / Pass button terminal outcomes. The
+ *  database owns every one of these; the orchestrator only transports them. */
+export type TelegramConversationActionResultCode =
+  | "conversation_accepted"
+  | "conversation_passed"
+  | "conversation_already_handled"
+  | "conversation_action_unavailable"
+  | "conversation_action_denied"
+  | "conversation_action_invalid";
+
+export const TELEGRAM_CONVERSATION_ACTION_RESULT_CODES:
+  readonly TelegramConversationActionResultCode[] = [
+    "conversation_accepted",
+    "conversation_passed",
+    "conversation_already_handled",
+    "conversation_action_unavailable",
+    "conversation_action_denied",
+    "conversation_action_invalid",
+  ];
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
   | TelegramStartResultCode
   | TelegramBindResultCode
-  | TelegramMenuResultCode;
+  | TelegramMenuResultCode
+  | TelegramConversationActionResultCode;
 
 export interface TelegramPollLease {
   leaseToken: string;
@@ -125,6 +146,24 @@ export interface TelegramPollLedger {
      *  an authorization input. */
     command: TelegramMenuCommand;
   }): Promise<TelegramTerminalResult>;
+  /** RB-2B. Atomic: actor derivation + CF-1 re-authorization + the canonical
+   *  CF-1 accept/decline transition + terminal receipt, all in ONE database
+   *  transaction. `action` / `threadId` are UNTRUSTED locator data parsed from
+   *  the callback payload and are validated server-side.
+   *
+   *  Optional so a ledger built before RB-2B still satisfies the contract.
+   *  When it is absent the orchestrator fails CLOSED for callback updates: no
+   *  receipt, no action, no cursor advance. */
+  processConversationActionUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    action: TelegramConversationAction | null;
+    threadId: string | null;
+  }): Promise<TelegramTerminalResult>;
 }
 
 export interface TelegramGatewayResponse<T> {
@@ -134,13 +173,24 @@ export interface TelegramGatewayResponse<T> {
   result?: T;
 }
 
-/** RB-1B. A Telegram inline keyboard button that carries a URL ONLY.
- *  URL buttons need no `callback_query`, so the poller keeps
- *  `allowed_updates = ['message']` and grows no callback surface. */
+/** RB-1B. A Telegram inline keyboard button that carries a URL ONLY. Menu
+ *  keyboards remain exclusively URL buttons. */
 export interface TelegramInlineUrlButton {
   text: string;
   url: string;
 }
+
+/** RB-2B. A Telegram inline keyboard button that carries compact, versioned,
+ *  privacy-safe routing data. Possession is NEVER authorization: the payload
+ *  is re-validated and re-authorized server-side on every tap. */
+export interface TelegramInlineCallbackButton {
+  text: string;
+  callbackData: string;
+}
+
+export type TelegramInlineButton =
+  | TelegramInlineUrlButton
+  | TelegramInlineCallbackButton;
 
 /** Lovable connector gateway side. The implementation never receives, holds,
  *  or exposes a Telegram bot token — the gateway injects it. */
@@ -154,9 +204,15 @@ export interface TelegramGateway {
   sendMessage(input: {
     chatId: number;
     text: string;
-    /** RB-1B. URL-only inline keyboard rows. Absent for every non-menu
-     *  outcome, exactly as before. */
-    buttons?: TelegramInlineUrlButton[][] | null;
+    /** URL-only for menus (RB-1B); RB-2B alerts may also carry callback rows.
+     *  Absent for every plain-text outcome, exactly as before. */
+    buttons?: TelegramInlineButton[][] | null;
+  }): Promise<TelegramGatewayResponse<unknown>>;
+  /** RB-2B. Resolves the Telegram spinner after a button tap. Answering is
+   *  NOT a state mutation, so it is always best-effort. */
+  answerCallbackQuery?(input: {
+    callbackQueryId: string;
+    text: string;
   }): Promise<TelegramGatewayResponse<unknown>>;
 }
 
@@ -191,7 +247,10 @@ export type TelegramPollRunResult =
 
 export const TELEGRAM_GET_UPDATES_LIMIT = 25;
 export const TELEGRAM_GET_UPDATES_TIMEOUT_SECONDS = 20;
-export const TELEGRAM_ALLOWED_UPDATES = ["message"] as const;
+// RB-2B. Extended from message-only to message + callback_query so recruiter
+// Accept / Pass taps arrive through the SAME single poller. Still no webhook,
+// no second poller, and no other update type.
+export const TELEGRAM_ALLOWED_UPDATES = ["message", "callback_query"] as const;
 
 export const TELEGRAM_LINK_SUCCESS_MESSAGE =
   "Your Telegram account is now linked to HaulTracker Pro.";
@@ -224,6 +283,36 @@ const MENU_COMMANDS: Record<string, TelegramMenuCommand> = {
   "/status": "status",
 };
 
+// ───────────────────── RB-2B — conversation action locator ─────────────────────
+//
+// Compact versioned form `c1:<a|p>:<thread uuid>` — 41 bytes, far inside
+// Telegram's 64-byte callback_data limit. It carries NO driver identity, no
+// recruiter id, no workspace id and no account id: only a version, an action
+// letter and an opaque conversation locator that is re-authorized server-side.
+
+export type TelegramConversationAction = "accept" | "pass";
+
+const CONVERSATION_ACTION_PATTERN =
+  /^c1:(a|p):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+export const TELEGRAM_CALLBACK_DATA_MAX_BYTES = 64;
+
+export function composeConversationActionData(
+  action: TelegramConversationAction,
+  threadId: string,
+): string {
+  return `c1:${action === "accept" ? "a" : "p"}:${threadId}`;
+}
+
+export function parseConversationActionData(
+  data: unknown,
+): { action: TelegramConversationAction; threadId: string } | null {
+  if (typeof data !== "string") return null;
+  const match = CONVERSATION_ACTION_PATTERN.exec(data);
+  if (!match) return null;
+  return { action: match[1] === "a" ? "accept" : "pass", threadId: match[2] };
+}
+
 /** Deterministic JSON serialisation: object keys sorted at every depth so the
  *  same logical update always hashes to the same digest regardless of the key
  *  order Telegram happened to emit. */
@@ -247,6 +336,9 @@ interface ParsedIdentity {
   telegramChatId: number | null;
   chatType: string | null;
   text: string | null;
+  /** RB-2B. Present ONLY for a `callback_query` update. */
+  callbackQueryId: string | null;
+  callbackData: string | null;
 }
 
 function asFiniteInteger(value: unknown): number | null {
@@ -261,6 +353,29 @@ export function readUpdateId(update: unknown): number | null {
 
 function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
   const record = update as Record<string, unknown>;
+
+  // RB-2B. A button tap. Identity comes from `callback_query.from`, never from
+  // the callback payload, and the chat is the one the alert was delivered to.
+  const callback = record.callback_query as Record<string, unknown> | undefined;
+  if (callback && typeof callback === "object" && !Array.isArray(callback)) {
+    const cbFrom = callback.from as Record<string, unknown> | undefined;
+    const cbMessage = callback.message as Record<string, unknown> | undefined;
+    const cbChat = cbMessage?.chat as Record<string, unknown> | undefined;
+    const cbUserId = asFiniteInteger(cbFrom?.id);
+    const cbChatId = asFiniteInteger(cbChat?.id);
+
+    return {
+      updateId,
+      telegramUserId: cbUserId !== null && cbUserId > 0 ? cbUserId : null,
+      telegramChatId: cbChatId !== null && cbChatId !== 0 ? cbChatId : null,
+      chatType: typeof cbChat?.type === "string" ? cbChat.type : null,
+      text: null,
+      callbackQueryId:
+        typeof callback.id === "string" && callback.id.length > 0 ? callback.id : null,
+      callbackData: typeof callback.data === "string" ? callback.data : null,
+    };
+  }
+
   const message = record.message as Record<string, unknown> | undefined;
   const from = message?.from as Record<string, unknown> | undefined;
   const chat = message?.chat as Record<string, unknown> | undefined;
@@ -274,6 +389,8 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
     telegramChatId: rawChatId !== null && rawChatId !== 0 ? rawChatId : null,
     chatType: typeof chat?.type === "string" ? chat.type : null,
     text: typeof message?.text === "string" ? message.text : null,
+    callbackQueryId: null,
+    callbackData: null,
   };
 }
 
@@ -281,13 +398,32 @@ export type TelegramClassification =
   | { kind: "ignored"; resultCode: TelegramIgnoredResultCode }
   | { kind: "start"; rawToken: string }
   | { kind: "bind"; rawToken: string; chatType: string }
-  | { kind: "menu"; command: TelegramMenuCommand };
+  | { kind: "menu"; command: TelegramMenuCommand }
+  | {
+      kind: "conversation_action";
+      action: TelegramConversationAction | null;
+      threadId: string | null;
+      chatType: string;
+    };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
 export function classifyUpdate(identity: ParsedIdentity): TelegramClassification {
   if (identity.telegramUserId === null || identity.telegramChatId === null) {
     return { kind: "ignored", resultCode: "invalid_update_shape" };
+  }
+  // RB-2B. A callback update is NEVER reinterpreted as a message command. A
+  // malformed payload or a non-private chat is still routed to the action
+  // processor so its terminal receipt is recorded as `callback_query`, and the
+  // processor — not this pure function — decides the fail-closed outcome.
+  if (identity.callbackQueryId !== null) {
+    const parsed = parseConversationActionData(identity.callbackData);
+    return {
+      kind: "conversation_action",
+      action: parsed?.action ?? null,
+      threadId: parsed?.threadId ?? null,
+      chatType: identity.chatType ?? "",
+    };
   }
   // TG-2F-C. Checked BEFORE the private-chat gate because a dispatch bind is
   // by definition a group action. Everything that is not an exactly-formed
