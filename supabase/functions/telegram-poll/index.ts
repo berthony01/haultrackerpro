@@ -227,7 +227,81 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       if (error) throw new Error(error.message);
       return unwrapTerminal(data);
     },
+    // RB-1A. Read-only recruiter menu/status. The database owns actor
+    // resolution, authorization and the terminal receipt in one transaction;
+    // this adapter only renders the bounded descriptor it returns.
+    async processMenuUpdate(input: {
+      leaseToken: string;
+      updateId: number;
+      payloadHash: string;
+      telegramUserId: number;
+      telegramChatId: number;
+      chatType: string;
+    }): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc("telegram_process_menu_update", {
+        _lease_token: input.leaseToken,
+        _update_id: input.updateId,
+        _payload_hash: input.payloadHash,
+        _telegram_user_id: input.telegramUserId,
+        _telegram_chat_id: input.telegramChatId,
+        _chat_type: input.chatType,
+      });
+      if (error) throw new Error(error.message);
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | { is_new?: boolean; result_code?: string; workspaces?: unknown }
+        | null;
+      const resultCode = (row?.result_code ?? "") as TelegramResultCode;
+      return {
+        isNew: row?.is_new === true,
+        resultCode,
+        menuText: composeMenuText(resultCode, row?.workspaces),
+      };
+    },
   };
+}
+
+// ───────────────────────────── RB-1A menu text ─────────────────────────────
+//
+// Fixed labels plus ONLY the bounded, authorized workspace summary the
+// database returned. No driver or candidate data, no contact details, no
+// billing data, no Telegram identifiers, no reason for a denial.
+
+const MENU_UNLINKED_TEXT =
+  "Your Telegram account is not connected to HaulTracker Pro. Open HaulTracker Pro and generate a connection link to get started.";
+const MENU_NO_WORKSPACE_TEXT =
+  "Your HaulTracker Pro account is connected. There is no recruiter workspace available for you here.";
+const MENU_HEADER_TEXT = "HaulTracker Pro — recruiter status";
+
+interface MenuWorkspaceDescriptor {
+  workspace_name?: unknown;
+  role?: unknown;
+  can_manage_opportunities?: unknown;
+  active_opportunity_count?: unknown;
+}
+
+function composeMenuText(
+  resultCode: TelegramResultCode,
+  workspaces: unknown,
+): string | null {
+  if (resultCode === "menu_unlinked") return MENU_UNLINKED_TEXT;
+  if (resultCode === "menu_linked_no_workspace") return MENU_NO_WORKSPACE_TEXT;
+  if (resultCode !== "menu_recruiter") return null;
+
+  const rows = Array.isArray(workspaces) ? (workspaces as MenuWorkspaceDescriptor[]) : [];
+  const lines = rows.map((row) => {
+    const name = typeof row?.workspace_name === "string" ? row.workspace_name : "Workspace";
+    const role = typeof row?.role === "string" ? row.role : "member";
+    const count = typeof row?.active_opportunity_count === "number"
+      ? row.active_opportunity_count
+      : 0;
+    const manage = row?.can_manage_opportunities === true
+      ? "Opportunity management: available"
+      : "Opportunity management: not available";
+    return `${name}\nRole: ${role}\nActive opportunities: ${count}\n${manage}`;
+  });
+
+  if (lines.length === 0) return MENU_NO_WORKSPACE_TEXT;
+  return `${MENU_HEADER_TEXT}\n\n${lines.join("\n\n")}`;
 }
 
 Deno.serve(async (req: Request) => {
