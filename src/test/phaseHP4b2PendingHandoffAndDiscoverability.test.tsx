@@ -27,9 +27,8 @@ vi.mock('react-router-dom', async () => {
 const roleState = { isDriver: true, isLoading: false };
 vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => roleState }));
 
-vi.mock('@/hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'driver-1', email: 'driver@example.com', user_metadata: {} } }),
-}));
+const AUTH_USER = { id: 'driver-1', email: 'driver@example.com', user_metadata: {} };
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: AUTH_USER }) }));
 
 const upsertMutate = vi.fn();
 const profileState: { profile: unknown; isLoading: boolean; isError: boolean } = {
