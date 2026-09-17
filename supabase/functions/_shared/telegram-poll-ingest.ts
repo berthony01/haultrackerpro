@@ -715,7 +715,8 @@ export async function runTelegramPoll(
 // exist in HaulTracker Pro. Contract:
 //   * the database owns eligibility, recruiter authorization, tenant scoping
 //     and recipient resolution — this code only renders and sends;
-//   * private linked recruiter chats only, URL-only button, no callback data;
+//   * private linked recruiter chats only; RB-2B adds Accept / Pass callback
+//     buttons whose payload is an untrusted locator re-authorized server-side;
 //   * no driver identity, contact detail or profile data is representable
 //     here: the only variable content is the opportunity title the recipient
 //     can already see in their own workspace;
