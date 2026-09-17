@@ -425,8 +425,11 @@ describe("RB-2A.1 D — unknown delivery outcome never auto-resends", () => {
 
   it("2) the final claim RPC selects ONLY pending rows", () => {
     const loop = RB2A1_CODE.split("FOR _row IN")[1] ?? "";
-    expect(loop).toContain("WHERE p.status = 'pending'");
-    expect(loop).not.toContain("'claimed'");
+    const predicate = loop.split("LOOP")[0] ?? "";
+    expect(predicate).toContain("WHERE p.status = 'pending'");
+    // The only 'claimed' reference left in the loop is the forward transition.
+    expect(predicate).not.toContain("'claimed'");
+    expect(predicate).not.toContain("OR");
   });
 
   it("3) the stale-claimed reclaim window is gone and cannot return", () => {
