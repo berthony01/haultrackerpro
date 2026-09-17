@@ -431,6 +431,7 @@ export async function runTelegramPoll(
                 telegramUserId: identity.telegramUserId as number,
                 telegramChatId: identity.telegramChatId as number,
                 chatType: "private",
+                command: classification.command,
               })
             : Promise.reject(new Error("telegram_menu_processor_unavailable")))
         : await ledger.recordIgnoredUpdate({
@@ -472,15 +473,20 @@ export async function runTelegramPoll(
         ? TELEGRAM_BIND_SUCCESS_MESSAGE
         : terminal.resultCode === "bind_rejected"
         ? TELEGRAM_BIND_FAILURE_MESSAGE
-        // RB-1A. The adapter composes the menu text from the bounded
-        // descriptor; the orchestrator only transports it.
-        : (terminal.resultCode === "menu_recruiter" ||
-            terminal.resultCode === "menu_linked_no_workspace" ||
-            terminal.resultCode === "menu_unlinked") &&
+        // RB-1A / RB-1B. The adapter composes the menu text (and its URL-only
+        // buttons) from the bounded descriptor; the orchestrator only
+        // transports them.
+        : isMenuResultCode(terminal.resultCode) &&
             typeof terminal.menuText === "string" &&
             terminal.menuText.length > 0
         ? terminal.menuText
         : null;
+
+      const feedbackButtons =
+        feedback !== null && isMenuResultCode(terminal.resultCode) &&
+          Array.isArray(terminal.menuButtons) && terminal.menuButtons.length > 0
+          ? terminal.menuButtons
+          : null;
 
       if (feedback !== null) {
         try {
