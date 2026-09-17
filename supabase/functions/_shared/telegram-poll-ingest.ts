@@ -526,3 +526,128 @@ export async function runTelegramPoll(
   log("poll_complete", { processed, advancedTo: advancedTo ?? -1 });
   return { kind: "ok", processed, advancedTo, resultCodes };
 }
+
+// ───────────────── RB-2A — outbound conversation alert drain ─────────────────
+//
+// A recruiter-facing notification companion for conversations that ALREADY
+// exist in HaulTracker Pro. Contract:
+//   * the database owns eligibility, recruiter authorization, tenant scoping
+//     and recipient resolution — this code only renders and sends;
+//   * private linked recruiter chats only, URL-only button, no callback data;
+//   * no driver identity, contact detail or profile data is representable
+//     here: the only variable content is the opportunity title the recipient
+//     can already see in their own workspace;
+//   * a row is marked delivered ONLY after Telegram confirms; any failure is
+//     reported back for a retry;
+//   * the drain runs AFTER inbound polling and can never throw into it, so an
+//     outbound failure can never stall cursor advancement.
+
+/** One claimed outbound alert, as returned by the claim RPC. */
+export interface TelegramAlertClaim {
+  alertId: string;
+  /** Private chat id of the linked recruiter. Never a group chat. */
+  telegramChatId: number;
+  /** Recruiter-visible opportunity title, or null. Never driver data. */
+  opportunityTitle: string | null;
+}
+
+export interface TelegramAlertOutbox {
+  claimConversationAlerts(limit: number): Promise<TelegramAlertClaim[]>;
+  markConversationAlertSent(alertId: string): Promise<void>;
+  markConversationAlertFailed(alertId: string, errorCode: string): Promise<void>;
+}
+
+export interface TelegramAlertDrainDeps {
+  outbox: TelegramAlertOutbox;
+  gateway: TelegramGateway;
+  /** Proven recruiter conversations inbox route. */
+  conversationsUrl: string;
+  log?: TelegramPollLogger;
+}
+
+export interface TelegramAlertDrainResult {
+  claimed: number;
+  sent: number;
+  failed: number;
+}
+
+export const TELEGRAM_ALERT_DRAIN_LIMIT = 10;
+
+export const TELEGRAM_ALERT_HEADER = "HaulTracker Pro — new driver conversation";
+export const TELEGRAM_ALERT_GENERIC_BODY =
+  "A driver started a conversation with your workspace. Open HaulTracker Pro to read it and reply.";
+export const TELEGRAM_ALERT_BUTTON_LABEL = "Open Conversations";
+
+/** Privacy-safe copy. The opportunity title is the ONLY variable element. */
+export function composeConversationAlertText(
+  opportunityTitle: string | null,
+): string {
+  const title = typeof opportunityTitle === "string" ? opportunityTitle.trim() : "";
+  if (title.length === 0) {
+    return `${TELEGRAM_ALERT_HEADER}\n\n${TELEGRAM_ALERT_GENERIC_BODY}`;
+  }
+  return `${TELEGRAM_ALERT_HEADER}\n\nOpportunity: ${title.slice(0, 120)}\n\n${TELEGRAM_ALERT_GENERIC_BODY}`;
+}
+
+export function composeConversationAlertButtons(
+  conversationsUrl: string,
+): TelegramInlineUrlButton[][] {
+  return [[{ text: TELEGRAM_ALERT_BUTTON_LABEL, url: conversationsUrl }]];
+}
+
+/** Drains claimed outbound alerts. Never throws. */
+export async function runTelegramAlertDrain(
+  deps: TelegramAlertDrainDeps,
+): Promise<TelegramAlertDrainResult> {
+  const log: TelegramPollLogger = deps.log ?? (() => {});
+  const result: TelegramAlertDrainResult = { claimed: 0, sent: 0, failed: 0 };
+
+  let claims: TelegramAlertClaim[];
+  try {
+    claims = await deps.outbox.claimConversationAlerts(TELEGRAM_ALERT_DRAIN_LIMIT);
+  } catch (error) {
+    log("alert_claim_failed", { code: sanitizeErrorCode(error) });
+    return result;
+  }
+
+  result.claimed = claims.length;
+  if (claims.length === 0) return result;
+
+  for (const claim of claims) {
+    let errorCode: string | null = null;
+    try {
+      const sent = await deps.gateway.sendMessage({
+        chatId: claim.telegramChatId,
+        text: composeConversationAlertText(claim.opportunityTitle),
+        buttons: composeConversationAlertButtons(deps.conversationsUrl),
+      });
+      if (!sent.ok) errorCode = sent.errorCode ?? "telegram_gateway_error";
+    } catch (error) {
+      errorCode = sanitizeErrorCode(error);
+    }
+
+    try {
+      if (errorCode === null) {
+        await deps.outbox.markConversationAlertSent(claim.alertId);
+        result.sent += 1;
+      } else {
+        await deps.outbox.markConversationAlertFailed(claim.alertId, errorCode);
+        result.failed += 1;
+        log("alert_send_failed", { code: errorCode });
+      }
+    } catch (error) {
+      // The row stays 'claimed' and is reconciled by its own attempt bound;
+      // delivery is never falsely recorded.
+      log("alert_mark_unresolved", { alertId: claim.alertId });
+      log("alert_mark_failed", { code: sanitizeErrorCode(error) });
+    }
+  }
+
+  log("alert_drain_complete", {
+    claimed: result.claimed,
+    sent: result.sent,
+    failed: result.failed,
+  });
+  return result;
+}
+

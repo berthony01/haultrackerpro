@@ -16,8 +16,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 import {
+  runTelegramAlertDrain,
   runTelegramPoll,
   sanitizeErrorCode,
+  type TelegramAlertClaim,
+  type TelegramAlertOutbox,
   type TelegramGateway,
   type TelegramGatewayResponse,
   type TelegramIgnoredResultCode,
@@ -272,6 +275,50 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
   };
 }
 
+// RB-2A. Outbound conversation alert outbox adapter. Every eligibility,
+// authorization, tenant-scoping and recipient decision belongs to the RPCs;
+// this adapter transports ids and delivery outcomes only.
+function buildAlertOutbox(supabase: RpcClient): TelegramAlertOutbox {
+  return {
+    async claimConversationAlerts(limit: number): Promise<TelegramAlertClaim[]> {
+      const { data, error } = await supabase.rpc("telegram_claim_conversation_alerts", {
+        _limit: limit,
+      });
+      if (error) throw new Error(error.message);
+      const rows = (Array.isArray(data) ? data : []) as {
+        alert_id?: unknown;
+        telegram_chat_id?: unknown;
+        opportunity_title?: unknown;
+      }[];
+      return rows
+        .filter((row) =>
+          typeof row?.alert_id === "string" && typeof row?.telegram_chat_id === "number"
+        )
+        .map((row) => ({
+          alertId: row.alert_id as string,
+          telegramChatId: row.telegram_chat_id as number,
+          opportunityTitle:
+            typeof row.opportunity_title === "string" ? row.opportunity_title : null,
+        }));
+    },
+    async markConversationAlertSent(alertId: string): Promise<void> {
+      const { error } = await supabase.rpc("telegram_mark_conversation_alert_sent", {
+        _alert_id: alertId,
+      });
+      if (error) throw new Error(error.message);
+    },
+    async markConversationAlertFailed(alertId: string, errorCode: string): Promise<void> {
+      const { error } = await supabase.rpc("telegram_mark_conversation_alert_failed", {
+        _alert_id: alertId,
+        _error_code: errorCode,
+      });
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+
+
 // ────────────────────── RB-1A / RB-1B menu presentation ──────────────────────
 //
 // Fixed labels plus ONLY the bounded, authorized workspace summary the
@@ -441,13 +488,35 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
+  const gateway = buildGateway(lovableApiKey, telegramConnectionKey);
+
+  // RB-2A. Outbound alerts are drained AFTER inbound polling has finished and
+  // released its lease, in its own isolated scope. It cannot throw, cannot
+  // change the inbound outcome, and therefore cannot stall the cursor.
+  const drainAlerts = async (): Promise<void> => {
+    try {
+      await runTelegramAlertDrain({
+        outbox: buildAlertOutbox(supabase),
+        gateway,
+        conversationsUrl: URL_CONVERSATIONS,
+        log,
+      });
+    } catch (error) {
+      log("alert_drain_unhandled_error", { code: sanitizeErrorCode(error) });
+    }
+  };
+
   try {
     const result = await runTelegramPoll({
       ledger: buildLedger(supabase),
-      gateway: buildGateway(lovableApiKey, telegramConnectionKey),
+      gateway,
       sha256: sha256Hex,
       log,
     });
+
+    await drainAlerts();
+
+
 
     if (result.kind === "busy") {
       return json({ status: "busy" }, 200);
