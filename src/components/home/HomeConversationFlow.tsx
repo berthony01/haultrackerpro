@@ -219,9 +219,13 @@ export default function HomeConversationFlow({
       setState((prev) => {
         setHistory((h) => [...h, prev]);
         const skipped = skippedStep ? [...prev.skipped, step.id] : prev.skipped;
+        // HP-4B1 — review mode must never treat a fresh object reference as
+        // progress. A correction counts only when THIS step's own field(s)
+        // actually changed to a value the deterministic parser accepted.
         const progressed = prev.reviewing
-          ? skippedStep || nextAnswers !== prev.answers
+          ? skippedStep || reviewStepCorrected(step.id, prev.answers, nextAnswers)
           : skippedStep || isStepAnswered(nextAnswers, step.id);
+
         const added: Bubble[] = [
           { id: nextBubbleId(), role: 'driver', text: spoken },
         ];
