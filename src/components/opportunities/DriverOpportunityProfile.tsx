@@ -204,6 +204,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         full_name: p.full_name || displayName,
         email: p.email || user.email || '',
         phone: p.phone || pickStr('phone'),
+        // Pending review values win over the account prefill too.
+        ...(pendingOverlayRef.current ?? {}),
       }));
     }
   }, [profile, user]);
