@@ -7788,6 +7788,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      telegram_process_bind_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _raw_token: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+        }[]
+      }
       telegram_process_start_update: {
         Args: {
           _chat_type: string
