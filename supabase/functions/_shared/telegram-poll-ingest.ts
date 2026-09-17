@@ -24,10 +24,17 @@ export type TelegramStartResultCode = "link_success" | "link_rejected";
 /** Phase TG-2F-C — dispatch group `/bind` terminal outcomes. */
 export type TelegramBindResultCode = "bind_success" | "bind_rejected";
 
+/** Phase RB-1A — private-chat read-only menu/status terminal outcomes. */
+export type TelegramMenuResultCode =
+  | "menu_recruiter"
+  | "menu_linked_no_workspace"
+  | "menu_unlinked";
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
   | TelegramStartResultCode
-  | TelegramBindResultCode;
+  | TelegramBindResultCode
+  | TelegramMenuResultCode;
 
 export interface TelegramPollLease {
   leaseToken: string;
@@ -37,6 +44,9 @@ export interface TelegramPollLease {
 export interface TelegramTerminalResult {
   isNew: boolean;
   resultCode: TelegramResultCode;
+  /** RB-1A. Fully composed plain-text menu reply, supplied by the adapter for
+   *  menu outcomes only. Never a template, never raw update data. */
+  menuText?: string | null;
 }
 
 /** Database side. Implemented by the Edge Function over the TG-2D RPCs, and
@@ -71,6 +81,16 @@ export interface TelegramPollLedger {
     telegramChatId: number;
     chatType: string;
     rawToken: string;
+  }): Promise<TelegramTerminalResult>;
+  /** RB-1A. Atomic: actor resolution + terminal receipt in one DB
+   *  transaction. Read-only with respect to recruiter data. */
+  processMenuUpdate(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
   }): Promise<TelegramTerminalResult>;
 }
 
@@ -150,6 +170,10 @@ const BIND_COMMAND_PATTERN = new RegExp(
   `^\\/bind(?:@${TELEGRAM_BOT_USERNAME})? ([0-9a-f]{64})$`,
 );
 const BIND_CHAT_TYPES = ["group", "supergroup"];
+
+/** RB-1A. Bare private-chat menu commands ONLY. Deliberately exact: any
+ *  suffixed or addressed variant keeps its existing TG-2D classification. */
+const MENU_COMMANDS = ["/start", "/status"];
 
 /** Deterministic JSON serialisation: object keys sorted at every depth so the
  *  same logical update always hashes to the same digest regardless of the key
