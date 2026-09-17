@@ -83,8 +83,12 @@ export interface TelegramPollLedger {
     rawToken: string;
   }): Promise<TelegramTerminalResult>;
   /** RB-1A. Atomic: actor resolution + terminal receipt in one DB
-   *  transaction. Read-only with respect to recruiter data. */
-  processMenuUpdate(input: {
+   *  transaction. Read-only with respect to recruiter data.
+   *
+   *  Optional so a ledger built before RB-1A still satisfies the contract.
+   *  When it is absent the orchestrator fails CLOSED for menu updates: no
+   *  receipt, no reply, no cursor advance. */
+  processMenuUpdate?(input: {
     leaseToken: string;
     updateId: number;
     payloadHash: string;
@@ -371,14 +375,16 @@ export async function runTelegramPoll(
             rawToken: classification.rawToken,
           })
         : classification.kind === "menu"
-        ? await ledger.processMenuUpdate({
-            leaseToken: lease.leaseToken,
-            updateId,
-            payloadHash,
-            telegramUserId: identity.telegramUserId as number,
-            telegramChatId: identity.telegramChatId as number,
-            chatType: "private",
-          })
+        ? await (ledger.processMenuUpdate
+            ? ledger.processMenuUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: "private",
+              })
+            : Promise.reject(new Error("telegram_menu_processor_unavailable")))
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
