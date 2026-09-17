@@ -231,7 +231,8 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
 export type TelegramClassification =
   | { kind: "ignored"; resultCode: TelegramIgnoredResultCode }
   | { kind: "start"; rawToken: string }
-  | { kind: "bind"; rawToken: string; chatType: string };
+  | { kind: "bind"; rawToken: string; chatType: string }
+  | { kind: "menu" };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
@@ -263,6 +264,12 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   const match = START_COMMAND_PATTERN.exec(identity.text);
   if (match) {
     return { kind: "start", rawToken: match[1] };
+  }
+  // RB-1A. Strictly AFTER the link-token pattern, so `/start <64hex>` keeps
+  // its TG-2B/TG-2D meaning, and strictly exact, so `/start ` prefixes and
+  // `/start@…` variants keep their existing `invalid_start_command` outcome.
+  if (MENU_COMMANDS.includes(identity.text)) {
+    return { kind: "menu" };
   }
   if (identity.text === "/start" || identity.text.startsWith("/start ") || identity.text.startsWith("/start@")) {
     return { kind: "ignored", resultCode: "invalid_start_command" };
