@@ -74,7 +74,7 @@ import { OpportunityDetail } from './OpportunityDetail';
 import { DriverOpportunityProfile } from './DriverOpportunityProfile';
 import { DriverApplicationsPanel } from './DriverApplicationsPanel';
 import { DriverReferralsPanel } from './DriverReferralsPanel';
-import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info, UserPlus } from 'lucide-react';
+import { UserCog, ArrowRight, CheckCircle2, Mailbox, Info, UserPlus, Compass } from 'lucide-react';
 import { calculateOpportunityFinancials } from '@/lib/opportunities/opportunityProfit';
 import { calculateOpportunityMatch, type MatchTier } from '@/lib/opportunities/opportunityMatch';
 import {
@@ -90,6 +90,13 @@ import {
 interface Props {
   onUpgrade: () => void;
   onViewChange?: (view: 'list' | 'recruiter' | 'driver-profile') => void;
+  /**
+   * HP-4B2 — optional Driver entry point into the authenticated Find Work
+   * conversation. Supplied by the dashboard, which owns navigation. When it is
+   * absent the card is not rendered, so this component still mounts without a
+   * Router.
+   */
+  onFindWork?: () => void;
 }
 
 const ANY = 'any';
@@ -107,7 +114,7 @@ function getSortableTs(o: { published_at: string | null; created_at: string | nu
   return parse(o.created_at);
 }
 
-export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
+export function OpportunitiesPage({ onUpgrade, onViewChange, onFindWork }: Props) {
   const { opportunities, isLoading, isError, error, refetch } = useOpportunities();
   const { saved, save, unsave } = useSavedOpportunities();
   const { isPro } = useSubscription();
@@ -541,6 +548,27 @@ export function OpportunitiesPage({ onUpgrade, onViewChange }: Props) {
           </div>
         </div>
       </Card>
+
+      {/* Find Work conversation entry */}
+      {onFindWork && (
+        <Card className="p-5 border-border/60">
+          <div className="flex items-start gap-4">
+            <div className="rounded-2xl bg-primary/15 p-3 shrink-0">
+              <Compass className="h-5 w-5 text-primary" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base font-bold text-foreground mb-1">Find Work</h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Tell HaulTracker what you are looking for and see real openings. Nothing is saved
+                until you review and save your preferences.
+              </p>
+              <Button data-testid="opportunities-find-work" onClick={onFindWork} variant="outline">
+                Start Find Work <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Opportunity Preferences entry card */}
       {profileIsError ? (

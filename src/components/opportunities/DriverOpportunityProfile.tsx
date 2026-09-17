@@ -33,6 +33,17 @@ import {
   clearIntakeSnapshot,
   toDriverProfileSeed,
 } from '@/lib/home/conversationIntake';
+import {
+  consumePendingProfileAnswers,
+  clearPendingProfileAnswers,
+} from '@/lib/home/pendingProfileHandoff';
+
+/**
+ * HP-4B2 — copy shown when the Find Work conversation handed unsaved answers
+ * to this form. The stored row stays source of truth until Save is pressed.
+ */
+export const PENDING_REVIEW_BANNER =
+  'These updates came from your Find Work conversation and are not saved yet. Review them, then press Save Preferences.';
 
 interface Props {
   onBack: () => void;
@@ -133,6 +144,23 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
     return typeof v === 'string' && v.trim() ? v.trim() : '';
   })();
 
+  /**
+   * HP-4B2 — unsaved answers handed over in memory by the authenticated Find
+   * Work conversation. They are overlaid on top of the stored profile and the
+   * account prefill, and re-applied if the profile query refetches, so a late
+   * re-render can never silently erase what the driver is reviewing. Nothing
+   * here writes to the database: `handleSave` remains the only mutation.
+   */
+  const pendingOverlayRef = useRef<Partial<FormState> | null>(null);
+  const pendingConsumedRef = useRef(false);
+  const [pendingFields, setPendingFields] = useState<string[]>([]);
+  const isPending = (k: keyof FormState) => pendingFields.includes(k);
+  const clearPendingReview = () => {
+    clearPendingProfileAnswers();
+    pendingOverlayRef.current = null;
+    setPendingFields([]);
+  };
+
   useEffect(() => {
     if (profile) {
       const loadedVisibility = (profile.visibility as FormState['visibility']) ?? 'private';
@@ -162,6 +190,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         visibility: loadedVisibility,
         allow_verified_recruiter_contact: loadedAllow,
         contact_preference: (profile.contact_preference as FormState['contact_preference']) ?? 'in_app',
+        // Pending review values survive a profile refetch.
+        ...(pendingOverlayRef.current ?? {}),
       });
     } else if (user) {
       // No saved row yet — prefill blank fields from the HaulTrackerPro account
@@ -174,6 +204,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         full_name: p.full_name || displayName,
         email: p.email || user.email || '',
         phone: p.phone || pickStr('phone'),
+        // Pending review values win over the account prefill too.
+        ...(pendingOverlayRef.current ?? {}),
       }));
     }
   }, [profile, user]);
@@ -212,6 +244,42 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
     }));
     setSeedApplied(true);
   }, [isLoading, profile]);
+
+  /**
+   * HP-4B2 — consume the in-memory Find Work handoff exactly once, after the
+   * stored profile / account defaults have been established, and overlay it as
+   * UNSAVED form values. A stored row does NOT block this: the driver asked for
+   * these changes in the conversation and must now review and save them.
+   */
+  useEffect(() => {
+    if (isLoading || pendingConsumedRef.current) return;
+    pendingConsumedRef.current = true;
+    const pending = consumePendingProfileAnswers();
+    if (!pending) return;
+
+    const overlay: Partial<FormState> = {};
+    if (pending.city !== undefined) overlay.city = pending.city;
+    if (pending.state !== undefined) overlay.state = pending.state;
+    if (pending.cdl_class !== undefined) overlay.cdl_class = pending.cdl_class;
+    if (pending.years_experience !== undefined)
+      overlay.years_experience = String(pending.years_experience);
+    if (pending.preferred_route_type !== undefined)
+      overlay.preferred_route_type = pending.preferred_route_type;
+    if (pending.preferred_driver_type !== undefined)
+      overlay.preferred_driver_type = pending.preferred_driver_type;
+    if (pending.preferred_home_time !== undefined)
+      overlay.preferred_home_time = pending.preferred_home_time;
+    if (pending.trailer_experience !== undefined)
+      overlay.trailer_experience = [...pending.trailer_experience];
+    if (pending.min_weekly_gross !== undefined)
+      overlay.min_weekly_gross = String(pending.min_weekly_gross);
+
+    const keys = Object.keys(overlay);
+    if (!keys.length) return;
+    pendingOverlayRef.current = overlay;
+    setForm((p) => ({ ...p, ...overlay }));
+    setPendingFields(keys);
+  }, [isLoading]);
 
 
 
@@ -278,6 +346,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         // The homepage seed has now been persisted by the driver's own action.
         clearIntakeSnapshot();
         setSeedApplied(false);
+        // The Find Work answers are now saved by the driver's own action.
+        clearPendingReview();
         if (completed) toast.success('Your Opportunity Preferences are ready.');
         else
           toast.success('Preferences saved. Add a few more details later to improve your match quality.');
@@ -300,7 +370,14 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <Button variant="ghost" onClick={onBack} className="text-muted-foreground hover:text-foreground -ml-2">
+      <Button
+        variant="ghost"
+        onClick={() => {
+          clearPendingReview();
+          onBack();
+        }}
+        className="text-muted-foreground hover:text-foreground -ml-2"
+      >
         <ArrowLeft className="h-4 w-4" /> Back to Opportunities
       </Button>
 
@@ -324,6 +401,16 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
           We prefilled this from your homepage conversation. Review before saving.
         </p>
       )}
+
+      {pendingFields.length > 0 && (
+        <p
+          data-testid="driver-profile-pending-review-note"
+          className="text-xs font-medium rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-foreground"
+        >
+          {PENDING_REVIEW_BANNER}
+        </p>
+      )}
+
 
       <Section icon={User} title="Recruiter Contact Information">
         <p className="text-xs text-muted-foreground -mt-1">
@@ -357,10 +444,10 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
               </button>
             )}
           </Field>
-          <Field label="City">
+          <Field label="City" pending={isPending('city')}>
             <Input value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="Dallas" />
           </Field>
-          <Field label="State">
+          <Field label="State" pending={isPending('state')}>
             <Input value={form.state} onChange={(e) => set('state', e.target.value.toUpperCase().slice(0, 2))} placeholder="TX" maxLength={2} />
           </Field>
         </Grid>
@@ -368,13 +455,13 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
       <Section icon={Compass} title="What You’re Looking For">
         <Grid>
-          <Field label="Preferred driver type">
+          <Field label="Preferred driver type" pending={isPending('preferred_driver_type')}>
             <SelectField value={form.preferred_driver_type} onChange={(v) => set('preferred_driver_type', v)} options={DRIVER_TYPES} placeholder="Select" />
           </Field>
-          <Field label="Preferred route type">
+          <Field label="Preferred route type" pending={isPending('preferred_route_type')}>
             <SelectField value={form.preferred_route_type} onChange={(v) => set('preferred_route_type', v)} options={ROUTE_TYPES} placeholder="Select" />
           </Field>
-          <Field label="Preferred home time">
+          <Field label="Preferred home time" pending={isPending('preferred_home_time')}>
             <SelectField value={form.preferred_home_time} onChange={(v) => set('preferred_home_time', v)} options={HOME_TIMES} placeholder="Select" />
           </Field>
           <Field label="Available start date">
@@ -397,10 +484,10 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
       <Section icon={IdCard} title="Experience & Equipment">
         <Grid>
-          <Field label="CDL Class">
+          <Field label="CDL Class" pending={isPending('cdl_class')}>
             <SelectField value={form.cdl_class} onChange={(v) => set('cdl_class', v)} options={CDL_CLASSES} placeholder="Select" />
           </Field>
-          <Field label="Years of experience">
+          <Field label="Years of experience" pending={isPending('years_experience')}>
             <Input
               type="number"
               min={0}
@@ -411,12 +498,12 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
           </Field>
         </Grid>
         <ChipGroup label="Endorsements" options={ENDORSEMENTS} selected={form.endorsements} onToggle={(v) => toggleArr('endorsements', v)} />
-        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} />
+        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} pending={isPending('trailer_experience')} />
       </Section>
 
       <Section icon={DollarSign} title="Pay Goals">
         <Grid>
-          <Field label="Min weekly gross ($)">
+          <Field label="Min weekly gross ($)" pending={isPending('min_weekly_gross')}>
             <Input
               type="number"
               min={0}
@@ -526,10 +613,32 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function PendingBadge() {
+  return (
+    <span
+      data-testid="driver-profile-pending-badge"
+      className="rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary"
+    >
+      Pending
+    </span>
+  );
+}
+
+function Field({
+  label,
+  children,
+  pending,
+}: {
+  label: string;
+  children: React.ReactNode;
+  pending?: boolean;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+        {pending && <PendingBadge />}
+      </div>
       {children}
     </div>
   );
@@ -563,15 +672,20 @@ function ChipGroup({
   options,
   selected,
   onToggle,
+  pending,
 }: {
   label: string;
   options: string[];
   selected: string[];
   onToggle: (v: string) => void;
+  pending?: boolean;
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+        {pending && <PendingBadge />}
+      </div>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => {
           const active = selected.includes(o);
