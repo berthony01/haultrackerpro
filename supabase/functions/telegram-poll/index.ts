@@ -235,7 +235,7 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       if (error) throw new Error(error.message);
       return unwrapTerminal(data);
     },
-    // RB-1A. Read-only recruiter menu/status. The database owns actor
+    // RB-1A / RB-1B. Read-only role-aware menu/status. The database owns actor
     // resolution, authorization and the terminal receipt in one transaction;
     // this adapter only renders the bounded descriptor it returns.
     async processMenuUpdate(input: {
@@ -245,6 +245,7 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       telegramUserId: number;
       telegramChatId: number;
       chatType: string;
+      command: TelegramMenuCommand;
     }): Promise<TelegramTerminalResult> {
       const { data, error } = await supabase.rpc("telegram_process_menu_update", {
         _lease_token: input.leaseToken,
@@ -262,23 +263,59 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       return {
         isNew: row?.is_new === true,
         resultCode,
-        menuText: composeMenuText(resultCode, row?.workspaces),
+        menuText: composeMenuText(resultCode, row?.workspaces, input.command),
+        menuButtons: composeMenuButtons(resultCode),
       };
     },
   };
 }
 
-// ───────────────────────────── RB-1A menu text ─────────────────────────────
+// ────────────────────── RB-1A / RB-1B menu presentation ──────────────────────
 //
 // Fixed labels plus ONLY the bounded, authorized workspace summary the
-// database returned. No driver or candidate data, no contact details, no
-// billing data, no Telegram identifiers, no reason for a denial.
+// database returned. No candidate data, no contact details, no billing data,
+// no Telegram identifiers, no reason for a denial. Buttons are URL-only and
+// every destination is a route that already exists in the web app.
+
+const APP_BASE_URL = "https://haultrackerpro.com";
+
+const URL_OPEN_APP = `${APP_BASE_URL}/dashboard`;
+const URL_FIND_WORK = `${APP_BASE_URL}/find-work`;
+const URL_WORK_PROFILE = `${APP_BASE_URL}/professional-profile`;
+const URL_OPPORTUNITIES = `${APP_BASE_URL}/dashboard?page=recruiter-access:manager`;
+const URL_CONVERSATIONS = `${APP_BASE_URL}/dashboard?page=recruiter-access:applications`;
+const URL_RESULTS = `${APP_BASE_URL}/dashboard?page=recruiter-access:reports`;
+
+const OPEN_APP_BUTTONS: TelegramInlineUrlButton[][] = [
+  [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],
+];
+const WORK_BUTTONS: TelegramInlineUrlButton[][] = [
+  [{ text: "🔎 Find Work", url: URL_FIND_WORK }],
+  [{ text: "👤 Work Profile", url: URL_WORK_PROFILE }],
+];
+const RECRUITER_BUTTONS: TelegramInlineUrlButton[][] = [
+  [{ text: "📋 My Opportunities", url: URL_OPPORTUNITIES }],
+  [{ text: "💬 Conversations", url: URL_CONVERSATIONS }],
+  [{ text: "📊 Results", url: URL_RESULTS }],
+];
 
 const MENU_UNLINKED_TEXT =
-  "Your Telegram account is not connected to HaulTracker Pro. Open HaulTracker Pro and generate a connection link to get started.";
+  "Your Telegram account is not connected to HaulTracker Pro. Open HaulTracker Pro and generate a connection link in Settings to get started.";
 const MENU_NO_WORKSPACE_TEXT =
-  "Your HaulTracker Pro account is connected. There is no recruiter workspace available for you here.";
+  "Your HaulTracker Pro account is connected. There is no recruiter workspace available for you yet — finish recruiter setup in HaulTracker Pro to unlock recruiter tools here.";
+const MENU_UNSUPPORTED_TEXT =
+  "Your HaulTracker Pro account is connected. There are no bot features available for this account yet.";
 const MENU_HEADER_TEXT = "HaulTracker Pro — recruiter status";
+
+const WORK_WELCOME_TEXT =
+  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to find work that matches your preferences, keep your Work Profile current, and manage your recruiter conversations in one place.\n\nThis bot is your companion for quick navigation and notifications as those features arrive.\n\nSend /menu for options or /status for your account status.";
+const RECRUITER_WELCOME_TEXT =
+  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to post and manage opportunities, work through qualified conversations, and review your results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options or /status for your workspace status.";
+const COMBINED_WELCOME_TEXT =
+  "HaulTracker Pro — welcome\n\nYour account is connected with both work-seeking and recruiter access.\n\nWork: find work that matches your preferences and keep your Work Profile current.\nRecruiter: post and manage opportunities, work qualified conversations, and review results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options or /status for your account status.";
+
+const WORK_MENU_TEXT = "HaulTracker Pro — menu\n\nJump straight to what you need:";
+const WORK_STATUS_TEXT = "HaulTracker Pro — account status\n\nWork account connected.";
 
 interface MenuWorkspaceDescriptor {
   workspace_name?: unknown;
@@ -287,14 +324,7 @@ interface MenuWorkspaceDescriptor {
   active_opportunity_count?: unknown;
 }
 
-function composeMenuText(
-  resultCode: TelegramResultCode,
-  workspaces: unknown,
-): string | null {
-  if (resultCode === "menu_unlinked") return MENU_UNLINKED_TEXT;
-  if (resultCode === "menu_linked_no_workspace") return MENU_NO_WORKSPACE_TEXT;
-  if (resultCode !== "menu_recruiter") return null;
-
+function composeWorkspaceSummary(workspaces: unknown): string | null {
   const rows = Array.isArray(workspaces) ? (workspaces as MenuWorkspaceDescriptor[]) : [];
   const lines = rows.map((row) => {
     const name = typeof row?.workspace_name === "string" ? row.workspace_name : "Workspace";
@@ -307,9 +337,62 @@ function composeMenuText(
       : "Opportunity management: not available";
     return `${name}\nRole: ${role}\nActive opportunities: ${count}\n${manage}`;
   });
-
-  if (lines.length === 0) return MENU_NO_WORKSPACE_TEXT;
+  if (lines.length === 0) return null;
   return `${MENU_HEADER_TEXT}\n\n${lines.join("\n\n")}`;
+}
+
+function composeMenuButtons(
+  resultCode: TelegramResultCode,
+): TelegramInlineUrlButton[][] | null {
+  switch (resultCode) {
+    case "menu_driver":
+      return WORK_BUTTONS;
+    case "menu_recruiter":
+      return RECRUITER_BUTTONS;
+    case "menu_multi_role":
+      return [...WORK_BUTTONS, ...RECRUITER_BUTTONS];
+    case "menu_unlinked":
+    case "menu_linked_no_workspace":
+    case "menu_linked_unsupported":
+      return OPEN_APP_BUTTONS;
+    default:
+      return null;
+  }
+}
+
+function composeMenuText(
+  resultCode: TelegramResultCode,
+  workspaces: unknown,
+  command: TelegramMenuCommand,
+): string | null {
+  if (resultCode === "menu_unlinked") return MENU_UNLINKED_TEXT;
+  if (resultCode === "menu_linked_no_workspace") return MENU_NO_WORKSPACE_TEXT;
+  if (resultCode === "menu_linked_unsupported") return MENU_UNSUPPORTED_TEXT;
+
+  if (resultCode === "menu_driver") {
+    if (command === "start") return WORK_WELCOME_TEXT;
+    if (command === "menu") return WORK_MENU_TEXT;
+    return WORK_STATUS_TEXT;
+  }
+
+  if (resultCode === "menu_recruiter") {
+    const summary = composeWorkspaceSummary(workspaces);
+    if (summary === null) return MENU_NO_WORKSPACE_TEXT;
+    if (command === "start") return RECRUITER_WELCOME_TEXT;
+    if (command === "menu") return WORK_MENU_TEXT;
+    return summary;
+  }
+
+  if (resultCode === "menu_multi_role") {
+    const summary = composeWorkspaceSummary(workspaces);
+    if (command === "start") return COMBINED_WELCOME_TEXT;
+    if (command === "menu") return WORK_MENU_TEXT;
+    return summary === null
+      ? WORK_STATUS_TEXT
+      : `${WORK_STATUS_TEXT}\n\n${summary}`;
+  }
+
+  return null;
 }
 
 Deno.serve(async (req: Request) => {
