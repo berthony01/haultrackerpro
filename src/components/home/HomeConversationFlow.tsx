@@ -97,6 +97,65 @@ function stepAfter(stepId: IntakeStepId, skipped: readonly IntakeStepId[]): Inta
 }
 
 /**
+ * HP-4B1 — review-mode acceptance.
+ *
+ * Pure, local and deterministic: no network, AI, storage or geocoding. It
+ * answers one question only — did the driver's reply actually change THIS
+ * step's field(s) to a value the existing parser accepted? Object identity is
+ * deliberately NOT used, because several parsers return a fresh object even
+ * when nothing was understood.
+ */
+const REVIEW_STATE_CODES = new Set(
+  ('AL AK AZ AR CA CO CT DE FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY ' +
+    'NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY DC').split(' '),
+);
+
+/** Conservative human place-name shape. Gibberish such as `???` must fail. */
+export function isPlausibleCityName(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const city = value.trim();
+  if (!city || city.length > 60) return false;
+  if (!/^[A-Za-z][A-Za-z\s'’.-]*$/.test(city)) return false;
+  return (city.match(/[A-Za-z]/g) ?? []).length >= 2;
+}
+
+export function reviewStepCorrected(
+  stepId: IntakeStepId,
+  prev: IntakeAnswers,
+  next: IntakeAnswers,
+): boolean {
+  switch (stepId) {
+    case 'work-type':
+      // `initialMessage` alone can never count as a correction.
+      return (
+        next.preferred_route_type !== prev.preferred_route_type ||
+        next.preferred_driver_type !== prev.preferred_driver_type
+      );
+    case 'location': {
+      if (next.city === prev.city && next.state === prev.state) return false;
+      if (next.state !== undefined && !REVIEW_STATE_CODES.has(next.state)) return false;
+      if (next.city !== undefined && !isPlausibleCityName(next.city)) return false;
+      return next.state !== undefined || next.city !== undefined;
+    }
+    case 'cdl-class':
+      return next.cdl_class !== prev.cdl_class;
+    case 'experience':
+      return next.years_experience !== prev.years_experience;
+    case 'home-time':
+      return next.preferred_home_time !== prev.preferred_home_time;
+    case 'trailer':
+      return (
+        (next.trailer_experience ?? []).join('|') !== (prev.trailer_experience ?? []).join('|')
+      );
+    case 'pay-goal':
+      return next.min_weekly_gross !== prev.min_weekly_gross;
+    default:
+      return false;
+  }
+}
+
+
+/**
  * HP-3C — only the FIRST assistant line may be prefixed with verified public
  * listing context. The script, order, chips and completion behavior are
  * untouched.
