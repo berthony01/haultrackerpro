@@ -21,6 +21,8 @@ import {
   type TelegramGateway,
   type TelegramGatewayResponse,
   type TelegramIgnoredResultCode,
+  type TelegramInlineUrlButton,
+  type TelegramMenuCommand,
   type TelegramPollLease,
   type TelegramPollLedger,
   type TelegramResultCode,
@@ -314,7 +316,16 @@ const RECRUITER_WELCOME_TEXT =
 const COMBINED_WELCOME_TEXT =
   "HaulTracker Pro — welcome\n\nYour account is connected with both work-seeking and recruiter access.\n\nWork: find work that matches your preferences and keep your Work Profile current.\nRecruiter: post and manage opportunities, work qualified conversations, and review results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options or /status for your account status.";
 
-const WORK_MENU_TEXT = "HaulTracker Pro — menu\n\nJump straight to what you need:";
+// RB-1B. Each capability group gets its OWN menu copy. A recruiter must never
+// be shown work-seeking wording, and a multi-capability account must see both
+// groups named explicitly.
+const WORK_MENU_TEXT =
+  "HaulTracker Pro — menu\n\nWork:\nFind work that matches your preferences, or keep your Work Profile current.";
+const RECRUITER_MENU_TEXT =
+  "HaulTracker Pro — menu\n\nRecruiter:\nManage your opportunities, work through conversations, or review your results.";
+const COMBINED_MENU_TEXT =
+  "HaulTracker Pro — menu\n\nWork:\nFind work that matches your preferences, or keep your Work Profile current.\n\nRecruiter:\nManage your opportunities, work through conversations, or review your results.";
+
 const WORK_STATUS_TEXT = "HaulTracker Pro — account status\n\nWork account connected.";
 
 interface MenuWorkspaceDescriptor {
@@ -379,14 +390,14 @@ function composeMenuText(
     const summary = composeWorkspaceSummary(workspaces);
     if (summary === null) return MENU_NO_WORKSPACE_TEXT;
     if (command === "start") return RECRUITER_WELCOME_TEXT;
-    if (command === "menu") return WORK_MENU_TEXT;
+    if (command === "menu") return RECRUITER_MENU_TEXT;
     return summary;
   }
 
   if (resultCode === "menu_multi_role") {
     const summary = composeWorkspaceSummary(workspaces);
     if (command === "start") return COMBINED_WELCOME_TEXT;
-    if (command === "menu") return WORK_MENU_TEXT;
+    if (command === "menu") return COMBINED_MENU_TEXT;
     return summary === null
       ? WORK_STATUS_TEXT
       : `${WORK_STATUS_TEXT}\n\n${summary}`;

@@ -859,13 +859,17 @@ describe("TG-2D edge function shell", () => {
     expect(EDGE_SOURCE).not.toMatch(/console\.log\([^)]*body/);
   });
 
-  it("drives the shared orchestrator and only the five TG-2D RPCs plus the TG-2F-C bind RPC", () => {
+  // RB-1B re-pin. The menu RPC was legitimately added by RB-1A, so this
+  // exhaustive list went stale at that commit. Re-pinned to the current exact
+  // set and kept exhaustive, so an unauthorised RPC still fails by design.
+  it("drives the shared orchestrator and only the five TG-2D RPCs plus the bind and menu RPCs", () => {
     expect(EDGE_SOURCE).toContain("runTelegramPoll");
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\("(\w+)"/g)].map((m) => m[1]);
-    expect(rpcs.sort()).toEqual([
+    expect([...new Set(rpcs)].sort()).toEqual([
       "telegram_advance_poll_cursor",
       "telegram_claim_poll_lease",
       "telegram_process_bind_update",
+      "telegram_process_menu_update",
       "telegram_process_start_update",
       "telegram_record_ignored_update",
       "telegram_release_poll_lease",
