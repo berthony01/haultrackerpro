@@ -362,7 +362,7 @@ export default function HomeConversationFlow({
     const nextAnswers = applyStepAnswer(answers, current.id, text);
     setDraft('');
     advance(text, nextAnswers, current, false);
-  }, [draft, current, answers, advance]);
+  }, [draft, current, answers, advance, state.reviewing]);
 
 
   const submitChip = useCallback(
