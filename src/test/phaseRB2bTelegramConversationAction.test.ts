@@ -51,7 +51,7 @@ const RB2B_CODE = stripSqlComments(RB2B_SQL);
 const ORCHESTRATOR_CODE = stripTsComments(ORCHESTRATOR_SOURCE);
 const EDGE_CODE = stripTsComments(EDGE_SOURCE);
 
-const THREAD_ID = "33333333-3333-4333-8333-333333333333";
+const THREAD_ID = "3a3b3c3d-1111-4e22-8f33-aabbccddeeff";
 
 // ─────────────────────────── A. locator contract ───────────────────────────
 
