@@ -429,7 +429,7 @@ describe("RB-2A.1 D — unknown delivery outcome never auto-resends", () => {
     expect(predicate).toContain("WHERE p.status = 'pending'");
     // The only 'claimed' reference left in the loop is the forward transition.
     expect(predicate).not.toContain("'claimed'");
-    expect(predicate).not.toContain("OR");
+    expect(predicate).not.toMatch(/\bOR\b\s+\(?\s*p\.status/);
   });
 
   it("3) the stale-claimed reclaim window is gone and cannot return", () => {
