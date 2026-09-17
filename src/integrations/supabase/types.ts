@@ -7716,6 +7716,7 @@ export type Database = {
           alert_id: string
           opportunity_title: string
           telegram_chat_id: number
+          thread_id: string
         }[]
       }
       telegram_claim_poll_lease: {
@@ -7872,6 +7873,22 @@ export type Database = {
           _raw_token: string
           _telegram_chat_id: number
           _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+        }[]
+      }
+      telegram_process_conversation_action_update: {
+        Args: {
+          _action: string
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _thread_id: string
           _update_id: number
         }
         Returns: {
