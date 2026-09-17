@@ -7,8 +7,9 @@
  * Hard rules for this phase:
  *  - READ ONLY. No profile write of any kind, and no browser-storage write.
  *    No backend, RLS, auth or billing change.
- *  - Employment fields only: identity, contact, visibility, recruiter-contact
- *    consent and every My Trucking financial surface are never read or shown.
+ *  - Employment fields only. Identity, contact details, sharing settings,
+ *    recruiter-contact consent and every My Trucking financial surface are
+ *    never read or shown here; the pure merge helper enforces that.
  *  - Non-drivers get a neutral not-available state and no profile data.
  */
 import { useMemo } from 'react';
