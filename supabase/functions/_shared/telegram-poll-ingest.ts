@@ -24,10 +24,17 @@ export type TelegramStartResultCode = "link_success" | "link_rejected";
 /** Phase TG-2F-C — dispatch group `/bind` terminal outcomes. */
 export type TelegramBindResultCode = "bind_success" | "bind_rejected";
 
+/** Phase RB-1A — private-chat read-only menu/status terminal outcomes. */
+export type TelegramMenuResultCode =
+  | "menu_recruiter"
+  | "menu_linked_no_workspace"
+  | "menu_unlinked";
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
   | TelegramStartResultCode
-  | TelegramBindResultCode;
+  | TelegramBindResultCode
+  | TelegramMenuResultCode;
 
 export interface TelegramPollLease {
   leaseToken: string;
@@ -37,6 +44,9 @@ export interface TelegramPollLease {
 export interface TelegramTerminalResult {
   isNew: boolean;
   resultCode: TelegramResultCode;
+  /** RB-1A. Fully composed plain-text menu reply, supplied by the adapter for
+   *  menu outcomes only. Never a template, never raw update data. */
+  menuText?: string | null;
 }
 
 /** Database side. Implemented by the Edge Function over the TG-2D RPCs, and
@@ -71,6 +81,20 @@ export interface TelegramPollLedger {
     telegramChatId: number;
     chatType: string;
     rawToken: string;
+  }): Promise<TelegramTerminalResult>;
+  /** RB-1A. Atomic: actor resolution + terminal receipt in one DB
+   *  transaction. Read-only with respect to recruiter data.
+   *
+   *  Optional so a ledger built before RB-1A still satisfies the contract.
+   *  When it is absent the orchestrator fails CLOSED for menu updates: no
+   *  receipt, no reply, no cursor advance. */
+  processMenuUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
   }): Promise<TelegramTerminalResult>;
 }
 
@@ -151,6 +175,10 @@ const BIND_COMMAND_PATTERN = new RegExp(
 );
 const BIND_CHAT_TYPES = ["group", "supergroup"];
 
+/** RB-1A. Bare private-chat menu commands ONLY. Deliberately exact: any
+ *  suffixed or addressed variant keeps its existing TG-2D classification. */
+const MENU_COMMANDS = ["/start", "/status"];
+
 /** Deterministic JSON serialisation: object keys sorted at every depth so the
  *  same logical update always hashes to the same digest regardless of the key
  *  order Telegram happened to emit. */
@@ -207,7 +235,8 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
 export type TelegramClassification =
   | { kind: "ignored"; resultCode: TelegramIgnoredResultCode }
   | { kind: "start"; rawToken: string }
-  | { kind: "bind"; rawToken: string; chatType: string };
+  | { kind: "bind"; rawToken: string; chatType: string }
+  | { kind: "menu" };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
@@ -239,6 +268,12 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   const match = START_COMMAND_PATTERN.exec(identity.text);
   if (match) {
     return { kind: "start", rawToken: match[1] };
+  }
+  // RB-1A. Strictly AFTER the link-token pattern, so `/start <64hex>` keeps
+  // its TG-2B/TG-2D meaning, and strictly exact, so `/start ` prefixes and
+  // `/start@…` variants keep their existing `invalid_start_command` outcome.
+  if (MENU_COMMANDS.includes(identity.text)) {
+    return { kind: "menu" };
   }
   if (identity.text === "/start" || identity.text.startsWith("/start ") || identity.text.startsWith("/start@")) {
     return { kind: "ignored", resultCode: "invalid_start_command" };
@@ -339,6 +374,17 @@ export async function runTelegramPoll(
             chatType: classification.chatType,
             rawToken: classification.rawToken,
           })
+        : classification.kind === "menu"
+        ? await (ledger.processMenuUpdate
+            ? ledger.processMenuUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: "private",
+              })
+            : Promise.reject(new Error("telegram_menu_processor_unavailable")))
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
@@ -378,6 +424,14 @@ export async function runTelegramPoll(
         ? TELEGRAM_BIND_SUCCESS_MESSAGE
         : terminal.resultCode === "bind_rejected"
         ? TELEGRAM_BIND_FAILURE_MESSAGE
+        // RB-1A. The adapter composes the menu text from the bounded
+        // descriptor; the orchestrator only transports it.
+        : (terminal.resultCode === "menu_recruiter" ||
+            terminal.resultCode === "menu_linked_no_workspace" ||
+            terminal.resultCode === "menu_unlinked") &&
+            typeof terminal.menuText === "string" &&
+            terminal.menuText.length > 0
+        ? terminal.menuText
         : null;
 
       if (feedback !== null) {
