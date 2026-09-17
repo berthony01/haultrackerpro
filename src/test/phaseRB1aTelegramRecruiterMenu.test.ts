@@ -327,17 +327,18 @@ describe("RB-1A classification — menu only where authorised", () => {
     });
   }
 
-  it("does not expand allowed_updates and adds no callback_query handling", () => {
-    expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message"]);
-    expect(ORCHESTRATOR_CODE).not.toContain("callback_query");
-    expect(EDGE_CODE).not.toContain("callback_query");
+  // RB-2B re-pin. RB-1A/RB-1B protected the menu surface from growing a
+  // callback path. RB-2B adds a callback path for conversation ACTIONS only,
+  // in the same poller. Re-pinned exactly: allowed_updates is the exact new
+  // two-entry tuple, the menu keyboards themselves stay URL-only, and no
+  // webhook is introduced.
+  it("keeps the menu surface URL-only and adds no webhook", () => {
+    expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message", "callback_query"]);
     expect(EDGE_CODE).not.toMatch(/setWebhook/i);
-    // RB-1B re-pin. RB-1A forbade `reply_markup`/`inline_keyboard` outright
-    // because it shipped no buttons at all. RB-1B ships URL-ONLY inline
-    // buttons, so the assertion is re-pinned to the actual safety property it
-    // was protecting: no callback surface, therefore no `callback_query`
-    // update type and no widening of allowed_updates.
-    expect(EDGE_CODE).not.toMatch(/callback_data/i);
+    const menuButtons = EDGE_CODE.split("function composeMenuButtons")[1]
+      ?.split("\nfunction ")[0] ?? "";
+    expect(menuButtons.length).toBeGreaterThan(0);
+    expect(menuButtons).not.toMatch(/callbackData|callback_data/i);
   });
 });
 
@@ -514,7 +515,13 @@ describe("RB-1A adapter — privacy and transport shape", () => {
 
   it("composes text with no callback surface and no candidate or contact data", () => {
     expect(EDGE_CODE).toContain("composeMenuText");
-    expect(EDGE_CODE).not.toMatch(/parse_mode|callback_data|callback_query/i);
+    // RB-2B re-pin: `parse_mode` stays forbidden; the callback terms are now
+    // scoped to the menu composer, which must still carry none.
+    expect(EDGE_CODE).not.toMatch(/parse_mode/i);
+    const menuText = EDGE_CODE.split("function composeMenuText")[1]
+      ?.split("\nfunction ")[0] ?? "";
+    expect(menuText.length).toBeGreaterThan(0);
+    expect(menuText).not.toMatch(/callbackData|callback_data|callback_query/i);
     // RB-1B re-pin. The original list included the literal word "driver",
     // which RB-1B legitimately uses as a RESULT-CODE name (`menu_driver`).
     // The protected property was never the word — it was that no candidate,

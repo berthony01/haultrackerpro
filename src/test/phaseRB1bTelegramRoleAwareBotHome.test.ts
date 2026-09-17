@@ -282,11 +282,14 @@ describe("RB-1B B — the three bare private commands are distinguished", () => 
     });
   });
 
-  it("keeps allowed_updates at message only and grows no callback surface", () => {
-    expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message"]);
+  // RB-2B re-pin. RB-1B forbade any callback surface because it shipped none.
+  // RB-2B legitimately adds exactly one, inside the SAME single poller. The
+  // assertion is re-pinned to the exact new allowed_updates tuple — still
+  // exhaustive, so a third update type fails by design — and the webhook /
+  // second-poller prohibition is unchanged.
+  it("keeps one poller with exactly message + callback_query and no webhook", () => {
+    expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message", "callback_query"]);
     for (const source of [ORCHESTRATOR_CODE, EDGE_CODE]) {
-      expect(source).not.toContain("callback_query");
-      expect(source).not.toContain("callback_data");
       expect(source).not.toMatch(/setWebhook|deleteWebhook/i);
     }
   });
