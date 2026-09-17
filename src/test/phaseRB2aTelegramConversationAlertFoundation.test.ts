@@ -31,6 +31,11 @@ const read = (p: string) => readFileSync(path.join(ROOT, p), "utf8");
 const RB2A_SQL = read(
   "supabase/migration-candidates/20260918120000_phase_rb2a_telegram_conversation_alert_outbox.sql",
 );
+// RB-2A.1 — the authoritative FINAL definition of the claim RPC.
+const RB2A1_SQL = read(
+  "supabase/migration-candidates/20260917204500_phase_rb2a1_alert_delivery_ambiguity_hardening.sql",
+);
+
 const ORCHESTRATOR_SOURCE = read(
   "supabase/functions/_shared/telegram-poll-ingest.ts",
 );
