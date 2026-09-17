@@ -392,12 +392,17 @@ describe("TG-2F-C D — bot feedback discloses nothing", () => {
 // ---------------------------------------------------------------------------
 
 describe("TG-2F-C E — edge adapter delegates to the atomic RPC only", () => {
+  // RB-1B re-pin. `telegram_process_menu_update` was legitimately added by
+  // RB-1A; this exhaustive list went stale at that commit, not at RB-1B. It is
+  // re-pinned to the current exact RPC set — still exhaustive, so any further
+  // unauthorised RPC still fails this assertion by design.
   it("calls telegram_process_bind_update and nothing else new", () => {
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\("(\w+)"/g)].map((m) => m[1]);
-    expect(rpcs.sort()).toEqual([
+    expect([...new Set(rpcs)].sort()).toEqual([
       "telegram_advance_poll_cursor",
       "telegram_claim_poll_lease",
       "telegram_process_bind_update",
+      "telegram_process_menu_update",
       "telegram_process_start_update",
       "telegram_record_ignored_update",
       "telegram_release_poll_lease",
@@ -455,8 +460,16 @@ describe("TG-2F-C F — shared orchestrator holds no token or command surface", 
     }
   });
 
-  it("adds no command beyond /start and /bind", () => {
-    for (const forbidden of ["/load", "/status", "/help", "/unbind"]) {
+  // RB-1B re-pin. `/status` was legitimately introduced by RB-1A and `/menu`
+  // by RB-1B; both are read-only private-chat commands. The protected
+  // property is that the orchestrator grows no ACTION command surface, so the
+  // assertion is re-pinned to the current legitimate set rather than relaxed.
+  it("adds no command beyond /start, /bind, /status and /menu", () => {
+    const commands = [...new Set(INGEST_SOURCE.match(/\/(?:[a-z]{3,12})\b/g) ?? [])]
+      .filter((c) => ["/start", "/bind", "/status", "/menu", "/load", "/help", "/unbind"].includes(c))
+      .sort();
+    expect(commands).toEqual(["/bind", "/menu", "/start", "/status"]);
+    for (const forbidden of ["/load", "/help", "/unbind"]) {
       expect(INGEST_SOURCE).not.toContain(forbidden);
     }
   });

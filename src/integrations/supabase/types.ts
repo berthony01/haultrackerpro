@@ -7851,6 +7851,10 @@ export type Database = {
         Args: { _lease_token: string }
         Returns: boolean
       }
+      telegram_resolve_account_role: {
+        Args: { _telegram_user_id: number }
+        Returns: string
+      }
       telegram_resolve_recruiter_actor: {
         Args: { _telegram_user_id: number }
         Returns: {

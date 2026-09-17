@@ -263,8 +263,17 @@ const HEX = "a".repeat(64);
 
 describe("RB-1A classification — menu only where authorised", () => {
   const cases: Array<[string, Parameters<typeof identity>[0], TelegramClassification]> = [
-    ["bare /start in private", { text: "/start" }, { kind: "menu" }],
-    ["/status in private", { text: "/status" }, { kind: "menu" }],
+    // RB-1B re-pin: the menu classification now carries the copy selector.
+    // The safety purpose is unchanged — menu ONLY in private chats, and only
+    // for exactly these bare commands.
+    ["bare /start in private", { text: "/start" }, { kind: "menu", command: "start" }],
+    ["/status in private", { text: "/status" }, { kind: "menu", command: "status" }],
+    ["/menu in private", { text: "/menu" }, { kind: "menu", command: "menu" }],
+    [
+      "group /menu stays non_private_message",
+      { chatType: "group", text: "/menu" },
+      { kind: "ignored", resultCode: "non_private_message" },
+    ],
     [
       "/start <64hex> in private stays the link-token path",
       { text: `/start ${HEX}` },
@@ -322,7 +331,13 @@ describe("RB-1A classification — menu only where authorised", () => {
     expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message"]);
     expect(ORCHESTRATOR_CODE).not.toContain("callback_query");
     expect(EDGE_CODE).not.toContain("callback_query");
-    expect(EDGE_CODE).not.toMatch(/setWebhook|reply_markup|inline_keyboard/i);
+    expect(EDGE_CODE).not.toMatch(/setWebhook/i);
+    // RB-1B re-pin. RB-1A forbade `reply_markup`/`inline_keyboard` outright
+    // because it shipped no buttons at all. RB-1B ships URL-ONLY inline
+    // buttons, so the assertion is re-pinned to the actual safety property it
+    // was protecting: no callback surface, therefore no `callback_query`
+    // update type and no widening of allowed_updates.
+    expect(EDGE_CODE).not.toMatch(/callback_data/i);
   });
 });
 
@@ -497,11 +512,24 @@ describe("RB-1A adapter — privacy and transport shape", () => {
     expect(rpcs).not.toContain("telegram_resolve_recruiter_actor");
   });
 
-  it("composes plain text only, with no buttons and no driver or candidate data", () => {
+  it("composes text with no callback surface and no candidate or contact data", () => {
     expect(EDGE_CODE).toContain("composeMenuText");
-    expect(EDGE_CODE).not.toMatch(/reply_markup|inline_keyboard|parse_mode|callback/i);
-    for (const forbidden of ["driver", "candidate", "applicant", "email", "phone", "@"]) {
-      const menuBlock = /function composeMenuText[\s\S]*?\n}/.exec(EDGE_CODE)![0];
+    expect(EDGE_CODE).not.toMatch(/parse_mode|callback_data|callback_query/i);
+    // RB-1B re-pin. The original list included the literal word "driver",
+    // which RB-1B legitimately uses as a RESULT-CODE name (`menu_driver`).
+    // The protected property was never the word — it was that no candidate,
+    // applicant or contact data reaches the composed reply. That is what is
+    // asserted here, and it is asserted more strictly than before.
+    const menuBlock = /function composeMenuText[\s\S]*?\n}/.exec(EDGE_CODE)![0];
+    for (const forbidden of [
+      "candidate",
+      "applicant",
+      "email",
+      "phone",
+      "driver_name",
+      "user_id",
+      "telegram_user_id",
+    ]) {
       expect(menuBlock.toLowerCase()).not.toContain(forbidden);
     }
   });

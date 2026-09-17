@@ -490,10 +490,12 @@ export async function runTelegramPoll(
 
       if (feedback !== null) {
         try {
+          // `buttons` is omitted entirely when there are none, so every
+          // pre-RB-1B outcome sends the exact payload it always sent.
           const sent = await gateway.sendMessage({
             chatId: identity.telegramChatId,
             text: feedback,
-            buttons: feedbackButtons,
+            ...(feedbackButtons ? { buttons: feedbackButtons } : {}),
           });
           if (!sent.ok) {
             log("send_message_failed", {
