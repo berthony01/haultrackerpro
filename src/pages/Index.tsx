@@ -1242,7 +1242,7 @@ const Index = () => {
                 isPro={isPro}
               />
             )}
-            {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} />}
+            {page === 'opportunities' && <OpportunitiesPage key={opportunitiesViewKey} onUpgrade={handleUpgrade} onViewChange={setOpportunitiesView} onFindWork={() => navigate('/find-work')} />}
             {page === 'settlements' && !isRecruiterView && (
               <DriverSettlementsView onBack={() => setPage('dashboard')} />
             )}
