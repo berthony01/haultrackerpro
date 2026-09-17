@@ -444,10 +444,10 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
               </button>
             )}
           </Field>
-          <Field label="City">
+          <Field label="City" pending={isPending('city')}>
             <Input value={form.city} onChange={(e) => set('city', e.target.value)} placeholder="Dallas" />
           </Field>
-          <Field label="State">
+          <Field label="State" pending={isPending('state')}>
             <Input value={form.state} onChange={(e) => set('state', e.target.value.toUpperCase().slice(0, 2))} placeholder="TX" maxLength={2} />
           </Field>
         </Grid>
@@ -455,13 +455,13 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
       <Section icon={Compass} title="What You’re Looking For">
         <Grid>
-          <Field label="Preferred driver type">
+          <Field label="Preferred driver type" pending={isPending('preferred_driver_type')}>
             <SelectField value={form.preferred_driver_type} onChange={(v) => set('preferred_driver_type', v)} options={DRIVER_TYPES} placeholder="Select" />
           </Field>
-          <Field label="Preferred route type">
+          <Field label="Preferred route type" pending={isPending('preferred_route_type')}>
             <SelectField value={form.preferred_route_type} onChange={(v) => set('preferred_route_type', v)} options={ROUTE_TYPES} placeholder="Select" />
           </Field>
-          <Field label="Preferred home time">
+          <Field label="Preferred home time" pending={isPending('preferred_home_time')}>
             <SelectField value={form.preferred_home_time} onChange={(v) => set('preferred_home_time', v)} options={HOME_TIMES} placeholder="Select" />
           </Field>
           <Field label="Available start date">
@@ -484,10 +484,10 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
       <Section icon={IdCard} title="Experience & Equipment">
         <Grid>
-          <Field label="CDL Class">
+          <Field label="CDL Class" pending={isPending('cdl_class')}>
             <SelectField value={form.cdl_class} onChange={(v) => set('cdl_class', v)} options={CDL_CLASSES} placeholder="Select" />
           </Field>
-          <Field label="Years of experience">
+          <Field label="Years of experience" pending={isPending('years_experience')}>
             <Input
               type="number"
               min={0}
@@ -498,12 +498,12 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
           </Field>
         </Grid>
         <ChipGroup label="Endorsements" options={ENDORSEMENTS} selected={form.endorsements} onToggle={(v) => toggleArr('endorsements', v)} />
-        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} />
+        <ChipGroup label="Trailer experience" options={TRAILERS} selected={form.trailer_experience} onToggle={(v) => toggleArr('trailer_experience', v)} pending={isPending('trailer_experience')} />
       </Section>
 
       <Section icon={DollarSign} title="Pay Goals">
         <Grid>
-          <Field label="Min weekly gross ($)">
+          <Field label="Min weekly gross ($)" pending={isPending('min_weekly_gross')}>
             <Input
               type="number"
               min={0}
@@ -613,10 +613,32 @@ function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">{children}</div>;
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function PendingBadge() {
+  return (
+    <span
+      data-testid="driver-profile-pending-badge"
+      className="rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary"
+    >
+      Pending
+    </span>
+  );
+}
+
+function Field({
+  label,
+  children,
+  pending,
+}: {
+  label: string;
+  children: React.ReactNode;
+  pending?: boolean;
+}) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+        {pending && <PendingBadge />}
+      </div>
       {children}
     </div>
   );
@@ -650,15 +672,20 @@ function ChipGroup({
   options,
   selected,
   onToggle,
+  pending,
 }: {
   label: string;
   options: string[];
   selected: string[];
   onToggle: (v: string) => void;
+  pending?: boolean;
 }) {
   return (
     <div className="space-y-2">
-      <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Label className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</Label>
+        {pending && <PendingBadge />}
+      </div>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => {
           const active = selected.includes(o);
