@@ -338,8 +338,12 @@ export default function HomeConversationFlow({
      * unambiguous PREFERENCE fields at once. Facts (CDL class, years of
      * experience, endorsements) are never inferred here; ambiguous dimensions
      * stay unset so the normal step still asks them.
+     *
+     * HP-4B1 — this branch is disabled during review mode; a correction is
+     * parsed with the explicit current-step parser only.
      */
-    if (current.id === 'work-type' && !answers.initialMessage) {
+    if (current.id === 'work-type' && !answers.initialMessage && !state.reviewing) {
+
       const captured = extractFirstMessagePreferences(text);
       const nextAnswers: IntakeAnswers = {
         ...answers,
