@@ -150,7 +150,7 @@ describe("TG-2F-C A — bind command recognition", () => {
 
   it("accepts the bot-addressed form", () => {
     const result = classifyUpdate(
-      identity({ text: `/bind@HaulTrackerProDispatchBot ${HEX64}` }),
+      identity({ text: `/bind@HaulTrackerBot ${HEX64}` }),
     );
     expect(result).toEqual({ kind: "bind", rawToken: HEX64, chatType: "group" });
   });

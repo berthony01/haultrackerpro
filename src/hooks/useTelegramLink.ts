@@ -19,7 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
-export const TELEGRAM_BOT_USERNAME = 'HaulTrackerProDispatchBot';
+export const TELEGRAM_BOT_USERNAME = 'HaulTrackerBot';
 export const TELEGRAM_DEEP_LINK_PREFIX = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=`;
 
 /** Raw tokens are exactly 64 lowercase hex characters. */

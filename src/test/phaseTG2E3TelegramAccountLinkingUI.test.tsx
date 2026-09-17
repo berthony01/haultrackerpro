@@ -71,10 +71,10 @@ describe('TG-2E3-A — own-link query safety', () => {
 
 describe('TG-2E3-A — bot identity and token validation', () => {
   it('pins the exact public bot username and deep-link prefix', () => {
-    expect(TELEGRAM_BOT_USERNAME).toBe('HaulTrackerProDispatchBot');
-    expect(TELEGRAM_DEEP_LINK_PREFIX).toBe('https://t.me/HaulTrackerProDispatchBot?start=');
+    expect(TELEGRAM_BOT_USERNAME).toBe('HaulTrackerBot');
+    expect(TELEGRAM_DEEP_LINK_PREFIX).toBe('https://t.me/HaulTrackerBot?start=');
     expect(buildTelegramDeepLink('a'.repeat(64))).toBe(
-      `https://t.me/HaulTrackerProDispatchBot?start=${'a'.repeat(64)}`,
+      `https://t.me/HaulTrackerBot?start=${'a'.repeat(64)}`,
     );
   });
 

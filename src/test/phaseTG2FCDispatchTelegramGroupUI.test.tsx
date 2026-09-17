@@ -210,7 +210,7 @@ describe("TG-2F-C UI E — owner settings mount and permission gating", () => {
 
   it("references the bot by public username only", () => {
     expect(SECTION_SOURCE).toContain("TELEGRAM_DISPATCH_BOT_USERNAME");
-    expect(TELEGRAM_DISPATCH_BOT_USERNAME).toBe("HaulTrackerProDispatchBot");
+    expect(TELEGRAM_DISPATCH_BOT_USERNAME).toBe("HaulTrackerBot");
   });
 });
 
@@ -224,7 +224,7 @@ const rpc = vi.fn();
 
 vi.mock("@/hooks/useTelegramLink", () => ({
   useTelegramLink: () => linkState,
-  TELEGRAM_BOT_USERNAME: "HaulTrackerProDispatchBot",
+  TELEGRAM_BOT_USERNAME: "HaulTrackerBot",
 }));
 
 vi.mock("@/hooks/recruiter/useRecruiterStaffPermissions", () => ({

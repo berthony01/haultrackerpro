@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const TOKEN = 'a1b2'.repeat(16);
-const DEEP_LINK = `https://t.me/HaulTrackerProDispatchBot?start=${TOKEN}`;
+const DEEP_LINK = `https://t.me/HaulTrackerBot?start=${TOKEN}`;
 
 const hookState = {
   connected: false,
@@ -27,7 +27,7 @@ const hookState = {
 };
 
 vi.mock('@/hooks/useTelegramLink', () => ({
-  TELEGRAM_BOT_USERNAME: 'HaulTrackerProDispatchBot',
+  TELEGRAM_BOT_USERNAME: 'HaulTrackerBot',
   useTelegramLink: () => hookState,
 }));
 

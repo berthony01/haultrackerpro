@@ -292,7 +292,7 @@ describe("RB-1A classification — menu only where authorised", () => {
     ],
     [
       "/start@Bot in private keeps invalid_start_command",
-      { text: "/start@HaulTrackerProDispatchBot" },
+      { text: "/start@HaulTrackerBot" },
       { kind: "ignored", resultCode: "invalid_start_command" },
     ],
     [

@@ -169,7 +169,7 @@ const START_COMMAND_PATTERN = /^\/start ([0-9a-f]{64})$/;
 
 /** TG-2F-C. `/bind <64 lowercase hex>`, optionally addressed to the bot. The
  *  bot username is a public, non-secret constant. */
-export const TELEGRAM_BOT_USERNAME = "HaulTrackerProDispatchBot";
+export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
 const BIND_COMMAND_PATTERN = new RegExp(
   `^\\/bind(?:@${TELEGRAM_BOT_USERNAME})? ([0-9a-f]{64})$`,
 );
