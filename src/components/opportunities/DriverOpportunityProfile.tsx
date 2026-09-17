@@ -370,7 +370,14 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <Button variant="ghost" onClick={onBack} className="text-muted-foreground hover:text-foreground -ml-2">
+      <Button
+        variant="ghost"
+        onClick={() => {
+          clearPendingReview();
+          onBack();
+        }}
+        className="text-muted-foreground hover:text-foreground -ml-2"
+      >
         <ArrowLeft className="h-4 w-4" /> Back to Opportunities
       </Button>
 
