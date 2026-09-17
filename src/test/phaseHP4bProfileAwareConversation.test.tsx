@@ -464,12 +464,14 @@ describe('HP-4B1 — Change mode accepts only real corrections', () => {
     expect(lastAssistant()).toContain('Where are you based?');
   });
 
-  it('a valid location correction advances, city-only or city+state', () => {
+  it('a valid city+state location correction advances', () => {
     renderReview();
     say('dedicated');
     say('Dallas, TX');
     expect(lastAssistant()).toContain('What CDL class do you hold?');
+  });
 
+  it('a valid city-only location correction advances', () => {
     renderReview();
     say('dedicated');
     say('Dallas');
@@ -489,7 +491,10 @@ describe('HP-4B1 — Change mode accepts only real corrections', () => {
     expect(lastAssistant()).toContain('I did not catch that one.');
     say('7');
     expect(lastAssistant()).toContain('How often do you want to be home?');
+    // Re-affirming the SAME seeded value is not a correction; a real change is.
     say('weekly');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+    say('home daily');
     expect(lastAssistant()).toContain('What equipment do you run?');
     say('reefer');
     expect(lastAssistant()).toContain('weekly gross');
@@ -501,8 +506,12 @@ describe('HP-4B1 — Change mode accepts only real corrections', () => {
     renderReview();
     say('dedicated');
     say('Dallas, TX');
+    say('class B');
+    say('7');
+    say('home daily');
+    // The equipment step is optional, so Skip must still move the review on.
     fireEvent.click(screen.getByTestId('home-conversation-skip'));
-    expect(lastAssistant()).toContain('How many years');
+    expect(lastAssistant()).toContain('weekly gross');
   });
 
   it('makes no database or storage write during a review correction', () => {
