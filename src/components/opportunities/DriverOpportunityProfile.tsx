@@ -346,6 +346,8 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         // The homepage seed has now been persisted by the driver's own action.
         clearIntakeSnapshot();
         setSeedApplied(false);
+        // The Find Work answers are now saved by the driver's own action.
+        clearPendingReview();
         if (completed) toast.success('Your Opportunity Preferences are ready.');
         else
           toast.success('Preferences saved. Add a few more details later to improve your match quality.');
