@@ -46,6 +46,8 @@ const stripTsComments = (s: string) =>
   s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 const RB2A_CODE = stripSqlComments(RB2A_SQL);
+const RB2A1_CODE = stripSqlComments(RB2A1_SQL);
+
 const ORCHESTRATOR_CODE = stripTsComments(ORCHESTRATOR_SOURCE);
 const EDGE_CODE = stripTsComments(EDGE_SOURCE);
 
