@@ -23,7 +23,9 @@ import {
   type TelegramAlertOutbox,
   type TelegramGateway,
   type TelegramGatewayResponse,
+  type TelegramConversationAction,
   type TelegramIgnoredResultCode,
+  type TelegramInlineButton,
   type TelegramInlineUrlButton,
   type TelegramMenuCommand,
   type TelegramPollLease,
@@ -121,17 +123,35 @@ function buildGateway(lovableApiKey: string, connectionKey: string): TelegramGat
     return { ok: true, status: response.status, result: body.result };
   };
 
+  // RB-2B. URL rows keep their exact previous wire shape; callback rows emit
+  // Telegram's `callback_data`. The payload carries no other new field.
+  const toInlineKeyboard = (rows: TelegramInlineButton[][]) =>
+    rows.map((row) =>
+      row.map((button) =>
+        "url" in button
+          ? { text: button.text, url: button.url }
+          : { text: button.text, callback_data: button.callbackData }
+      )
+    );
+
   return {
     getUpdates: (options) => call<unknown[]>("getUpdates", { ...options }),
-    // RB-1B. `buttons` carries URL-only inline rows. When absent the payload
-    // is byte-identical to the RB-1A one.
+    // RB-1B. `buttons` carries inline rows. When absent the payload is
+    // byte-identical to the RB-1A one.
     sendMessage: ({ chatId, text, buttons }) =>
       call<unknown>("sendMessage", {
         chat_id: chatId,
         text,
         ...(buttons && buttons.length > 0
-          ? { reply_markup: { inline_keyboard: buttons } }
+          ? { reply_markup: { inline_keyboard: toInlineKeyboard(buttons) } }
           : {}),
+      }),
+    // RB-2B. Resolves the tap spinner. Non-mutating and best-effort: the
+    // orchestrator never lets a failure here repeat or undo a database action.
+    answerCallbackQuery: ({ callbackQueryId, text }) =>
+      call<unknown>("answerCallbackQuery", {
+        callback_query_id: callbackQueryId,
+        text,
       }),
   };
 }
@@ -272,6 +292,38 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
         menuButtons: composeMenuButtons(resultCode),
       };
     },
+    // RB-2B. Private-chat Accept / Pass. The database derives the acting
+    // account from the active Telegram link, re-authorizes it against CF-1 for
+    // THAT conversation, performs the canonical CF-1 transition and writes the
+    // terminal receipt in one transaction. This adapter transports the untrusted
+    // locator and the fixed outcome code only — never an actor, workspace or
+    // driver identity.
+    async processConversationActionUpdate(input: {
+      leaseToken: string;
+      updateId: number;
+      payloadHash: string;
+      telegramUserId: number;
+      telegramChatId: number;
+      chatType: string;
+      action: TelegramConversationAction | null;
+      threadId: string | null;
+    }): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(
+        "telegram_process_conversation_action_update",
+        {
+          _lease_token: input.leaseToken,
+          _update_id: input.updateId,
+          _payload_hash: input.payloadHash,
+          _telegram_user_id: input.telegramUserId,
+          _telegram_chat_id: input.telegramChatId,
+          _chat_type: input.chatType,
+          _action: input.action,
+          _thread_id: input.threadId,
+        },
+      );
+      if (error) throw new Error(error.message);
+      return unwrapTerminal(data);
+    },
   };
 }
 
@@ -287,15 +339,22 @@ function buildAlertOutbox(supabase: RpcClient): TelegramAlertOutbox {
       if (error) throw new Error(error.message);
       const rows = (Array.isArray(data) ? data : []) as {
         alert_id?: unknown;
+        thread_id?: unknown;
         telegram_chat_id?: unknown;
         opportunity_title?: unknown;
       }[];
       return rows
         .filter((row) =>
-          typeof row?.alert_id === "string" && typeof row?.telegram_chat_id === "number"
+          typeof row?.alert_id === "string" &&
+          // RB-2B. Without a usable conversation locator the Accept / Pass
+          // buttons cannot be addressed, so the row is skipped rather than
+          // sent with a broken or guessable action.
+          typeof row?.thread_id === "string" &&
+          typeof row?.telegram_chat_id === "number"
         )
         .map((row) => ({
           alertId: row.alert_id as string,
+          threadId: row.thread_id as string,
           telegramChatId: row.telegram_chat_id as number,
           opportunityTitle:
             typeof row.opportunity_title === "string" ? row.opportunity_title : null,
