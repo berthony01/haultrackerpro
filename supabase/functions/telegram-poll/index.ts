@@ -16,8 +16,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 import {
+  runTelegramAlertDrain,
   runTelegramPoll,
   sanitizeErrorCode,
+  type TelegramAlertClaim,
+  type TelegramAlertOutbox,
   type TelegramGateway,
   type TelegramGatewayResponse,
   type TelegramIgnoredResultCode,
