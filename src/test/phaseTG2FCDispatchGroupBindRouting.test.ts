@@ -168,6 +168,7 @@ describe("TG-2F-C A — bind command recognition", () => {
     [`/bind  ${HEX64}`, "double space"],
     [`/bind ${HEX64} extra`, "trailing content"],
     [`/bind@OtherBot ${HEX64}`, "foreign bot mention"],
+    [`/bind@HaulTrackerProDispatchBot ${HEX64}`, "retired bot identity"],
     [`bind ${HEX64}`, "missing slash"],
     [`/BIND ${HEX64}`, "uppercase command"],
     [`/bindx ${HEX64}`, "command prefix collision"],

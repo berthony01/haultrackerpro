@@ -97,7 +97,7 @@ export function TelegramConnectionSection() {
 
       <p className="text-xs text-muted-foreground leading-relaxed">
         Connecting lets HaulTracker Pro securely recognize this account inside the HaulTracker Pro
-        Dispatch bot (@{TELEGRAM_BOT_USERNAME}) on Telegram.
+        bot (@{TELEGRAM_BOT_USERNAME}) on Telegram.
       </p>
 
       {isLoading ? (
