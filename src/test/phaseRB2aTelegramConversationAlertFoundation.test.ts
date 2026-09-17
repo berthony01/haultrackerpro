@@ -504,6 +504,7 @@ describe("RB-2A.1 D — unknown delivery outcome never auto-resends", () => {
     // back from the claim RPC because 'claimed' is no longer send-eligible.
     const claim: TelegramAlertClaim = {
       alertId: "a1",
+      threadId: THREAD_ID,
       telegramChatId: 111,
       opportunityTitle: null,
     };

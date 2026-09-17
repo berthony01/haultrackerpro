@@ -336,9 +336,11 @@ interface ParsedIdentity {
   telegramChatId: number | null;
   chatType: string | null;
   text: string | null;
-  /** RB-2B. Present ONLY for a `callback_query` update. */
-  callbackQueryId: string | null;
-  callbackData: string | null;
+  /** RB-2B. Present ONLY for a `callback_query` update. Optional so an
+   *  absent field is indistinguishable from an explicit null: a message
+   *  update can never be mistaken for a button tap. */
+  callbackQueryId?: string | null;
+  callbackData?: string | null;
 }
 
 function asFiniteInteger(value: unknown): number | null {
@@ -416,7 +418,7 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   // malformed payload or a non-private chat is still routed to the action
   // processor so its terminal receipt is recorded as `callback_query`, and the
   // processor — not this pure function — decides the fail-closed outcome.
-  if (identity.callbackQueryId !== null) {
+  if (identity.callbackQueryId != null) {
     const parsed = parseConversationActionData(identity.callbackData);
     return {
       kind: "conversation_action",
@@ -622,11 +624,12 @@ export async function runTelegramPoll(
     // new message. Answering is not a state mutation, so it runs even for a
     // duplicate delivery (which reports the already-recorded outcome) and a
     // failure here can never re-apply or roll back the database action.
-    if (identity.callbackQueryId !== null) {
+    if (identity.callbackQueryId != null) {
+      const callbackQueryId = identity.callbackQueryId;
       if (gateway.answerCallbackQuery) {
         try {
           const answered = await gateway.answerCallbackQuery({
-            callbackQueryId: identity.callbackQueryId,
+            callbackQueryId,
             text: composeConversationActionAnswer(terminal.resultCode),
           });
           if (!answered.ok) {
