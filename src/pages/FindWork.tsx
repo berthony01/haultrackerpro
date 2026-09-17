@@ -24,6 +24,8 @@ import {
   describeProfileReuse,
   mapProfileToIntakeAnswers,
 } from '@/lib/home/profileConversationMerge';
+import { setPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
+import type { IntakeAnswers } from '@/lib/home/conversationIntake';
 
 const NAVY_BG = 'hsl(220, 20%, 8%)';
 const NAVY_SURFACE = 'hsl(220, 20%, 11%)';
