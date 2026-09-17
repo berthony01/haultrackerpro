@@ -7803,6 +7803,21 @@ export type Database = {
           result_code: string
         }[]
       }
+      telegram_process_menu_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+          workspaces: Json
+        }[]
+      }
       telegram_process_start_update: {
         Args: {
           _chat_type: string
@@ -7835,6 +7850,16 @@ export type Database = {
       telegram_release_poll_lease: {
         Args: { _lease_token: string }
         Returns: boolean
+      }
+      telegram_resolve_recruiter_actor: {
+        Args: { _telegram_user_id: number }
+        Returns: {
+          active_opportunity_count: number
+          can_manage_opportunities: boolean
+          recruiter_id: string
+          role: string
+          workspace_name: string
+        }[]
       }
       telegram_revoke_dispatch_chat: {
         Args: { _telegram_chat_id: number; _telegram_user_id: number }
