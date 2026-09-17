@@ -273,6 +273,7 @@ const App = () => (
               <Route path="/ai-contract-review-for-truckers" element={<AiContractReviewForTruckers />} />
               <Route path="/how-to-use-haultrackerpro" element={<HowToUseHaulTrackerPro />} />
               <Route path="/parking" element={<ProtectedRoute><Parking /></ProtectedRoute>} />
+              <Route path="/find-work" element={<ProtectedRoute><FindWork /></ProtectedRoute>} />
               <Route path="/starter-kit" element={<StarterKit />} />
               <Route path="/starter-kit/thanks" element={<StarterKitThanks />} />
               <Route path="/updates" element={<ProtectedRoute><Updates /></ProtectedRoute>} />
