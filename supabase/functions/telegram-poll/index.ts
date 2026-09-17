@@ -118,8 +118,16 @@ function buildGateway(lovableApiKey: string, connectionKey: string): TelegramGat
 
   return {
     getUpdates: (options) => call<unknown[]>("getUpdates", { ...options }),
-    sendMessage: ({ chatId, text }) =>
-      call<unknown>("sendMessage", { chat_id: chatId, text }),
+    // RB-1B. `buttons` carries URL-only inline rows. When absent the payload
+    // is byte-identical to the RB-1A one.
+    sendMessage: ({ chatId, text, buttons }) =>
+      call<unknown>("sendMessage", {
+        chat_id: chatId,
+        text,
+        ...(buttons && buttons.length > 0
+          ? { reply_markup: { inline_keyboard: buttons } }
+          : {}),
+      }),
   };
 }
 
