@@ -370,6 +370,15 @@ export async function runTelegramPoll(
             chatType: classification.chatType,
             rawToken: classification.rawToken,
           })
+        : classification.kind === "menu"
+        ? await ledger.processMenuUpdate({
+            leaseToken: lease.leaseToken,
+            updateId,
+            payloadHash,
+            telegramUserId: identity.telegramUserId as number,
+            telegramChatId: identity.telegramChatId as number,
+            chatType: "private",
+          })
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
@@ -409,6 +418,14 @@ export async function runTelegramPoll(
         ? TELEGRAM_BIND_SUCCESS_MESSAGE
         : terminal.resultCode === "bind_rejected"
         ? TELEGRAM_BIND_FAILURE_MESSAGE
+        // RB-1A. The adapter composes the menu text from the bounded
+        // descriptor; the orchestrator only transports it.
+        : (terminal.resultCode === "menu_recruiter" ||
+            terminal.resultCode === "menu_linked_no_workspace" ||
+            terminal.resultCode === "menu_unlinked") &&
+            typeof terminal.menuText === "string" &&
+            terminal.menuText.length > 0
+        ? terminal.menuText
         : null;
 
       if (feedback !== null) {
