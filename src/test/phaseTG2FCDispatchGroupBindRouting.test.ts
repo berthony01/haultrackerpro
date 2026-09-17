@@ -150,7 +150,7 @@ describe("TG-2F-C A — bind command recognition", () => {
 
   it("accepts the bot-addressed form", () => {
     const result = classifyUpdate(
-      identity({ text: `/bind@HaulTrackerProDispatchBot ${HEX64}` }),
+      identity({ text: `/bind@HaulTrackerBot ${HEX64}` }),
     );
     expect(result).toEqual({ kind: "bind", rawToken: HEX64, chatType: "group" });
   });
@@ -168,6 +168,7 @@ describe("TG-2F-C A — bind command recognition", () => {
     [`/bind  ${HEX64}`, "double space"],
     [`/bind ${HEX64} extra`, "trailing content"],
     [`/bind@OtherBot ${HEX64}`, "foreign bot mention"],
+    [`/bind@HaulTrackerProDispatchBot ${HEX64}`, "retired bot identity"],
     [`bind ${HEX64}`, "missing slash"],
     [`/BIND ${HEX64}`, "uppercase command"],
     [`/bindx ${HEX64}`, "command prefix collision"],

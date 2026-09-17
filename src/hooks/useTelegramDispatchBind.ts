@@ -14,7 +14,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 /** Public, non-secret bot handle. Matches the live dispatch bot. */
-export const TELEGRAM_DISPATCH_BOT_USERNAME = 'HaulTrackerProDispatchBot';
+export const TELEGRAM_DISPATCH_BOT_USERNAME = 'HaulTrackerBot';
 
 /** Server-side TTL of a dispatch bind token (TG-2F-B: 15 minutes). */
 export const DISPATCH_BIND_TOKEN_TTL_MS = 15 * 60 * 1000;
