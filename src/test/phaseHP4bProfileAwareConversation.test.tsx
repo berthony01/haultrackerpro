@@ -400,3 +400,127 @@ describe('HP-4B routing', () => {
     );
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* HP-4B1 — review-mode progression                                    */
+/* ------------------------------------------------------------------ */
+
+describe('HP-4B1 — Change mode accepts only real corrections', () => {
+  const seedAll = () => mapProfileToIntakeAnswers(FULL_PROFILE);
+
+  function renderReview() {
+    const seed = seedAll();
+    renderFlow({ initialAnswers: seed, profileReuseLabels: describeProfileReuse(seed) });
+    fireEvent.click(screen.getByTestId('home-conversation-confirm-change'));
+  }
+
+  function say(text: string) {
+    fireEvent.change(screen.getByTestId('home-conversation-input'), { target: { value: text } });
+    fireEvent.click(screen.getByTestId('home-conversation-send'));
+  }
+
+  const lastAssistant = () => {
+    const all = screen.getAllByTestId('home-conversation-bubble-assistant');
+    return all[all.length - 1].textContent ?? '';
+  };
+
+  const FLOW_SRC_4B1 = read('src/components/home/HomeConversationFlow.tsx');
+
+  it('never decides review progress by object identity', () => {
+    expect(FLOW_SRC_4B1).not.toContain('nextAnswers !== prev.answers');
+    expect(FLOW_SRC_4B1).toContain('reviewStepCorrected(step.id, prev.answers, nextAnswers)');
+  });
+
+  it('does not run the HP-4A first-message branch while reviewing', () => {
+    expect(FLOW_SRC_4B1).toContain(
+      "current.id === 'work-type' && !answers.initialMessage && !state.reviewing",
+    );
+  });
+
+  it('gibberish work-type does not advance and is not progress via initialMessage', () => {
+    renderReview();
+    say('???');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+    say('something random');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+    // Still on the work-type step, seeded value intact.
+    expect(lastAssistant()).toContain(INTAKE_OPENING_PROMPT);
+  });
+
+  it('a valid work-type correction advances and wins over the seed', () => {
+    renderReview();
+    say('local work');
+    const text = screen.getByTestId('home-conversation-transcript').textContent ?? '';
+    expect(text).not.toContain('I did not catch that one.');
+    expect(lastAssistant()).toContain('Where are you based?');
+  });
+
+  it('gibberish location does not advance', () => {
+    renderReview();
+    say('dedicated');
+    expect(lastAssistant()).toContain('Where are you based?');
+    say('???');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+    expect(lastAssistant()).toContain('Where are you based?');
+  });
+
+  it('a valid city+state location correction advances', () => {
+    renderReview();
+    say('dedicated');
+    say('Dallas, TX');
+    expect(lastAssistant()).toContain('What CDL class do you hold?');
+  });
+
+  it('a valid city-only location correction advances', () => {
+    renderReview();
+    say('dedicated');
+    say('Dallas');
+    expect(lastAssistant()).toContain('What CDL class do you hold?');
+  });
+
+  it('invalid CDL, experience and pay replies re-ask and preserve the seeded value', () => {
+    renderReview();
+    say('dedicated');
+    say('Dallas, TX');
+    // CDL — the seed already holds A; an unparseable reply must re-ask.
+    say('zzzz');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+    say('class B');
+    expect(lastAssistant()).toContain('How many years');
+    say('not sure');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+    say('7');
+    expect(lastAssistant()).toContain('How often do you want to be home?');
+    // Re-affirming the SAME seeded value is not a correction; a real change is.
+    say('weekly');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+    say('home daily');
+    expect(lastAssistant()).toContain('What equipment do you run?');
+    say('reefer');
+    expect(lastAssistant()).toContain('weekly gross');
+    say('no idea');
+    expect(lastAssistant()).toContain('I did not catch that one.');
+  });
+
+  it('Skip still advances during review', () => {
+    renderReview();
+    say('dedicated');
+    say('Dallas, TX');
+    say('class B');
+    say('7');
+    say('home daily');
+    // The equipment step is optional, so Skip must still move the review on.
+    fireEvent.click(screen.getByTestId('home-conversation-skip'));
+    expect(lastAssistant()).toContain('weekly gross');
+  });
+
+  it('makes no database or storage write during a review correction', () => {
+    renderReview();
+    say('???');
+    say('local work');
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(deleteMock).not.toHaveBeenCalled();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(sessionStorage.length).toBe(0);
+  });
+});
