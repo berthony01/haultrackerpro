@@ -402,6 +402,16 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         </p>
       )}
 
+      {pendingFields.length > 0 && (
+        <p
+          data-testid="driver-profile-pending-review-note"
+          className="text-xs font-medium rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-foreground"
+        >
+          {PENDING_REVIEW_BANNER}
+        </p>
+      )}
+
+
       <Section icon={User} title="Recruiter Contact Information">
         <p className="text-xs text-muted-foreground -mt-1">
           These are the contact details used for opportunity applications and recruiter sharing according to your privacy choices below. Changing them does not change your sign-in email or your Leaderboard Identity.
