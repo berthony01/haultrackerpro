@@ -440,6 +440,9 @@ export interface TelegramPollDeps {
   gateway: TelegramGateway;
   sha256: TelegramSha256;
   log?: TelegramPollLogger;
+  /** RB-3A. Absent = Quick Post extraction is unavailable and a reserved draft
+   *  is marked failed rather than retried, so no model call is ever implied. */
+  quickPostExtractor?: TelegramQuickPostExtractor;
 }
 
 export type TelegramPollRunResult =
