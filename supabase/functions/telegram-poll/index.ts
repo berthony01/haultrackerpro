@@ -678,6 +678,24 @@ Deno.serve(async (req: Request) => {
     }
   };
 
+  // RB-2D. Outbound driver messages are drained AFTER inbound polling and
+  // after the alert drain, in their own isolated scope. A delivery failure can
+  // never throw into inbound processing and therefore can never stall the
+  // cursor, the lease, or any command / callback / reply handling.
+  const drainMessageDeliveries = async (): Promise<void> => {
+    try {
+      await runTelegramMessageDeliveryDrain({
+        outbox: buildMessageDeliveryOutbox(supabase),
+        gateway,
+        log,
+      });
+    } catch (error) {
+      log("message_delivery_drain_unhandled_error", {
+        code: sanitizeErrorCode(error),
+      });
+    }
+  };
+
   try {
     const result = await runTelegramPoll({
       ledger: buildLedger(supabase),
@@ -687,6 +705,9 @@ Deno.serve(async (req: Request) => {
     });
 
     await drainAlerts();
+    await drainMessageDeliveries();
+
+
 
 
 
