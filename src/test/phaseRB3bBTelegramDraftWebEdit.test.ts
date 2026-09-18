@@ -346,3 +346,46 @@ describe("RB-3B-B 8 — draft mode form shape", () => {
     expect(FORM_CODE).toContain("buildOpportunityPersistencePayload(state, 'draft')");
   });
 });
+
+// ─────────────────── 9. Lifecycle fields stay server-owned ───────────────────
+
+describe("RB-3B-B 9 — web save cannot touch server-owned lifecycle state", () => {
+  const SAVE_FN = MIGRATION_CODE.slice(
+    MIGRATION_CODE.indexOf("FUNCTION public.save_telegram_opportunity_draft_payload"),
+    MIGRATION_CODE.indexOf("FUNCTION public.telegram_quick_post_review_snapshot"),
+  );
+
+  it("strips a caller-supplied status so nothing can be published from the web", () => {
+    expect(SAVE_FN).toContain("_payload := _payload - 'status'");
+  });
+
+  it("writes only extracted_payload on a still-reviewable, still-owned row", () => {
+    expect(SAVE_FN).toMatch(/SET extracted_payload = _filtered/);
+    expect(SAVE_FN).toMatch(/AND state = 'review'/);
+    expect(SAVE_FN).toMatch(/AND created_opportunity_id IS NULL/);
+    expect(SAVE_FN).not.toMatch(/SET[\s\S]{0,200}(actor_user_id|recruiter_id|telegram_user_id|telegram_chat_id|state\s*=\s*')/);
+  });
+
+  it("requires ownership, review state, unexpired and current recruiter capability", () => {
+    expect(SAVE_FN).toContain("d.actor_user_id = _actor");
+    expect(SAVE_FN).toContain("_draft.expires_at <= now()");
+    expect(SAVE_FN).toContain("current_user_can_recruiter_opportunity_action");
+  });
+
+  it("never returns Telegram identifiers or raw source to the browser", () => {
+    const READ_FN = MIGRATION_CODE.slice(
+      MIGRATION_CODE.indexOf("FUNCTION public.get_telegram_opportunity_draft_for_edit"),
+      MIGRATION_CODE.indexOf("FUNCTION public.save_telegram_opportunity_draft_payload"),
+    );
+    expect(READ_FN).not.toContain("telegram_user_id");
+    expect(READ_FN).not.toContain("telegram_chat_id");
+    expect(READ_FN).not.toContain("raw_source_text");
+    expect(READ_FN).not.toContain("source_update_id");
+  });
+
+  it("keeps the internal whitelist helper off the authenticated surface", () => {
+    expect(MIGRATION_CODE).toMatch(
+      /REVOKE ALL ON FUNCTION public\._telegram_quick_post_editable_keys\(\) FROM authenticated/,
+    );
+  });
+});
