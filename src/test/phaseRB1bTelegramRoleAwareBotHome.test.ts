@@ -268,9 +268,13 @@ describe("RB-1B B — the three bare private commands are distinguished", () => 
   });
 
   it("ignores unknown text and addressed variants rather than answering them", () => {
+    // RB-3A re-pin. Plain unknown text is now offered to the Quick Post SOURCE
+    // processor, which records the unchanged `non_start_message` outcome unless
+    // a live awaiting-input draft exists. It is still never a menu command, and
+    // every ADDRESSED slash variant below keeps its exact prior outcome.
     expect(classifyUpdate(identity({ text: "hello" }))).toEqual({
-      kind: "ignored",
-      resultCode: "non_start_message",
+      kind: "quick_post_source",
+      text: "hello",
     });
     expect(classifyUpdate(identity({ text: "/menu@HaulTrackerBot" }))).toEqual({
       kind: "ignored",
