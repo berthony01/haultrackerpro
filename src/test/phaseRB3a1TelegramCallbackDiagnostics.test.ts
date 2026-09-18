@@ -117,7 +117,9 @@ describe("RB-3A.1 — bounded callback RPC error codes", () => {
  */
 describe("RB-3A.1 — quick post recruiter resolver min(uuid) regression", () => {
   it("no longer aggregates the recruiter uuid with min()", () => {
-    expect(FIX_SQL).not.toMatch(/min\s*\(\s*r?\.?recruiter_id/i);
+    const executable = FIX_SQL.split("\n").filter((l) => !l.trim().startsWith("--"))
+      .join("\n");
+    expect(executable).not.toMatch(/min\s*\(/i);
     expect(FIX_SQL).toContain("array_agg(r.recruiter_id)");
   });
 
