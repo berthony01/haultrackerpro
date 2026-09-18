@@ -299,10 +299,7 @@ export function useRecruiterStaffOpportunities({
     mutationFn: async (data: OpportunityInsert) => {
       require(permissions.canCreateOpportunities);
       if (data.status === 'active') require(permissions.canChangeOpportunityStatus);
-      const { error } = await supabase
-        .from('opportunities')
-        .insert({ ...data, recruiter_id: id! });
-      if (error) throw error;
+      await createRecruiterOpportunityViaRpc(id!, data);
     },
     onSuccess: invalidate,
   });
