@@ -1298,7 +1298,16 @@ function RecruiterOpportunityFormCore({
 
 /* ---------------- stage primitives ---------------- */
 
-function StageTabs({ current, onSelect }: { current: StageKey; onSelect: (k: StageKey) => void }) {
+function StageTabs({
+  current,
+  onSelect,
+  hiddenStages,
+}: {
+  current: StageKey;
+  onSelect: (k: StageKey) => void;
+  /** RB-3B-B — stages suppressed in Telegram draft edit mode. */
+  hiddenStages?: StageKey[];
+}) {
   return (
     <div
       role="tablist"
