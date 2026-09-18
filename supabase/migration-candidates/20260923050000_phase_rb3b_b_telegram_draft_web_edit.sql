@@ -240,6 +240,11 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- Lifecycle stays server-owned: the web editor can never raise a Quick Post
+  -- draft to an active/published status. Confirm remains the only creator and
+  -- keeps producing a draft opportunity.
+  _payload := _payload - 'status';
+
   SELECT * INTO _draft
     FROM public.telegram_opportunity_drafts d
    WHERE d.id = _draft_id
