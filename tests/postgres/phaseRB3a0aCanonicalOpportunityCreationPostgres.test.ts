@@ -813,17 +813,17 @@ describe('RB-3A-0A — authorization (real roles, real predicates)', () => {
   });
 
   it('3b. an unrelated authenticated user is denied', async () => {
-    const err = await expectFailure('authenticated', OUTSIDER_USER, RECRUITER_A, MINIMAL_PAYLOAD);
+    const err = await expectFailure('authenticated', OUTSIDER_USER, RECRUITER_TEAM, MINIMAL_PAYLOAD);
     expect(err.message).toContain('permission_denied');
   });
 
   it('4. staff WITH opportunities_create succeed; staff WITHOUT it are denied', async () => {
     const ok = await asRole('authenticated', STAFF_USER, (c) =>
-      callCreate(c, RECRUITER_A, { ...MINIMAL_PAYLOAD, title: 'Staff create' }),
+      callCreate(c, RECRUITER_TEAM, { ...MINIMAL_PAYLOAD, title: 'Staff create' }),
     );
     expect(ok.result_code).toBe('created');
 
-    const err = await expectFailure('authenticated', STAFF_NO_PERM_USER, RECRUITER_A, MINIMAL_PAYLOAD);
+    const err = await expectFailure('authenticated', STAFF_NO_PERM_USER, RECRUITER_TEAM, MINIMAL_PAYLOAD);
     expect(err.message).toContain('permission_denied');
   });
 
@@ -832,7 +832,7 @@ describe('RB-3A-0A — authorization (real roles, real predicates)', () => {
       `UPDATE public.recruiter_members SET status='revoked' WHERE member_user_id=$1`,
       [STAFF_USER],
     );
-    const err = await expectFailure('authenticated', STAFF_USER, RECRUITER_A, MINIMAL_PAYLOAD);
+    const err = await expectFailure('authenticated', STAFF_USER, RECRUITER_TEAM, MINIMAL_PAYLOAD);
     expect(err.message).toContain('permission_denied');
     await pool.query(
       `UPDATE public.recruiter_members SET status='active' WHERE member_user_id=$1`,
@@ -943,12 +943,12 @@ describe('RB-3A-0A — payload whitelist and defaults', () => {
 
   it('always binds recruiter_id to the validated argument', async () => {
     const out = await asRole('authenticated', STAFF_USER, (c) =>
-      callCreate(c, RECRUITER_A, { ...MINIMAL_PAYLOAD, title: 'Bound' }),
+      callCreate(c, RECRUITER_TEAM, { ...MINIMAL_PAYLOAD, title: 'Bound' }),
     );
     const row = await pool.query('SELECT recruiter_id FROM public.opportunities WHERE id=$1', [
       out.opportunity_id,
     ]);
-    expect(row.rows[0].recruiter_id).toBe(RECRUITER_A);
+    expect(row.rows[0].recruiter_id).toBe(RECRUITER_TEAM);
   });
 });
 
