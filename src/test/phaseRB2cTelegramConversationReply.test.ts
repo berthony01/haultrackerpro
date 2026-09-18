@@ -74,12 +74,19 @@ describe("RB-2C A — free text routes ONLY as an explicit reply to an alert", (
     });
   });
 
-  it("2) free text that is NOT a reply is never routed", () => {
+  it("2) free text that is NOT a reply is never routed as a conversation reply", () => {
+    // RB-3A re-pin: non-reply private text is now offered to the Quick Post
+    // SOURCE processor, which records the unchanged `non_start_message`
+    // outcome unless the acting account holds a live awaiting-input draft.
+    // The RB-2C invariant under test is unchanged and asserted exactly: this
+    // text must NEVER become a conversation reply.
     for (const replyToMessageId of [null, undefined, 0, -1]) {
-      expect(classifyUpdate(messageIdentity({ replyToMessageId }))).toEqual({
-        kind: "ignored",
-        resultCode: "non_start_message",
+      const classification = classifyUpdate(messageIdentity({ replyToMessageId }));
+      expect(classification).toEqual({
+        kind: "quick_post_source",
+        text: "Thanks, when can you start?",
       });
+      expect(classification.kind).not.toBe("conversation_reply");
     }
   });
 
