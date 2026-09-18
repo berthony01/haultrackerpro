@@ -965,6 +965,7 @@ Deno.serve(async (req: Request) => {
       gateway,
       sha256: sha256Hex,
       log,
+      quickPostExtractor: buildQuickPostExtractor(supabaseUrl, serviceRoleKey),
     });
 
     await drainAlerts();
