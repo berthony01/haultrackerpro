@@ -28,6 +28,7 @@ import {
   parseQuickPostActionData,
   runTelegramPoll,
   type TelegramGateway,
+  type TelegramInlineButton,
   type TelegramPollLedger,
   type TelegramQuickPostExtractor,
   type TelegramResultCode,
