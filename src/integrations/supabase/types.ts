@@ -4780,6 +4780,72 @@ export type Database = {
         }
         Relationships: []
       }
+      telegram_opportunity_drafts: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          created_opportunity_id: string | null
+          expires_at: string
+          extracted_payload: Json | null
+          id: string
+          last_error_code: string | null
+          raw_source_text: string | null
+          recruiter_id: string
+          source_update_id: number | null
+          state: string
+          telegram_chat_id: number
+          telegram_user_id: number
+          updated_at: string
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          created_opportunity_id?: string | null
+          expires_at?: string
+          extracted_payload?: Json | null
+          id?: string
+          last_error_code?: string | null
+          raw_source_text?: string | null
+          recruiter_id: string
+          source_update_id?: number | null
+          state?: string
+          telegram_chat_id: number
+          telegram_user_id: number
+          updated_at?: string
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          created_opportunity_id?: string | null
+          expires_at?: string
+          extracted_payload?: Json | null
+          id?: string
+          last_error_code?: string | null
+          raw_source_text?: string | null
+          recruiter_id?: string
+          source_update_id?: number | null
+          state?: string
+          telegram_chat_id?: number
+          telegram_user_id?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_opportunity_drafts_created_opportunity_id_fkey"
+            columns: ["created_opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_opportunity_drafts_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_poll_state: {
         Row: {
           id: number
@@ -5242,6 +5308,14 @@ export type Database = {
       _sync_recruiter_capability: {
         Args: { _user_id: string }
         Returns: undefined
+      }
+      _telegram_quick_post_filter_payload: {
+        Args: { _payload: Json }
+        Returns: Json
+      }
+      _telegram_quick_post_recruiter: {
+        Args: { _telegram_user_id: number }
+        Returns: string
       }
       accept_agency_invite: {
         Args: { _token: string }
@@ -7811,6 +7885,10 @@ export type Database = {
           next_offset: number
         }[]
       }
+      telegram_complete_quick_post_extraction: {
+        Args: { _draft_id: string; _error_code: string; _extracted: Json }
+        Returns: Json
+      }
       telegram_dispatch_create_driver_load: {
         Args: {
           _deadhead_miles?: number
@@ -8026,6 +8104,55 @@ export type Database = {
           is_new: boolean
           result_code: string
           workspaces: Json
+        }[]
+      }
+      telegram_process_quick_post_action_update: {
+        Args: {
+          _action: string
+          _chat_type: string
+          _draft_id: string
+          _lease_token: string
+          _payload_hash: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          draft_id: string
+          is_new: boolean
+          result_code: string
+        }[]
+      }
+      telegram_process_quick_post_command_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          draft_id: string
+          is_new: boolean
+          result_code: string
+        }[]
+      }
+      telegram_process_quick_post_source_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _text: string
+          _update_id: number
+        }
+        Returns: {
+          actor_user_id: string
+          draft_id: string
+          is_new: boolean
+          result_code: string
         }[]
       }
       telegram_process_start_update: {

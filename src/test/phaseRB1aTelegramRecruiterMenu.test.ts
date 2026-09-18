@@ -294,10 +294,15 @@ describe("RB-1A classification — menu only where authorised", () => {
       { chatType: "group", text: "/status" },
       { kind: "ignored", resultCode: "non_private_message" },
     ],
+    // RB-3A re-pin. Unknown private text is NOT a menu and never was; it is
+    // now offered to the Quick Post SOURCE processor, which records the
+    // unchanged `non_start_message` outcome unless the acting account holds a
+    // live awaiting-input draft. The RB-1A invariant under test — unknown text
+    // never reaches the menu surface — is asserted exactly below.
     [
-      "unknown private text stays non_start_message",
+      "unknown private text is never a menu and carries only the raw text",
       { text: "hello there" },
-      { kind: "ignored", resultCode: "non_start_message" },
+      { kind: "quick_post_source", text: "hello there" },
     ],
     [
       "/start@Bot in private keeps invalid_start_command",

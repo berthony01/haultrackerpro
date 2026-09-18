@@ -1058,7 +1058,7 @@ export async function runTelegramPoll(
               actorUserId,
               text: classification.text,
             });
-            if (outcome.ok) {
+            if (outcome.ok === true) {
               extracted = outcome.extracted;
             } else {
               errorCode = outcome.errorCode;
