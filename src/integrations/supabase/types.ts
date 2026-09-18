@@ -5688,6 +5688,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_recruiter_opportunity: {
+        Args: { _payload: Json; _recruiter_id: string }
+        Returns: Json
+      }
       current_owner_qa_persona: {
         Args: never
         Returns: {
