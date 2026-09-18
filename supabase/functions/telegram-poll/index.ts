@@ -834,7 +834,9 @@ function composeWorkspaceSummary(workspaces: unknown): string | null {
 
 function composeMenuButtons(
   resultCode: TelegramResultCode,
-): TelegramInlineUrlButton[][] | null {
+  // RB-3A. Widened from URL-only so the recruiter menu can carry its single
+  // Quick Post callback. Every Driver/work button remains URL-only.
+): TelegramInlineButton[][] | null {
   switch (resultCode) {
     case "menu_driver":
       return WORK_BUTTONS;
