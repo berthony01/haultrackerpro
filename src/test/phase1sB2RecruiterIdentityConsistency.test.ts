@@ -25,13 +25,23 @@ describe('Phase 1S-B2 — recruiter identity contract', () => {
   it('1. recruiter opportunities are owned by the recruiter PROFILE id, not the auth user id', () => {
     const src = read(RECRUITER_OPPS);
     expect(src).toMatch(/const recruiterId = profile\?\.id \?\? null;/);
-    // writes and filters use the recruiter profile id
-    expect(src).toMatch(/recruiter_id: recruiterId!/);
+    // Phase RB-3A-0A re-pin: creation no longer direct-inserts recruiter_id.
+    // It delegates to the canonical SECURITY DEFINER RPC, which binds
+    // recruiter_id from its validated argument. The identity contract is
+    // unchanged — the recruiter PROFILE id is still what is passed.
+    expect(src).toMatch(
+      /await createRecruiterOpportunityViaRpc\(recruiterId!, data\);/,
+    );
+    expect(src).toMatch(/_recruiter_id: recruiterId,/);
+    // filters still use the recruiter profile id
     expect(src).toMatch(/\.eq\('recruiter_id', recruiterId!?\)/);
     // never the auth user id
     expect(src).not.toMatch(/recruiter_id:\s*user\.id/);
     expect(src).not.toMatch(/recruiter_id:\s*user\?\.id/);
+    expect(src).not.toMatch(/_recruiter_id:\s*user\??\.id/);
     expect(src).not.toMatch(/\.eq\('recruiter_id',\s*user\??\.id\)/);
+    // and creation must never bypass the canonical RPC again
+    expect(src).not.toMatch(/\.from\('opportunities'\)\s*\.insert\(/);
   });
 
   it('2. the recruiter applications dashboard passes the recruiter profile id as identity', () => {
