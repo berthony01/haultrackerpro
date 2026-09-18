@@ -125,6 +125,7 @@ export type TelegramQuickPostResultCode =
   | "quick_post_create_blocked"
   | "quick_post_cancelled"
   | "quick_post_restarted"
+  | "quick_post_review_refreshed"
   | "quick_post_action_invalid"
   | "quick_post_action_denied"
   | "quick_post_action_unavailable";
@@ -141,6 +142,7 @@ export const TELEGRAM_QUICK_POST_RESULT_CODES:
     "quick_post_create_blocked",
     "quick_post_cancelled",
     "quick_post_restarted",
+    "quick_post_review_refreshed",
     "quick_post_action_invalid",
     "quick_post_action_denied",
     "quick_post_action_unavailable",
@@ -173,6 +175,8 @@ export const TELEGRAM_QUICK_POST_ANSWERS: Record<
     "That couldn't be created. Open HaulTracker Pro to finish this opportunity.",
   quick_post_cancelled: "Quick Post cancelled. Nothing was created.",
   quick_post_restarted: "Starting over. Paste the job post as one plain-text message.",
+  // RB-3B-B. Read-only re-render of the current draft after a web edit.
+  quick_post_review_refreshed: "Showing your latest draft details.",
   quick_post_action_invalid: "That button is no longer valid.",
   quick_post_action_denied: "You can't use that button.",
   quick_post_action_unavailable: "That draft isn't ready to post.",
