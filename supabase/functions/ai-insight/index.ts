@@ -40,26 +40,28 @@ const SYSTEM_PROMPTS: Record<string, string> = {
   parse_ratecon: `You are a rate confirmation parser for a trucking app. Extract structured load data from raw OCR text. Rules: (1) loaded_miles = line-haul/trip miles only. (2) deadhead_miles = empty/DH/bobtail miles only — never guess; omit if not explicitly present. (3) total_miles = dispatcher-provided total/all miles when explicitly labeled — keep separate from loaded. (4) Never treat total miles as deadhead. (5) Extract deadhead_rate_per_mile and flat_rate only if explicitly stated. (6) Suggest pay_model_suggestion based on detected fields: 'flat_rate' if flat amount present, 'loaded_plus_deadhead' if separate DH rate present, 'total_miles' if rate + total miles but no loaded miles, otherwise 'loaded_miles_only'. (7) If loaded+deadhead disagree with total by more than 2 miles, set mileage_warning. (8) DATES: only return load_date / dropoff_date / per-stop stop_date when the rate confirmation explicitly shows a full, unambiguous date. If only a partial date (e.g. "5/17" with no year) appears, assume the CURRENT calendar year — never default to a prior year. Never return a date older than 60 days before today or more than 30 days in the future. If the date is ambiguous or the year is uncertain, omit the field entirely (null) rather than guessing. (9) STOPS: use stop_type values Pickup, Stop, or Drop (final delivery). Do not invent stop dates. Use the provided tool.`,
 
   parse_opportunity: `You are a trucking job-posting parser. Given raw text pasted by a recruiter (job ad, recruiter pitch, internal posting, rate sheet), extract structured opportunity fields using the provided tool. Rules:
-(1) CPM = dollars per mile as a decimal (e.g. "65 cents per mile" → 0.65, "$0.58/mi" → 0.58). Never return cents as whole numbers like 65.
+(1) CPM = dollars per mile as a decimal (e.g. "65 cents per mile" → 0.65, "$0.58/mi" → 0.58). Never return cents as whole numbers like 65. Emit cpm ONLY when the source states a single, unambiguous dollars-per-mile rate. If the source has different rates for Solo vs Team, a range (e.g. "$0.70-$0.75"), or multiple conditional rates, OMIT cpm entirely — never pick one endpoint of a range. Preserve the exact pay wording in the description field instead.
 (2) percentage_pay = percentage as a number 0-100 (e.g. "72% of gross" → 72).
 (3) flat_weekly_pay = weekly salary in dollars.
 (4) estimated_weekly_miles, estimated_loaded_miles, estimated_deadhead_miles = whole miles only.
 (5) pay_model: pick exactly one of cpm | percentage | flat_weekly | salary | mixed | other based on what dominates the posting.
-(6) driver_type: company | owner_operator | lease_purchase | 1099 | team — pick the closest match, otherwise omit.
+(6) driver_type: company | owner_operator | lease_purchase | 1099 | team — pick the closest match, otherwise omit. Use "team" when the source explicitly mentions team driving. When the source mentions both solo and team, use "team" only if the posting is primarily team-oriented; otherwise omit.
 (7) route_type: one of Local | Regional | OTR | Dedicated | Semi-Dedicated.
 (8) trailer_type: one of Dry Van | Reefer | Flatbed | Tanker | Car Hauler | Intermodal | Other.
 (9) deadhead_paid, escrow_required, forced_dispatch, pets_allowed, riders_allowed: true/false only when clearly stated; omit otherwise (do not guess).
-(10) hiring_state: 2-letter US state code (e.g. TX). hiring_states: array of 2-letter codes for multi-state postings.
+(10) hiring_state: 2-letter US state code (e.g. TX). hiring_states: array of 2-letter codes for multi-state postings. Include ONLY state codes that appear explicitly in the source text. For "Philadelphia, PA | Sacramento, CA", include PA and CA only. Never infer a state from a city name, phone area code, recruiter location, company name, or model knowledge. Never add a state that does not appear in the source.
 (11) typical_lanes: short multi-line text of lane pairs like "Dallas, TX → Houston, TX" if mentioned.
 (12) requirements: experience, CDL class, endorsements, MVR rules, drug test, age requirements, etc.
-(13) description: a clean 1-3 sentence summary of the opportunity.
+(13) description: a clean 1-3 sentence summary of the opportunity. When the pay is complex (multiple rates, ranges, conditional pay) and scalar cpm was omitted, include the exact pay wording from the source here so it survives into review. Include benefits when stated.
 (14) Never invent numbers. Omit any field not clearly supported by the text.
 (15) Strip recruiter contact info (phone numbers, emails) from all extracted text fields.
 (16) STRUCTURED QUALIFICATION CRITERIA — explicit statements only, never inference. These are additive: keep extracting experience, CDL, endorsement, MVR, DUI, SAP, road test, drug test and age rules into the free-text \`requirements\` field exactly as before. Never strip them from \`requirements\` just because a structured field was also emitted.
-(17) min_years_experience: emit a number ONLY when the posting explicitly states a minimum or required amount of driving experience (e.g. "2 years experience required", "minimum 18 months" → 1.5). Decimal years are allowed when clearly stated. Do NOT emit for "preferred", "ideal", "a plus", or recruiter wish-list wording. Omit when no explicit minimum is stated.
+(17) min_years_experience: emit a number ONLY when the posting explicitly states a minimum or required amount of driving experience (e.g. "2 years experience required", "minimum 18 months" → 1.5). Decimal years are allowed when clearly stated. Do NOT emit for "preferred", "ideal", "a plus", or recruiter wish-list wording. Omit when no explicit minimum is stated. NEVER emit 0 to represent "not provided" — omit the field entirely. The only valid 0 is when the source literally says "0 years" or "no experience required".
 (18) required_cdl_class: emit A, B, or C ONLY when the posting explicitly states that CDL class as required. Do NOT infer a class from route type, trailer type, vehicle, job title, or generic "CDL required" wording. Omit when not explicitly stated.
 (19) required_endorsements: emit only endorsement codes the posting explicitly requires, from H (Hazmat), N (Tanker), P (Passenger), T (Doubles/Triples), X (combined Hazmat + Tanker). Never emit S. Emit X only when the posting explicitly requires the combined X / Hazmat+Tanker endorsement — do NOT convert a separately stated H and N into X. Do NOT infer N from a tanker trailer, nor H from hazmat freight, unless the posting states the endorsement itself is required. Omit the field entirely when no endorsement is explicitly required.
-(20) Never invent qualification criteria. When in doubt, omit the structured field and leave the wording in \`requirements\`.`,
+(20) Never invent qualification criteria. When in doubt, omit the structured field and leave the wording in \`requirements\`.
+(21) title: derive from the headline or job title in the source. A headline like "HIRING CDL-A drivers ASAP" may be cleaned to "CDL-A Drivers" or an equivalently faithful title. Never invent a title from a contact name or company guess. Omit when no headline or title is present.
+(22) company_name: omit when the source does not name a company. Never derive from a contact name or recruiter name.`,
 };
 
 // ── Tool definitions for structured extraction ───────────────────────
@@ -189,8 +191,7 @@ const PARSE_OPPORTUNITY_TOOL = {
         requirements: { type: "string", description: "Experience, CDL, endorsements, MVR, etc." },
         min_years_experience: {
           type: "number",
-          minimum: 0,
-          description: "Explicitly required minimum years of driving experience. Omit unless stated as required/minimum — never for 'preferred'.",
+          description: "Explicitly required minimum years of driving experience as a positive number. Omit entirely when not stated — NEVER emit 0 to represent 'not provided'.",
         },
         required_cdl_class: {
           type: "string",

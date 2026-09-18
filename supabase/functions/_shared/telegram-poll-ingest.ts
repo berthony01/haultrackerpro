@@ -178,6 +178,12 @@ export const TELEGRAM_QUICK_POST_ANSWERS: Record<
   quick_post_action_unavailable: "That draft isn't ready to post.",
 };
 
+/** RB-3B-A. Processing feedback sent BEFORE the extraction call so the
+ *  recruiter knows the bot is working. Best-effort, after the committed
+ *  terminal receipt, so a send failure can never affect cursor correctness. */
+export const QUICK_POST_PROCESSING_TEXT =
+  "Got it. I'm extracting the pay, route, equipment, home time, and requirements now. This can take a few seconds. I'll send the review when it's ready.";
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
   | TelegramStartResultCode
@@ -1051,6 +1057,35 @@ export async function runTelegramPoll(
       isNew: terminal.isNew,
     });
 
+    // RB-3B-A. Processing feedback sent BEFORE the extraction call so the
+    // recruiter sees visible progress during the model call. Best-effort:
+    // after the committed terminal receipt, so a send failure can never
+    // affect cursor correctness. Sent only for a fresh reservation, never
+    // on replay.
+    if (
+      terminal.isNew &&
+      terminal.resultCode === "quick_post_source_reserved" &&
+      identity.telegramChatId !== null
+    ) {
+      try {
+        const processing = await gateway.sendMessage({
+          chatId: identity.telegramChatId,
+          text: QUICK_POST_PROCESSING_TEXT,
+        });
+        if (!processing.ok) {
+          log("quick_post_processing_send_failed", {
+            updateId,
+            code: processing.errorCode ?? "telegram_gateway_error",
+          });
+        }
+      } catch (error) {
+        log("quick_post_processing_send_failed", {
+          updateId,
+          code: sanitizeErrorCode(error),
+        });
+      }
+    }
+
     // RB-3A. The canonical extractor runs ONLY for a source update that was
     // freshly RESERVED in the transaction above, and therefore exactly once per
     // unique Telegram update: a duplicate delivery reports the already-recorded
@@ -1154,6 +1189,11 @@ export async function runTelegramPoll(
         // failure can never re-write or undo the conversation message.
         : isConversationReplyResultCode(terminal.resultCode)
         ? TELEGRAM_CONVERSATION_REPLY_ANSWERS[terminal.resultCode]
+        // RB-3B-A. The processing message was already sent before extraction,
+        // and the review card arrives via quickPostMessages. Suppress the
+        // redundant "Reading that job post…" answer here.
+        : terminal.resultCode === "quick_post_source_reserved"
+        ? null
         // RB-3A. One fixed, bounded reply per Quick Post message outcome. The
         // adapter may supply richer bounded copy; it never supplies extracted
         // content here.
@@ -1229,6 +1269,7 @@ export async function runTelegramPoll(
     }
     if (
       identity.callbackQueryId != null &&
+      terminal.isNew &&
       isQuickPostResultCode(terminal.resultCode) &&
       typeof terminal.followUpText === "string" &&
       terminal.followUpText.length > 0

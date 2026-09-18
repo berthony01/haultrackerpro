@@ -553,19 +553,22 @@ const QUICK_POST_REVIEW_FIELDS: readonly { key: string; label: string }[] = [
   { key: "company_name", label: "Company" },
   { key: "hiring_city", label: "City" },
   { key: "hiring_state", label: "State" },
+  { key: "hiring_states", label: "States" },
   { key: "driver_type", label: "Driver type" },
   { key: "route_type", label: "Route type" },
   { key: "trailer_type", label: "Trailer" },
   { key: "pay_model", label: "Pay model" },
-  { key: "cpm_rate", label: "Rate per mile" },
-  { key: "percentage_rate", label: "Percentage" },
-  { key: "flat_rate_amount", label: "Flat rate" },
-  { key: "weekly_pay_min", label: "Weekly pay (min)" },
-  { key: "weekly_pay_max", label: "Weekly pay (max)" },
+  { key: "cpm", label: "Rate per mile" },
+  { key: "percentage_pay", label: "Percentage" },
+  { key: "flat_weekly_pay", label: "Flat weekly pay" },
+  { key: "estimated_weekly_gross", label: "Weekly gross" },
   { key: "estimated_weekly_miles", label: "Weekly miles" },
   { key: "home_time", label: "Home time" },
   { key: "min_years_experience", label: "Experience required" },
   { key: "required_cdl_class", label: "CDL class" },
+  { key: "required_endorsements", label: "Endorsements" },
+  { key: "description", label: "Summary / pay details" },
+  { key: "requirements", label: "Requirements" },
 ];
 
 function formatQuickPostValue(value: unknown): string {
@@ -653,9 +656,15 @@ function buildQuickPostExtractor(
 
 
 
+const QUICK_POST_GUIDANCE_TEXT =
+  "Ready to post an opportunity.\n\nPaste the full job post here as one message. I'll extract the details and show you a review before anything is created.\n\nNothing is posted until you confirm.";
+
 function composeQuickPostActionFollowUp(
   resultCode: TelegramResultCode,
 ): string | null {
+  if (resultCode === "quick_post_started") {
+    return QUICK_POST_GUIDANCE_TEXT;
+  }
   if (resultCode === "quick_post_created") {
     return "Draft opportunity created in HaulTracker Pro. Open it to review the details and publish when you're ready.";
   }
