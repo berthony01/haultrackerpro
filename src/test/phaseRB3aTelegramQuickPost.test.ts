@@ -300,7 +300,7 @@ function makeHarness(options: {
         followUpText: "Review this draft opportunity\n\nTitle: Not provided",
         followUpButtons: [
           [{ text: "Confirm", callback_data: composeQuickPostActionData("confirm", draftId) }],
-        ],
+        ] as TelegramInlineButton[][],
       };
     },
   };
