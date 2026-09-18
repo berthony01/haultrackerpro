@@ -107,6 +107,55 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     return <Gate onBack={onBack} title={block.title} body={block.body} Icon={Ban} />;
   }
 
+  // Phase RB-3B-B — Telegram draft edit handoff. Reached only after the normal
+  // recruiter authorization above. The form here can never create, update or
+  // publish an opportunity: its only write target is the bot draft.
+  if (telegramDraftId) {
+    if (telegramDraft.isLoading) {
+      return (
+        <div className="space-y-4" data-testid="telegram-draft-loading">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      );
+    }
+    if (telegramDraft.unavailable || !telegramDraft.draft) {
+      return (
+        <Gate
+          onBack={closeTelegramDraft}
+          title="This Telegram draft isn't available"
+          body="It may have expired, already been posted, or been started over. Open Telegram and send /post to begin a new one."
+          Icon={Inbox}
+        />
+      );
+    }
+    return (
+      <RecruiterOpportunityForm
+        initial={telegramDraft.draft.payload as unknown as Opportunity}
+        telegramDraftMode={{
+          draftId: telegramDraft.draft.draftId,
+          isSaving: telegramDraft.isSaving,
+          onSaveChanges: async (payload) => {
+            const result = await telegramDraft.savePayload(
+              payload as unknown as Record<string, unknown>,
+            );
+            if (result.ok) {
+              toast.success(
+                'Changes saved to your Telegram draft. Return to Telegram and refresh the review before confirming.',
+              );
+            } else {
+              toast.error(
+                "Those changes couldn't be saved. The Telegram draft may have expired or already been posted.",
+              );
+            }
+          },
+        }}
+        onBack={closeTelegramDraft}
+        onSaved={closeTelegramDraft}
+      />
+    );
+  }
+
   if (view === 'form') {
     return (
       <RecruiterOpportunityForm
