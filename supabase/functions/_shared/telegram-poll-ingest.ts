@@ -112,13 +112,80 @@ export const TELEGRAM_CONVERSATION_REPLY_ANSWERS: Record<
     "To message a driver, reply directly to that conversation alert.",
 };
 
+/** Phase RB-3A — recruiter text Quick Post terminal outcomes. The database
+ *  owns every one of these; the orchestrator only transports them. */
+export type TelegramQuickPostResultCode =
+  | "quick_post_started"
+  | "quick_post_denied"
+  | "quick_post_unavailable"
+  | "quick_post_source_reserved"
+  | "quick_post_source_rejected"
+  | "quick_post_created"
+  | "quick_post_already_completed"
+  | "quick_post_create_blocked"
+  | "quick_post_cancelled"
+  | "quick_post_restarted"
+  | "quick_post_action_invalid"
+  | "quick_post_action_denied"
+  | "quick_post_action_unavailable";
+
+export const TELEGRAM_QUICK_POST_RESULT_CODES:
+  readonly TelegramQuickPostResultCode[] = [
+    "quick_post_started",
+    "quick_post_denied",
+    "quick_post_unavailable",
+    "quick_post_source_reserved",
+    "quick_post_source_rejected",
+    "quick_post_created",
+    "quick_post_already_completed",
+    "quick_post_create_blocked",
+    "quick_post_cancelled",
+    "quick_post_restarted",
+    "quick_post_action_invalid",
+    "quick_post_action_denied",
+    "quick_post_action_unavailable",
+  ];
+
+export function isQuickPostResultCode(
+  code: TelegramResultCode,
+): code is TelegramQuickPostResultCode {
+  return (TELEGRAM_QUICK_POST_RESULT_CODES as readonly string[]).includes(code);
+}
+
+/** RB-3A. Bounded, privacy-safe replies. One fixed string per terminal
+ *  outcome — never an error detail, a provider message, a workspace name or
+ *  any extracted content. */
+export const TELEGRAM_QUICK_POST_ANSWERS: Record<
+  TelegramQuickPostResultCode,
+  string
+> = {
+  quick_post_started:
+    "Paste the full job post as one plain-text message and I'll turn it into a draft opportunity for your review.",
+  quick_post_denied: "Quick Post isn't available for this chat.",
+  quick_post_unavailable:
+    "No single recruiter workspace with posting access was found for your account. Post from HaulTracker Pro instead.",
+  quick_post_source_reserved: "Reading that job post…",
+  quick_post_source_rejected:
+    "That couldn't be used. Send the full job post as one plain-text message between 30 and 8000 characters.",
+  quick_post_created: "Draft opportunity created in HaulTracker Pro.",
+  quick_post_already_completed: "That draft was already posted.",
+  quick_post_create_blocked:
+    "That couldn't be created. Open HaulTracker Pro to finish this opportunity.",
+  quick_post_cancelled: "Quick Post cancelled. Nothing was created.",
+  quick_post_restarted: "Starting over. Paste the job post as one plain-text message.",
+  quick_post_action_invalid: "That button is no longer valid.",
+  quick_post_action_denied: "You can't use that button.",
+  quick_post_action_unavailable: "That draft isn't ready to post.",
+};
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
   | TelegramStartResultCode
   | TelegramBindResultCode
   | TelegramMenuResultCode
   | TelegramConversationActionResultCode
-  | TelegramConversationReplyResultCode;
+  | TelegramConversationReplyResultCode
+  | TelegramQuickPostResultCode;
 
 export interface TelegramPollLease {
   leaseToken: string;
