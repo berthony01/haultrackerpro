@@ -18,11 +18,11 @@ import {
   resolveDelegatedRecruiterCapability,
   secretsMatch,
   type DelegationDbClient,
-} from '../../supabase/functions/_shared/ai-insight-delegation.ts';
+} from '../../supabase/functions/ai-insight/delegation.ts';
 
 const ROOT = resolve(__dirname, '../..');
 const INDEX_PATH = resolve(ROOT, 'supabase/functions/ai-insight/index.ts');
-const SHARED_PATH = resolve(ROOT, 'supabase/functions/_shared/ai-insight-delegation.ts');
+const SHARED_PATH = resolve(ROOT, 'supabase/functions/ai-insight/delegation.ts');
 const indexSource = readFileSync(INDEX_PATH, 'utf8');
 const sharedSource = readFileSync(SHARED_PATH, 'utf8');
 

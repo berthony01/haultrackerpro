@@ -6,7 +6,7 @@ import {
   isTrustedServiceCaller,
   resolveDelegatedRecruiterCapability,
   type DelegationDbClient,
-} from "../_shared/ai-insight-delegation.ts";
+} from "./delegation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
