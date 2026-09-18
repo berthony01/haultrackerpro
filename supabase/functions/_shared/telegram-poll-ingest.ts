@@ -302,6 +302,73 @@ export interface TelegramPollLedger {
     replyToMessageId: number | null;
     text: string;
   }): Promise<TelegramTerminalResult>;
+  /** RB-3A. `/post`. Atomic: actor derivation + recruiter capability + draft
+   *  creation + terminal receipt in ONE transaction.
+   *
+   *  Optional so a ledger built before RB-3A still satisfies the contract.
+   *  When it is absent `/post` keeps its exact pre-RB-3A `non_start_message`
+   *  outcome — no draft, no extraction, no creation. */
+  processQuickPostCommandUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+  }): Promise<TelegramTerminalResult>;
+  /** RB-3A. Ordinary private non-reply text. The DATABASE decides whether the
+   *  acting account holds a live awaiting-input draft; when it does not, the
+   *  pre-existing `non_start_message` outcome is recorded unchanged and
+   *  nothing is extracted. Reserving the source update is atomic, so a
+   *  duplicate delivery can never spend a second model call.
+   *
+   *  Optional so a ledger built before RB-3A still satisfies the contract. */
+  processQuickPostSourceUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    text: string;
+  }): Promise<TelegramTerminalResult>;
+  /** RB-3A. Persist the canonical extractor outcome for a reserved draft and
+   *  compose the bounded review. Never a receipt: the source update already
+   *  holds its terminal receipt. */
+  completeQuickPostExtraction?(input: {
+    draftId: string;
+    extracted: unknown | null;
+    errorCode: string | null;
+  }): Promise<TelegramTerminalResult | null>;
+  /** RB-3A. Quick Post button taps. Atomic: actor derivation + draft ownership
+   *  + recruiter capability re-check + canonical delegated creation + terminal
+   *  receipt in ONE transaction.
+   *
+   *  Optional so a ledger built before RB-3A still satisfies the contract.
+   *  When it is absent the orchestrator fails CLOSED for q1 callbacks. */
+  processQuickPostActionUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    action: TelegramQuickPostAction | null;
+    draftId: string | null;
+  }): Promise<TelegramTerminalResult>;
+}
+
+/** RB-3A. The canonical extractor, reached through the ai-insight delegated
+ *  mode. Injected so the orchestrator never holds a prompt, a model id, a
+ *  provider, or a credential. */
+export interface TelegramQuickPostExtractor {
+  extract(input: {
+    actorUserId: string;
+    text: string;
+  }): Promise<
+    | { ok: true; extracted: unknown }
+    | { ok: false; errorCode: string }
+  >;
 }
 
 export interface TelegramGatewayResponse<T> {
