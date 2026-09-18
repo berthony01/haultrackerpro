@@ -1132,6 +1132,13 @@ export async function runTelegramPoll(
         // failure can never re-write or undo the conversation message.
         : isConversationReplyResultCode(terminal.resultCode)
         ? TELEGRAM_CONVERSATION_REPLY_ANSWERS[terminal.resultCode]
+        // RB-3A. One fixed, bounded reply per Quick Post message outcome. The
+        // adapter may supply richer bounded copy; it never supplies extracted
+        // content here.
+        : isQuickPostResultCode(terminal.resultCode)
+        ? (typeof terminal.followUpText === "string" && terminal.followUpText.length > 0
+            ? terminal.followUpText
+            : TELEGRAM_QUICK_POST_ANSWERS[terminal.resultCode])
         // RB-1A / RB-1B. The adapter composes the menu text (and its URL-only
         // buttons) from the bounded descriptor; the orchestrator only
         // transports them.
@@ -1142,9 +1149,15 @@ export async function runTelegramPoll(
         : null;
 
       const feedbackButtons =
-        feedback !== null && isMenuResultCode(terminal.resultCode) &&
-          Array.isArray(terminal.menuButtons) && terminal.menuButtons.length > 0
+        feedback === null
+          ? null
+          : isMenuResultCode(terminal.resultCode) &&
+              Array.isArray(terminal.menuButtons) && terminal.menuButtons.length > 0
           ? terminal.menuButtons
+          : isQuickPostResultCode(terminal.resultCode) &&
+              Array.isArray(terminal.followUpButtons) &&
+              terminal.followUpButtons.length > 0
+          ? terminal.followUpButtons
           : null;
 
       if (feedback !== null) {
