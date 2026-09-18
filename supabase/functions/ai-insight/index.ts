@@ -1,5 +1,12 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
+import {
+  classifyAiInsightRequest,
+  hasDelegationControlField,
+  isTrustedServiceCaller,
+  resolveDelegatedRecruiterCapability,
+  type DelegationDbClient,
+} from "./delegation.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -282,16 +289,62 @@ serve(async (req) => {
       });
     }
     const token = authHeader.replace("Bearer ", "");
-    const { data: userData, error: userError } = await supabase.auth.getUser(token);
-    if (userError || !userData.user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    const userId = userData.user.id;
 
-    const body = await req.json();
+    // RB-3A-0B. Trusted server delegation. Selected ONLY when the bearer token
+    // IS this project's own service-role credential — never from a
+    // caller-supplied role string, and never logged.
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const trustedServiceCaller = isTrustedServiceCaller(token, serviceRoleKey);
+
+    let body: Record<string, unknown>;
+    let userId: string;
+    let delegatedActorUserId: string | null = null;
+
+    if (trustedServiceCaller) {
+      body = (await req.json()) as Record<string, unknown>;
+      const decision = classifyAiInsightRequest({ token, serviceRoleKey, body });
+      if (decision.mode !== "delegated") {
+        const denied = decision as { status?: number; code?: string; error?: string };
+        log("Delegation denied", { code: denied.code ?? "delegation_required" });
+        return new Response(JSON.stringify({ error: denied.error ?? "Forbidden" }), {
+          status: denied.status ?? 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Capability re-validated BEFORE any model credit is spent.
+      const capability = await resolveDelegatedRecruiterCapability(
+        supabase as unknown as DelegationDbClient,
+        decision.actorUserId,
+      );
+      if (!capability) {
+        log("Delegation denied", { code: "actor_not_authorized" });
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      delegatedActorUserId = decision.actorUserId;
+      userId = decision.actorUserId;
+    } else {
+      const { data: userData, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !userData.user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      userId = userData.user.id;
+
+      body = (await req.json()) as Record<string, unknown>;
+      if (hasDelegationControlField(body)) {
+        log("Delegation denied", { code: "delegation_not_permitted" });
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     const { type, context, weekStart } = body as {
       type: string;
       context: Record<string, unknown>;
@@ -348,7 +401,13 @@ serve(async (req) => {
     const model = MODEL_MAP[type] || "google/gemini-3-flash-preview";
     const contextStr = JSON.stringify(context);
     const contextHash = simpleHash(contextStr);
-    log("Processing", { type, model, userId, contextHash });
+    log("Processing", {
+      type,
+      model,
+      userId,
+      contextHash,
+      delegated: delegatedActorUserId !== null,
+    });
 
     // ── For cacheable types, check cache first ───────────────────────
     const cacheableTypes = ["lane_advice", "weekly_report", "tax_tips"];
