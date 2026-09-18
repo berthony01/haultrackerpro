@@ -803,6 +803,22 @@ export function sanitizeErrorCode(error: unknown): string {
   return match ? match[0] : "telegram_poll_unexpected_error";
 }
 
+/** RB-3A.1 diagnostics. A failed database call is reduced to the SHORT
+ *  machine code the client reports (`PGRST202`, `42501`, ...) and nothing
+ *  else: never the message, details, hint, SQL, identifiers, chat content or
+ *  any credential. An absent or unrecognisable code keeps the existing
+ *  generic fallback, so `sanitizeErrorCode` stays strict. */
+export function boundedRpcErrorCode(error: unknown): string {
+  const code = (error as { code?: unknown } | null | undefined)?.code;
+  if (typeof code !== "string" && typeof code !== "number") {
+    return "telegram_poll_unexpected_error";
+  }
+  const normalized = String(code).trim().toLowerCase();
+  return /^[a-z0-9_]{1,40}$/.test(normalized)
+    ? `rpc_error_${normalized}`
+    : "telegram_poll_unexpected_error";
+}
+
 export async function runTelegramPoll(
   deps: TelegramPollDeps,
 ): Promise<TelegramPollRunResult> {
