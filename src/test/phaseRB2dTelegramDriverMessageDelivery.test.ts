@@ -228,7 +228,12 @@ function harness(options: {
         : {
             ok: true,
             status: 200,
-            result: { message_id: options.sendMessageId ?? 9001 },
+            result: {
+              message_id:
+                "sendMessageId" in options
+                  ? (options.sendMessageId as number | null ?? undefined)
+                  : 9001,
+            },
           };
     },
   };
@@ -380,8 +385,15 @@ describe("RB-2D C — replying to a delivered driver message resolves the same t
     expect(SQL).toContain("FROM public.telegram_conversation_alerts a");
     expect(SQL).toContain("a.recipient_user_id = _actor_user_id");
     expect(SQL).toContain("a.telegram_message_id = _reply_to_message_id");
-    expect(SQL.indexOf("FROM public.telegram_conversation_alerts a\n       WHERE a.recipient_user_id"))
-      .toBeLessThan(SQL.indexOf("FROM public.telegram_conversation_message_deliveries d"));
+    const reply = SQL.slice(
+      SQL.indexOf("CREATE OR REPLACE FUNCTION public.telegram_process_conversation_reply_update"),
+    );
+    const alertLookup = reply.indexOf("FROM public.telegram_conversation_alerts a");
+    const deliveryLookup = reply.indexOf(
+      "FROM public.telegram_conversation_message_deliveries d",
+    );
+    expect(alertLookup).toBeGreaterThan(-1);
+    expect(deliveryLookup).toBeGreaterThan(alertLookup);
   });
 
   it("28) a copied id from another account or chat resolves to nothing", () => {
