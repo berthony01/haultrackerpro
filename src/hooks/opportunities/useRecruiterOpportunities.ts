@@ -156,10 +156,7 @@ export function useRecruiterOpportunities() {
   const createOpportunity = useMutation({
     mutationFn: async (data: OpportunityInsert) => {
       requireCanPost();
-      const { error } = await supabase
-        .from('opportunities')
-        .insert({ ...data, recruiter_id: recruiterId! });
-      if (error) throw error;
+      await createRecruiterOpportunityViaRpc(recruiterId!, data);
     },
     onSuccess: invalidate,
   });
