@@ -17,6 +17,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 import {
   runTelegramAlertDrain,
+  runTelegramMessageDeliveryDrain,
   runTelegramPoll,
   sanitizeErrorCode,
   type TelegramAlertClaim,
@@ -28,12 +29,15 @@ import {
   type TelegramInlineButton,
   type TelegramInlineUrlButton,
   type TelegramMenuCommand,
+  type TelegramMessageDeliveryClaim,
+  type TelegramMessageDeliveryOutbox,
   type TelegramPollLease,
   type TelegramPollLedger,
   type TelegramResultCode,
   type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
+
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
 
@@ -421,6 +425,70 @@ function buildAlertOutbox(supabase: RpcClient): TelegramAlertOutbox {
   };
 }
 
+// RB-2D. Outbound driver-message delivery adapter. Eligibility, echo
+// prevention, the post-acceptance cutoff, recipient resolution and
+// re-authorization all belong to the RPCs; this adapter transports ids, the
+// canonical body and delivery outcomes only — and never logs the body.
+function buildMessageDeliveryOutbox(
+  supabase: RpcClient,
+): TelegramMessageDeliveryOutbox {
+  return {
+    async claimConversationMessageDeliveries(
+      limit: number,
+    ): Promise<TelegramMessageDeliveryClaim[]> {
+      const { data, error } = await supabase.rpc(
+        "telegram_claim_conversation_message_deliveries",
+        { _limit: limit },
+      );
+      if (error) throw new Error(error.message);
+      const rows = (Array.isArray(data) ? data : []) as {
+        delivery_id?: unknown;
+        telegram_chat_id?: unknown;
+        message_body?: unknown;
+      }[];
+      return rows
+        .filter((row) =>
+          typeof row?.delivery_id === "string" &&
+          typeof row?.telegram_chat_id === "number" &&
+          typeof row?.message_body === "string" &&
+          row.message_body.length > 0
+        )
+        .map((row) => ({
+          deliveryId: row.delivery_id as string,
+          telegramChatId: row.telegram_chat_id as number,
+          messageBody: row.message_body as string,
+        }));
+    },
+    async markConversationMessageDeliverySent(
+      deliveryId: string,
+      telegramMessageId: number | null,
+      telegramChatId: number | null,
+    ): Promise<void> {
+      const { error } = await supabase.rpc(
+        "telegram_mark_conversation_message_delivery_sent",
+        {
+          _delivery_id: deliveryId,
+          _telegram_message_id: telegramMessageId,
+          _telegram_chat_id: telegramChatId,
+        },
+      );
+      if (error) throw new Error(error.message);
+    },
+    async markConversationMessageDeliveryFailed(
+      deliveryId: string,
+      errorCode: string,
+    ): Promise<void> {
+      const { error } = await supabase.rpc(
+        "telegram_mark_conversation_message_delivery_failed",
+        { _delivery_id: deliveryId, _error_code: errorCode },
+      );
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+
+
 
 
 // ────────────────────── RB-1A / RB-1B menu presentation ──────────────────────
@@ -610,6 +678,24 @@ Deno.serve(async (req: Request) => {
     }
   };
 
+  // RB-2D. Outbound driver messages are drained AFTER inbound polling and
+  // after the alert drain, in their own isolated scope. A delivery failure can
+  // never throw into inbound processing and therefore can never stall the
+  // cursor, the lease, or any command / callback / reply handling.
+  const drainMessageDeliveries = async (): Promise<void> => {
+    try {
+      await runTelegramMessageDeliveryDrain({
+        outbox: buildMessageDeliveryOutbox(supabase),
+        gateway,
+        log,
+      });
+    } catch (error) {
+      log("message_delivery_drain_unhandled_error", {
+        code: sanitizeErrorCode(error),
+      });
+    }
+  };
+
   try {
     const result = await runTelegramPoll({
       ledger: buildLedger(supabase),
@@ -619,6 +705,9 @@ Deno.serve(async (req: Request) => {
     });
 
     await drainAlerts();
+    await drainMessageDeliveries();
+
+
 
 
 

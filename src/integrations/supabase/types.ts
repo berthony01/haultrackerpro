@@ -4646,6 +4646,69 @@ export type Database = {
           },
         ]
       }
+      telegram_conversation_message_deliveries: {
+        Row: {
+          attempts: number
+          claimed_at: string | null
+          conversation_message_id: string
+          created_at: string
+          id: string
+          last_error_code: string | null
+          recipient_user_id: string
+          sent_at: string | null
+          status: string
+          telegram_chat_id: number | null
+          telegram_message_id: number | null
+          thread_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          claimed_at?: string | null
+          conversation_message_id: string
+          created_at?: string
+          id?: string
+          last_error_code?: string | null
+          recipient_user_id: string
+          sent_at?: string | null
+          status?: string
+          telegram_chat_id?: number | null
+          telegram_message_id?: number | null
+          thread_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          claimed_at?: string | null
+          conversation_message_id?: string
+          created_at?: string
+          id?: string
+          last_error_code?: string | null
+          recipient_user_id?: string
+          sent_at?: string | null
+          status?: string
+          telegram_chat_id?: number | null
+          telegram_message_id?: number | null
+          thread_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_conversation_message_deli_conversation_message_id_fkey"
+            columns: ["conversation_message_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_conversation_message_deliveries_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_dispatch_bind_tokens: {
         Row: {
           consumed_at: string | null
@@ -7725,6 +7788,14 @@ export type Database = {
           thread_id: string
         }[]
       }
+      telegram_claim_conversation_message_deliveries: {
+        Args: { _limit?: number }
+        Returns: {
+          delivery_id: string
+          message_body: string
+          telegram_chat_id: number
+        }[]
+      }
       telegram_claim_poll_lease: {
         Args: never
         Returns: {
@@ -7870,6 +7941,18 @@ export type Database = {
       telegram_mark_conversation_alert_sent: {
         Args: {
           _alert_id: string
+          _telegram_chat_id?: number
+          _telegram_message_id?: number
+        }
+        Returns: boolean
+      }
+      telegram_mark_conversation_message_delivery_failed: {
+        Args: { _delivery_id: string; _error_code: string }
+        Returns: string
+      }
+      telegram_mark_conversation_message_delivery_sent: {
+        Args: {
+          _delivery_id: string
           _telegram_chat_id?: number
           _telegram_message_id?: number
         }

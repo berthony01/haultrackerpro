@@ -1034,3 +1034,174 @@ export async function runTelegramAlertDrain(
   return result;
 }
 
+
+// ────────── RB-2D — outbound driver-message delivery drain (one way) ──────────
+//
+// Delivers a canonical CF-1 DRIVER message into the recruiter's private
+// @HaulTrackerBot chat. Contract:
+//   * the database owns eligibility, echo prevention, the post-acceptance
+//     cutoff, recipient resolution and re-authorization — this code only
+//     renders and sends;
+//   * the ONLY variable content is the driver's own conversation message body,
+//     which the driver deliberately sent to this recruiter in an accepted
+//     conversation. No profile, contact, load, financial or inferred data is
+//     representable here;
+//   * plain text only — no parse_mode, no HTML, no Markdown, no buttons — so
+//     message content can never be interpreted as formatting or injection;
+//   * the body is NEVER truncated or otherwise mutated;
+//   * a row is marked delivered ONLY after Telegram confirms, and the
+//     confirmed message id is persisted so the recruiter can reply to it;
+//   * the drain runs AFTER inbound polling and after the alert drain, in its
+//     own isolated scope, and can never throw into them.
+
+/** One claimed outbound driver message, as returned by the claim RPC. */
+export interface TelegramMessageDeliveryClaim {
+  deliveryId: string;
+  /** Private chat id of the linked recruiter. Never a group chat. */
+  telegramChatId: number;
+  /** Canonical CF-1 driver message body, read at claim time. */
+  messageBody: string;
+}
+
+export interface TelegramMessageDeliveryOutbox {
+  claimConversationMessageDeliveries(
+    limit: number,
+  ): Promise<TelegramMessageDeliveryClaim[]>;
+  /** The delivered Telegram message id (and its chat) are persisted so a later
+   *  recruiter REPLY to that exact message resolves back to this conversation
+   *  through the RB-2C bridge. Transport identifiers only. */
+  markConversationMessageDeliverySent(
+    deliveryId: string,
+    telegramMessageId: number | null,
+    telegramChatId: number | null,
+  ): Promise<void>;
+  markConversationMessageDeliveryFailed(
+    deliveryId: string,
+    errorCode: string,
+  ): Promise<void>;
+}
+
+export interface TelegramMessageDeliveryDrainDeps {
+  outbox: TelegramMessageDeliveryOutbox;
+  gateway: TelegramGateway;
+  log?: TelegramPollLogger;
+}
+
+export interface TelegramMessageDeliveryDrainResult {
+  claimed: number;
+  sent: number;
+  failed: number;
+}
+
+export const TELEGRAM_MESSAGE_DELIVERY_DRAIN_LIMIT = 10;
+
+/** Fixed, privacy-safe prefix. Names nobody and reveals nothing the recipient
+ *  does not already have in their own workspace. */
+export const TELEGRAM_MESSAGE_DELIVERY_PREFIX = "Driver message:\n\n";
+
+/** Telegram's hard sendMessage limit. The canonical CF-1 body limit is 4000,
+ *  so prefix + body stays inside it; the guard below exists so that contract
+ *  can never be violated silently. */
+export const TELEGRAM_SEND_MESSAGE_MAX_CHARS = 4096;
+
+/** Composes the outbound text. The driver's body is never truncated: if the
+ *  prefix would push it past Telegram's limit the body is sent alone, and a
+ *  body that cannot fit at all is refused rather than mutated. */
+export function composeDriverMessageText(body: string): string | null {
+  const text = `${TELEGRAM_MESSAGE_DELIVERY_PREFIX}${body}`;
+  if (text.length <= TELEGRAM_SEND_MESSAGE_MAX_CHARS) return text;
+  if (body.length <= TELEGRAM_SEND_MESSAGE_MAX_CHARS) return body;
+  return null;
+}
+
+/** Drains claimed outbound driver messages. Never throws. */
+export async function runTelegramMessageDeliveryDrain(
+  deps: TelegramMessageDeliveryDrainDeps,
+): Promise<TelegramMessageDeliveryDrainResult> {
+  const log: TelegramPollLogger = deps.log ?? (() => {});
+  const result: TelegramMessageDeliveryDrainResult = {
+    claimed: 0,
+    sent: 0,
+    failed: 0,
+  };
+
+  let claims: TelegramMessageDeliveryClaim[];
+  try {
+    claims = await deps.outbox.claimConversationMessageDeliveries(
+      TELEGRAM_MESSAGE_DELIVERY_DRAIN_LIMIT,
+    );
+  } catch (error) {
+    log("message_delivery_claim_failed", { code: sanitizeErrorCode(error) });
+    return result;
+  }
+
+  result.claimed = claims.length;
+  if (claims.length === 0) return result;
+
+  for (const claim of claims) {
+    const text = composeDriverMessageText(claim.messageBody);
+    if (text === null) {
+      try {
+        await deps.outbox.markConversationMessageDeliveryFailed(
+          claim.deliveryId,
+          "message_too_long_for_telegram",
+        );
+      } catch (error) {
+        log("message_delivery_mark_failed", { code: sanitizeErrorCode(error) });
+      }
+      result.failed += 1;
+      continue;
+    }
+
+    let errorCode: string | null = null;
+    let sentMessageId: number | null = null;
+    try {
+      // Plain text ONLY: no buttons, no parse_mode, nothing that could turn
+      // driver content into markup.
+      const sent = await deps.gateway.sendMessage({
+        chatId: claim.telegramChatId,
+        text,
+      });
+      if (!sent.ok) {
+        errorCode = sent.errorCode ?? "telegram_gateway_error";
+      } else {
+        const id = sent.result?.message_id;
+        sentMessageId =
+          typeof id === "number" && Number.isSafeInteger(id) && id > 0 ? id : null;
+      }
+    } catch (error) {
+      errorCode = sanitizeErrorCode(error);
+    }
+
+    try {
+      if (errorCode === null) {
+        await deps.outbox.markConversationMessageDeliverySent(
+          claim.deliveryId,
+          sentMessageId,
+          claim.telegramChatId,
+        );
+        result.sent += 1;
+      } else {
+        await deps.outbox.markConversationMessageDeliveryFailed(
+          claim.deliveryId,
+          errorCode,
+        );
+        result.failed += 1;
+        log("message_delivery_send_failed", { code: errorCode });
+      }
+    } catch (error) {
+      // Telegram may already have delivered this message, so the row stays
+      // 'claimed' and is NEVER auto-reclaimed. Delivery is never falsely
+      // recorded and never duplicated.
+      log("message_delivery_mark_unresolved", { deliveryId: claim.deliveryId });
+      log("message_delivery_mark_failed", { code: sanitizeErrorCode(error) });
+    }
+  }
+
+  log("message_delivery_drain_complete", {
+    claimed: result.claimed,
+    sent: result.sent,
+    failed: result.failed,
+  });
+  return result;
+}

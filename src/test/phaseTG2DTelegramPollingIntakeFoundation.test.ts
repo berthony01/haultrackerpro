@@ -865,17 +865,21 @@ describe("TG-2D edge function shell", () => {
   // set and kept exhaustive, so an unauthorised RPC still fails by design.
   // RB-2A re-pin. The three outbound conversation-alert RPCs were legitimately
   // added by RB-2A. Re-pinned exactly — not loosened — and still exhaustive.
-  // RB-2B re-pin. The single conversation-action RPC was legitimately added by
   // RB-2C. Re-pinned exactly, still exhaustive: any further RPC must fail here.
-  it("drives the shared orchestrator and only the TG-2D RPCs plus the bind, menu, RB-2A alert, RB-2B action and RB-2C reply RPCs", () => {
+  // RB-2D re-pin. The three outbound driver-message delivery RPCs were
+  // legitimately added by RB-2D. Re-pinned exactly — not loosened.
+  it("drives the shared orchestrator and only the TG-2D RPCs plus the bind, menu, RB-2A alert, RB-2B action, RB-2C reply and RB-2D delivery RPCs", () => {
     expect(EDGE_SOURCE).toContain("runTelegramPoll");
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\(\s*"(\w+)"/g)].map((m) => m[1]);
     expect([...new Set(rpcs)].sort()).toEqual([
       "telegram_advance_poll_cursor",
       "telegram_claim_conversation_alerts",
+      "telegram_claim_conversation_message_deliveries",
       "telegram_claim_poll_lease",
       "telegram_mark_conversation_alert_failed",
       "telegram_mark_conversation_alert_sent",
+      "telegram_mark_conversation_message_delivery_failed",
+      "telegram_mark_conversation_message_delivery_sent",
       "telegram_process_bind_update",
       "telegram_process_conversation_action_update",
       "telegram_process_conversation_reply_update",
@@ -885,6 +889,7 @@ describe("TG-2D edge function shell", () => {
       "telegram_release_poll_lease",
     ]);
   });
+
 
   // RB-2B re-pin. TG-2D forbade any callback surface because none existed.
   // RB-2B adds exactly one, and ONLY for conversation Accept / Pass. The
