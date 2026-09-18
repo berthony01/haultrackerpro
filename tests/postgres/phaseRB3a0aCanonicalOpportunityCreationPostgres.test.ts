@@ -608,6 +608,14 @@ const RECRUITER_A = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const RECRUITER_B = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const RECRUITER_SUSPENDED = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const RECRUITER_INCOMPLETE = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+/**
+ * Staff workspace. Kept separate from RECRUITER_A because staff authority runs
+ * through recruiter_team_workspace_within_limit: a free workspace has exactly
+ * one seat, so a realistic two-staff workspace must hold a paid plan. RECRUITER_A
+ * deliberately stays on the free tier so the active-opportunity limit test is
+ * honest.
+ */
+const RECRUITER_TEAM = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
 const SEED_SQL = `
 INSERT INTO public.recruiter_profiles
@@ -618,6 +626,8 @@ VALUES
    'a@example.com', 'carrier', 'DOT123', now()),
   ('${RECRUITER_B}', '${OTHER_OWNER_USER}', 'active', 'verified', 'Owner B', 'Carrier B',
    'b@example.com', 'carrier', 'DOT456', now()),
+  ('${RECRUITER_TEAM}', '${OWNER_USER}', 'active', 'verified', 'Owner A', 'Carrier A Team',
+   'a@example.com', 'carrier', 'DOT789', now()),
   ('${RECRUITER_SUSPENDED}', '${OWNER_USER}', 'suspended', 'verified', 'Owner A', 'Carrier A',
    'a@example.com', 'carrier', 'DOT123', now());
 
@@ -629,11 +639,15 @@ VALUES
   ('${RECRUITER_INCOMPLETE}', '${OWNER_USER}', 'active', 'verified', 'Owner A', 'Carrier A',
    'a@example.com', 'carrier');
 
+-- Growth plan => 5 team seats, enough for the two seeded staff members.
+INSERT INTO public.recruiter_billing_profiles (recruiter_id, user_id, plan, status)
+VALUES ('${RECRUITER_TEAM}', '${OWNER_USER}', 'growth', 'active');
+
 INSERT INTO public.recruiter_members (recruiter_id, member_user_id, role, status, permissions)
 VALUES
-  ('${RECRUITER_A}', '${STAFF_USER}', 'recruiter_staff', 'active',
+  ('${RECRUITER_TEAM}', '${STAFF_USER}', 'recruiter_staff', 'active',
    '{"opportunities_create": true, "opportunities_view": true}'::jsonb),
-  ('${RECRUITER_A}', '${STAFF_NO_PERM_USER}', 'recruiter_staff', 'active',
+  ('${RECRUITER_TEAM}', '${STAFF_NO_PERM_USER}', 'recruiter_staff', 'active',
    '{"opportunities_view": true}'::jsonb);
 `;
 
