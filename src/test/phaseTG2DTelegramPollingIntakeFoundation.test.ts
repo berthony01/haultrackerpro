@@ -877,6 +877,7 @@ describe("TG-2D edge function shell", () => {
       "telegram_claim_conversation_alerts",
       "telegram_claim_conversation_message_deliveries",
       "telegram_claim_poll_lease",
+      "telegram_complete_quick_post_extraction",
       "telegram_mark_conversation_alert_failed",
       "telegram_mark_conversation_alert_sent",
       "telegram_mark_conversation_message_delivery_failed",
