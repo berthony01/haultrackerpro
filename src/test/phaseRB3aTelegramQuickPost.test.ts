@@ -580,7 +580,9 @@ describe("RB-3A D — the database owns authorization, creation and exactly-once
 
 describe("RB-3A E — one poller, one extractor, no secret or content in a log", () => {
   it("reuses the SINGLE ai-insight delegated extractor and forks no prompt or model", () => {
-    expect(EDGE_CODE).toContain("/functions/v1/ai-insight");
+    // TG-SEC-1. The internal call goes through the already-constructed
+    // service-role client, so the credential never reaches a fetch header.
+    expect(EDGE_CODE).toContain('supabase.functions.invoke("ai-insight"');
     expect(EDGE_CODE).toContain("delegated_actor_user_id");
     expect(EDGE_CODE).toContain('type: "parse_opportunity"');
     expect(EDGE_CODE).not.toContain("gemini");
