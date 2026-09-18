@@ -867,8 +867,9 @@ describe("TG-2D edge function shell", () => {
   // added by RB-2A. Re-pinned exactly — not loosened — and still exhaustive.
   // RB-2C. Re-pinned exactly, still exhaustive: any further RPC must fail here.
   // RB-2D re-pin. The three outbound driver-message delivery RPCs were
-  // legitimately added by RB-2D. Re-pinned exactly — not loosened.
-  it("drives the shared orchestrator and only the TG-2D RPCs plus the bind, menu, RB-2A alert, RB-2B action, RB-2C reply and RB-2D delivery RPCs", () => {
+  // legitimately added by RB-2D, plus the three RB-3A Quick Post RPCs.
+  // Re-pinned exactly and exhaustively — not loosened.
+  it("drives the shared orchestrator and only the TG-2D RPCs plus the bind, menu, RB-2A alert, RB-2B action, RB-2C reply, RB-2D delivery and RB-3A Quick Post RPCs", () => {
     expect(EDGE_SOURCE).toContain("runTelegramPoll");
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\(\s*"(\w+)"/g)].map((m) => m[1]);
     expect([...new Set(rpcs)].sort()).toEqual([
