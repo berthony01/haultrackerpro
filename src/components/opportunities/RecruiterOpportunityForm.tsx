@@ -671,7 +671,17 @@ function RecruiterOpportunityFormCore({
       permissions: staffPerms,
     });
 
+  // Phase RB-3B-B — the ONLY write in Telegram draft edit mode. It targets the
+  // bot draft through the actor-scoped RPC supplied by the manager; no
+  // opportunity is created, updated or published here.
+  const saveTelegramDraft = async () => {
+    if (!telegramDraft) return;
+    await telegramDraft.onSaveChanges(buildOpportunityPersistencePayload(state, 'draft'));
+  };
+
   const save = async (mode: 'draft' | 'publish') => {
+    // Defence in depth: the draft-edit UI never renders these actions.
+    if (telegramDraft) return;
     if (mode === 'draft' && !staffCanSaveDraft) {
       toast.error(STAFF_PERMISSION_MESSAGE);
       return;
