@@ -49,8 +49,22 @@ const CANDIDATE_PATH =
   'supabase/migration-candidates/20260921050000_phase_rb3a0a_canonical_opportunity_creation.sql';
 const CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, 'utf8');
 
+/** RB-3A-0A.1 corrective migration: trusted service-role delegation wrapper. */
+const CORRECTIVE_PATH =
+  REPO_ROOT +
+  'supabase/migration-candidates/20260921060000_phase_rb3a0a1_trusted_delegation_wrapper.sql';
+const CORRECTIVE_SQL = readFileSync(CORRECTIVE_PATH, 'utf8');
+
 if (!CANDIDATE_SQL.includes('CREATE OR REPLACE FUNCTION public.create_recruiter_opportunity(')) {
   throw new Error('Candidate migration does not define create_recruiter_opportunity.');
+}
+
+if (
+  !CORRECTIVE_SQL.includes(
+    'CREATE OR REPLACE FUNCTION public.create_recruiter_opportunity_as_actor(',
+  )
+) {
+  throw new Error('Corrective migration does not define create_recruiter_opportunity_as_actor.');
 }
 
 /** Columns of public.opportunities that are server-managed and never writable. */
@@ -714,12 +728,52 @@ async function countOpportunities(): Promise<number> {
   return res.rows[0].n as number;
 }
 
+/**
+ * RB-3A-0A.1 — trusted delegation wrapper. Executed as service_role WITHOUT any
+ * jwt sub, which is exactly how PostgREST runs a service-key request.
+ */
+async function asServiceRole<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  return asRole('service_role', null, fn);
+}
+
+async function callDelegated(
+  client: PoolClient,
+  actorUserId: string | null,
+  recruiterId: string | null,
+  payload: unknown,
+): Promise<Record<string, unknown>> {
+  const res = await client.query(
+    'SELECT public.create_recruiter_opportunity_as_actor($1::uuid, $2::uuid, $3::jsonb) AS out',
+    [actorUserId, recruiterId, JSON.stringify(payload)],
+  );
+  return res.rows[0].out as Record<string, unknown>;
+}
+
+async function expectDelegatedFailure(
+  role: 'anon' | 'authenticated' | 'service_role',
+  sessionUserId: string | null,
+  actorUserId: string | null,
+  recruiterId: string | null,
+  payload: unknown,
+): Promise<{ message: string; code: string }> {
+  try {
+    await asRole(role, sessionUserId, (c) =>
+      callDelegated(c, actorUserId, recruiterId, payload),
+    );
+  } catch (e) {
+    const err = e as { message: string; code: string };
+    return { message: err.message, code: err.code };
+  }
+  throw new Error('Expected the delegation wrapper to fail, but it succeeded.');
+}
+
 beforeAll(async () => {
   pool = new Pool({ connectionString: DATABASE_URL, max: 6 });
   await pool.query(BOOTSTRAP_SQL);
   await pool.query(LIVE_FUNCTIONS_SQL);
   await pool.query(LIVE_POLICIES_SQL);
   await pool.query(CANDIDATE_SQL);
+  await pool.query(CORRECTIVE_SQL);
   await pool.query(SEED_SQL);
 }, 120_000);
 
@@ -743,7 +797,8 @@ describe('RB-3A-0A — function shape and grants', () => {
     expect(res.rows[0].prosecdef).toBe(true);
     expect(res.rows[0].provolatile).toBe('v');
     expect(res.rows[0].lanname).toBe('plpgsql');
-    expect(res.rows[0].proconfig).toEqual(['search_path=public']);
+    // RB-3A-0A.1 hardened the search_path; pg_catalog first blocks shadowing.
+    expect(res.rows[0].proconfig).toEqual(['search_path=pg_catalog, public, auth']);
   });
 
   it('grants EXECUTE to authenticated only — never PUBLIC, anon, or service_role', async () => {
@@ -853,7 +908,7 @@ describe('RB-3A-0A — authorization (real roles, real predicates)', () => {
     expect(err.message).toContain('invalid_payload');
   });
 
-  it('6/7. service_role cannot execute: no delegated-actor path exists in this phase', async () => {
+  it('6/7. service_role cannot execute the web function — delegation must go through the wrapper', async () => {
     const err = await expectFailure('service_role', OWNER_USER, RECRUITER_A, MINIMAL_PAYLOAD);
     expect(err.code).toBe('42501');
   });
@@ -999,5 +1054,230 @@ describe('RB-3A-0A — existing guards still run through the RPC', () => {
       company_name: 'Carrier A',
     });
     expect(err.code).toBe('23502');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RB-3A-0A.1 — trusted service-role delegation wrapper
+// ---------------------------------------------------------------------------
+describe('RB-3A-0A.1 — delegation wrapper shape and grants', () => {
+  it('is SECURITY DEFINER plpgsql with a hardened search_path', async () => {
+    const res = await pool.query(`
+      SELECT p.prosecdef, p.provolatile, l.lanname, p.proconfig,
+             pg_get_function_identity_arguments(p.oid) AS args
+      FROM pg_proc p
+      JOIN pg_namespace n ON n.oid = p.pronamespace
+      JOIN pg_language l ON l.oid = p.prolang
+      WHERE n.nspname='public' AND p.proname='create_recruiter_opportunity_as_actor'
+    `);
+    expect(res.rowCount).toBe(1);
+    expect(res.rows[0].prosecdef).toBe(true);
+    expect(res.rows[0].provolatile).toBe('v');
+    expect(res.rows[0].lanname).toBe('plpgsql');
+    expect(res.rows[0].proconfig).toEqual(['search_path=pg_catalog, public, auth']);
+    expect(res.rows[0].args).toBe('_actor_user_id uuid, _recruiter_id uuid, _payload jsonb');
+  });
+
+  it('grants EXECUTE to service_role ONLY', async () => {
+    const res = await pool.query(`
+      SELECT
+        has_function_privilege('anon',          p.oid, 'EXECUTE') AS anon,
+        has_function_privilege('authenticated', p.oid, 'EXECUTE') AS authed,
+        has_function_privilege('service_role',  p.oid, 'EXECUTE') AS svc,
+        p.proacl::text AS acl
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname='create_recruiter_opportunity_as_actor'
+    `);
+    expect(res.rows[0].svc).toBe(true);
+    expect(res.rows[0].authed).toBe(false);
+    expect(res.rows[0].anon).toBe(false);
+    expect(res.rows[0].acl).not.toMatch(/(^|,)=X/); // no PUBLIC execute
+  });
+
+  it('contains NO creation logic of its own — no INSERT, no whitelist, no predicate', () => {
+    const body = CORRECTIVE_SQL.split('$function$')[1] ?? '';
+    expect(body).not.toMatch(/INSERT\s+INTO/i);
+    expect(body).not.toMatch(/v_allowed/);
+    expect(body).not.toMatch(/current_user_can_recruiter_opportunity_action/);
+    // exactly one delegated call into the single canonical implementation
+    expect(body.match(/public\.create_recruiter_opportunity\(/g)).toHaveLength(1);
+  });
+
+  it('exactly two creation functions exist — no third implementation', async () => {
+    const res = await pool.query(`
+      SELECT p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS sig
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='public' AND p.proname LIKE 'create_recruiter_opportunity%'
+      ORDER BY 1
+    `);
+    expect(res.rows.map((r) => r.sig)).toEqual([
+      'create_recruiter_opportunity(_recruiter_id uuid, _payload jsonb)',
+      'create_recruiter_opportunity_as_actor(_actor_user_id uuid, _recruiter_id uuid, _payload jsonb)',
+    ]);
+  });
+});
+
+describe('RB-3A-0A.1 — delegation authorization', () => {
+  it('anon cannot execute the wrapper', async () => {
+    const err = await expectDelegatedFailure(
+      'anon', null, OWNER_USER, RECRUITER_A, MINIMAL_PAYLOAD,
+    );
+    expect(err.code).toBe('42501');
+  });
+
+  it('an authenticated recruiter cannot execute the wrapper, even naming themselves', async () => {
+    const err = await expectDelegatedFailure(
+      'authenticated', OWNER_USER, OWNER_USER, RECRUITER_A, MINIMAL_PAYLOAD,
+    );
+    expect(err.code).toBe('42501');
+  });
+
+  it('an authenticated recruiter cannot impersonate another actor through the wrapper', async () => {
+    const err = await expectDelegatedFailure(
+      'authenticated', OUTSIDER_USER, OWNER_USER, RECRUITER_A, MINIMAL_PAYLOAD,
+    );
+    expect(err.code).toBe('42501');
+  });
+
+  it('service_role delegating an AUTHORIZED actor succeeds through the canonical function', async () => {
+    await pool.query(`DELETE FROM public.opportunities WHERE recruiter_id=$1`, [RECRUITER_A]);
+    const out = await asServiceRole((c) =>
+      callDelegated(c, OWNER_USER, RECRUITER_A, {
+        ...MINIMAL_PAYLOAD,
+        title: 'Delegated post',
+      }),
+    );
+    expect(out.result_code).toBe('created');
+    expect(typeof out.opportunity_id).toBe('string');
+    expect(out.status).toBe('draft');
+
+    const row = await pool.query(
+      `SELECT recruiter_id, title FROM public.opportunities WHERE id=$1`,
+      [out.opportunity_id],
+    );
+    expect(row.rows[0].recruiter_id).toBe(RECRUITER_A);
+    expect(row.rows[0].title).toBe('Delegated post');
+    await pool.query(`DELETE FROM public.opportunities WHERE recruiter_id=$1`, [RECRUITER_A]);
+  });
+
+  it('service_role delegating an actor WITHOUT permission is denied', async () => {
+    const before = await countOpportunities();
+    try {
+      await asServiceRole((c) => callDelegated(c, OUTSIDER_USER, RECRUITER_A, MINIMAL_PAYLOAD));
+      throw new Error('Expected permission_denied for an unauthorized delegated actor.');
+    } catch (e) {
+      expect((e as { message: string }).message).toContain('permission_denied');
+    }
+    expect(await countOpportunities()).toBe(before);
+  });
+
+  it('actor/recruiter mismatch is denied — staff of another workspace cannot post here', async () => {
+    const before = await countOpportunities();
+    try {
+      await asServiceRole((c) => callDelegated(c, STAFF_USER, RECRUITER_A, MINIMAL_PAYLOAD));
+      throw new Error('Expected permission_denied for an actor/recruiter mismatch.');
+    } catch (e) {
+      expect((e as { message: string }).message).toContain('permission_denied');
+    }
+    expect(await countOpportunities()).toBe(before);
+  });
+
+  it('a staff actor WITH opportunities_create in their own workspace succeeds', async () => {
+    const out = await asServiceRole((c) =>
+      callDelegated(c, STAFF_USER, RECRUITER_TEAM, {
+        ...MINIMAL_PAYLOAD,
+        title: 'Delegated staff post',
+      }),
+    );
+    expect(out.result_code).toBe('created');
+    await pool.query(`DELETE FROM public.opportunities WHERE id=$1`, [out.opportunity_id]);
+  });
+
+  it('a staff actor WITHOUT opportunities_create is denied through delegation', async () => {
+    const before = await countOpportunities();
+    try {
+      await asServiceRole((c) =>
+        callDelegated(c, STAFF_NO_PERM_USER, RECRUITER_TEAM, MINIMAL_PAYLOAD),
+      );
+      throw new Error('Expected permission_denied for staff without opportunities_create.');
+    } catch (e) {
+      expect((e as { message: string }).message).toContain('permission_denied');
+    }
+    expect(await countOpportunities()).toBe(before);
+  });
+
+  it('a null actor is rejected before anything else happens', async () => {
+    const before = await countOpportunities();
+    try {
+      await asServiceRole((c) => callDelegated(c, null, RECRUITER_A, MINIMAL_PAYLOAD));
+      throw new Error('Expected invalid_actor.');
+    } catch (e) {
+      expect((e as { message: string }).message).toContain('invalid_actor');
+    }
+    expect(await countOpportunities()).toBe(before);
+  });
+});
+
+describe('RB-3A-0A.1 — delegation keeps every existing guard and leaks no identity', () => {
+  it('the unknown-field whitelist still fails closed through delegation', async () => {
+    try {
+      await asServiceRole((c) =>
+        callDelegated(c, OWNER_USER, RECRUITER_A, { ...MINIMAL_PAYLOAD, view_count: 999 }),
+      );
+      throw new Error('Expected unknown_field.');
+    } catch (e) {
+      expect((e as { message: string }).message).toContain('unknown_field');
+    }
+  });
+
+  it('the active opportunity limit still fires through delegation', async () => {
+    await pool.query(`DELETE FROM public.opportunities WHERE recruiter_id=$1`, [RECRUITER_A]);
+    const first = await asServiceRole((c) =>
+      callDelegated(c, OWNER_USER, RECRUITER_A, {
+        ...MINIMAL_PAYLOAD,
+        title: 'Delegated active 1',
+        status: 'active',
+      }),
+    );
+    expect(first.status).toBe('active');
+
+    const before = await countOpportunities();
+    try {
+      await asServiceRole((c) =>
+        callDelegated(c, OWNER_USER, RECRUITER_A, {
+          ...MINIMAL_PAYLOAD,
+          title: 'Delegated active 2',
+          status: 'active',
+        }),
+      );
+      throw new Error('Expected the active opportunity limit to reject this.');
+    } catch (e) {
+      expect((e as { message: string }).message).toContain('Active opportunity limit reached.');
+    }
+    expect(await countOpportunities()).toBe(before);
+    await pool.query(`DELETE FROM public.opportunities WHERE recruiter_id=$1`, [RECRUITER_A]);
+  });
+
+  it('the delegated identity does not survive the call', async () => {
+    const seen = await asServiceRole(async (c) => {
+      await callDelegated(c, OWNER_USER, RECRUITER_A, {
+        ...MINIMAL_PAYLOAD,
+        title: 'Delegated leak check',
+      });
+      const res = await c.query(
+        `SELECT COALESCE(current_setting('request.jwt.claim.sub', true), '') AS sub`,
+      );
+      return res.rows[0].sub as string;
+    });
+    expect(seen).toBe('');
+    await pool.query(`DELETE FROM public.opportunities WHERE recruiter_id=$1`, [RECRUITER_A]);
+  });
+
+  it('the web function is still reachable by an authenticated recruiter (no regression)', async () => {
+    const out = await asRole('authenticated', OWNER_USER, (c) =>
+      callCreate(c, RECRUITER_A, { ...MINIMAL_PAYLOAD, title: 'Web still works' }),
+    );
+    expect(out.result_code).toBe('created');
+    await pool.query(`DELETE FROM public.opportunities WHERE id=$1`, [out.opportunity_id]);
   });
 });

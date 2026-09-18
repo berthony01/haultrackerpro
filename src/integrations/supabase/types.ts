@@ -5692,6 +5692,10 @@ export type Database = {
         Args: { _payload: Json; _recruiter_id: string }
         Returns: Json
       }
+      create_recruiter_opportunity_as_actor: {
+        Args: { _actor_user_id: string; _payload: Json; _recruiter_id: string }
+        Returns: Json
+      }
       current_owner_qa_persona: {
         Args: never
         Returns: {
