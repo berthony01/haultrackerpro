@@ -112,13 +112,80 @@ export const TELEGRAM_CONVERSATION_REPLY_ANSWERS: Record<
     "To message a driver, reply directly to that conversation alert.",
 };
 
+/** Phase RB-3A — recruiter text Quick Post terminal outcomes. The database
+ *  owns every one of these; the orchestrator only transports them. */
+export type TelegramQuickPostResultCode =
+  | "quick_post_started"
+  | "quick_post_denied"
+  | "quick_post_unavailable"
+  | "quick_post_source_reserved"
+  | "quick_post_source_rejected"
+  | "quick_post_created"
+  | "quick_post_already_completed"
+  | "quick_post_create_blocked"
+  | "quick_post_cancelled"
+  | "quick_post_restarted"
+  | "quick_post_action_invalid"
+  | "quick_post_action_denied"
+  | "quick_post_action_unavailable";
+
+export const TELEGRAM_QUICK_POST_RESULT_CODES:
+  readonly TelegramQuickPostResultCode[] = [
+    "quick_post_started",
+    "quick_post_denied",
+    "quick_post_unavailable",
+    "quick_post_source_reserved",
+    "quick_post_source_rejected",
+    "quick_post_created",
+    "quick_post_already_completed",
+    "quick_post_create_blocked",
+    "quick_post_cancelled",
+    "quick_post_restarted",
+    "quick_post_action_invalid",
+    "quick_post_action_denied",
+    "quick_post_action_unavailable",
+  ];
+
+export function isQuickPostResultCode(
+  code: TelegramResultCode,
+): code is TelegramQuickPostResultCode {
+  return (TELEGRAM_QUICK_POST_RESULT_CODES as readonly string[]).includes(code);
+}
+
+/** RB-3A. Bounded, privacy-safe replies. One fixed string per terminal
+ *  outcome — never an error detail, a provider message, a workspace name or
+ *  any extracted content. */
+export const TELEGRAM_QUICK_POST_ANSWERS: Record<
+  TelegramQuickPostResultCode,
+  string
+> = {
+  quick_post_started:
+    "Paste the full job post as one plain-text message and I'll turn it into a draft opportunity for your review.",
+  quick_post_denied: "Quick Post isn't available for this chat.",
+  quick_post_unavailable:
+    "No single recruiter workspace with posting access was found for your account. Post from HaulTracker Pro instead.",
+  quick_post_source_reserved: "Reading that job post…",
+  quick_post_source_rejected:
+    "That couldn't be used. Send the full job post as one plain-text message between 30 and 8000 characters.",
+  quick_post_created: "Draft opportunity created in HaulTracker Pro.",
+  quick_post_already_completed: "That draft was already posted.",
+  quick_post_create_blocked:
+    "That couldn't be created. Open HaulTracker Pro to finish this opportunity.",
+  quick_post_cancelled: "Quick Post cancelled. Nothing was created.",
+  quick_post_restarted: "Starting over. Paste the job post as one plain-text message.",
+  quick_post_action_invalid: "That button is no longer valid.",
+  quick_post_action_denied: "You can't use that button.",
+  quick_post_action_unavailable: "That draft isn't ready to post.",
+};
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
   | TelegramStartResultCode
   | TelegramBindResultCode
   | TelegramMenuResultCode
   | TelegramConversationActionResultCode
-  | TelegramConversationReplyResultCode;
+  | TelegramConversationReplyResultCode
+  | TelegramQuickPostResultCode;
 
 export interface TelegramPollLease {
   leaseToken: string;
@@ -131,10 +198,21 @@ export interface TelegramTerminalResult {
   /** RB-1A. Fully composed plain-text menu reply, supplied by the adapter for
    *  menu outcomes only. Never a template, never raw update data. */
   menuText?: string | null;
-  /** RB-1B. URL-only inline buttons for menu outcomes, supplied by the
-   *  adapter. Every destination is a route that already exists in the web
-   *  app; there is no callback button and no callback data. */
-  menuButtons?: TelegramInlineUrlButton[][] | null;
+  /** RB-1B. Inline buttons for menu outcomes, supplied by the adapter. Every
+   *  URL destination is a route that already exists in the web app. RB-3A adds
+   *  at most ONE recruiter callback button, whose payload is an untrusted
+   *  locator re-authorized server-side. */
+  menuButtons?: TelegramInlineButton[][] | null;
+  /** RB-3A. Draft locator returned by a Quick Post processor. Opaque; never
+   *  authorization. */
+  draftId?: string | null;
+  /** RB-3A. The delegated actor for the reserved extraction call. Internal
+   *  only: never rendered, never logged. */
+  actorUserId?: string | null;
+  /** RB-3A. Adapter-composed bounded chat reply for a Quick Post outcome. */
+  followUpText?: string | null;
+  /** RB-3A. Adapter-composed buttons that accompany `followUpText`. */
+  followUpButtons?: TelegramInlineButton[][] | null;
 }
 
 /** Database side. Implemented by the Edge Function over the TG-2D RPCs, and
@@ -224,6 +302,73 @@ export interface TelegramPollLedger {
     replyToMessageId: number | null;
     text: string;
   }): Promise<TelegramTerminalResult>;
+  /** RB-3A. `/post`. Atomic: actor derivation + recruiter capability + draft
+   *  creation + terminal receipt in ONE transaction.
+   *
+   *  Optional so a ledger built before RB-3A still satisfies the contract.
+   *  When it is absent `/post` keeps its exact pre-RB-3A `non_start_message`
+   *  outcome — no draft, no extraction, no creation. */
+  processQuickPostCommandUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+  }): Promise<TelegramTerminalResult>;
+  /** RB-3A. Ordinary private non-reply text. The DATABASE decides whether the
+   *  acting account holds a live awaiting-input draft; when it does not, the
+   *  pre-existing `non_start_message` outcome is recorded unchanged and
+   *  nothing is extracted. Reserving the source update is atomic, so a
+   *  duplicate delivery can never spend a second model call.
+   *
+   *  Optional so a ledger built before RB-3A still satisfies the contract. */
+  processQuickPostSourceUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    text: string;
+  }): Promise<TelegramTerminalResult>;
+  /** RB-3A. Persist the canonical extractor outcome for a reserved draft and
+   *  compose the bounded review. Never a receipt: the source update already
+   *  holds its terminal receipt. */
+  completeQuickPostExtraction?(input: {
+    draftId: string;
+    extracted: unknown | null;
+    errorCode: string | null;
+  }): Promise<TelegramTerminalResult | null>;
+  /** RB-3A. Quick Post button taps. Atomic: actor derivation + draft ownership
+   *  + recruiter capability re-check + canonical delegated creation + terminal
+   *  receipt in ONE transaction.
+   *
+   *  Optional so a ledger built before RB-3A still satisfies the contract.
+   *  When it is absent the orchestrator fails CLOSED for q1 callbacks. */
+  processQuickPostActionUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    action: TelegramQuickPostAction | null;
+    draftId: string | null;
+  }): Promise<TelegramTerminalResult>;
+}
+
+/** RB-3A. The canonical extractor, reached through the ai-insight delegated
+ *  mode. Injected so the orchestrator never holds a prompt, a model id, a
+ *  provider, or a credential. */
+export interface TelegramQuickPostExtractor {
+  extract(input: {
+    actorUserId: string;
+    text: string;
+  }): Promise<
+    | { ok: true; extracted: unknown }
+    | { ok: false; errorCode: string }
+  >;
 }
 
 export interface TelegramGatewayResponse<T> {
@@ -295,6 +440,9 @@ export interface TelegramPollDeps {
   gateway: TelegramGateway;
   sha256: TelegramSha256;
   log?: TelegramPollLogger;
+  /** RB-3A. Absent = Quick Post extraction is unavailable and a reserved draft
+   *  is marked failed rather than retried, so no model call is ever implied. */
+  quickPostExtractor?: TelegramQuickPostExtractor;
 }
 
 export type TelegramPollRunResult =
@@ -378,6 +526,50 @@ export function parseConversationActionData(
   const match = CONVERSATION_ACTION_PATTERN.exec(data);
   if (!match) return null;
   return { action: match[1] === "a" ? "accept" : "pass", threadId: match[2] };
+}
+
+// ────────────────────── RB-3A — Quick Post command + locator ──────────────────
+//
+// `/post` is accepted bare or addressed to the bot, in a PRIVATE chat only.
+// Callback payloads use their own versioned `q1` namespace so the RB-2B `c1`
+// vocabulary is untouched: `q1:n` (4 bytes) or `q1:<c|r|x>:<draft uuid>`
+// (41 bytes), both far inside Telegram's 64-byte limit. The draft id is an
+// opaque locator: possession is never authorization.
+
+const POST_COMMAND_PATTERN = new RegExp(`^\\/post(?:@${TELEGRAM_BOT_USERNAME})?$`);
+
+export type TelegramQuickPostAction = "new" | "confirm" | "restart" | "cancel";
+
+const QUICK_POST_NEW_DATA = "q1:n";
+const QUICK_POST_ACTION_PATTERN =
+  /^q1:(c|r|x):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+
+export function composeQuickPostNewData(): string {
+  return QUICK_POST_NEW_DATA;
+}
+
+export function composeQuickPostActionData(
+  action: Exclude<TelegramQuickPostAction, "new">,
+  draftId: string,
+): string {
+  const letter = action === "confirm" ? "c" : action === "restart" ? "r" : "x";
+  return `q1:${letter}:${draftId}`;
+}
+
+export function isQuickPostCallbackData(data: unknown): boolean {
+  return typeof data === "string" && data.startsWith("q1:");
+}
+
+export function parseQuickPostActionData(
+  data: unknown,
+): { action: TelegramQuickPostAction; draftId: string | null } | null {
+  if (typeof data !== "string") return null;
+  if (data === QUICK_POST_NEW_DATA) return { action: "new", draftId: null };
+  const match = QUICK_POST_ACTION_PATTERN.exec(data);
+  if (!match) return null;
+  const action: TelegramQuickPostAction =
+    match[1] === "c" ? "confirm" : match[1] === "r" ? "restart" : "cancel";
+  return { action, draftId: match[2] };
 }
 
 /** Deterministic JSON serialisation: object keys sorted at every depth so the
@@ -490,7 +682,15 @@ export type TelegramClassification =
       kind: "conversation_reply";
       replyToMessageId: number;
       text: string;
-    };
+    }
+  | { kind: "quick_post_command" }
+  | {
+      kind: "quick_post_action";
+      action: TelegramQuickPostAction | null;
+      draftId: string | null;
+      chatType: string;
+    }
+  | { kind: "quick_post_source"; text: string };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
@@ -503,6 +703,19 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   // processor so its terminal receipt is recorded as `callback_query`, and the
   // processor — not this pure function — decides the fail-closed outcome.
   if (identity.callbackQueryId != null) {
+    // RB-3A. The `q1` namespace is disjoint from RB-2B's `c1`, so an
+    // Accept / Pass tap can never be reinterpreted as a Quick Post action and
+    // vice versa. A malformed `q1` payload stays in the Quick Post processor,
+    // which records the fail-closed outcome.
+    if (isQuickPostCallbackData(identity.callbackData)) {
+      const quick = parseQuickPostActionData(identity.callbackData);
+      return {
+        kind: "quick_post_action",
+        action: quick?.action ?? null,
+        draftId: quick?.draftId ?? null,
+        chatType: identity.chatType ?? "",
+      };
+    }
     const parsed = parseConversationActionData(identity.callbackData);
     return {
       kind: "conversation_action",
@@ -548,11 +761,19 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   if (identity.text === "/start" || identity.text.startsWith("/start ") || identity.text.startsWith("/start@")) {
     return { kind: "ignored", resultCode: "invalid_start_command" };
   }
+  // RB-3A. An explicit, intentional recruiter command. Strictly AFTER every
+  // pre-existing command branch, and strictly exact, so no other command or
+  // ordinary text changes meaning.
+  if (POST_COMMAND_PATTERN.test(identity.text)) {
+    return { kind: "quick_post_command" };
+  }
   // RB-2C. Strictly LAST among the command branches, so every existing command
   // classification is unchanged. Ordinary private text becomes a conversation
   // reply ONLY when Telegram says it is a reply to a specific bot message; a
-  // slash command is never routed as conversation text, and a non-reply
-  // message keeps its exact existing `non_start_message` outcome.
+  // slash command is never routed as conversation text.
+  //
+  // RB-3A depends on this ordering: a recruiter reply to a delivered
+  // conversation alert ALWAYS wins over Quick Post source ingestion.
   if (
     identity.replyToMessageId != null &&
     identity.replyToMessageId > 0 &&
@@ -563,6 +784,13 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
       replyToMessageId: identity.replyToMessageId,
       text: identity.text,
     };
+  }
+  // RB-3A. Ordinary private non-reply, non-command text. This is NOT yet a
+  // Quick Post: the database decides whether this account holds a live
+  // awaiting-input draft, and records the unchanged `non_start_message`
+  // outcome when it does not.
+  if (!identity.text.startsWith("/")) {
+    return { kind: "quick_post_source", text: identity.text };
   }
   return { kind: "ignored", resultCode: "non_start_message" };
 }
@@ -712,6 +940,69 @@ export async function runTelegramPoll(
             : Promise.reject(
                 new Error("telegram_conversation_reply_processor_unavailable"),
               ))
+        // RB-3A. `/post`. The database derives the acting account, resolves the
+        // ONE recruiter workspace it may post into and opens the draft in one
+        // transaction. When the processor is absent the command keeps its exact
+        // pre-RB-3A `non_start_message` outcome — never a silent draft.
+        : classification.kind === "quick_post_command"
+        ? await (ledger.processQuickPostCommandUpdate
+            ? ledger.processQuickPostCommandUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: "private",
+              })
+            : ledger.recordIgnoredUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId,
+                telegramChatId: identity.telegramChatId,
+                resultCode: "non_start_message",
+              }))
+        // RB-3A. Ordinary private text. The database alone decides whether it
+        // is Quick Post source; without a live draft it records the unchanged
+        // `non_start_message` outcome and nothing is extracted.
+        : classification.kind === "quick_post_source"
+        ? await (ledger.processQuickPostSourceUpdate
+            ? ledger.processQuickPostSourceUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: "private",
+                text: classification.text,
+              })
+            : ledger.recordIgnoredUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId,
+                telegramChatId: identity.telegramChatId,
+                resultCode: "non_start_message",
+              }))
+        // RB-3A. Quick Post button tap. Ownership, chat, recruiter capability
+        // and the canonical delegated creation all happen inside ONE database
+        // transaction with the terminal receipt. Fail CLOSED when the processor
+        // is unavailable: no receipt, no creation, no cursor advance.
+        : classification.kind === "quick_post_action"
+        ? await (ledger.processQuickPostActionUpdate
+            ? ledger.processQuickPostActionUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: classification.chatType,
+                action: classification.action,
+                draftId: classification.draftId,
+              })
+            : Promise.reject(
+                new Error("telegram_quick_post_action_processor_unavailable"),
+              ))
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
@@ -738,6 +1029,62 @@ export async function runTelegramPoll(
       isNew: terminal.isNew,
     });
 
+    // RB-3A. The canonical extractor runs ONLY for a source update that was
+    // freshly RESERVED in the transaction above, and therefore exactly once per
+    // unique Telegram update: a duplicate delivery reports the already-recorded
+    // outcome (`isNew === false`) and never reaches this branch. The terminal
+    // receipt is already committed, so nothing here can affect cursor
+    // correctness; a crash before the outcome is persisted leaves the draft in
+    // `extracting`, which is never auto-replayed.
+    let quickPostFollowUp: TelegramTerminalResult | null = null;
+    if (
+      terminal.isNew &&
+      terminal.resultCode === "quick_post_source_reserved" &&
+      classification.kind === "quick_post_source"
+    ) {
+      const draftId = typeof terminal.draftId === "string" ? terminal.draftId : null;
+      const actorUserId =
+        typeof terminal.actorUserId === "string" ? terminal.actorUserId : null;
+
+      if (draftId !== null && ledger.completeQuickPostExtraction) {
+        let extracted: unknown | null = null;
+        let errorCode: string | null = null;
+
+        if (!deps.quickPostExtractor || actorUserId === null) {
+          errorCode = "extractor_unavailable";
+        } else {
+          try {
+            const outcome = await deps.quickPostExtractor.extract({
+              actorUserId,
+              text: classification.text,
+            });
+            if (outcome.ok) {
+              extracted = outcome.extracted;
+            } else {
+              errorCode = outcome.errorCode;
+            }
+          } catch (error) {
+            errorCode = sanitizeErrorCode(error);
+          }
+        }
+
+        try {
+          quickPostFollowUp = await ledger.completeQuickPostExtraction({
+            draftId,
+            extracted,
+            errorCode,
+          });
+        } catch (error) {
+          log("quick_post_extraction_persist_failed", {
+            updateId,
+            code: sanitizeErrorCode(error),
+          });
+        }
+      }
+    }
+
+
+
     // Best-effort user feedback. Deliberately AFTER the terminal receipt and
     // deliberately outside cursor correctness: a failed send must never make
     // the update look unprocessed.
@@ -751,7 +1098,11 @@ export async function runTelegramPoll(
         try {
           const answered = await gateway.answerCallbackQuery({
             callbackQueryId,
-            text: composeConversationActionAnswer(terminal.resultCode),
+            // RB-3A. Quick Post taps get their OWN bounded answer vocabulary;
+            // every RB-2B answer is unchanged.
+            text: isQuickPostResultCode(terminal.resultCode)
+              ? TELEGRAM_QUICK_POST_ANSWERS[terminal.resultCode]
+              : composeConversationActionAnswer(terminal.resultCode),
           });
           if (!answered.ok) {
             log("answer_callback_failed", {
@@ -781,6 +1132,13 @@ export async function runTelegramPoll(
         // failure can never re-write or undo the conversation message.
         : isConversationReplyResultCode(terminal.resultCode)
         ? TELEGRAM_CONVERSATION_REPLY_ANSWERS[terminal.resultCode]
+        // RB-3A. One fixed, bounded reply per Quick Post message outcome. The
+        // adapter may supply richer bounded copy; it never supplies extracted
+        // content here.
+        : isQuickPostResultCode(terminal.resultCode)
+        ? (typeof terminal.followUpText === "string" && terminal.followUpText.length > 0
+            ? terminal.followUpText
+            : TELEGRAM_QUICK_POST_ANSWERS[terminal.resultCode])
         // RB-1A / RB-1B. The adapter composes the menu text (and its URL-only
         // buttons) from the bounded descriptor; the orchestrator only
         // transports them.
@@ -791,9 +1149,15 @@ export async function runTelegramPoll(
         : null;
 
       const feedbackButtons =
-        feedback !== null && isMenuResultCode(terminal.resultCode) &&
-          Array.isArray(terminal.menuButtons) && terminal.menuButtons.length > 0
+        feedback === null
+          ? null
+          : isMenuResultCode(terminal.resultCode) &&
+              Array.isArray(terminal.menuButtons) && terminal.menuButtons.length > 0
           ? terminal.menuButtons
+          : isQuickPostResultCode(terminal.resultCode) &&
+              Array.isArray(terminal.followUpButtons) &&
+              terminal.followUpButtons.length > 0
+          ? terminal.followUpButtons
           : null;
 
       if (feedback !== null) {
@@ -819,6 +1183,66 @@ export async function runTelegramPoll(
         }
       }
     }
+
+    // RB-3A. The bounded Quick Post follow-up: the review card after an
+    // extraction, or the confirmation after a button tap. Strictly best-effort
+    // and strictly AFTER the committed transaction — a send failure can never
+    // create, re-create or undo an opportunity. Every string here is composed
+    // by the adapter from the approved field list only.
+    const quickPostMessages: Array<
+      { text: string; buttons: TelegramInlineButton[][] | null }
+    > = [];
+    if (
+      quickPostFollowUp !== null &&
+      typeof quickPostFollowUp.followUpText === "string" &&
+      quickPostFollowUp.followUpText.length > 0
+    ) {
+      quickPostMessages.push({
+        text: quickPostFollowUp.followUpText,
+        buttons: Array.isArray(quickPostFollowUp.followUpButtons) &&
+            quickPostFollowUp.followUpButtons.length > 0
+          ? quickPostFollowUp.followUpButtons
+          : null,
+      });
+    }
+    if (
+      identity.callbackQueryId != null &&
+      isQuickPostResultCode(terminal.resultCode) &&
+      typeof terminal.followUpText === "string" &&
+      terminal.followUpText.length > 0
+    ) {
+      quickPostMessages.push({
+        text: terminal.followUpText,
+        buttons: Array.isArray(terminal.followUpButtons) &&
+            terminal.followUpButtons.length > 0
+          ? terminal.followUpButtons
+          : null,
+      });
+    }
+    if (quickPostMessages.length > 0 && identity.telegramChatId !== null) {
+      for (const message of quickPostMessages) {
+        try {
+          const sent = await gateway.sendMessage({
+            chatId: identity.telegramChatId,
+            text: message.text,
+            ...(message.buttons ? { buttons: message.buttons } : {}),
+          });
+          if (!sent.ok) {
+            log("quick_post_send_failed", {
+              updateId,
+              code: sent.errorCode ?? "telegram_gateway_error",
+            });
+          }
+        } catch (error) {
+          log("quick_post_send_failed", {
+            updateId,
+            code: sanitizeErrorCode(error),
+          });
+        }
+      }
+    }
+
+
 
     try {
       advancedTo = await ledger.advanceCursor(lease.leaseToken, updateId);
