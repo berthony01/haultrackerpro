@@ -743,7 +743,8 @@ describe('RB-3A-0A — function shape and grants', () => {
     expect(res.rows[0].prosecdef).toBe(true);
     expect(res.rows[0].provolatile).toBe('v');
     expect(res.rows[0].lanname).toBe('plpgsql');
-    expect(res.rows[0].proconfig).toEqual(['search_path=public']);
+    // RB-3A-0A.1 hardened the search_path; pg_catalog first blocks shadowing.
+    expect(res.rows[0].proconfig).toEqual(['search_path=pg_catalog, public, auth']);
   });
 
   it('grants EXECUTE to authenticated only — never PUBLIC, anon, or service_role', async () => {
