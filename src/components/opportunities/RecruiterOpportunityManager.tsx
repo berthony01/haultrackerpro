@@ -42,6 +42,11 @@ import {
   type RecruiterStaffOpportunityPermissions,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
+// Phase RB-3B-B — Telegram Quick Post draft handoff.
+import {
+  readTelegramDraftLocator,
+  useTelegramOpportunityDraft,
+} from '@/hooks/opportunities/useTelegramOpportunityDraft';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 import { getOpportunityPublicationStatus } from '@/lib/opportunities/publicationStatus';
@@ -68,6 +73,23 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     { kind: 'create' } | { kind: 'activate'; id: string } | null
   >(null);
 
+  // Phase RB-3B-B — optional Telegram Quick Post draft locator. Read only
+  // AFTER the normal recruiter workspace authorization below is satisfied; the
+  // value itself grants nothing and every check happens server-side.
+  const [telegramDraftId, setTelegramDraftId] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : readTelegramDraftLocator(window.location.search),
+  );
+  const telegramDraft = useTelegramOpportunityDraft(telegramDraftId);
+
+  const closeTelegramDraft = () => {
+    setTelegramDraftId(null);
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('telegramDraft');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  };
+
   if (profileLoading) {
     return (
       <div className="space-y-4">
@@ -83,6 +105,55 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const block = describeRecruiterBlock(profile, { intentRecruiter });
   if (block.reason === 'suspended') {
     return <Gate onBack={onBack} title={block.title} body={block.body} Icon={Ban} />;
+  }
+
+  // Phase RB-3B-B — Telegram draft edit handoff. Reached only after the normal
+  // recruiter authorization above. The form here can never create, update or
+  // publish an opportunity: its only write target is the bot draft.
+  if (telegramDraftId) {
+    if (telegramDraft.isLoading) {
+      return (
+        <div className="space-y-4" data-testid="telegram-draft-loading">
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-64 w-full" />
+        </div>
+      );
+    }
+    if (telegramDraft.unavailable || !telegramDraft.draft) {
+      return (
+        <Gate
+          onBack={closeTelegramDraft}
+          title="This Telegram draft isn't available"
+          body="It may have expired, already been posted, or been started over. Open Telegram and send /post to begin a new one."
+          Icon={Inbox}
+        />
+      );
+    }
+    return (
+      <RecruiterOpportunityForm
+        initial={telegramDraft.draft.payload as unknown as Opportunity}
+        telegramDraftMode={{
+          draftId: telegramDraft.draft.draftId,
+          isSaving: telegramDraft.isSaving,
+          onSaveChanges: async (payload) => {
+            const result = await telegramDraft.savePayload(
+              payload as unknown as Record<string, unknown>,
+            );
+            if (result.ok) {
+              toast.success(
+                'Changes saved to your Telegram draft. Return to Telegram and refresh the review before confirming.',
+              );
+            } else {
+              toast.error(
+                "Those changes couldn't be saved. The Telegram draft may have expired or already been posted.",
+              );
+            }
+          },
+        }}
+        onBack={closeTelegramDraft}
+        onSaved={closeTelegramDraft}
+      />
+    );
   }
 
   if (view === 'form') {

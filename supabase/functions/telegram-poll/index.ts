@@ -501,7 +501,7 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       telegramUserId: number;
       telegramChatId: number;
       chatType: string;
-      action: "new" | "confirm" | "restart" | "cancel" | null;
+      action: "new" | "confirm" | "restart" | "cancel" | "refresh" | null;
       draftId: string | null;
     }): Promise<TelegramTerminalResult> {
       const { data, error } = await supabase.rpc(
@@ -523,10 +523,48 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
         | { is_new?: boolean; result_code?: string; draft_id?: unknown }
         | null;
       const resultCode = (row?.result_code ?? "") as TelegramResultCode;
+      const actionDraftId = typeof row?.draft_id === "string" ? row.draft_id : null;
+
+      // RB-3B-B. Refresh Review re-renders the CURRENT payload after a web
+      // edit. It is a read-only snapshot: no extractor call, no draft mutation,
+      // no opportunity mutation. Sent exactly once, because the orchestrator
+      // only transports follow-ups for a NEW terminal receipt.
+      if (
+        resultCode === "quick_post_review_refreshed" &&
+        row?.is_new === true &&
+        actionDraftId !== null
+      ) {
+        const snapshot = await supabase.rpc(
+          "telegram_quick_post_review_snapshot",
+          {
+            _draft_id: actionDraftId,
+            _telegram_user_id: input.telegramUserId,
+            _telegram_chat_id: input.telegramChatId,
+          },
+        );
+        if (snapshot.error) throw new Error(boundedRpcErrorCode(snapshot.error));
+        if (snapshot.data && typeof snapshot.data === "object") {
+          return {
+            isNew: true,
+            resultCode,
+            draftId: actionDraftId,
+            followUpText: composeQuickPostReview(snapshot.data),
+            followUpButtons: composeQuickPostReviewButtons(actionDraftId),
+          };
+        }
+        return {
+          isNew: true,
+          resultCode,
+          draftId: actionDraftId,
+          followUpText: null,
+          followUpButtons: null,
+        };
+      }
+
       return {
         isNew: row?.is_new === true,
         resultCode,
-        draftId: typeof row?.draft_id === "string" ? row.draft_id : null,
+        draftId: actionDraftId,
         followUpText: composeQuickPostActionFollowUp(resultCode),
         followUpButtons: resultCode === "quick_post_created"
           ? OPPORTUNITIES_BUTTONS
@@ -604,9 +642,18 @@ function composeQuickPostReview(payload: unknown): string {
   ].join("\n");
 }
 
+// RB-3B-B. The Edit Details link carries the draft id as an OPAQUE locator in
+// an ordinary internal app URL. Possession grants nothing: the web read/save
+// RPCs re-derive the acting account and the recruiter capability server-side.
+function composeQuickPostEditUrl(draftId: string): string {
+  return `${APP_BASE_URL}/dashboard?page=recruiter-access:manager&telegramDraft=${draftId}`;
+}
+
 function composeQuickPostReviewButtons(draftId: string): TelegramInlineButton[][] {
   return [
     [{ text: "✅ Confirm", callbackData: composeQuickPostActionData("confirm", draftId) }],
+    [{ text: "✏️ Edit Details", url: composeQuickPostEditUrl(draftId) }],
+    [{ text: "🔁 Refresh Review", callbackData: composeQuickPostActionData("refresh", draftId) }],
     [{ text: "🔄 Start Over", callbackData: composeQuickPostActionData("restart", draftId) }],
     [{ text: "✖️ Cancel", callbackData: composeQuickPostActionData("cancel", draftId) }],
   ];

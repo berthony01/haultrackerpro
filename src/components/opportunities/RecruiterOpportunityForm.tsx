@@ -50,6 +50,7 @@ import {
   type CanonicalPayModel,
   type CanonicalTeamConfiguration,
   type EscrowRequiredState,
+  type OpportunityPersistencePayload,
   type RecurringFrequency,
   type YesNoUnknown,
 } from '@/lib/opportunities/opportunityCanonical';
@@ -76,6 +77,20 @@ interface Props {
    * (recruiter profile, readiness self-heal, billing) is ever mounted.
    */
   staffController?: RecruiterOpportunityStaffController | null;
+  /**
+   * Phase RB-3B-B — optional Telegram Quick Post draft edit mode. When present
+   * the form edits the bot draft ONLY: no opportunity is created or updated,
+   * publishing is unavailable, and Save Changes writes the canonical payload
+   * back to the draft through the actor-scoped RPC.
+   */
+  telegramDraftMode?: RecruiterOpportunityTelegramDraftMode | null;
+}
+
+/** Phase RB-3B-B — Telegram draft edit contract supplied by the manager. */
+export interface RecruiterOpportunityTelegramDraftMode {
+  draftId: string;
+  isSaving: boolean;
+  onSaveChanges: (payload: OpportunityPersistencePayload) => void | Promise<void>;
 }
 
 /** Phase RC-1D — staff authoring controller supplied by the staff manager. */
@@ -573,7 +588,11 @@ function RecruiterOpportunityFormCore({
   onBack,
   onSaved,
   controller,
+  telegramDraftMode,
 }: Props & { controller: OpportunityFormController }) {
+  // Phase RB-3B-B — Telegram draft edit mode. Nothing here can create or
+  // publish an opportunity; the only write target is the bot draft.
+  const telegramDraft = telegramDraftMode ?? null;
 
 
   // Phase 1R-E1 — publishing a listing that is not already active consumes
@@ -652,7 +671,17 @@ function RecruiterOpportunityFormCore({
       permissions: staffPerms,
     });
 
+  // Phase RB-3B-B — the ONLY write in Telegram draft edit mode. It targets the
+  // bot draft through the actor-scoped RPC supplied by the manager; no
+  // opportunity is created, updated or published here.
+  const saveTelegramDraft = async () => {
+    if (!telegramDraft) return;
+    await telegramDraft.onSaveChanges(buildOpportunityPersistencePayload(state, 'draft'));
+  };
+
   const save = async (mode: 'draft' | 'publish') => {
+    // Defence in depth: the draft-edit UI never renders these actions.
+    if (telegramDraft) return;
     if (mode === 'draft' && !staffCanSaveDraft) {
       toast.error(STAFF_PERMISSION_MESSAGE);
       return;
@@ -754,22 +783,38 @@ function RecruiterOpportunityFormCore({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-              {initial ? 'Edit Opportunity' : 'Post Opportunity'}
+              {telegramDraft
+                ? 'Edit Telegram Draft'
+                : initial ? 'Edit Opportunity' : 'Post Opportunity'}
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl mt-1">
-              Required details adapt to the selected employment arrangement and pay model. Review the
-              live calculation before publishing.
+              {telegramDraft
+                ? 'Correct anything that was missed. Nothing is posted here — save your changes, then return to Telegram and refresh the review before confirming.'
+                : 'Required details adapt to the selected employment arrangement and pay model. Review the live calculation before publishing.'}
             </p>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setPasteOpen(true)}
-            disabled={pending}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Sparkles className="h-4 w-4" /> Paste to auto-fill
-          </Button>
+          {telegramDraft ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => { void saveTelegramDraft(); }}
+              disabled={telegramDraft.isSaving}
+              data-testid="save-telegram-draft-changes-header"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Save className="h-4 w-4" /> Save Changes
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setPasteOpen(true)}
+              disabled={pending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Sparkles className="h-4 w-4" /> Paste to auto-fill
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1196,17 +1241,30 @@ function RecruiterOpportunityFormCore({
               <Button variant="outline" onClick={goPrev} type="button">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-              <Button variant="outline" onClick={() => save('draft')}
-                data-testid="save-draft-opportunity"
-                disabled={pending || !readiness.canSaveDraft || !staffCanSaveDraft}>
-                <Save className="h-4 w-4" /> Save Draft
-              </Button>
-              <Button onClick={() => save('publish')}
-                data-testid="publish-opportunity"
-                disabled={pending || !readiness.canPublish || atActiveLimit || !staffCanPublish}>
-                <Send className="h-4 w-4" /> Publish Opportunity
+              {telegramDraft ? (
+                <Button
+                  type="button"
+                  onClick={() => { void saveTelegramDraft(); }}
+                  data-testid="save-telegram-draft-changes"
+                  disabled={telegramDraft.isSaving}
+                >
+                  <Save className="h-4 w-4" /> Save Changes
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => save('draft')}
+                    data-testid="save-draft-opportunity"
+                    disabled={pending || !readiness.canSaveDraft || !staffCanSaveDraft}>
+                    <Save className="h-4 w-4" /> Save Draft
+                  </Button>
+                  <Button onClick={() => save('publish')}
+                    data-testid="publish-opportunity"
+                    disabled={pending || !readiness.canPublish || atActiveLimit || !staffCanPublish}>
+                    <Send className="h-4 w-4" /> Publish Opportunity
 
-              </Button>
+                  </Button>
+                </>
+              )}
             </div>
             {staffPerms && (!staffCanSaveDraft || !staffCanPublish) && (
               <p
