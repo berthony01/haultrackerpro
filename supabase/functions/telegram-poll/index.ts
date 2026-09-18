@@ -16,6 +16,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 import {
+  boundedRpcErrorCode,
   composeQuickPostActionData,
   composeQuickPostNewData,
   runTelegramAlertDrain,
@@ -331,7 +332,8 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
           _thread_id: input.threadId,
         },
       );
-      if (error) throw new Error(error.message);
+      // RB-3A.1. Callback RPC failures surface as a BOUNDED code only.
+      if (error) throw new Error(boundedRpcErrorCode(error));
       return unwrapTerminal(data);
     },
     // RB-2C. Private-chat recruiter reply. The database resolves the thread
@@ -515,7 +517,8 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
           _draft_id: input.draftId,
         },
       );
-      if (error) throw new Error(error.message);
+      // RB-3A.1. Callback RPC failures surface as a BOUNDED code only.
+      if (error) throw new Error(boundedRpcErrorCode(error));
       const row = (Array.isArray(data) ? data[0] : data) as
         | { is_new?: boolean; result_code?: string; draft_id?: unknown }
         | null;
