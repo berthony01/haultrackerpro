@@ -890,6 +890,8 @@ describe("TG-2D edge function shell", () => {
       "telegram_process_quick_post_command_update",
       "telegram_process_quick_post_source_update",
       "telegram_process_start_update",
+      // RB-3B-B: read-only snapshot used to re-render a Quick Post review.
+      "telegram_quick_post_review_snapshot",
       "telegram_record_ignored_update",
       "telegram_release_poll_lease",
     ]);
