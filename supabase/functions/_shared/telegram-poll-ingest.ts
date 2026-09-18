@@ -72,12 +72,53 @@ export const TELEGRAM_CONVERSATION_ACTION_RESULT_CODES:
     "conversation_action_invalid",
   ];
 
+/** Phase RB-2C — private-chat recruiter reply terminal outcomes. The database
+ *  owns every one of these; the orchestrator only transports them. */
+export type TelegramConversationReplyResultCode =
+  | "conversation_reply_sent"
+  | "conversation_reply_denied"
+  | "conversation_reply_unavailable"
+  | "conversation_reply_invalid"
+  | "conversation_reply_unroutable";
+
+export const TELEGRAM_CONVERSATION_REPLY_RESULT_CODES:
+  readonly TelegramConversationReplyResultCode[] = [
+    "conversation_reply_sent",
+    "conversation_reply_denied",
+    "conversation_reply_unavailable",
+    "conversation_reply_invalid",
+    "conversation_reply_unroutable",
+  ];
+
+export function isConversationReplyResultCode(
+  code: TelegramResultCode,
+): code is TelegramConversationReplyResultCode {
+  return (TELEGRAM_CONVERSATION_REPLY_RESULT_CODES as readonly string[]).includes(code);
+}
+
+/** RB-2C. Bounded, privacy-safe acknowledgements. One fixed string per
+ *  terminal outcome — never an error detail, a driver name, a thread id or any
+ *  workspace data. */
+export const TELEGRAM_CONVERSATION_REPLY_ANSWERS: Record<
+  TelegramConversationReplyResultCode,
+  string
+> = {
+  conversation_reply_sent: "Sent to the driver in HaulTracker Pro.",
+  conversation_reply_denied: "You can't message this conversation.",
+  conversation_reply_unavailable:
+    "This conversation isn't open for messages. Accept it in HaulTracker Pro first.",
+  conversation_reply_invalid: "That message couldn't be sent. Keep it to plain text under 4000 characters.",
+  conversation_reply_unroutable:
+    "To message a driver, reply directly to that conversation alert.",
+};
+
 export type TelegramResultCode =
   | TelegramIgnoredResultCode
   | TelegramStartResultCode
   | TelegramBindResultCode
   | TelegramMenuResultCode
-  | TelegramConversationActionResultCode;
+  | TelegramConversationActionResultCode
+  | TelegramConversationReplyResultCode;
 
 export interface TelegramPollLease {
   leaseToken: string;
@@ -164,6 +205,25 @@ export interface TelegramPollLedger {
     action: TelegramConversationAction | null;
     threadId: string | null;
   }): Promise<TelegramTerminalResult>;
+  /** RB-2C. Atomic: actor derivation + alert-mapped thread resolution + CF-1
+   *  re-authorization + the canonical CF-1 message write + terminal receipt,
+   *  all in ONE database transaction. `replyToMessageId` is an UNTRUSTED
+   *  locator and `text` is untrusted external input; both are validated
+   *  server-side.
+   *
+   *  Optional so a ledger built before RB-2C still satisfies the contract.
+   *  When it is absent the orchestrator fails CLOSED for reply updates: no
+   *  receipt, no message, no cursor advance. */
+  processConversationReplyUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    replyToMessageId: number | null;
+    text: string;
+  }): Promise<TelegramTerminalResult>;
 }
 
 export interface TelegramGatewayResponse<T> {
@@ -192,6 +252,13 @@ export type TelegramInlineButton =
   | TelegramInlineUrlButton
   | TelegramInlineCallbackButton;
 
+/** RB-2C. The only part of Telegram's sendMessage result this runtime reads:
+ *  the transport id of the message it just sent. No chat, user, or content
+ *  field is consumed. */
+export interface TelegramSentMessage {
+  message_id?: number;
+}
+
 /** Lovable connector gateway side. The implementation never receives, holds,
  *  or exposes a Telegram bot token — the gateway injects it. */
 export interface TelegramGateway {
@@ -207,7 +274,7 @@ export interface TelegramGateway {
     /** URL-only for menus (RB-1B); RB-2B alerts may also carry callback rows.
      *  Absent for every plain-text outcome, exactly as before. */
     buttons?: TelegramInlineButton[][] | null;
-  }): Promise<TelegramGatewayResponse<unknown>>;
+  }): Promise<TelegramGatewayResponse<TelegramSentMessage>>;
   /** RB-2B. Resolves the Telegram spinner after a button tap. Answering is
    *  NOT a state mutation, so it is always best-effort. */
   answerCallbackQuery?(input: {
@@ -341,6 +408,10 @@ interface ParsedIdentity {
    *  update can never be mistaken for a button tap. */
   callbackQueryId?: string | null;
   callbackData?: string | null;
+  /** RB-2C. `message.reply_to_message.message_id`. An UNTRUSTED transport
+   *  locator: possession confers nothing and it is resolved server-side only
+   *  against an alert actually delivered to the acting account. */
+  replyToMessageId?: number | null;
 }
 
 function asFiniteInteger(value: unknown): number | null {
@@ -375,6 +446,7 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
       callbackQueryId:
         typeof callback.id === "string" && callback.id.length > 0 ? callback.id : null,
       callbackData: typeof callback.data === "string" ? callback.data : null,
+      replyToMessageId: null,
     };
   }
 
@@ -385,6 +457,12 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
   const rawUserId = asFiniteInteger(from?.id);
   const rawChatId = asFiniteInteger(chat?.id);
 
+  // RB-2C. Transport locator only.
+  const replyTo = message?.reply_to_message as Record<string, unknown> | undefined;
+  const replyToId = replyTo && typeof replyTo === "object" && !Array.isArray(replyTo)
+    ? asFiniteInteger(replyTo.message_id)
+    : null;
+
   return {
     updateId,
     telegramUserId: rawUserId !== null && rawUserId > 0 ? rawUserId : null,
@@ -393,6 +471,7 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
     text: typeof message?.text === "string" ? message.text : null,
     callbackQueryId: null,
     callbackData: null,
+    replyToMessageId: replyToId !== null && replyToId > 0 ? replyToId : null,
   };
 }
 
@@ -406,6 +485,11 @@ export type TelegramClassification =
       action: TelegramConversationAction | null;
       threadId: string | null;
       chatType: string;
+    }
+  | {
+      kind: "conversation_reply";
+      replyToMessageId: number;
+      text: string;
     };
 
 /** Pure classification. Exported so the contract can be tested directly
@@ -463,6 +547,22 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   }
   if (identity.text === "/start" || identity.text.startsWith("/start ") || identity.text.startsWith("/start@")) {
     return { kind: "ignored", resultCode: "invalid_start_command" };
+  }
+  // RB-2C. Strictly LAST among the command branches, so every existing command
+  // classification is unchanged. Ordinary private text becomes a conversation
+  // reply ONLY when Telegram says it is a reply to a specific bot message; a
+  // slash command is never routed as conversation text, and a non-reply
+  // message keeps its exact existing `non_start_message` outcome.
+  if (
+    identity.replyToMessageId != null &&
+    identity.replyToMessageId > 0 &&
+    !identity.text.startsWith("/")
+  ) {
+    return {
+      kind: "conversation_reply",
+      replyToMessageId: identity.replyToMessageId,
+      text: identity.text,
+    };
   }
   return { kind: "ignored", resultCode: "non_start_message" };
 }
@@ -591,6 +691,27 @@ export async function runTelegramPoll(
             : Promise.reject(
                 new Error("telegram_conversation_action_processor_unavailable"),
               ))
+        // RB-2C. The database resolves the thread from an alert delivered to
+        // the acting account, re-authorizes it against CF-1, writes the
+        // Driver-visible message through the canonical CF-1 function and
+        // records the terminal receipt in ONE transaction. Fail CLOSED when
+        // the processor is unavailable: no receipt, no message, no cursor
+        // advance.
+        : classification.kind === "conversation_reply"
+        ? await (ledger.processConversationReplyUpdate
+            ? ledger.processConversationReplyUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: "private",
+                replyToMessageId: classification.replyToMessageId,
+                text: classification.text,
+              })
+            : Promise.reject(
+                new Error("telegram_conversation_reply_processor_unavailable"),
+              ))
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
@@ -655,6 +776,11 @@ export async function runTelegramPoll(
         ? TELEGRAM_BIND_SUCCESS_MESSAGE
         : terminal.resultCode === "bind_rejected"
         ? TELEGRAM_BIND_FAILURE_MESSAGE
+        // RB-2C. One fixed, bounded acknowledgement per reply outcome. Sent
+        // AFTER the committed transaction and strictly best-effort, so a send
+        // failure can never re-write or undo the conversation message.
+        : isConversationReplyResultCode(terminal.resultCode)
+        ? TELEGRAM_CONVERSATION_REPLY_ANSWERS[terminal.resultCode]
         // RB-1A / RB-1B. The adapter composes the menu text (and its URL-only
         // buttons) from the bounded descriptor; the orchestrator only
         // transports them.
@@ -739,7 +865,14 @@ export interface TelegramAlertClaim {
 
 export interface TelegramAlertOutbox {
   claimConversationAlerts(limit: number): Promise<TelegramAlertClaim[]>;
-  markConversationAlertSent(alertId: string): Promise<void>;
+  /** RB-2C. The delivered Telegram message id (and its chat) are persisted so
+   *  a later recruiter REPLY to that exact message can be resolved back to
+   *  this conversation. Transport identifiers only — never driver data. */
+  markConversationAlertSent(
+    alertId: string,
+    telegramMessageId: number | null,
+    telegramChatId: number | null,
+  ): Promise<void>;
   markConversationAlertFailed(alertId: string, errorCode: string): Promise<void>;
 }
 
@@ -762,6 +895,10 @@ export const TELEGRAM_ALERT_DRAIN_LIMIT = 10;
 export const TELEGRAM_ALERT_HEADER = "HaulTracker Pro — new driver conversation";
 export const TELEGRAM_ALERT_GENERIC_BODY =
   "A driver started a conversation with your workspace. Open HaulTracker Pro to read it and reply.";
+/** RB-2C. Explains the ONLY supported routing: an explicit Telegram reply to
+ *  this exact alert. Makes no availability or employment promise. */
+export const TELEGRAM_ALERT_REPLY_HINT =
+  "Accept the conversation, then reply to this alert to message the driver.";
 export const TELEGRAM_ALERT_BUTTON_LABEL = "Open Conversations";
 export const TELEGRAM_ALERT_ACCEPT_LABEL = "✅ Accept";
 export const TELEGRAM_ALERT_PASS_LABEL = "❌ Pass";
@@ -772,9 +909,9 @@ export function composeConversationAlertText(
 ): string {
   const title = typeof opportunityTitle === "string" ? opportunityTitle.trim() : "";
   if (title.length === 0) {
-    return `${TELEGRAM_ALERT_HEADER}\n\n${TELEGRAM_ALERT_GENERIC_BODY}`;
+    return `${TELEGRAM_ALERT_HEADER}\n\n${TELEGRAM_ALERT_GENERIC_BODY}\n\n${TELEGRAM_ALERT_REPLY_HINT}`;
   }
-  return `${TELEGRAM_ALERT_HEADER}\n\nOpportunity: ${title.slice(0, 120)}\n\n${TELEGRAM_ALERT_GENERIC_BODY}`;
+  return `${TELEGRAM_ALERT_HEADER}\n\nOpportunity: ${title.slice(0, 120)}\n\n${TELEGRAM_ALERT_GENERIC_BODY}\n\n${TELEGRAM_ALERT_REPLY_HINT}`;
 }
 
 /** RB-2B. Accept / Pass carry compact versioned callback data; Open
@@ -845,6 +982,9 @@ export async function runTelegramAlertDrain(
 
   for (const claim of claims) {
     let errorCode: string | null = null;
+    // RB-2C. Captured ONLY on a confirmed send, and used ONLY as the reply
+    // locator for this alert.
+    let sentMessageId: number | null = null;
     try {
       const sent = await deps.gateway.sendMessage({
         chatId: claim.telegramChatId,
@@ -854,14 +994,24 @@ export async function runTelegramAlertDrain(
           claim.threadId,
         ),
       });
-      if (!sent.ok) errorCode = sent.errorCode ?? "telegram_gateway_error";
+      if (!sent.ok) {
+        errorCode = sent.errorCode ?? "telegram_gateway_error";
+      } else {
+        const id = sent.result?.message_id;
+        sentMessageId =
+          typeof id === "number" && Number.isSafeInteger(id) && id > 0 ? id : null;
+      }
     } catch (error) {
       errorCode = sanitizeErrorCode(error);
     }
 
     try {
       if (errorCode === null) {
-        await deps.outbox.markConversationAlertSent(claim.alertId);
+        await deps.outbox.markConversationAlertSent(
+          claim.alertId,
+          sentMessageId,
+          claim.telegramChatId,
+        );
         result.sent += 1;
       } else {
         await deps.outbox.markConversationAlertFailed(claim.alertId, errorCode);
