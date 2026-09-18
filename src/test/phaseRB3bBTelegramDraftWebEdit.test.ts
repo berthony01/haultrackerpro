@@ -363,7 +363,12 @@ describe("RB-3B-B 9 — web save cannot touch server-owned lifecycle state", () 
     expect(SAVE_FN).toMatch(/SET extracted_payload = _filtered/);
     expect(SAVE_FN).toMatch(/AND state = 'review'/);
     expect(SAVE_FN).toMatch(/AND created_opportunity_id IS NULL/);
-    expect(SAVE_FN).not.toMatch(/SET[\s\S]{0,200}(actor_user_id|recruiter_id|telegram_user_id|telegram_chat_id|state\s*=\s*')/);
+    const updateStmt = SAVE_FN.slice(
+      SAVE_FN.indexOf("UPDATE public.telegram_opportunity_drafts"),
+      SAVE_FN.indexOf("RETURN jsonb_build_object("),
+    );
+    expect(updateStmt).not.toMatch(/(actor_user_id|recruiter_id|telegram_user_id|telegram_chat_id)\s*=/);
+    expect(updateStmt).not.toMatch(/SET[\s\S]*state\s*=/);
   });
 
   it("requires ownership, review state, unexpired and current recruiter capability", () => {
