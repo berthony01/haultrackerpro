@@ -109,11 +109,21 @@ BEGIN
   -- not to NULL. Nullable columns keep exact NULL semantics.
   v_rec := jsonb_populate_record(
     NULL::public.opportunities,
+    -- Exact live column defaults of every NOT NULL writable column:
+    --   hiring_states          text[]  NOT NULL DEFAULT '{}'
+    --   escrow_required        boolean NOT NULL DEFAULT false
+    --   transparency_confirmed boolean NOT NULL DEFAULT false
+    --   status                 text    NOT NULL DEFAULT 'draft'
+    --   mixed_pay_components   jsonb   NOT NULL DEFAULT '[]'
+    --   required_endorsements  text[]  NOT NULL DEFAULT '{}'
+    -- (title/company_name are NOT NULL with no default and must be supplied.)
     jsonb_build_object(
-      'hiring_states', '[]'::jsonb,
+      'hiring_states', jsonb_build_array(),
       'escrow_required', false,
       'transparency_confirmed', false,
-      'status', 'draft'
+      'status', 'draft',
+      'mixed_pay_components', jsonb_build_array(),
+      'required_endorsements', jsonb_build_array()
     ) || v_payload
   );
 
