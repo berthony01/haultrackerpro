@@ -765,10 +765,20 @@ const WORK_BUTTONS: TelegramInlineUrlButton[][] = [
   [{ text: "🔎 Find Work", url: URL_FIND_WORK }],
   [{ text: "👤 Work Profile", url: URL_WORK_PROFILE }],
 ];
-const RECRUITER_BUTTONS: TelegramInlineUrlButton[][] = [
+// RB-3A. The ONE Quick Post entry button, shown only on a recruiter menu. It
+// carries a versioned `q1` callback rather than a URL because no draft exists
+// yet; the payload is an intent, never authorization — the database re-derives
+// the actor and re-checks posting capability on every tap.
+const RECRUITER_BUTTONS: TelegramInlineButton[][] = [
+  [{ text: "➕ Post Opportunity", callback_data: composeQuickPostNewData() }],
   [{ text: "📋 My Opportunities", url: URL_OPPORTUNITIES }],
   [{ text: "💬 Conversations", url: URL_CONVERSATIONS }],
   [{ text: "📊 Results", url: URL_RESULTS }],
+];
+// RB-3A. Reuses the existing recruiter opportunities route for the bounded
+// success confirmation. No opportunity id is ever placed in a chat.
+const OPPORTUNITIES_BUTTONS: TelegramInlineButton[][] = [
+  [{ text: "📋 My Opportunities", url: URL_OPPORTUNITIES }],
 ];
 
 const MENU_UNLINKED_TEXT =
