@@ -100,6 +100,10 @@ describe("RB-3A A — Quick Post routing sits behind every existing rule", () =>
       command: "status",
     });
     expect(classifyUpdate(identity({ text: "/start" }))).toEqual({
+      kind: "menu",
+      command: "start",
+    });
+    expect(classifyUpdate(identity({ text: "/start@HaulTrackerBot" }))).toEqual({
       kind: "ignored",
       resultCode: "invalid_start_command",
     });
