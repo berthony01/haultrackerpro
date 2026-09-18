@@ -940,6 +940,69 @@ export async function runTelegramPoll(
             : Promise.reject(
                 new Error("telegram_conversation_reply_processor_unavailable"),
               ))
+        // RB-3A. `/post`. The database derives the acting account, resolves the
+        // ONE recruiter workspace it may post into and opens the draft in one
+        // transaction. When the processor is absent the command keeps its exact
+        // pre-RB-3A `non_start_message` outcome — never a silent draft.
+        : classification.kind === "quick_post_command"
+        ? await (ledger.processQuickPostCommandUpdate
+            ? ledger.processQuickPostCommandUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: "private",
+              })
+            : ledger.recordIgnoredUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId,
+                telegramChatId: identity.telegramChatId,
+                resultCode: "non_start_message",
+              }))
+        // RB-3A. Ordinary private text. The database alone decides whether it
+        // is Quick Post source; without a live draft it records the unchanged
+        // `non_start_message` outcome and nothing is extracted.
+        : classification.kind === "quick_post_source"
+        ? await (ledger.processQuickPostSourceUpdate
+            ? ledger.processQuickPostSourceUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: "private",
+                text: classification.text,
+              })
+            : ledger.recordIgnoredUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId,
+                telegramChatId: identity.telegramChatId,
+                resultCode: "non_start_message",
+              }))
+        // RB-3A. Quick Post button tap. Ownership, chat, recruiter capability
+        // and the canonical delegated creation all happen inside ONE database
+        // transaction with the terminal receipt. Fail CLOSED when the processor
+        // is unavailable: no receipt, no creation, no cursor advance.
+        : classification.kind === "quick_post_action"
+        ? await (ledger.processQuickPostActionUpdate
+            ? ledger.processQuickPostActionUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: classification.chatType,
+                action: classification.action,
+                draftId: classification.draftId,
+              })
+            : Promise.reject(
+                new Error("telegram_quick_post_action_processor_unavailable"),
+              ))
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
