@@ -42,6 +42,11 @@ import {
   type RecruiterStaffOpportunityPermissions,
 } from '@/hooks/opportunities/useRecruiterOpportunities';
 import { RecruiterOpportunityForm } from './RecruiterOpportunityForm';
+// Phase RB-3B-B — Telegram Quick Post draft handoff.
+import {
+  readTelegramDraftLocator,
+  useTelegramOpportunityDraft,
+} from '@/hooks/opportunities/useTelegramOpportunityDraft';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
 import { getOpportunityPublicationStatus } from '@/lib/opportunities/publicationStatus';
