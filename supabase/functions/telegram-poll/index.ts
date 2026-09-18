@@ -31,6 +31,7 @@ import {
   type TelegramPollLease,
   type TelegramPollLedger,
   type TelegramResultCode,
+  type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
 
@@ -138,8 +139,10 @@ function buildGateway(lovableApiKey: string, connectionKey: string): TelegramGat
     getUpdates: (options) => call<unknown[]>("getUpdates", { ...options }),
     // RB-1B. `buttons` carries inline rows. When absent the payload is
     // byte-identical to the RB-1A one.
+    // RB-2C. The typed result exposes ONLY `message_id`, which the alert drain
+    // persists as the reply locator for that alert.
     sendMessage: ({ chatId, text, buttons }) =>
-      call<unknown>("sendMessage", {
+      call<TelegramSentMessage>("sendMessage", {
         chat_id: chatId,
         text,
         ...(buttons && buttons.length > 0
@@ -324,6 +327,39 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       if (error) throw new Error(error.message);
       return unwrapTerminal(data);
     },
+    // RB-2C. Private-chat recruiter reply. The database resolves the thread
+    // from an alert actually delivered to the acting linked account,
+    // re-authorizes it against CF-1, writes the Driver-visible message through
+    // the canonical CF-1 function and records the terminal receipt in one
+    // transaction. This adapter transports the untrusted locator, the raw text
+    // and the fixed outcome code only — never an actor, workspace or driver
+    // identity, and it never logs the text.
+    async processConversationReplyUpdate(input: {
+      leaseToken: string;
+      updateId: number;
+      payloadHash: string;
+      telegramUserId: number;
+      telegramChatId: number;
+      chatType: string;
+      replyToMessageId: number | null;
+      text: string;
+    }): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(
+        "telegram_process_conversation_reply_update",
+        {
+          _lease_token: input.leaseToken,
+          _update_id: input.updateId,
+          _payload_hash: input.payloadHash,
+          _telegram_user_id: input.telegramUserId,
+          _telegram_chat_id: input.telegramChatId,
+          _chat_type: input.chatType,
+          _reply_to_message_id: input.replyToMessageId,
+          _text: input.text,
+        },
+      );
+      if (error) throw new Error(error.message);
+      return unwrapTerminal(data);
+    },
   };
 }
 
@@ -360,9 +396,18 @@ function buildAlertOutbox(supabase: RpcClient): TelegramAlertOutbox {
             typeof row.opportunity_title === "string" ? row.opportunity_title : null,
         }));
     },
-    async markConversationAlertSent(alertId: string): Promise<void> {
+    // RB-2C. The delivered Telegram message id is persisted alongside the
+    // confirmed send so a later reply to that exact alert resolves back to its
+    // conversation. Transport identifiers only.
+    async markConversationAlertSent(
+      alertId: string,
+      telegramMessageId: number | null,
+      telegramChatId: number | null,
+    ): Promise<void> {
       const { error } = await supabase.rpc("telegram_mark_conversation_alert_sent", {
         _alert_id: alertId,
+        _telegram_message_id: telegramMessageId,
+        _telegram_chat_id: telegramChatId,
       });
       if (error) throw new Error(error.message);
     },

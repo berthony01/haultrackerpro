@@ -18,6 +18,7 @@ import {
   TELEGRAM_ALERT_PASS_LABEL,
   TELEGRAM_ALERT_DRAIN_LIMIT,
   TELEGRAM_ALERT_GENERIC_BODY,
+  TELEGRAM_ALERT_REPLY_HINT,
   TELEGRAM_ALERT_HEADER,
   composeConversationAlertButtons,
   composeConversationAlertText,
@@ -347,7 +348,11 @@ describe("RB-2A B — outbound drain semantics", () => {
 
   it("7) falls back to generic copy when no opportunity title is available", () => {
     const text = composeConversationAlertText(null);
-    expect(text).toBe(`${TELEGRAM_ALERT_HEADER}\n\n${TELEGRAM_ALERT_GENERIC_BODY}`);
+    // RB-2C re-pin: the alert now also states the only supported routing.
+    // Still exact equality — no new variable element was introduced.
+    expect(text).toBe(
+      `${TELEGRAM_ALERT_HEADER}\n\n${TELEGRAM_ALERT_GENERIC_BODY}\n\n${TELEGRAM_ALERT_REPLY_HINT}`,
+    );
     expect(composeConversationAlertText("   ")).toBe(text);
     const rows = composeConversationAlertButtons(CONVERSATIONS_URL, THREAD_ID);
     expect((rows[1][0] as { url: string }).url).toBe(CONVERSATIONS_URL);

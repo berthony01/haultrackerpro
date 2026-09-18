@@ -4592,6 +4592,8 @@ export type Database = {
           recruiter_id: string
           sent_at: string | null
           status: string
+          telegram_chat_id: number | null
+          telegram_message_id: number | null
           thread_id: string
           updated_at: string
         }
@@ -4606,6 +4608,8 @@ export type Database = {
           recruiter_id: string
           sent_at?: string | null
           status?: string
+          telegram_chat_id?: number | null
+          telegram_message_id?: number | null
           thread_id: string
           updated_at?: string
         }
@@ -4620,6 +4624,8 @@ export type Database = {
           recruiter_id?: string
           sent_at?: string | null
           status?: string
+          telegram_chat_id?: number | null
+          telegram_message_id?: number | null
           thread_id?: string
           updated_at?: string
         }
@@ -7862,7 +7868,11 @@ export type Database = {
         Returns: string
       }
       telegram_mark_conversation_alert_sent: {
-        Args: { _alert_id: string }
+        Args: {
+          _alert_id: string
+          _telegram_chat_id?: number
+          _telegram_message_id?: number
+        }
         Returns: boolean
       }
       telegram_process_bind_update: {
@@ -7889,6 +7899,22 @@ export type Database = {
           _telegram_chat_id: number
           _telegram_user_id: number
           _thread_id: string
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+        }[]
+      }
+      telegram_process_conversation_reply_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _reply_to_message_id: number
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _text: string
           _update_id: number
         }
         Returns: {
