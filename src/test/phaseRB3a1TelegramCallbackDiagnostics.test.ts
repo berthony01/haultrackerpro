@@ -22,6 +22,12 @@ const EDGE_CODE = read("supabase/functions/telegram-poll/index.ts");
 const ORCHESTRATOR_CODE = read(
   "supabase/functions/_shared/telegram-poll-ingest.ts",
 );
+const QUICK_POST_SQL = read(
+  "supabase/migration-candidates/20260922050000_phase_rb3a_telegram_quick_post.sql",
+);
+const FIX_SQL = read(
+  "supabase/migration-candidates/20260922060000_phase_rb3a1_quick_post_recruiter_min_uuid_fix.sql",
+);
 
 describe("RB-3A.1 — bounded callback RPC error codes", () => {
   it("maps a PostgREST code to a bounded snake_case code", () => {
