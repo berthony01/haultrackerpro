@@ -364,7 +364,255 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       if (error) throw new Error(error.message);
       return unwrapTerminal(data);
     },
+    // RB-3A. `/post`. The database derives the acting account, resolves the ONE
+    // recruiter workspace it may post into, re-checks posting capability, opens
+    // the draft and records the terminal receipt in one transaction. This
+    // adapter transports the fixed outcome code and the opaque draft locator
+    // only, and never logs any of it.
+    async processQuickPostCommandUpdate(input: {
+      leaseToken: string;
+      updateId: number;
+      payloadHash: string;
+      telegramUserId: number;
+      telegramChatId: number;
+      chatType: string;
+    }): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(
+        "telegram_process_quick_post_command_update",
+        {
+          _lease_token: input.leaseToken,
+          _update_id: input.updateId,
+          _payload_hash: input.payloadHash,
+          _telegram_user_id: input.telegramUserId,
+          _telegram_chat_id: input.telegramChatId,
+          _chat_type: input.chatType,
+        },
+      );
+      if (error) throw new Error(error.message);
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | { is_new?: boolean; result_code?: string; draft_id?: unknown }
+        | null;
+      return {
+        isNew: row?.is_new === true,
+        resultCode: (row?.result_code ?? "") as TelegramResultCode,
+        draftId: typeof row?.draft_id === "string" ? row.draft_id : null,
+      };
+    },
+    // RB-3A. Ordinary private text. The DATABASE alone decides whether the
+    // acting account holds a live awaiting-input draft; without one it records
+    // the unchanged `non_start_message` outcome. Reserving the source is atomic,
+    // so a duplicate delivery can never spend a second extraction. The raw text
+    // is transported and never logged.
+    async processQuickPostSourceUpdate(input: {
+      leaseToken: string;
+      updateId: number;
+      payloadHash: string;
+      telegramUserId: number;
+      telegramChatId: number;
+      chatType: string;
+      text: string;
+    }): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(
+        "telegram_process_quick_post_source_update",
+        {
+          _lease_token: input.leaseToken,
+          _update_id: input.updateId,
+          _payload_hash: input.payloadHash,
+          _telegram_user_id: input.telegramUserId,
+          _telegram_chat_id: input.telegramChatId,
+          _chat_type: input.chatType,
+          _text: input.text,
+        },
+      );
+      if (error) throw new Error(error.message);
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | {
+          is_new?: boolean;
+          result_code?: string;
+          draft_id?: unknown;
+          actor_user_id?: unknown;
+        }
+        | null;
+      return {
+        isNew: row?.is_new === true,
+        resultCode: (row?.result_code ?? "") as TelegramResultCode,
+        draftId: typeof row?.draft_id === "string" ? row.draft_id : null,
+        // Internal only: the delegated actor for the ONE extraction call. Never
+        // rendered to a chat and never logged.
+        actorUserId: typeof row?.actor_user_id === "string" ? row.actor_user_id : null,
+      };
+    },
+    // RB-3A. Persist the canonical extractor outcome for a reserved draft. The
+    // database filters the payload down to the approved field whitelist, so the
+    // review below can only ever render approved fields.
+    async completeQuickPostExtraction(input: {
+      draftId: string;
+      extracted: unknown | null;
+      errorCode: string | null;
+    }): Promise<TelegramTerminalResult | null> {
+      const { data, error } = await supabase.rpc(
+        "telegram_complete_quick_post_extraction",
+        {
+          _draft_id: input.draftId,
+          _extracted: input.extracted ?? null,
+          _error_code: input.errorCode,
+        },
+      );
+      if (error) throw new Error(error.message);
+      const row = (data ?? null) as
+        | { state?: unknown; draft_id?: unknown; payload?: unknown }
+        | null;
+      const state = typeof row?.state === "string" ? row.state : "unavailable";
+      const draftId = typeof row?.draft_id === "string" ? row.draft_id : null;
+
+      if (state === "review" && draftId !== null) {
+        return {
+          isNew: true,
+          resultCode: "quick_post_source_reserved",
+          draftId,
+          followUpText: composeQuickPostReview(row?.payload),
+          followUpButtons: composeQuickPostReviewButtons(draftId),
+        };
+      }
+      if (state === "failed") {
+        return {
+          isNew: true,
+          resultCode: "quick_post_source_rejected",
+          draftId,
+          followUpText: QUICK_POST_EXTRACTION_FAILED_TEXT,
+        };
+      }
+      return null;
+    },
+    // RB-3A. Quick Post button taps. Ownership of the draft, private-chat
+    // identity, recruiter capability re-check and the CANONICAL delegated
+    // creation all happen inside the one database transaction that writes the
+    // terminal receipt — so a duplicate tap can never create twice, and this
+    // adapter contains no creation logic of its own.
+    async processQuickPostActionUpdate(input: {
+      leaseToken: string;
+      updateId: number;
+      payloadHash: string;
+      telegramUserId: number;
+      telegramChatId: number;
+      chatType: string;
+      action: "new" | "confirm" | "restart" | "cancel" | null;
+      draftId: string | null;
+    }): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(
+        "telegram_process_quick_post_action_update",
+        {
+          _lease_token: input.leaseToken,
+          _update_id: input.updateId,
+          _payload_hash: input.payloadHash,
+          _telegram_user_id: input.telegramUserId,
+          _telegram_chat_id: input.telegramChatId,
+          _chat_type: input.chatType,
+          _action: input.action,
+          _draft_id: input.draftId,
+        },
+      );
+      if (error) throw new Error(error.message);
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | { is_new?: boolean; result_code?: string; draft_id?: unknown }
+        | null;
+      const resultCode = (row?.result_code ?? "") as TelegramResultCode;
+      return {
+        isNew: row?.is_new === true,
+        resultCode,
+        draftId: typeof row?.draft_id === "string" ? row.draft_id : null,
+        followUpText: composeQuickPostActionFollowUp(resultCode),
+        followUpButtons: resultCode === "quick_post_created"
+          ? OPPORTUNITIES_BUTTONS
+          : null,
+      };
+    },
   };
+}
+
+// ────────────────────── RB-3A — Quick Post presentation ──────────────────────
+//
+// The review is composed ONLY from the approved field whitelist the database
+// already filtered the extractor output down to. A field the extractor did not
+// return is rendered as `Not provided` — never guessed, never inferred, never
+// defaulted. No raw source text is echoed back.
+
+const QUICK_POST_EXTRACTION_FAILED_TEXT =
+  "That job post couldn't be read. Send /post to try again with the full text, or create the opportunity in HaulTracker Pro.";
+
+const QUICK_POST_NOT_PROVIDED = "Not provided";
+
+const QUICK_POST_REVIEW_FIELDS: readonly { key: string; label: string }[] = [
+  { key: "title", label: "Title" },
+  { key: "company_name", label: "Company" },
+  { key: "hiring_city", label: "City" },
+  { key: "hiring_state", label: "State" },
+  { key: "driver_type", label: "Driver type" },
+  { key: "route_type", label: "Route type" },
+  { key: "trailer_type", label: "Trailer" },
+  { key: "pay_model", label: "Pay model" },
+  { key: "cpm_rate", label: "Rate per mile" },
+  { key: "percentage_rate", label: "Percentage" },
+  { key: "flat_rate_amount", label: "Flat rate" },
+  { key: "weekly_pay_min", label: "Weekly pay (min)" },
+  { key: "weekly_pay_max", label: "Weekly pay (max)" },
+  { key: "estimated_weekly_miles", label: "Weekly miles" },
+  { key: "home_time", label: "Home time" },
+  { key: "min_years_experience", label: "Experience required" },
+  { key: "required_cdl_class", label: "CDL class" },
+];
+
+function formatQuickPostValue(value: unknown): string {
+  if (value === null || value === undefined) return QUICK_POST_NOT_PROVIDED;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length === 0 ? QUICK_POST_NOT_PROVIDED : trimmed.slice(0, 120);
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (Array.isArray(value)) {
+    const parts = value
+      .filter((entry): entry is string => typeof entry === "string" && entry.trim() !== "")
+      .map((entry) => entry.trim());
+    return parts.length === 0 ? QUICK_POST_NOT_PROVIDED : parts.join(", ").slice(0, 120);
+  }
+  return QUICK_POST_NOT_PROVIDED;
+}
+
+function composeQuickPostReview(payload: unknown): string {
+  const record = (payload && typeof payload === "object" && !Array.isArray(payload)
+    ? payload
+    : {}) as Record<string, unknown>;
+  const lines = QUICK_POST_REVIEW_FIELDS.map(
+    (field) => `${field.label}: ${formatQuickPostValue(record[field.key])}`,
+  );
+  return [
+    "Review this draft opportunity",
+    "",
+    ...lines,
+    "",
+    "Nothing has been created yet. Confirm to create it as a draft in HaulTracker Pro.",
+  ].join("\n");
+}
+
+function composeQuickPostReviewButtons(draftId: string): TelegramInlineButton[][] {
+  return [
+    [{ text: "✅ Confirm", callback_data: composeQuickPostActionData("confirm", draftId) }],
+    [{ text: "🔄 Start Over", callback_data: composeQuickPostActionData("restart", draftId) }],
+    [{ text: "✖️ Cancel", callback_data: composeQuickPostActionData("cancel", draftId) }],
+  ];
+}
+
+function composeQuickPostActionFollowUp(
+  resultCode: TelegramResultCode,
+): string | null {
+  if (resultCode === "quick_post_created") {
+    return "Draft opportunity created in HaulTracker Pro. Open it to review the details and publish when you're ready.";
+  }
+  if (resultCode === "quick_post_create_blocked") {
+    return "That couldn't be created from here. Open HaulTracker Pro to finish this opportunity.";
+  }
+  return null;
 }
 
 // RB-2A. Outbound conversation alert outbox adapter. Every eligibility,
