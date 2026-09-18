@@ -642,9 +642,18 @@ function composeQuickPostReview(payload: unknown): string {
   ].join("\n");
 }
 
+// RB-3B-B. The Edit Details link carries the draft id as an OPAQUE locator in
+// an ordinary internal app URL. Possession grants nothing: the web read/save
+// RPCs re-derive the acting account and the recruiter capability server-side.
+function composeQuickPostEditUrl(draftId: string): string {
+  return `${APP_BASE_URL}/dashboard?page=recruiter-access:manager&telegramDraft=${draftId}`;
+}
+
 function composeQuickPostReviewButtons(draftId: string): TelegramInlineButton[][] {
   return [
     [{ text: "✅ Confirm", callbackData: composeQuickPostActionData("confirm", draftId) }],
+    [{ text: "✏️ Edit Details", url: composeQuickPostEditUrl(draftId) }],
+    [{ text: "🔁 Refresh Review", callbackData: composeQuickPostActionData("refresh", draftId) }],
     [{ text: "🔄 Start Over", callbackData: composeQuickPostActionData("restart", draftId) }],
     [{ text: "✖️ Cancel", callbackData: composeQuickPostActionData("cancel", draftId) }],
   ];
