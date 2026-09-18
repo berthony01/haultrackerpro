@@ -260,7 +260,12 @@ GRANT ALL ON public.opportunities TO service_role;
 GRANT SELECT ON public.opportunities TO anon;
 ALTER TABLE public.opportunities ENABLE ROW LEVEL SECURITY;
 
--- Live insert policy.
+-- (The live RLS policies are created in LIVE_POLICIES_SQL below, after the
+-- predicate functions they reference exist.)
+`;
+
+/** Live RLS policies on public.opportunities. */
+const LIVE_POLICIES_SQL = `
 CREATE POLICY "Recruiter inserts own opportunities"
 ON public.opportunities FOR INSERT TO authenticated
 WITH CHECK (public.current_user_can_recruiter_opportunity_action(
