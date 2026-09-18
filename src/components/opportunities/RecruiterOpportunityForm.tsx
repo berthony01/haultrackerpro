@@ -829,8 +829,13 @@ function RecruiterOpportunityFormCore({
 
 
 
-      {/* Stage navigation */}
-      <StageTabs current={stage} onSelect={setStage} />
+      {/* Stage navigation. RB-3B-B hides Write & Extract in Telegram draft
+          mode: the extraction already happened in the bot and must not rerun. */}
+      <StageTabs
+        current={stage}
+        onSelect={setStage}
+        hiddenStages={telegramDraft ? ['write'] : undefined}
+      />
 
       {/* Stage panels — only the active stage is mounted; state is preserved in useState above. */}
       {stage === 'write' && (
