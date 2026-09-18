@@ -542,17 +542,23 @@ export function parseConversationActionData(
 //
 // `/post` is accepted bare or addressed to the bot, in a PRIVATE chat only.
 // Callback payloads use their own versioned `q1` namespace so the RB-2B `c1`
-// vocabulary is untouched: `q1:n` (4 bytes) or `q1:<c|r|x>:<draft uuid>`
+// vocabulary is untouched: `q1:n` (4 bytes) or `q1:<c|r|x|f>:<draft uuid>`
 // (41 bytes), both far inside Telegram's 64-byte limit. The draft id is an
 // opaque locator: possession is never authorization.
 
 const POST_COMMAND_PATTERN = new RegExp(`^\\/post(?:@${TELEGRAM_BOT_USERNAME})?$`);
 
-export type TelegramQuickPostAction = "new" | "confirm" | "restart" | "cancel";
+export type TelegramQuickPostAction =
+  | "new"
+  | "confirm"
+  | "restart"
+  | "cancel"
+  // RB-3B-B. Read-only re-render of the current draft after a web edit.
+  | "refresh";
 
 const QUICK_POST_NEW_DATA = "q1:n";
 const QUICK_POST_ACTION_PATTERN =
-  /^q1:(c|r|x):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
+  /^q1:(c|r|x|f):([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
 export function composeQuickPostNewData(): string {
   return QUICK_POST_NEW_DATA;
@@ -562,7 +568,13 @@ export function composeQuickPostActionData(
   action: Exclude<TelegramQuickPostAction, "new">,
   draftId: string,
 ): string {
-  const letter = action === "confirm" ? "c" : action === "restart" ? "r" : "x";
+  const letter = action === "confirm"
+    ? "c"
+    : action === "restart"
+    ? "r"
+    : action === "refresh"
+    ? "f"
+    : "x";
   return `q1:${letter}:${draftId}`;
 }
 
