@@ -73,6 +73,23 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     { kind: 'create' } | { kind: 'activate'; id: string } | null
   >(null);
 
+  // Phase RB-3B-B — optional Telegram Quick Post draft locator. Read only
+  // AFTER the normal recruiter workspace authorization below is satisfied; the
+  // value itself grants nothing and every check happens server-side.
+  const [telegramDraftId, setTelegramDraftId] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : readTelegramDraftLocator(window.location.search),
+  );
+  const telegramDraft = useTelegramOpportunityDraft(telegramDraftId);
+
+  const closeTelegramDraft = () => {
+    setTelegramDraftId(null);
+    if (typeof window !== 'undefined' && window.history?.replaceState) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('telegramDraft');
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    }
+  };
+
   if (profileLoading) {
     return (
       <div className="space-y-4">
