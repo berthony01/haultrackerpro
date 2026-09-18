@@ -682,7 +682,15 @@ export type TelegramClassification =
       kind: "conversation_reply";
       replyToMessageId: number;
       text: string;
-    };
+    }
+  | { kind: "quick_post_command" }
+  | {
+      kind: "quick_post_action";
+      action: TelegramQuickPostAction | null;
+      draftId: string | null;
+      chatType: string;
+    }
+  | { kind: "quick_post_source"; text: string };
 
 /** Pure classification. Exported so the contract can be tested directly
  *  without a gateway or a database. */
