@@ -22,6 +22,12 @@ const EDGE_CODE = read("supabase/functions/telegram-poll/index.ts");
 const ORCHESTRATOR_CODE = read(
   "supabase/functions/_shared/telegram-poll-ingest.ts",
 );
+const QUICK_POST_SQL = read(
+  "supabase/migration-candidates/20260922050000_phase_rb3a_telegram_quick_post.sql",
+);
+const FIX_SQL = read(
+  "supabase/migration-candidates/20260922060000_phase_rb3a1_quick_post_recruiter_min_uuid_fix.sql",
+);
 
 describe("RB-3A.1 — bounded callback RPC error codes", () => {
   it("maps a PostgREST code to a bounded snake_case code", () => {
@@ -100,5 +106,57 @@ describe("RB-3A.1 — bounded callback RPC error codes", () => {
     expect(ORCHESTRATOR_CODE).not.toMatch(
       /log\("update_terminal_failed"[\s\S]{0,200}(text|chatId|userId|payload|draftId)/,
     );
+  });
+});
+
+/**
+ * RB-3A.1 root cause. Every Quick Post callback aborted with SQLSTATE 42883
+ * (`function min(uuid) does not exist`) because the recruiter resolver
+ * aggregated a uuid with min(). The corrective migration must remove that
+ * aggregate while keeping the fail-closed ambiguity rule intact.
+ */
+describe("RB-3A.1 — quick post recruiter resolver min(uuid) regression", () => {
+  it("no longer aggregates the recruiter uuid with min()", () => {
+    const executable = FIX_SQL.split("\n").filter((l) => !l.trim().startsWith("--"))
+      .join("\n");
+    expect(executable).not.toMatch(/min\s*\(/i);
+    expect(FIX_SQL).toContain("array_agg(r.recruiter_id)");
+  });
+
+  it("keeps the exact fail-closed ambiguity rule", () => {
+    expect(FIX_SQL).toMatch(
+      /IF _ids IS NULL OR array_length\(_ids, 1\) <> 1 THEN\s*\n\s*RETURN NULL;/,
+    );
+  });
+
+  it("keeps the same signature, security posture and grants", () => {
+    expect(FIX_SQL).toContain(
+      "CREATE OR REPLACE FUNCTION public._telegram_quick_post_recruiter(",
+    );
+    expect(FIX_SQL).toContain("_telegram_user_id bigint");
+    expect(FIX_SQL).toContain("RETURNS uuid");
+    expect(FIX_SQL).toContain("SECURITY DEFINER");
+    expect(FIX_SQL).toContain("SET search_path TO 'pg_catalog', 'public', 'auth'");
+    expect(FIX_SQL).toContain(
+      "GRANT EXECUTE ON FUNCTION public._telegram_quick_post_recruiter(bigint) TO service_role",
+    );
+    for (const role of ["PUBLIC", "anon", "authenticated"]) {
+      expect(FIX_SQL).toContain(
+        `REVOKE ALL ON FUNCTION public._telegram_quick_post_recruiter(bigint) FROM ${role}`,
+      );
+    }
+  });
+
+  it("changes nothing else: only this one helper is redefined", () => {
+    expect(FIX_SQL.match(/CREATE (OR REPLACE )?FUNCTION/g)?.length).toBe(1);
+    expect(FIX_SQL).not.toMatch(
+      /CREATE TABLE|DROP |ALTER TABLE|CREATE POLICY|create_recruiter_opportunity|telegram_process_/,
+    );
+    // The RB-3A state machine, callback vocabulary and creation delegation are
+    // untouched by the correction.
+    expect(QUICK_POST_SQL).toContain(
+      "public.create_recruiter_opportunity_as_actor(",
+    );
+    expect(QUICK_POST_SQL).toContain("_telegram_quick_post_recruiter(");
   });
 });
