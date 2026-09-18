@@ -1029,6 +1029,62 @@ export async function runTelegramPoll(
       isNew: terminal.isNew,
     });
 
+    // RB-3A. The canonical extractor runs ONLY for a source update that was
+    // freshly RESERVED in the transaction above, and therefore exactly once per
+    // unique Telegram update: a duplicate delivery reports the already-recorded
+    // outcome (`isNew === false`) and never reaches this branch. The terminal
+    // receipt is already committed, so nothing here can affect cursor
+    // correctness; a crash before the outcome is persisted leaves the draft in
+    // `extracting`, which is never auto-replayed.
+    let quickPostFollowUp: TelegramTerminalResult | null = null;
+    if (
+      terminal.isNew &&
+      terminal.resultCode === "quick_post_source_reserved" &&
+      classification.kind === "quick_post_source"
+    ) {
+      const draftId = typeof terminal.draftId === "string" ? terminal.draftId : null;
+      const actorUserId =
+        typeof terminal.actorUserId === "string" ? terminal.actorUserId : null;
+
+      if (draftId !== null && ledger.completeQuickPostExtraction) {
+        let extracted: unknown | null = null;
+        let errorCode: string | null = null;
+
+        if (!deps.quickPostExtractor || actorUserId === null) {
+          errorCode = "extractor_unavailable";
+        } else {
+          try {
+            const outcome = await deps.quickPostExtractor.extract({
+              actorUserId,
+              text: classification.text,
+            });
+            if (outcome.ok) {
+              extracted = outcome.extracted;
+            } else {
+              errorCode = outcome.errorCode;
+            }
+          } catch (error) {
+            errorCode = sanitizeErrorCode(error);
+          }
+        }
+
+        try {
+          quickPostFollowUp = await ledger.completeQuickPostExtraction({
+            draftId,
+            extracted,
+            errorCode,
+          });
+        } catch (error) {
+          log("quick_post_extraction_persist_failed", {
+            updateId,
+            code: sanitizeErrorCode(error),
+          });
+        }
+      }
+    }
+
+
+
     // Best-effort user feedback. Deliberately AFTER the terminal receipt and
     // deliberately outside cursor correctness: a failed send must never make
     // the update look unprocessed.
