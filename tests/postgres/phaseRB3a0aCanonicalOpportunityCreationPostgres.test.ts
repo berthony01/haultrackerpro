@@ -714,12 +714,52 @@ async function countOpportunities(): Promise<number> {
   return res.rows[0].n as number;
 }
 
+/**
+ * RB-3A-0A.1 — trusted delegation wrapper. Executed as service_role WITHOUT any
+ * jwt sub, which is exactly how PostgREST runs a service-key request.
+ */
+async function asServiceRole<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
+  return asRole('service_role', null, fn);
+}
+
+async function callDelegated(
+  client: PoolClient,
+  actorUserId: string | null,
+  recruiterId: string | null,
+  payload: unknown,
+): Promise<Record<string, unknown>> {
+  const res = await client.query(
+    'SELECT public.create_recruiter_opportunity_as_actor($1::uuid, $2::uuid, $3::jsonb) AS out',
+    [actorUserId, recruiterId, JSON.stringify(payload)],
+  );
+  return res.rows[0].out as Record<string, unknown>;
+}
+
+async function expectDelegatedFailure(
+  role: 'anon' | 'authenticated' | 'service_role',
+  sessionUserId: string | null,
+  actorUserId: string | null,
+  recruiterId: string | null,
+  payload: unknown,
+): Promise<{ message: string; code: string }> {
+  try {
+    await asRole(role, sessionUserId, (c) =>
+      callDelegated(c, actorUserId, recruiterId, payload),
+    );
+  } catch (e) {
+    const err = e as { message: string; code: string };
+    return { message: err.message, code: err.code };
+  }
+  throw new Error('Expected the delegation wrapper to fail, but it succeeded.');
+}
+
 beforeAll(async () => {
   pool = new Pool({ connectionString: DATABASE_URL, max: 6 });
   await pool.query(BOOTSTRAP_SQL);
   await pool.query(LIVE_FUNCTIONS_SQL);
   await pool.query(LIVE_POLICIES_SQL);
   await pool.query(CANDIDATE_SQL);
+  await pool.query(CORRECTIVE_SQL);
   await pool.query(SEED_SQL);
 }, 120_000);
 
