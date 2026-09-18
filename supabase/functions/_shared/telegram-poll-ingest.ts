@@ -1184,6 +1184,66 @@ export async function runTelegramPoll(
       }
     }
 
+    // RB-3A. The bounded Quick Post follow-up: the review card after an
+    // extraction, or the confirmation after a button tap. Strictly best-effort
+    // and strictly AFTER the committed transaction — a send failure can never
+    // create, re-create or undo an opportunity. Every string here is composed
+    // by the adapter from the approved field list only.
+    const quickPostMessages: Array<
+      { text: string; buttons: TelegramInlineButton[][] | null }
+    > = [];
+    if (
+      quickPostFollowUp !== null &&
+      typeof quickPostFollowUp.followUpText === "string" &&
+      quickPostFollowUp.followUpText.length > 0
+    ) {
+      quickPostMessages.push({
+        text: quickPostFollowUp.followUpText,
+        buttons: Array.isArray(quickPostFollowUp.followUpButtons) &&
+            quickPostFollowUp.followUpButtons.length > 0
+          ? quickPostFollowUp.followUpButtons
+          : null,
+      });
+    }
+    if (
+      identity.callbackQueryId != null &&
+      isQuickPostResultCode(terminal.resultCode) &&
+      typeof terminal.followUpText === "string" &&
+      terminal.followUpText.length > 0
+    ) {
+      quickPostMessages.push({
+        text: terminal.followUpText,
+        buttons: Array.isArray(terminal.followUpButtons) &&
+            terminal.followUpButtons.length > 0
+          ? terminal.followUpButtons
+          : null,
+      });
+    }
+    if (quickPostMessages.length > 0 && identity.telegramChatId !== null) {
+      for (const message of quickPostMessages) {
+        try {
+          const sent = await gateway.sendMessage({
+            chatId: identity.telegramChatId,
+            text: message.text,
+            ...(message.buttons ? { buttons: message.buttons } : {}),
+          });
+          if (!sent.ok) {
+            log("quick_post_send_failed", {
+              updateId,
+              code: sent.errorCode ?? "telegram_gateway_error",
+            });
+          }
+        } catch (error) {
+          log("quick_post_send_failed", {
+            updateId,
+            code: sanitizeErrorCode(error),
+          });
+        }
+      }
+    }
+
+
+
     try {
       advancedTo = await ledger.advanceCursor(lease.leaseToken, updateId);
     } catch (error) {
