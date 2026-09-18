@@ -589,8 +589,13 @@ export function parseQuickPostActionData(
   if (data === QUICK_POST_NEW_DATA) return { action: "new", draftId: null };
   const match = QUICK_POST_ACTION_PATTERN.exec(data);
   if (!match) return null;
-  const action: TelegramQuickPostAction =
-    match[1] === "c" ? "confirm" : match[1] === "r" ? "restart" : "cancel";
+  const action: TelegramQuickPostAction = match[1] === "c"
+    ? "confirm"
+    : match[1] === "r"
+    ? "restart"
+    : match[1] === "f"
+    ? "refresh"
+    : "cancel";
   return { action, draftId: match[2] };
 }
 
