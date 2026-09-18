@@ -1241,17 +1241,30 @@ function RecruiterOpportunityFormCore({
               <Button variant="outline" onClick={goPrev} type="button">
                 <ArrowLeft className="h-4 w-4" /> Back
               </Button>
-              <Button variant="outline" onClick={() => save('draft')}
-                data-testid="save-draft-opportunity"
-                disabled={pending || !readiness.canSaveDraft || !staffCanSaveDraft}>
-                <Save className="h-4 w-4" /> Save Draft
-              </Button>
-              <Button onClick={() => save('publish')}
-                data-testid="publish-opportunity"
-                disabled={pending || !readiness.canPublish || atActiveLimit || !staffCanPublish}>
-                <Send className="h-4 w-4" /> Publish Opportunity
+              {telegramDraft ? (
+                <Button
+                  type="button"
+                  onClick={() => { void saveTelegramDraft(); }}
+                  data-testid="save-telegram-draft-changes"
+                  disabled={telegramDraft.isSaving}
+                >
+                  <Save className="h-4 w-4" /> Save Changes
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={() => save('draft')}
+                    data-testid="save-draft-opportunity"
+                    disabled={pending || !readiness.canSaveDraft || !staffCanSaveDraft}>
+                    <Save className="h-4 w-4" /> Save Draft
+                  </Button>
+                  <Button onClick={() => save('publish')}
+                    data-testid="publish-opportunity"
+                    disabled={pending || !readiness.canPublish || atActiveLimit || !staffCanPublish}>
+                    <Send className="h-4 w-4" /> Publish Opportunity
 
-              </Button>
+                  </Button>
+                </>
+              )}
             </div>
             {staffPerms && (!staffCanSaveDraft || !staffCanPublish) && (
               <p
