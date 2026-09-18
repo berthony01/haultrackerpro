@@ -50,6 +50,7 @@ import {
   type CanonicalPayModel,
   type CanonicalTeamConfiguration,
   type EscrowRequiredState,
+  type OpportunityPersistencePayload,
   type RecurringFrequency,
   type YesNoUnknown,
 } from '@/lib/opportunities/opportunityCanonical';
