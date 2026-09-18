@@ -1032,7 +1032,13 @@ export async function runTelegramPoll(
       // move past it and the rest of the batch must not be processed out of
       // order. The next tick re-reads this exact update.
       const errorCode = sanitizeErrorCode(error);
-      log("update_terminal_failed", { updateId, code: errorCode });
+      // RB-3A.1. The classification KIND is the only added field: it is a
+      // fixed internal vocabulary and carries no chat, user, payload or text.
+      log("update_terminal_failed", {
+        updateId,
+        code: errorCode,
+        kind: classification.kind,
+      });
       await release();
       return { kind: "failed", errorCode, processed, advancedTo };
     }
