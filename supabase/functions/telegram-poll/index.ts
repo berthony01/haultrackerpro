@@ -425,6 +425,70 @@ function buildAlertOutbox(supabase: RpcClient): TelegramAlertOutbox {
   };
 }
 
+// RB-2D. Outbound driver-message delivery adapter. Eligibility, echo
+// prevention, the post-acceptance cutoff, recipient resolution and
+// re-authorization all belong to the RPCs; this adapter transports ids, the
+// canonical body and delivery outcomes only — and never logs the body.
+function buildMessageDeliveryOutbox(
+  supabase: RpcClient,
+): TelegramMessageDeliveryOutbox {
+  return {
+    async claimConversationMessageDeliveries(
+      limit: number,
+    ): Promise<TelegramMessageDeliveryClaim[]> {
+      const { data, error } = await supabase.rpc(
+        "telegram_claim_conversation_message_deliveries",
+        { _limit: limit },
+      );
+      if (error) throw new Error(error.message);
+      const rows = (Array.isArray(data) ? data : []) as {
+        delivery_id?: unknown;
+        telegram_chat_id?: unknown;
+        message_body?: unknown;
+      }[];
+      return rows
+        .filter((row) =>
+          typeof row?.delivery_id === "string" &&
+          typeof row?.telegram_chat_id === "number" &&
+          typeof row?.message_body === "string" &&
+          row.message_body.length > 0
+        )
+        .map((row) => ({
+          deliveryId: row.delivery_id as string,
+          telegramChatId: row.telegram_chat_id as number,
+          messageBody: row.message_body as string,
+        }));
+    },
+    async markConversationMessageDeliverySent(
+      deliveryId: string,
+      telegramMessageId: number | null,
+      telegramChatId: number | null,
+    ): Promise<void> {
+      const { error } = await supabase.rpc(
+        "telegram_mark_conversation_message_delivery_sent",
+        {
+          _delivery_id: deliveryId,
+          _telegram_message_id: telegramMessageId,
+          _telegram_chat_id: telegramChatId,
+        },
+      );
+      if (error) throw new Error(error.message);
+    },
+    async markConversationMessageDeliveryFailed(
+      deliveryId: string,
+      errorCode: string,
+    ): Promise<void> {
+      const { error } = await supabase.rpc(
+        "telegram_mark_conversation_message_delivery_failed",
+        { _delivery_id: deliveryId, _error_code: errorCode },
+      );
+      if (error) throw new Error(error.message);
+    },
+  };
+}
+
+
+
 
 
 // ────────────────────── RB-1A / RB-1B menu presentation ──────────────────────
