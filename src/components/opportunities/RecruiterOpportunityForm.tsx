@@ -588,7 +588,11 @@ function RecruiterOpportunityFormCore({
   onBack,
   onSaved,
   controller,
+  telegramDraftMode,
 }: Props & { controller: OpportunityFormController }) {
+  // Phase RB-3B-B — Telegram draft edit mode. Nothing here can create or
+  // publish an opportunity; the only write target is the bot draft.
+  const telegramDraft = telegramDraftMode ?? null;
 
 
   // Phase 1R-E1 — publishing a listing that is not already active consumes
