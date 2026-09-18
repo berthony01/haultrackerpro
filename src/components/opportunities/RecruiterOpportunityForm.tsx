@@ -76,6 +76,20 @@ interface Props {
    * (recruiter profile, readiness self-heal, billing) is ever mounted.
    */
   staffController?: RecruiterOpportunityStaffController | null;
+  /**
+   * Phase RB-3B-B — optional Telegram Quick Post draft edit mode. When present
+   * the form edits the bot draft ONLY: no opportunity is created or updated,
+   * publishing is unavailable, and Save Changes writes the canonical payload
+   * back to the draft through the actor-scoped RPC.
+   */
+  telegramDraftMode?: RecruiterOpportunityTelegramDraftMode | null;
+}
+
+/** Phase RB-3B-B — Telegram draft edit contract supplied by the manager. */
+export interface RecruiterOpportunityTelegramDraftMode {
+  draftId: string;
+  isSaving: boolean;
+  onSaveChanges: (payload: OpportunityPersistencePayload) => void | Promise<void>;
 }
 
 /** Phase RC-1D — staff authoring controller supplied by the staff manager. */
