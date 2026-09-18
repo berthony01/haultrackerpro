@@ -704,6 +704,7 @@ beforeAll(async () => {
   pool = new Pool({ connectionString: DATABASE_URL, max: 6 });
   await pool.query(BOOTSTRAP_SQL);
   await pool.query(LIVE_FUNCTIONS_SQL);
+  await pool.query(LIVE_POLICIES_SQL);
   await pool.query(CANDIDATE_SQL);
   await pool.query(SEED_SQL);
 }, 120_000);
