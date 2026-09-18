@@ -703,6 +703,19 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   // processor so its terminal receipt is recorded as `callback_query`, and the
   // processor — not this pure function — decides the fail-closed outcome.
   if (identity.callbackQueryId != null) {
+    // RB-3A. The `q1` namespace is disjoint from RB-2B's `c1`, so an
+    // Accept / Pass tap can never be reinterpreted as a Quick Post action and
+    // vice versa. A malformed `q1` payload stays in the Quick Post processor,
+    // which records the fail-closed outcome.
+    if (isQuickPostCallbackData(identity.callbackData)) {
+      const quick = parseQuickPostActionData(identity.callbackData);
+      return {
+        kind: "quick_post_action",
+        action: quick?.action ?? null,
+        draftId: quick?.draftId ?? null,
+        chatType: identity.chatType ?? "",
+      };
+    }
     const parsed = parseConversationActionData(identity.callbackData);
     return {
       kind: "conversation_action",
