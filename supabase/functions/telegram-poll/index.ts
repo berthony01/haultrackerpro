@@ -17,6 +17,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 import {
   runTelegramAlertDrain,
+  runTelegramMessageDeliveryDrain,
   runTelegramPoll,
   sanitizeErrorCode,
   type TelegramAlertClaim,
@@ -28,12 +29,15 @@ import {
   type TelegramInlineButton,
   type TelegramInlineUrlButton,
   type TelegramMenuCommand,
+  type TelegramMessageDeliveryClaim,
+  type TelegramMessageDeliveryOutbox,
   type TelegramPollLease,
   type TelegramPollLedger,
   type TelegramResultCode,
   type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
+
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
 
