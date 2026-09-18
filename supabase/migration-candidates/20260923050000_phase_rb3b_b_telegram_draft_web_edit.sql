@@ -107,7 +107,9 @@ $function$;
 
 REVOKE ALL ON FUNCTION public._telegram_quick_post_editable_keys() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public._telegram_quick_post_editable_keys() FROM anon;
-GRANT EXECUTE ON FUNCTION public._telegram_quick_post_editable_keys() TO authenticated;
+-- Internal whitelist helper. The authenticated web RPCs reach it through
+-- SECURITY DEFINER ownership, so `authenticated` gets no direct execute.
+REVOKE ALL ON FUNCTION public._telegram_quick_post_editable_keys() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public._telegram_quick_post_editable_keys() TO service_role;
 
 -- Widened to the canonical writable set so web-corrected canonical fields
