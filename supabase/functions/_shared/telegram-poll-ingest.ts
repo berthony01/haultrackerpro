@@ -1098,7 +1098,11 @@ export async function runTelegramPoll(
         try {
           const answered = await gateway.answerCallbackQuery({
             callbackQueryId,
-            text: composeConversationActionAnswer(terminal.resultCode),
+            // RB-3A. Quick Post taps get their OWN bounded answer vocabulary;
+            // every RB-2B answer is unchanged.
+            text: isQuickPostResultCode(terminal.resultCode)
+              ? TELEGRAM_QUICK_POST_ANSWERS[terminal.resultCode]
+              : composeConversationActionAnswer(terminal.resultCode),
           });
           if (!answered.ok) {
             log("answer_callback_failed", {
