@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 import {
   TELEGRAM_QUICK_POST_ANSWERS,
   composeQuickPostActionData,
-  parseQuickPostCallbackData,
+  parseQuickPostActionData,
   runTelegramPoll,
   type TelegramGateway,
   type TelegramPollLedger,
@@ -57,7 +57,7 @@ describe("RB-3B-B 1 — refresh callback grammar", () => {
   it("composes q1:f:<uuid> and round-trips to the refresh action", () => {
     const data = composeQuickPostActionData("refresh", DRAFT_ID);
     expect(data).toBe(`q1:f:${DRAFT_ID}`);
-    expect(parseQuickPostCallbackData(data)).toEqual({ action: "refresh", draftId: DRAFT_ID });
+    expect(parseQuickPostActionData(data)).toEqual({ action: "refresh", draftId: DRAFT_ID });
   });
 
   it("stays inside Telegram's 64-byte callback_data limit", () => {
@@ -72,9 +72,9 @@ describe("RB-3B-B 1 — refresh callback grammar", () => {
   });
 
   it("rejects malformed refresh payloads instead of guessing a draft", () => {
-    expect(parseQuickPostCallbackData("q1:f:not-a-uuid")).toBeNull();
-    expect(parseQuickPostCallbackData("q1:f:")).toBeNull();
-    expect(parseQuickPostCallbackData(`c1:f:${DRAFT_ID}`)).toBeNull();
+    expect(parseQuickPostActionData("q1:f:not-a-uuid")).toBeNull();
+    expect(parseQuickPostActionData("q1:f:")).toBeNull();
+    expect(parseQuickPostActionData(`c1:f:${DRAFT_ID}`)).toBeNull();
   });
 
   it("registers a bounded answer text for the refreshed result code", () => {
