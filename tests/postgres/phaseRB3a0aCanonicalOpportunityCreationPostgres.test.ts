@@ -70,8 +70,6 @@ const SYSTEM_COLUMNS = [
 // ---------------------------------------------------------------------------
 
 const BOOTSTRAP_SQL = `
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
 DO $$ BEGIN
   CREATE ROLE anon NOLOGIN;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
@@ -84,9 +82,14 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 GRANT anon, authenticated, service_role TO CURRENT_USER;
 
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public;
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA public;
+
 CREATE SCHEMA IF NOT EXISTS auth;
 GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 -- PostgREST identity semantics.
 CREATE OR REPLACE FUNCTION auth.uid()
@@ -96,10 +99,6 @@ STABLE
 AS $fn$
   SELECT NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid
 $fn$;
-
-DROP SCHEMA IF EXISTS public CASCADE;
-CREATE SCHEMA public;
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 
 DO $$ BEGIN
   CREATE TYPE public.recruiter_workspace_permission AS ENUM (
