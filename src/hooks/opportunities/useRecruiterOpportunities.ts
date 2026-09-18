@@ -51,6 +51,73 @@ function parseDeleteResult(x: unknown): DeleteRecruiterOpportunityResult | null 
   return { result_code: code };
 }
 
+/* -------------------------------------------------------------------------
+ * Phase RB-3A-0A — canonical opportunity CREATION boundary.
+ *
+ * Creation no longer direct-inserts into public.opportunities. It goes through
+ * the SECURITY DEFINER RPC `create_recruiter_opportunity`, which re-asserts the
+ * EXACT same predicate as the RLS WITH CHECK
+ * (`current_user_can_recruiter_opportunity_action(recruiter_id,
+ * 'opportunities_create')`) and performs an ordinary INSERT, so every existing
+ * BEFORE INSERT guard (billing/active limit, staff action, canonical
+ * publication, field validation, featured) still fires unchanged.
+ *
+ * Client-side `canPost` / staff permission checks below remain UX prechecks
+ * only; they are no longer the sole enforcement.
+ *
+ * Narrow adapter because generated types are not regenerated until the
+ * migration is applied. No `any`, no `@ts-ignore`, no generated-type edits.
+ * ---------------------------------------------------------------------- */
+type CreateRecruiterOpportunityRpc = (
+  fn: 'create_recruiter_opportunity',
+  args: { _recruiter_id: string; _payload: OpportunityInsert },
+) => PromiseLike<{ data: unknown; error: unknown }>;
+
+const callCreateRecruiterOpportunity =
+  supabase.rpc.bind(supabase) as unknown as CreateRecruiterOpportunityRpc;
+
+const GENERIC_CREATE_ERROR = 'Unable to post this opportunity right now.';
+
+/** Deterministic server sentinels → stable UI copy. */
+const CREATE_ERROR_MESSAGES: Record<string, string> = {
+  not_authenticated: 'Sign in again to post an opportunity.',
+  permission_denied:
+    'You do not have permission to post opportunities for this workspace.',
+  invalid_payload: GENERIC_CREATE_ERROR,
+  unknown_field: GENERIC_CREATE_ERROR,
+};
+
+async function createRecruiterOpportunityViaRpc(
+  recruiterId: string,
+  data: OpportunityInsert,
+): Promise<void> {
+  let resp: { data: unknown; error: unknown };
+  try {
+    resp = await callCreateRecruiterOpportunity('create_recruiter_opportunity', {
+      _recruiter_id: recruiterId,
+      _payload: data,
+    });
+  } catch {
+    throw new Error(GENERIC_CREATE_ERROR);
+  }
+  if (resp.error) {
+    const raw = (resp.error as { message?: unknown })?.message;
+    const msg = typeof raw === 'string' ? raw.trim() : '';
+    // Guard-trigger messages (plan limit, publication validation, staff action)
+    // are product copy already and must reach the user unchanged.
+    throw new Error(CREATE_ERROR_MESSAGES[msg] ?? (msg || GENERIC_CREATE_ERROR));
+  }
+  const result = resp.data;
+  if (!result || typeof result !== 'object' || Array.isArray(result)) {
+    throw new Error(GENERIC_CREATE_ERROR);
+  }
+  const obj = result as Record<string, unknown>;
+  if (obj.result_code !== 'created' || typeof obj.opportunity_id !== 'string') {
+    throw new Error(GENERIC_CREATE_ERROR);
+  }
+}
+
+
 export function useRecruiterOpportunities() {
   const { user } = useAuth();
   const { profile, isApproved, canPost, isVerified } = useRecruiterProfile();
@@ -89,10 +156,7 @@ export function useRecruiterOpportunities() {
   const createOpportunity = useMutation({
     mutationFn: async (data: OpportunityInsert) => {
       requireCanPost();
-      const { error } = await supabase
-        .from('opportunities')
-        .insert({ ...data, recruiter_id: recruiterId! });
-      if (error) throw error;
+      await createRecruiterOpportunityViaRpc(recruiterId!, data);
     },
     onSuccess: invalidate,
   });
@@ -235,10 +299,7 @@ export function useRecruiterStaffOpportunities({
     mutationFn: async (data: OpportunityInsert) => {
       require(permissions.canCreateOpportunities);
       if (data.status === 'active') require(permissions.canChangeOpportunityStatus);
-      const { error } = await supabase
-        .from('opportunities')
-        .insert({ ...data, recruiter_id: id! });
-      if (error) throw error;
+      await createRecruiterOpportunityViaRpc(id!, data);
     },
     onSuccess: invalidate,
   });
