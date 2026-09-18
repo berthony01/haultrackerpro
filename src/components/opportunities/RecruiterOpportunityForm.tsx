@@ -1316,6 +1316,7 @@ function StageTabs({
       data-testid="stage-tabs"
     >
       {STAGES.map((s, i) => {
+        if (hiddenStages?.includes(s.key)) return null;
         const active = s.key === current;
         return (
           <button
