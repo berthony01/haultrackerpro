@@ -49,8 +49,22 @@ const CANDIDATE_PATH =
   'supabase/migration-candidates/20260921050000_phase_rb3a0a_canonical_opportunity_creation.sql';
 const CANDIDATE_SQL = readFileSync(CANDIDATE_PATH, 'utf8');
 
+/** RB-3A-0A.1 corrective migration: trusted service-role delegation wrapper. */
+const CORRECTIVE_PATH =
+  REPO_ROOT +
+  'supabase/migration-candidates/20260921060000_phase_rb3a0a1_trusted_delegation_wrapper.sql';
+const CORRECTIVE_SQL = readFileSync(CORRECTIVE_PATH, 'utf8');
+
 if (!CANDIDATE_SQL.includes('CREATE OR REPLACE FUNCTION public.create_recruiter_opportunity(')) {
   throw new Error('Candidate migration does not define create_recruiter_opportunity.');
+}
+
+if (
+  !CORRECTIVE_SQL.includes(
+    'CREATE OR REPLACE FUNCTION public.create_recruiter_opportunity_as_actor(',
+  )
+) {
+  throw new Error('Corrective migration does not define create_recruiter_opportunity_as_actor.');
 }
 
 /** Columns of public.opportunities that are server-managed and never writable. */
