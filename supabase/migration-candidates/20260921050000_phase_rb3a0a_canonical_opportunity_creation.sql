@@ -31,8 +31,6 @@
 --   * No RLS/policy/grant/trigger/column/index change on public.opportunities.
 --   * No Stripe, price, plan-name, or entitlement change.
 
-BEGIN;
-
 CREATE OR REPLACE FUNCTION public.create_recruiter_opportunity(
   _recruiter_id uuid,
   _payload jsonb
@@ -182,5 +180,3 @@ $function$;
 REVOKE ALL ON FUNCTION public.create_recruiter_opportunity(uuid, jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.create_recruiter_opportunity(uuid, jsonb) FROM anon;
 GRANT EXECUTE ON FUNCTION public.create_recruiter_opportunity(uuid, jsonb) TO authenticated;
-
-COMMIT;
