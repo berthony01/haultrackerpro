@@ -606,6 +606,60 @@ function composeQuickPostReviewButtons(draftId: string): TelegramInlineButton[][
   ];
 }
 
+// RB-3A. The CANONICAL extractor, reached through the existing `ai-insight`
+// delegated mode. There is no prompt, no model id, no provider and no schema
+// here — only a delegated actor and the untrusted source text. The service-role
+// key authenticates the internal call and is never logged; neither is the text
+// nor the extracted payload.
+function buildQuickPostExtractor(
+  supabaseUrl: string,
+  serviceRoleKey: string,
+): TelegramQuickPostExtractor {
+  return {
+    async extract(input: { actorUserId: string; text: string }) {
+      let response: Response;
+      try {
+        response = await fetch(`${supabaseUrl}/functions/v1/ai-insight`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${serviceRoleKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "parse_opportunity",
+            delegated_actor_user_id: input.actorUserId,
+            context: { text: input.text },
+          }),
+        });
+      } catch (error) {
+        return { ok: false as const, errorCode: sanitizeErrorCode(error) };
+      }
+
+      if (!response.ok) {
+        // The body can echo user content or a provider message, so it is
+        // consumed and discarded rather than logged or surfaced.
+        await response.text().catch(() => "");
+        return { ok: false as const, errorCode: "extraction_failed" };
+      }
+
+      let body: { parsed?: unknown };
+      try {
+        body = await response.json();
+      } catch {
+        return { ok: false as const, errorCode: "extraction_bad_body" };
+      }
+
+      const parsed = body?.parsed;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return { ok: false as const, errorCode: "extraction_empty" };
+      }
+      return { ok: true as const, extracted: parsed };
+    },
+  };
+}
+
+
+
 function composeQuickPostActionFollowUp(
   resultCode: TelegramResultCode,
 ): string | null {
