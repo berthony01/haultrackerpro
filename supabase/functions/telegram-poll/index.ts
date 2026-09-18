@@ -16,6 +16,8 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
 
 import {
+  composeQuickPostActionData,
+  composeQuickPostNewData,
   runTelegramAlertDrain,
   runTelegramMessageDeliveryDrain,
   runTelegramPoll,
@@ -33,6 +35,7 @@ import {
   type TelegramMessageDeliveryOutbox,
   type TelegramPollLease,
   type TelegramPollLedger,
+  type TelegramQuickPostExtractor,
   type TelegramResultCode,
   type TelegramSentMessage,
   type TelegramTerminalResult,
