@@ -501,7 +501,7 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       telegramUserId: number;
       telegramChatId: number;
       chatType: string;
-      action: "new" | "confirm" | "restart" | "cancel" | null;
+      action: "new" | "confirm" | "restart" | "cancel" | "refresh" | null;
       draftId: string | null;
     }): Promise<TelegramTerminalResult> {
       const { data, error } = await supabase.rpc(
