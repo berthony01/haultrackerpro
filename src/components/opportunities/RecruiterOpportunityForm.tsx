@@ -783,22 +783,38 @@ function RecruiterOpportunityFormCore({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-              {initial ? 'Edit Opportunity' : 'Post Opportunity'}
+              {telegramDraft
+                ? 'Edit Telegram Draft'
+                : initial ? 'Edit Opportunity' : 'Post Opportunity'}
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl mt-1">
-              Required details adapt to the selected employment arrangement and pay model. Review the
-              live calculation before publishing.
+              {telegramDraft
+                ? 'Correct anything that was missed. Nothing is posted here — save your changes, then return to Telegram and refresh the review before confirming.'
+                : 'Required details adapt to the selected employment arrangement and pay model. Review the live calculation before publishing.'}
             </p>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => setPasteOpen(true)}
-            disabled={pending}
-            className="bg-primary text-primary-foreground hover:bg-primary/90"
-          >
-            <Sparkles className="h-4 w-4" /> Paste to auto-fill
-          </Button>
+          {telegramDraft ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => { void saveTelegramDraft(); }}
+              disabled={telegramDraft.isSaving}
+              data-testid="save-telegram-draft-changes-header"
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Save className="h-4 w-4" /> Save Changes
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => setPasteOpen(true)}
+              disabled={pending}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <Sparkles className="h-4 w-4" /> Paste to auto-fill
+            </Button>
+          )}
         </div>
       </div>
 
