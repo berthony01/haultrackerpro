@@ -854,7 +854,7 @@ describe('RB-3A-0A — authorization (real roles, real predicates)', () => {
     expect(err.message).toContain('invalid_payload');
   });
 
-  it('6/7. service_role cannot execute: no delegated-actor path exists in this phase', async () => {
+  it('6/7. service_role cannot execute the web function — delegation must go through the wrapper', async () => {
     const err = await expectFailure('service_role', OWNER_USER, RECRUITER_A, MINIMAL_PAYLOAD);
     expect(err.code).toBe('42501');
   });
