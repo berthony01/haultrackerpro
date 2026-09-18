@@ -1271,6 +1271,23 @@ function RecruiterOpportunityFormCore({
                 </>
               )}
             </div>
+            {telegramDraft && (
+              <p
+                className="mt-3 text-xs text-muted-foreground sm:text-right"
+                data-testid="telegram-draft-return-hint"
+              >
+                Nothing is posted from this page. Save your changes, then open{' '}
+                <a
+                  href="https://t.me/HaulTrackerBot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline-offset-2 hover:underline"
+                >
+                  @HaulTrackerBot
+                </a>
+                , tap Refresh Review, then tap Confirm to post.
+              </p>
+            )}
             {staffPerms && (!staffCanSaveDraft || !staffCanPublish) && (
               <p
                 className="mt-3 text-xs text-muted-foreground sm:text-right"
