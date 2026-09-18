@@ -523,10 +523,48 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
         | { is_new?: boolean; result_code?: string; draft_id?: unknown }
         | null;
       const resultCode = (row?.result_code ?? "") as TelegramResultCode;
+      const actionDraftId = typeof row?.draft_id === "string" ? row.draft_id : null;
+
+      // RB-3B-B. Refresh Review re-renders the CURRENT payload after a web
+      // edit. It is a read-only snapshot: no extractor call, no draft mutation,
+      // no opportunity mutation. Sent exactly once, because the orchestrator
+      // only transports follow-ups for a NEW terminal receipt.
+      if (
+        resultCode === "quick_post_review_refreshed" &&
+        row?.is_new === true &&
+        actionDraftId !== null
+      ) {
+        const snapshot = await supabase.rpc(
+          "telegram_quick_post_review_snapshot",
+          {
+            _draft_id: actionDraftId,
+            _telegram_user_id: input.telegramUserId,
+            _telegram_chat_id: input.telegramChatId,
+          },
+        );
+        if (snapshot.error) throw new Error(boundedRpcErrorCode(snapshot.error));
+        if (snapshot.data && typeof snapshot.data === "object") {
+          return {
+            isNew: true,
+            resultCode,
+            draftId: actionDraftId,
+            followUpText: composeQuickPostReview(snapshot.data),
+            followUpButtons: composeQuickPostReviewButtons(actionDraftId),
+          };
+        }
+        return {
+          isNew: true,
+          resultCode,
+          draftId: actionDraftId,
+          followUpText: null,
+          followUpButtons: null,
+        };
+      }
+
       return {
         isNew: row?.is_new === true,
         resultCode,
-        draftId: typeof row?.draft_id === "string" ? row.draft_id : null,
+        draftId: actionDraftId,
         followUpText: composeQuickPostActionFollowUp(resultCode),
         followUpButtons: resultCode === "quick_post_created"
           ? OPPORTUNITIES_BUTTONS
