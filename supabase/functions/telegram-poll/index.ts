@@ -600,9 +600,9 @@ function composeQuickPostReview(payload: unknown): string {
 
 function composeQuickPostReviewButtons(draftId: string): TelegramInlineButton[][] {
   return [
-    [{ text: "✅ Confirm", callback_data: composeQuickPostActionData("confirm", draftId) }],
-    [{ text: "🔄 Start Over", callback_data: composeQuickPostActionData("restart", draftId) }],
-    [{ text: "✖️ Cancel", callback_data: composeQuickPostActionData("cancel", draftId) }],
+    [{ text: "✅ Confirm", callbackData: composeQuickPostActionData("confirm", draftId) }],
+    [{ text: "🔄 Start Over", callbackData: composeQuickPostActionData("restart", draftId) }],
+    [{ text: "✖️ Cancel", callbackData: composeQuickPostActionData("cancel", draftId) }],
   ];
 }
 
@@ -824,7 +824,7 @@ const WORK_BUTTONS: TelegramInlineUrlButton[][] = [
 // yet; the payload is an intent, never authorization — the database re-derives
 // the actor and re-checks posting capability on every tap.
 const RECRUITER_BUTTONS: TelegramInlineButton[][] = [
-  [{ text: "➕ Post Opportunity", callback_data: composeQuickPostNewData() }],
+  [{ text: "➕ Post Opportunity", callbackData: composeQuickPostNewData() }],
   [{ text: "📋 My Opportunities", url: URL_OPPORTUNITIES }],
   [{ text: "💬 Conversations", url: URL_CONVERSATIONS }],
   [{ text: "📊 Results", url: URL_RESULTS }],
