@@ -608,48 +608,38 @@ function composeQuickPostReviewButtons(draftId: string): TelegramInlineButton[][
 
 // RB-3A. The CANONICAL extractor, reached through the existing `ai-insight`
 // delegated mode. There is no prompt, no model id, no provider and no schema
-// here — only a delegated actor and the untrusted source text. The service-role
-// key authenticates the internal call and is never logged; neither is the text
-// nor the extracted payload.
+// here — only a delegated actor and the untrusted source text.
+//
+// TG-SEC-1. The internal call is issued through the ALREADY-CONSTRUCTED
+// internal Supabase client, so the service-role credential stays bound to that
+// client and never appears in an outbound fetch header, a log line or a
+// response body here. Neither the source text nor the extracted payload is
+// ever logged.
 function buildQuickPostExtractor(
-  supabaseUrl: string,
-  serviceRoleKey: string,
+  supabase: ReturnType<typeof createClient>,
 ): TelegramQuickPostExtractor {
   return {
     async extract(input: { actorUserId: string; text: string }) {
-      let response: Response;
+      let data: unknown;
       try {
-        response = await fetch(`${supabaseUrl}/functions/v1/ai-insight`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${serviceRoleKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
+        const invoked = await supabase.functions.invoke("ai-insight", {
+          body: {
             type: "parse_opportunity",
             delegated_actor_user_id: input.actorUserId,
             context: { text: input.text },
-          }),
+          },
         });
+        // The error body can echo user content or a provider message, so it is
+        // discarded rather than logged or surfaced.
+        if (invoked.error) {
+          return { ok: false as const, errorCode: "extraction_failed" };
+        }
+        data = invoked.data;
       } catch (error) {
         return { ok: false as const, errorCode: sanitizeErrorCode(error) };
       }
 
-      if (!response.ok) {
-        // The body can echo user content or a provider message, so it is
-        // consumed and discarded rather than logged or surfaced.
-        await response.text().catch(() => "");
-        return { ok: false as const, errorCode: "extraction_failed" };
-      }
-
-      let body: { parsed?: unknown };
-      try {
-        body = await response.json();
-      } catch {
-        return { ok: false as const, errorCode: "extraction_bad_body" };
-      }
-
-      const parsed = body?.parsed;
+      const parsed = (data as { parsed?: unknown } | null)?.parsed;
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
         return { ok: false as const, errorCode: "extraction_empty" };
       }
