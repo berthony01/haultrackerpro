@@ -761,11 +761,19 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
   if (identity.text === "/start" || identity.text.startsWith("/start ") || identity.text.startsWith("/start@")) {
     return { kind: "ignored", resultCode: "invalid_start_command" };
   }
+  // RB-3A. An explicit, intentional recruiter command. Strictly AFTER every
+  // pre-existing command branch, and strictly exact, so no other command or
+  // ordinary text changes meaning.
+  if (POST_COMMAND_PATTERN.test(identity.text)) {
+    return { kind: "quick_post_command" };
+  }
   // RB-2C. Strictly LAST among the command branches, so every existing command
   // classification is unchanged. Ordinary private text becomes a conversation
   // reply ONLY when Telegram says it is a reply to a specific bot message; a
-  // slash command is never routed as conversation text, and a non-reply
-  // message keeps its exact existing `non_start_message` outcome.
+  // slash command is never routed as conversation text.
+  //
+  // RB-3A depends on this ordering: a recruiter reply to a delivered
+  // conversation alert ALWAYS wins over Quick Post source ingestion.
   if (
     identity.replyToMessageId != null &&
     identity.replyToMessageId > 0 &&
@@ -776,6 +784,13 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
       replyToMessageId: identity.replyToMessageId,
       text: identity.text,
     };
+  }
+  // RB-3A. Ordinary private non-reply, non-command text. This is NOT yet a
+  // Quick Post: the database decides whether this account holds a live
+  // awaiting-input draft, and records the unchanged `non_start_message`
+  // outcome when it does not.
+  if (!identity.text.startsWith("/")) {
+    return { kind: "quick_post_source", text: identity.text };
   }
   return { kind: "ignored", resultCode: "non_start_message" };
 }
