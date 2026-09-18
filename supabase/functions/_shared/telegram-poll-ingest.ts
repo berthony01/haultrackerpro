@@ -198,10 +198,21 @@ export interface TelegramTerminalResult {
   /** RB-1A. Fully composed plain-text menu reply, supplied by the adapter for
    *  menu outcomes only. Never a template, never raw update data. */
   menuText?: string | null;
-  /** RB-1B. URL-only inline buttons for menu outcomes, supplied by the
-   *  adapter. Every destination is a route that already exists in the web
-   *  app; there is no callback button and no callback data. */
-  menuButtons?: TelegramInlineUrlButton[][] | null;
+  /** RB-1B. Inline buttons for menu outcomes, supplied by the adapter. Every
+   *  URL destination is a route that already exists in the web app. RB-3A adds
+   *  at most ONE recruiter callback button, whose payload is an untrusted
+   *  locator re-authorized server-side. */
+  menuButtons?: TelegramInlineButton[][] | null;
+  /** RB-3A. Draft locator returned by a Quick Post processor. Opaque; never
+   *  authorization. */
+  draftId?: string | null;
+  /** RB-3A. The delegated actor for the reserved extraction call. Internal
+   *  only: never rendered, never logged. */
+  actorUserId?: string | null;
+  /** RB-3A. Adapter-composed bounded chat reply for a Quick Post outcome. */
+  followUpText?: string | null;
+  /** RB-3A. Adapter-composed buttons that accompany `followUpText`. */
+  followUpButtons?: TelegramInlineButton[][] | null;
 }
 
 /** Database side. Implemented by the Edge Function over the TG-2D RPCs, and
