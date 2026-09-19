@@ -394,3 +394,24 @@ describe("RB-3B-B 9 — web save cannot touch server-owned lifecycle state", () 
     );
   });
 });
+
+
+// ─────────────────── 10. RB-3B-B.1 created-opportunity ID parity ───────────────────
+
+describe("RB-3B-B.1 — Quick Post stores the canonical created opportunity ID", () => {
+  const HOTFIX_MIGRATION_CODE = stripSqlComments(
+    read("supabase/migrations/20260923060000_phase_rb3b_b1_quick_post_created_id_fix.sql"),
+  );
+
+  it("reads the canonical creator result from opportunity_id", () => {
+    expect(HOTFIX_MIGRATION_CODE).toContain("(_created->>'opportunity_id')::uuid");
+  });
+
+  it("never regresses to the nonexistent id key", () => {
+    expect(HOTFIX_MIGRATION_CODE).not.toContain("(_created->>'id')::uuid");
+  });
+
+  it("still writes the value only into the draft creation-link field", () => {
+    expect(HOTFIX_MIGRATION_CODE).toContain("created_opportunity_id = (_created->>'opportunity_id')::uuid");
+  });
+});
