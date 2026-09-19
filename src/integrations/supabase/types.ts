@@ -5309,6 +5309,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: undefined
       }
+      _telegram_quick_post_editable_keys: { Args: never; Returns: string[] }
       _telegram_quick_post_filter_payload: {
         Args: { _payload: Json }
         Returns: Json
@@ -6310,6 +6311,10 @@ export type Database = {
           within_limit: boolean
         }[]
       }
+      get_telegram_opportunity_draft_for_edit: {
+        Args: { _draft_id: string }
+        Returns: Json
+      }
       get_weekly_driver_leaderboard: {
         Args: { _limit?: number }
         Returns: {
@@ -7074,6 +7079,10 @@ export type Database = {
       }
       revoke_my_telegram_link: { Args: never; Returns: boolean }
       revoke_recruiter_member: { Args: { _member_id: string }; Returns: Json }
+      save_telegram_opportunity_draft_payload: {
+        Args: { _draft_id: string; _payload: Json }
+        Returns: Json
+      }
       set_agency_client_request_status: {
         Args: {
           _assigned_member_user_id?: string
@@ -8169,6 +8178,14 @@ export type Database = {
           is_new: boolean
           result_code: string
         }[]
+      }
+      telegram_quick_post_review_snapshot: {
+        Args: {
+          _draft_id: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+        }
+        Returns: Json
       }
       telegram_record_ignored_update: {
         Args: {
