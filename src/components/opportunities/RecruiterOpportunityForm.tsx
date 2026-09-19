@@ -829,8 +829,13 @@ function RecruiterOpportunityFormCore({
 
 
 
-      {/* Stage navigation */}
-      <StageTabs current={stage} onSelect={setStage} />
+      {/* Stage navigation. RB-3B-B hides Write & Extract in Telegram draft
+          mode: the extraction already happened in the bot and must not rerun. */}
+      <StageTabs
+        current={stage}
+        onSelect={setStage}
+        hiddenStages={telegramDraft ? ['write'] : undefined}
+      />
 
       {/* Stage panels — only the active stage is mounted; state is preserved in useState above. */}
       {stage === 'write' && (
@@ -1266,6 +1271,23 @@ function RecruiterOpportunityFormCore({
                 </>
               )}
             </div>
+            {telegramDraft && (
+              <p
+                className="mt-3 text-xs text-muted-foreground sm:text-right"
+                data-testid="telegram-draft-return-hint"
+              >
+                Nothing is posted from this page. Save your changes, then open{' '}
+                <a
+                  href="https://t.me/HaulTrackerBot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-primary underline-offset-2 hover:underline"
+                >
+                  @HaulTrackerBot
+                </a>
+                , tap Refresh Review, then tap Confirm to post.
+              </p>
+            )}
             {staffPerms && (!staffCanSaveDraft || !staffCanPublish) && (
               <p
                 className="mt-3 text-xs text-muted-foreground sm:text-right"
@@ -1293,7 +1315,16 @@ function RecruiterOpportunityFormCore({
 
 /* ---------------- stage primitives ---------------- */
 
-function StageTabs({ current, onSelect }: { current: StageKey; onSelect: (k: StageKey) => void }) {
+function StageTabs({
+  current,
+  onSelect,
+  hiddenStages,
+}: {
+  current: StageKey;
+  onSelect: (k: StageKey) => void;
+  /** RB-3B-B — stages suppressed in Telegram draft edit mode. */
+  hiddenStages?: StageKey[];
+}) {
   return (
     <div
       role="tablist"
@@ -1302,6 +1333,7 @@ function StageTabs({ current, onSelect }: { current: StageKey; onSelect: (k: Sta
       data-testid="stage-tabs"
     >
       {STAGES.map((s, i) => {
+        if (hiddenStages?.includes(s.key)) return null;
         const active = s.key === current;
         return (
           <button

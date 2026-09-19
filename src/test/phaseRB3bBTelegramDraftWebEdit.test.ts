@@ -305,3 +305,92 @@ describe("RB-3B-B 6 — web client boundaries", () => {
     expect(MANAGER_CODE).toContain("refresh the review before confirming");
   });
 });
+
+// ─────────────────── 7. Auth continuation + draft-mode form shape ───────────────────
+
+import { buildAuthUrl, resolvePostAuthDestination, sanitizeNextPath } from "@/lib/authNavigation";
+
+describe("RB-3B-B 7 — auth continuation preserves the whole draft link", () => {
+  const dest = `/dashboard?page=recruiter-access:manager&telegramDraft=${DRAFT_ID}`;
+
+  it("keeps the full telegramDraft query through sanitize → auth URL → resolve", () => {
+    expect(sanitizeNextPath(dest)).toBe(dest);
+    const authUrl = buildAuthUrl(dest);
+    expect(resolvePostAuthDestination(authUrl.slice(authUrl.indexOf("?")))).toBe(dest);
+  });
+
+  it("still rejects external continuation targets", () => {
+    expect(sanitizeNextPath("//evil.example.com")).toBeNull();
+    expect(sanitizeNextPath("https://evil.example.com")).toBeNull();
+  });
+});
+
+describe("RB-3B-B 8 — draft mode form shape", () => {
+  it("prefills through the canonical authoring normalizer and starts at Essentials", () => {
+    expect(FORM_CODE).toContain("normalizeOpportunityForAuthoring(initial)");
+    expect(FORM_CODE).toContain("useState<StageKey>(initial ? 'essentials' : 'write')");
+  });
+
+  it("hides Write & Extract so no extraction can rerun on open", () => {
+    expect(FORM_CODE).toMatch(/hiddenStages=\{telegramDraft \? \['write'\] : undefined\}/);
+    expect(FORM_CODE).toContain("hiddenStages?.includes(s.key)");
+  });
+
+  it("labels the mode and points the recruiter back to the bot", () => {
+    expect(FORM_CODE).toContain("Edit Telegram Draft");
+    expect(FORM_CODE).toContain("https://t.me/HaulTrackerBot");
+    expect(FORM_CODE).toContain("tap Refresh Review, then tap Confirm");
+  });
+
+  it("serializes saves through the canonical draft payload builder", () => {
+    expect(FORM_CODE).toContain("buildOpportunityPersistencePayload(state, 'draft')");
+  });
+});
+
+// ─────────────────── 9. Lifecycle fields stay server-owned ───────────────────
+
+describe("RB-3B-B 9 — web save cannot touch server-owned lifecycle state", () => {
+  const SAVE_FN = MIGRATION_CODE.slice(
+    MIGRATION_CODE.indexOf("FUNCTION public.save_telegram_opportunity_draft_payload"),
+    MIGRATION_CODE.indexOf("FUNCTION public.telegram_quick_post_review_snapshot"),
+  );
+
+  it("strips a caller-supplied status so nothing can be published from the web", () => {
+    expect(SAVE_FN).toContain("_payload := _payload - 'status'");
+  });
+
+  it("writes only extracted_payload on a still-reviewable, still-owned row", () => {
+    expect(SAVE_FN).toMatch(/SET extracted_payload = _filtered/);
+    expect(SAVE_FN).toMatch(/AND state = 'review'/);
+    expect(SAVE_FN).toMatch(/AND created_opportunity_id IS NULL/);
+    const updateStmt = SAVE_FN.slice(
+      SAVE_FN.indexOf("UPDATE public.telegram_opportunity_drafts"),
+      SAVE_FN.indexOf("RETURN jsonb_build_object("),
+    );
+    expect(updateStmt).not.toMatch(/(actor_user_id|recruiter_id|telegram_user_id|telegram_chat_id)\s*=/);
+    expect(updateStmt).not.toMatch(/SET[\s\S]*state\s*=/);
+  });
+
+  it("requires ownership, review state, unexpired and current recruiter capability", () => {
+    expect(SAVE_FN).toContain("d.actor_user_id = _actor");
+    expect(SAVE_FN).toContain("_draft.expires_at <= now()");
+    expect(SAVE_FN).toContain("current_user_can_recruiter_opportunity_action");
+  });
+
+  it("never returns Telegram identifiers or raw source to the browser", () => {
+    const READ_FN = MIGRATION_CODE.slice(
+      MIGRATION_CODE.indexOf("FUNCTION public.get_telegram_opportunity_draft_for_edit"),
+      MIGRATION_CODE.indexOf("FUNCTION public.save_telegram_opportunity_draft_payload"),
+    );
+    expect(READ_FN).not.toContain("telegram_user_id");
+    expect(READ_FN).not.toContain("telegram_chat_id");
+    expect(READ_FN).not.toContain("raw_source_text");
+    expect(READ_FN).not.toContain("source_update_id");
+  });
+
+  it("keeps the internal whitelist helper off the authenticated surface", () => {
+    expect(MIGRATION_CODE).toMatch(
+      /REVOKE ALL ON FUNCTION public\._telegram_quick_post_editable_keys\(\) FROM authenticated/,
+    );
+  });
+});
