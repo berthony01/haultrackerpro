@@ -6289,6 +6289,13 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_recruiter_qa_publication_context: {
+        Args: { _recruiter_id: string }
+        Returns: {
+          is_qa_fixture: boolean
+          recruiter_id: string
+        }[]
+      }
       get_recruiter_referral_settings_for_workspace: {
         Args: { _recruiter_id: string }
         Returns: Json
