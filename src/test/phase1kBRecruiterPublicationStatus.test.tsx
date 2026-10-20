@@ -21,6 +21,13 @@ const h = vi.hoisted(() => ({
 vi.mock('sonner', () => ({
   toast: { error: h.toastError, success: h.toastSuccess },
 }));
+vi.mock('@/hooks/opportunities/useRecruiterQaPublicationContext', () => ({
+  useRecruiterQaPublicationContext: vi.fn(() => ({ context: 'public', isLoading: false, isError: false })),
+}));
+vi.mock('@/hooks/opportunities/useTelegramOpportunityDraft', () => ({
+  readTelegramDraftLocator: () => null,
+  useTelegramOpportunityDraft: () => ({ draft: null }),
+}));
 vi.mock('@/hooks/opportunities/useRecruiterProfile', () => ({
   useRecruiterProfile: vi.fn(),
 }));
@@ -109,7 +116,7 @@ describe('Phase 1K-B — getOpportunityPublicationStatus matrix', () => {
   });
 
   it('active + approved + non-null published_at => live', () => {
-    expect(getOpportunityPublicationStatus(input())).toEqual({
+    expect(getOpportunityPublicationStatus(input(), 'public')).toEqual({
       key: 'live',
       label: 'Live to drivers',
       description: 'Visible in the driver opportunities marketplace.',

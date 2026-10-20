@@ -49,7 +49,8 @@ import {
 } from '@/hooks/opportunities/useTelegramOpportunityDraft';
 import { RecruiterReferralsPanel } from './RecruiterReferralsPanel';
 import { useRecruiterBilling } from '@/hooks/opportunities/useRecruiterBilling';
-import { getOpportunityPublicationStatus } from '@/lib/opportunities/publicationStatus';
+import { getOpportunityPublicationStatus, type RecruiterQaPublicationContext } from '@/lib/opportunities/publicationStatus';
+import { useRecruiterQaPublicationContext } from '@/hooks/opportunities/useRecruiterQaPublicationContext';
 
 interface Props {
   onBack: () => void;
@@ -63,6 +64,10 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   const { opportunities, isLoading, setStatus, deleteOpportunity, refetch } =
     useRecruiterOpportunities();
   const billing = useRecruiterBilling();
+  const publicationContext = useRecruiterQaPublicationContext(
+    profile?.id,
+    !profileLoading && !!profile && describeRecruiterBlock(profile, { intentRecruiter }).reason !== 'suspended',
+  );
 
   const [view, setView] = useState<View>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
@@ -329,6 +334,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
             <OpportunityRow
               key={o.id}
               o={o}
+              publicationContext={publicationContext.context}
               onEdit={() => openEdit(o)}
               onPause={() => handleStatus(o.id, 'paused')}
               onActivate={() => requestActivate(o)}
@@ -399,8 +405,10 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
 function OpportunityRow({
   o, onEdit, onPause, onActivate, onClose, onDelete, busy, canActivate,
   canEdit = true, canChangeStatus = true, canDeletePermission = true,
+  publicationContext,
 }: {
   o: Opportunity;
+  publicationContext: RecruiterQaPublicationContext;
   onEdit: () => void;
   onPause: () => void;
   onActivate: () => void;
@@ -420,7 +428,7 @@ function OpportunityRow({
     closed: 'destructive',
   };
 
-  const publication = getOpportunityPublicationStatus(o);
+  const publication = getOpportunityPublicationStatus(o, publicationContext);
   const canDelete =
     canDeletePermission && (o.status === 'draft' || o.status === 'closed');
 
@@ -557,6 +565,9 @@ export function RecruiterStaffOpportunityManager({
   onBack,
 }: RecruiterStaffOpportunityManagerProps) {
   const store = useRecruiterStaffOpportunities({ recruiterId, permissions });
+  const publicationContext = useRecruiterQaPublicationContext(
+    recruiterId, permissions.canViewOpportunities,
+  );
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Opportunity | null>(null);
@@ -679,6 +690,7 @@ export function RecruiterStaffOpportunityManager({
               onDelete={() => setPendingDelete(o)}
               busy={busy}
               canActivate={permissions.canChangeOpportunityStatus}
+              publicationContext={publicationContext.context}
               canEdit={permissions.canEditOpportunities}
               canChangeStatus={permissions.canChangeOpportunityStatus}
               canDeletePermission={permissions.canDeleteOpportunities}

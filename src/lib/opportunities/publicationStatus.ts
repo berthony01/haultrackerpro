@@ -1,7 +1,11 @@
 export type PublicationBadgeVariant = 'default' | 'secondary' | 'outline' | 'destructive';
 
+export type RecruiterQaPublicationContext = 'public' | 'qa_only' | 'unknown';
+
 export type OpportunityPublicationStateKey =
   | 'live'
+  | 'qa_only'
+  | 'visibility_unknown'
   | 'draft'
   | 'paused'
   | 'closed'
@@ -26,6 +30,7 @@ export interface OpportunityPublicationStatus {
 
 export function getOpportunityPublicationStatus(
   opportunity: OpportunityPublicationInput,
+  context: RecruiterQaPublicationContext = 'unknown',
 ): OpportunityPublicationStatus {
   const { status, admin_review_status, published_at } = opportunity;
 
@@ -83,6 +88,24 @@ export function getOpportunityPublicationStatus(
       const hasPublishedAt =
         typeof published_at === 'string' && published_at.length > 0;
       if (hasPublishedAt) {
+        if (context === 'qa_only') {
+          return {
+            key: 'qa_only',
+            label: 'QA only · Hidden from other drivers',
+            description: 'This QA listing is hidden from ordinary drivers in the opportunities marketplace.',
+            variant: 'secondary',
+            isDriverVisible: false,
+          };
+        }
+        if (context !== 'public') {
+          return {
+            key: 'visibility_unknown',
+            label: 'Visibility not verified',
+            description: 'Unable to confirm driver visibility for this listing.',
+            variant: 'outline',
+            isDriverVisible: false,
+          };
+        }
         return {
           key: 'live',
           label: 'Live to drivers',
