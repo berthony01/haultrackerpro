@@ -22,6 +22,8 @@ const outsider = '44444444-4444-4444-4444-444444444444';
 const qa = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const normal = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 let db: PGlite;
+let registryAclBefore: unknown;
+let registryPoliciesBefore: unknown;
 async function read(user: string | null, recruiter = qa, role = 'authenticated') {
   await db.exec(`BEGIN; SET LOCAL ROLE ${role};`);
   try {
@@ -59,6 +61,8 @@ beforeAll(async () => {
     'current_user_can_manage_recruiter_opportunities', 'current_user_can_recruiter_opportunity_action']) {
     await db.exec(productionFunction(name));
   }
+  registryAclBefore = (await db.query("SELECT relacl::text FROM pg_class WHERE oid='public.qa_fixture_roots'::regclass")).rows;
+  registryPoliciesBefore = (await db.query("SELECT polname,polcmd,pg_get_expr(polqual,polrelid) AS predicate FROM pg_policy WHERE polrelid='public.qa_fixture_roots'::regclass ORDER BY polname")).rows;
   await db.exec(sql);
   await db.exec(`INSERT INTO auth.users VALUES('${owner}'),('${staff}'),('${ordinary}'),('${outsider}');
     INSERT INTO recruiter_profiles(id,user_id) VALUES('${qa}','${owner}'),('${normal}','${ordinary}');
@@ -97,6 +101,8 @@ describe('QA publication read RPC with production authorization and real roles',
     finally { await db.exec(`UPDATE recruiter_members SET status='active' WHERE member_user_id='${staff}'`); }
   });
   it('registry privileges unchanged and outsider cannot select registry', async () => {
+    expect((await db.query("SELECT relacl::text FROM pg_class WHERE oid='public.qa_fixture_roots'::regclass")).rows).toEqual(registryAclBefore);
+    expect((await db.query("SELECT polname,polcmd,pg_get_expr(polqual,polrelid) AS predicate FROM pg_policy WHERE polrelid='public.qa_fixture_roots'::regclass ORDER BY polname")).rows).toEqual(registryPoliciesBefore);
     expect((await db.query("SELECT has_table_privilege('anon','public.qa_fixture_roots','SELECT') AS anon, has_table_privilege('authenticated','public.qa_fixture_roots','UPDATE') AS writes")).rows).toEqual([{ anon: false, writes: false }]);
     await db.exec('BEGIN; SET LOCAL ROLE authenticated');
     try {
