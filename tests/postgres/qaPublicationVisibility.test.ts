@@ -13,7 +13,7 @@ function productionFunction(name: string) {
   if (!definition) throw new Error(`Missing production function ${name}`);
   return definition;
 }
-const migrationPath = `${process.cwd()}/supabase/migration-candidates/20261020205248_qa_publication_visibility.sql`;
+const migrationPath = `${process.cwd()}/supabase/migrations/20261020205248_qa_publication_visibility.sql`;
 const sql = readFileSync(migrationPath, 'utf8');
 const owner = '11111111-1111-1111-1111-111111111111';
 const staff = '22222222-2222-2222-2222-222222222222';
