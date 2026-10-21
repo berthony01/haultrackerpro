@@ -297,6 +297,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
     fireEvent.click(await screen.findByTestId('home-conversation-continue'));
     expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
+    await new Promise(resolve => setTimeout(resolve, 200)); console.log('CHAT DOM', document.body.textContent, sessionStorage.getItem('htp_opportunities_initial_view'));
     expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
     expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('driver');
