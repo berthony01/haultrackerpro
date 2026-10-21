@@ -1,3 +1,8 @@
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useActingContext } from '@/hooks/useActingContext';
+import { useDriverConversationThreads } from '@/hooks/conversations/useConversations';
+import { conversationUrl, matchingConversation } from '@/lib/conversations/conversationNavigation';
 import { useMemo, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -82,6 +87,9 @@ const RESPONSE_OPTIONS: { value: DriverResponseType; label: string; icon: any }[
 ];
 
 export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
+  const { user } = useAuth();
+  const { isActingAsAssistant } = useActingContext();
+  const { threads } = useDriverConversationThreads(!!user && !isActingAsAssistant);
   const {
     driverApplications,
     isLoadingDriver,
@@ -148,6 +156,7 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
 
   const renderCard = (a: any) => {
     const opp = a.opportunities;
+    const conversation = a.driver_user_id === user?.id ? matchingConversation(threads, a.opportunity_id, user?.id, opp?.recruiter_id) : null;
     const canWithdraw = !isTerminal(a.status);
     const isOpen = !!expanded[a.id];
     return (
@@ -203,6 +212,7 @@ export function DriverApplicationsPanel({ onBack, onViewOpportunity }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-2 mb-3">
+          {conversation && <Button asChild variant="outline" size="sm"><Link to={conversationUrl('driver', conversation.id)}>View Conversation</Link></Button>}
           {opp?.id && onViewOpportunity && (
             <Button variant="outline" size="sm" onClick={() => onViewOpportunity(opp.id)}>
               <Eye className="h-4 w-4" /> View Opportunity
