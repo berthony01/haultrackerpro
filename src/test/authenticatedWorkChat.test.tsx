@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, cleanup, configure } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { computeWorkspaceAccess } from '@/lib/workspaceAccess';
@@ -94,6 +94,9 @@ vi.mock('@/components/WhatsNewCard', () => ({ WhatsNewCard: () => null }));
 vi.mock('@/components/ViewModeSwitch', () => ({ ViewModeSwitch: () => null }));
 vi.mock('@/components/notifications/NotificationBell', () => ({ NotificationBell: () => null }));
 vi.mock('@/components/contracts/ContractActionsCard', () => ({ ContractActionsCard: () => null }));
+
+// The real destination is lazy-loaded; allow its cold import to settle.
+configure({ asyncUtilTimeout: 5000 });
 
 import DriverWorkConversation from '@/components/home/DriverWorkConversation';
 import FindWork from '@/pages/FindWork';
@@ -297,7 +300,6 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
     fireEvent.click(await screen.findByTestId('home-conversation-continue'));
     expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
-    await new Promise(resolve => setTimeout(resolve, 200)); console.log('CHAT DOM', document.body.textContent, sessionStorage.getItem('htp_opportunities_initial_view'));
     expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
     expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('driver');
