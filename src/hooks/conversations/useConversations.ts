@@ -133,6 +133,7 @@ export function useDriverOpportunityConversation(
   const scope = JSON.stringify([userId, opportunityId, enabled, existingThreadId]);
   const currentScope = useRef(scope);
   currentScope.current = scope;
+  useEffect(() => () => { currentScope.current = ''; }, []);
   const [snapshot, setSnapshot] = useState<{ scope: string; thread: ConversationThread | null; messages: ConversationMessage[]; error: string | null }>({ scope: '', thread: null, messages: [], error: null });
   const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [busyScope, setBusyScope] = useState<string | null>(null);
@@ -214,6 +215,7 @@ function useScopedConversationThreads(recruiterId: string | null | undefined, en
   const scope = JSON.stringify([userId, recruiterId, enabled, includeHistory, driver]);
   const currentScope = useRef(scope);
   currentScope.current = scope;
+  useEffect(() => () => { currentScope.current = ''; }, []);
   const [snapshot, setSnapshot] = useState<{ scope: string; threads: ConversationThread[]; opportunityTitles: Record<string, string>; error: string | null }>({ scope: '', threads: [], opportunityTitles: {}, error: null });
   const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
@@ -276,6 +278,7 @@ export function useConversationMessages(threadId: string | null | undefined, ena
   const scope = JSON.stringify([user?.id, threadId, enabled]);
   const currentScope = useRef(scope);
   currentScope.current = scope;
+  useEffect(() => () => { currentScope.current = ''; }, []);
   const [snapshot, setSnapshot] = useState<{ scope: string; messages: ConversationMessage[]; error: string | null }>({ scope: '', messages: [], error: null });
   const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
@@ -320,6 +323,7 @@ export function useRecruiterConversationActions(
   const scope = JSON.stringify([user?.id, surfaceKey]);
   const currentScope = useRef(scope);
   currentScope.current = scope;
+  useEffect(() => () => { currentScope.current = ''; }, []);
   const [busyScope, setBusyScope] = useState<string | null>(null);
   const [errorState, setErrorState] = useState<{ scope: string; message: string } | null>(null);
   const isBusy = busyScope === scope;

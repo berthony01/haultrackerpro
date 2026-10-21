@@ -313,7 +313,7 @@ describe('exact existing mode versus opportunity start mode', () => {
 
 describe('rendered application handoffs', () => {
   function application(driver: string, id: string, opportunity = 'opportunity-a', recruiter = 'recruiter-a') {
-    return { id, driver_user_id: driver, opportunity_id: opportunity, status: 'submitted',
+    return { id, driver_user_id: driver, opportunity_id: opportunity, status: 'new',
       opportunities: { id: opportunity, recruiter_id: recruiter, title: 'Listing' }, driver_profile: null };
   }
   it('driver panel links only its exact existing thread, never another applicant', async () => {
