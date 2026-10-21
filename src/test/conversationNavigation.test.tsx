@@ -273,7 +273,14 @@ describe('exact existing mode versus opportunity start mode', () => {
     state.threads = [thread()]; state.messages = [{ id: 'm1', thread_id: T1, sender_actor_type: 'recruiter', body: 'Closed history' }];
     render(<DriverConversationDialog open onOpenChange={vi.fn()} opportunityId="opportunity-a" opportunityTitle="Opportunity" existingThreadId={T1} />);
     await screen.findByText('Closed history'); expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Open Conversations' })).toHaveAttribute('href', conversationUrl('driver', T1)); expect(state.rpc).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: 'Open Conversations' })).toBeNull(); expect(state.rpc).not.toHaveBeenCalled();
+  });
+  it('opportunity mode links its existing thread without starting a conversation', async () => {
+    state.threads = [thread(T1, 'driver-a', 'recruiter-a', 'active')];
+    render(<DriverConversationDialog open onOpenChange={vi.fn()} opportunityId="opportunity-a" opportunityTitle="Opportunity" />);
+    expect(await screen.findByRole('link', { name: 'Open Conversations' })).toHaveAttribute('href', conversationUrl('driver', T1));
+    expect(screen.queryByRole('button', { name: 'Start Conversation' })).toBeNull();
+    expect(state.rpc).not.toHaveBeenCalled();
   });
   it('opportunity mode still starts through unchanged RPC', async () => {
     render(<DriverConversationDialog open onOpenChange={vi.fn()} opportunityId="opportunity-a" opportunityTitle="Opportunity" />);
