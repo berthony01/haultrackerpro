@@ -204,7 +204,9 @@ describe('discovery/detail scope', () => {
     await db.exec(`UPDATE qa_opportunity_test_access SET granted_at=now()-interval '2 hours', expires_at=now()-interval '90 min'`);
     try { await hidden(); } finally { await db.exec(`UPDATE qa_opportunity_test_access SET granted_at=now(), expires_at=now()+interval '30 min'`); }
     await db.exec(`UPDATE qa_fixture_roots SET active=false, revoked_at=now() WHERE root_id='${qaR}'`);
-    try { await hidden(); } finally { await db.exec(`UPDATE qa_fixture_roots SET active=true, revoked_at=NULL WHERE root_id='${qaR}'`); }
+    // Inactive root = no longer a fixture, so pre-existing logic treats it as ordinary; the grant itself must not apply.
+    try { expect(await as(tester, async () => (await db.query<any>(`SELECT public._qa_opportunity_test_access_allowed('${oQa}') ok`)).rows[0].ok, 'postgres')).toBe(false); }
+    finally { await db.exec(`UPDATE qa_fixture_roots SET active=true, revoked_at=NULL WHERE root_id='${qaR}'`); }
     await db.exec(`UPDATE recruiter_profiles SET user_id='${otherAdmin}' WHERE id='${qaR}'`);
     try { await hidden(); } finally { await db.exec(`UPDATE recruiter_profiles SET user_id='${admin}' WHERE id='${qaR}'`); }
     await db.exec(`DELETE FROM admin_users WHERE user_id='${admin}'`);
