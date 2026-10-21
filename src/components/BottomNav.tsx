@@ -128,6 +128,7 @@ export function BottomNav(props: BottomNavProps) {
   type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
 
   const driverMoreItemsFull: MoreItem[] = [
+    { label: 'Talk to HaulTracker', icon: MessageSquare, onClick: () => goHref('/find-work') },
     { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=driver') },
     { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
     { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Review, approve, request changes, sign.' },
