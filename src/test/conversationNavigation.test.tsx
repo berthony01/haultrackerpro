@@ -73,7 +73,7 @@ function deferred() {
 function Location() {
   const location = useLocation();
   const navigate = useNavigate();
-  return <><output data-testid="location">{location.pathname}{location.search}</output><button onClick={() => navigate(-1)}>Browser Back</button></>;
+  return <><span data-testid="location">{location.pathname}{location.search}</span><button onClick={() => navigate(-1)}>Browser Back</button></>;
 }
 function route(url = conversationUrl('driver')) {
   return render(<MemoryRouter initialEntries={[url]}><Location /><Conversations /></MemoryRouter>);
