@@ -14,9 +14,19 @@ const state = vi.hoisted(() => ({
   acting: false, actingLoading: false, loads: [] as any[],
   profiles: {} as Record<string, any>, profileLoading: false, profileError: false,
   profileRead: vi.fn(), mutation: vi.fn(), rpc: vi.fn(), model: vi.fn(),
+  realWorkspace: false, capabilityRows: [] as any[], recruiterMount: vi.fn(),
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: state.user, loading: state.authLoading, signOut: vi.fn() }) }));
-vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => state.access }));
+vi.mock('@/hooks/useViewMode', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/hooks/useViewMode')>();
+  return { ...actual, useViewMode: () => state.realWorkspace ? actual.useViewMode() : state.access };
+});
+vi.mock('@/hooks/useUserCapabilities', () => ({ useUserCapabilities: () => ({
+  rows: state.capabilityRows, isLoading: false, error: null,
+}) }));
+vi.mock('@/hooks/recruiter/useRecruiterStaffWorkspace', () => ({ useRecruiterStaffWorkspace: () => ({
+  workspaces: [], selectedWorkspace: null, isLoading: false, error: null, requiresSelection: false,
+}) }));
 vi.mock('@/hooks/useActingContext', () => ({ useActingContext: () => ({
   isActingAsAssistant: state.acting, isLoadingManagedDrivers: state.actingLoading,
   actingDriver: null, permissions: {}, exitActingAs: vi.fn(),
@@ -60,8 +70,16 @@ vi.mock('@/components/MonthlySummary', () => ({ MonthlySummary: () => null }));
 vi.mock('@/components/FeedbackModal', () => ({ FeedbackModal: () => null }));
 vi.mock('@/components/OnboardingModal', () => ({ OnboardingModal: () => null }));
 vi.mock('@/components/AlertsView', () => ({ AlertsView: () => null }));
-vi.mock('@/components/opportunities/OpportunitiesPage', () => ({ OpportunitiesPage: () => null }));
-vi.mock('@/components/opportunities/recruiter/RecruiterAccessRoute', () => ({ RecruiterAccessRoute: () => null }));
+vi.mock('@/components/opportunities/OpportunitiesPage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/components/opportunities/OpportunitiesPage')>();
+  return { ...actual, OpportunitiesPage: (props: React.ComponentProps<typeof actual.OpportunitiesPage>) =>
+    state.realWorkspace ? <actual.OpportunitiesPage {...props} /> : null };
+});
+vi.mock('@/hooks/opportunities/useOpportunities', () => ({ useOpportunities: () => ({ opportunities: [], isLoading: false }) }));
+vi.mock('@/hooks/opportunities/useSavedOpportunities', () => ({ useSavedOpportunities: () => ({ saved: [], save: { mutate: state.mutation }, unsave: { mutate: state.mutation } }) }));
+vi.mock('@/components/opportunities/recruiter/RecruiterAccessRoute', () => ({ RecruiterAccessRoute: () => {
+  state.recruiterMount(); return <div data-testid="recruiter-hub" />;
+} }));
 vi.mock('@/components/opportunities/recruiter/RecruiterSettingsView', () => ({ RecruiterSettingsView: () => null }));
 vi.mock('@/components/RecurringExpensesView', () => ({ RecurringExpensesView: () => null }));
 vi.mock('@/components/DriverScorecard', () => ({ DriverScorecard: () => null }));
@@ -88,6 +106,7 @@ function capability(driver: UserCapabilityStatus | null, recruiter: UserCapabili
   if (driver) rows.push({ capability: 'driver' as const, status: driver, activated_at: null });
   if (recruiter) rows.push({ capability: 'recruiter' as const, status: recruiter, activated_at: null });
   const decisions = computeWorkspaceAccess(deriveUserCapabilitiesView(rows));
+  state.capabilityRows = rows;
   state.access = { ...decisions, effectiveRole: decisions.allowedFallbackWorkspace, isLoading: false,
     error: null, setViewMode: vi.fn(), recruiterWorkspaceStatus: recruiter, canSwitch: false };
 }
@@ -102,6 +121,7 @@ function tree(child: React.ReactNode) {
 }
 beforeEach(() => {
   cleanup(); vi.clearAllMocks(); state.user = { id: 'driver-a' }; state.authLoading = false;
+  state.realWorkspace = false;
   state.acting = false; state.actingLoading = false; state.loads = [];
   state.profiles = {}; state.profileLoading = false; state.profileError = false;
   state.rpc.mockResolvedValue({ data: [], error: null }); capability('active');
@@ -253,5 +273,66 @@ describe('actual Index settled dashboard integration', () => {
     expect(await screen.findByTestId('home-conversation-surface')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Loads' })[0]);
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
+  });
+});
+
+/** Keep the real URL handler, workspace hook/policy, opportunities entry, and review form. */
+function ReviewJourney() {
+  const location = useLocation();
+  // Index intentionally reads the browser URL rather than MemoryRouter's location.
+  window.history.replaceState({}, '', `${location.pathname}${location.search}`);
+  return location.pathname === '/find-work' ? <FindWork /> : <Index />;
+}
+
+describe('canonical workspace handoff reaches the actual review destination', () => {
+  it('dual-capability recruiter workspace continues Find Work into Driver profile review without saving', async () => {
+    capability('active', 'active'); state.realWorkspace = true;
+    state.profiles['driver-a'] = fullProfile;
+    localStorage.setItem('htp_view_mode:driver-a', 'recruiter');
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    render(<QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/find-work']}><Location /><ReviewJourney /></MemoryRouter>
+    </QueryClientProvider>);
+    expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('recruiter');
+    fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
+    fireEvent.click(await screen.findByTestId('home-conversation-continue'));
+    expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
+    expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
+    expect(screen.getByDisplayValue('Houston')).toBeTruthy();
+    expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('driver');
+    expect(screen.queryByTestId('recruiter-hub')).toBeNull();
+    expect(state.recruiterMount).not.toHaveBeenCalled();
+    expect(writes.mock.calls.every(([key, value]) =>
+      (key === 'htp_view_mode:driver-a' && value === 'driver') ||
+      (key === 'htp_opportunities_initial_view' && value === 'driver-profile'),
+    )).toBe(true);
+    expect(state.mutation).not.toHaveBeenCalled();
+    expect(state.model).not.toHaveBeenCalled();
+  });
+
+  it.each([null, 'revoked'] as const)('Driver status %s cannot acquire review access using the destination hint', async (driver) => {
+    capability(driver, 'active'); state.realWorkspace = true;
+    localStorage.setItem('htp_view_mode:driver-a', 'recruiter');
+    render(<QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={[HOME_INTAKE_NEXT_PATH]}><ReviewJourney /></MemoryRouter>
+    </QueryClientProvider>);
+    expect(await screen.findByTestId('recruiter-hub')).toBeTruthy();
+    expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Save Preferences' })).toBeNull();
+    expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('recruiter');
+    expect(sessionStorage.getItem('htp_opportunities_initial_view')).toBeNull();
+    expect(state.mutation).not.toHaveBeenCalled();
+  });
+
+  it('a generic Opportunities URL does not switch a dual-capability recruiter workspace', async () => {
+    capability('active', 'active'); state.realWorkspace = true;
+    localStorage.setItem('htp_view_mode:driver-a', 'recruiter');
+    render(<QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/dashboard?page=opportunities']}><ReviewJourney /></MemoryRouter>
+    </QueryClientProvider>);
+    expect(await screen.findByTestId('recruiter-hub')).toBeTruthy();
+    expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('recruiter');
+    expect(sessionStorage.getItem('htp_opportunities_initial_view')).toBeNull();
+    expect(state.mutation).not.toHaveBeenCalled();
   });
 });

@@ -365,6 +365,7 @@ const Index = () => {
           setPage('dashboard');
         }
       } else if (driverWorkspaceAllowed) {
+        if (view === 'driver-profile') setViewMode('driver');
         setPage('opportunities');
         if (view === 'driver-profile') {
           try { sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile'); } catch {}
