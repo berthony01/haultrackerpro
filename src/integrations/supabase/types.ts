@@ -3731,6 +3731,41 @@ export type Database = {
         }
         Relationships: []
       }
+      qa_opportunity_test_access: {
+        Row: {
+          driver_user_id: string
+          expires_at: string
+          granted_at: string
+          opportunity_id: string
+          qa_owner_user_id: string
+          revoked_at: string | null
+        }
+        Insert: {
+          driver_user_id: string
+          expires_at: string
+          granted_at: string
+          opportunity_id: string
+          qa_owner_user_id: string
+          revoked_at?: string | null
+        }
+        Update: {
+          driver_user_id?: string
+          expires_at?: string
+          granted_at?: string
+          opportunity_id?: string
+          qa_owner_user_id?: string
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qa_opportunity_test_access_opportunity_id_fkey"
+            columns: ["opportunity_id"]
+            isOneToOne: false
+            referencedRelation: "opportunities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruiter_billing_profiles: {
         Row: {
           active_opportunity_limit: number
@@ -5305,6 +5340,10 @@ export type Database = {
         Args: { _input: string[]; _max_elems: number; _max_len: number }
         Returns: boolean
       }
+      _qa_opportunity_test_access_allowed: {
+        Args: { _opportunity_id: string }
+        Returns: boolean
+      }
       _sync_recruiter_capability: {
         Args: { _user_id: string }
         Returns: undefined
@@ -6336,6 +6375,14 @@ export type Database = {
           weekly_points: number
         }[]
       }
+      grant_qa_opportunity_test_access: {
+        Args: {
+          _driver_user_id: string
+          _duration_minutes?: number
+          _opportunity_id: string
+        }
+        Returns: string
+      }
       invite_agency_member: {
         Args: {
           _agency_id: string
@@ -7085,6 +7132,10 @@ export type Database = {
         Returns: number
       }
       revoke_my_telegram_link: { Args: never; Returns: boolean }
+      revoke_qa_opportunity_test_access: {
+        Args: { _driver_user_id: string; _opportunity_id: string }
+        Returns: boolean
+      }
       revoke_recruiter_member: { Args: { _member_id: string }; Returns: Json }
       save_telegram_opportunity_draft_payload: {
         Args: { _draft_id: string; _payload: Json }
