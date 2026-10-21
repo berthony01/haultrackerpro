@@ -248,6 +248,7 @@ const Index = () => {
   const driverProfileTransition = useRef<{ userId: string; phase: 'workspace' | 'target' } | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    console.log('CHAT URL', effectiveRole, page, window.location.search, driverProfileTransition.current);
     if (params.get('checkout') === 'success') {
       toast.success('Welcome to Pro! Your subscription is now active.', { duration: 5000 });
       setPendingPurchaseTrack(true);
@@ -709,6 +710,7 @@ const Index = () => {
   // that used `useUserRole`.
   useEffect(() => {
     const transition = driverProfileTransition.current;
+    console.log('CHAT RECON', effectiveRole, page, transition);
     if (transition) {
       if (transition.phase === 'target') driverProfileTransition.current = null;
       if (transition.userId === user?.id && !workspaceLoading && !workspaceError &&
