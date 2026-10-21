@@ -18,7 +18,8 @@ const state = vi.hoisted(() => ({
   errorTable: '',
   calls: [] as { table: string; filters: [string, unknown][] }[],
   deferred: null as null | { table: string; promise: Promise<{ data: unknown; error: unknown }> },
-  rpc: vi.fn(async () => ({ data: 'ok', error: null })),
+  applications: [] as Record<string, unknown>[],
+  rpc: vi.fn(async (_fn: string, _args: Record<string, unknown>) => ({ data: 'ok', error: null })),
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: state.user, loading: state.loading, signOut: vi.fn() }) }));
 vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => state.access }));
@@ -50,6 +51,19 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {
     return chain;
   },
 } }));
+
+vi.mock('@/hooks/opportunities/useOpportunityApplications', () => ({ useOpportunityApplications: () => ({
+  driverApplications: state.applications, recruiterApplications: state.applications,
+  isLoadingDriver: false, isErrorDriver: false, isLoadingRecruiter: false, isErrorRecruiter: false,
+  withdrawApplication: { mutate: vi.fn() }, recordDriverResponse: { mutate: vi.fn() }, updateApplicationStatus: { mutate: vi.fn() },
+}) }));
+vi.mock('@/hooks/opportunities/useRecruiterContactRequests', () => ({ useRecruiterContactRequests: () => ({ requests: [], respond: { mutate: vi.fn() }, requestContact: { mutate: vi.fn() } }), latestRequestForApp: () => null }));
+vi.mock('@/hooks/opportunities/useRecruiterBilling', () => ({ useRecruiterBilling: () => ({ canUseContractWorkflowTools: false }) }));
+vi.mock('@/hooks/contracts/useContractReadinessMap', () => ({ useContractReadinessMap: () => ({ readinessMap: new Map() }) }));
+vi.mock('@/components/contracts/ContractAttachment', () => ({ ContractAttachment: () => null }));
+vi.mock('@/components/opportunities/ApplicationTimeline', () => ({ ApplicationTimeline: () => null }));
+import { DriverApplicationsPanel } from '@/components/opportunities/DriverApplicationsPanel';
+import { RecruiterApplicationsDashboard } from '@/components/opportunities/RecruiterApplicationsDashboard';
 
 import Conversations from '@/pages/Conversations';
 import { AppSidebar } from '@/components/premium/AppSidebar';
@@ -85,6 +99,7 @@ beforeEach(() => {
     recruiterAccessKind: 'capability', recruiterCapabilityStatus: 'active', recruiterOperationsAllowed: true };
   state.profile = { id: 'recruiter-a', user_id: 'driver-a' };
   state.profileLoading = false; state.profileSuspended = false; state.canPost = true; state.profileCalls = 0;
+  state.applications = [];
   state.threads = []; state.messages = []; state.errorTable = ''; state.calls = []; state.deferred = null; state.rpc.mockClear();
   HTMLElement.prototype.scrollIntoView = vi.fn();
 });
@@ -292,5 +307,35 @@ describe('exact existing mode versus opportunity start mode', () => {
     await screen.findByTestId('conversation-thread-detail'); expect(screen.queryByRole('textbox')).toBeNull();
     state.calls = []; view.rerender(<RecruiterConversationInbox recruiterId="recruiter-a" canView={false} canReply includeHistory selectedThreadId={T1} />);
     expect(screen.queryByTestId('conversation-thread-detail')).toBeNull(); expect(state.calls).toEqual([]);
+  });
+});
+
+
+describe('rendered application handoffs', () => {
+  function application(driver: string, id: string, opportunity = 'opportunity-a', recruiter = 'recruiter-a') {
+    return { id, driver_user_id: driver, opportunity_id: opportunity, status: 'submitted',
+      opportunities: { id: opportunity, recruiter_id: recruiter, title: 'Listing' }, driver_profile: null };
+  }
+  it('driver panel links only its exact existing thread, never another applicant', async () => {
+    state.applications = [application('driver-a', 'app-a'), application('driver-b', 'app-b'), application('driver-a', 'app-c', 'other-listing')];
+    state.threads = [thread(), thread(T2, 'driver-b')];
+    render(<MemoryRouter><DriverApplicationsPanel onBack={vi.fn()} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'View Conversation' })).toHaveLength(1));
+    expect(screen.getByRole('link', { name: 'View Conversation' })).toHaveAttribute('href', conversationUrl('driver', T1));
+    expect(state.calls.filter(c => c.table === 'conversation_threads')).toHaveLength(1); expect(state.rpc).not.toHaveBeenCalled();
+  });
+  it('owner panel matches each applicant and known recruiter, excluding absent threads', async () => {
+    state.applications = [application('driver-a', 'app-a'), application('driver-b', 'app-b'), application('driver-c', 'app-c')];
+    state.threads = [thread(), thread(T2, 'driver-b'), thread(FOREIGN, 'driver-c', 'other-recruiter')];
+    render(<MemoryRouter><RecruiterApplicationsDashboard onBack={vi.fn()} /></MemoryRouter>);
+    await waitFor(() => expect(screen.getAllByRole('link', { name: 'View Conversation' })).toHaveLength(2));
+    expect(screen.getAllByRole('link', { name: 'View Conversation' }).map(a => a.getAttribute('href'))).toEqual([conversationUrl('recruiter', T1), conversationUrl('recruiter', T2)]);
+    expect(state.calls.filter(c => c.table === 'conversation_threads')).toHaveLength(1); expect(state.rpc).not.toHaveBeenCalled();
+  });
+  it('no thread yields no link and never creates a thread', async () => {
+    state.applications = [application('driver-a', 'app-a')];
+    render(<MemoryRouter><DriverApplicationsPanel onBack={vi.fn()} /></MemoryRouter>);
+    await waitFor(() => expect(state.calls.filter(c => c.table === 'conversation_threads')).toHaveLength(1));
+    expect(screen.queryByRole('link', { name: 'View Conversation' })).toBeNull(); expect(state.rpc).not.toHaveBeenCalled();
   });
 });

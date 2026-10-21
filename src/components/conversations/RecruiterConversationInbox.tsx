@@ -187,12 +187,13 @@ export function RecruiterConversationInbox({
                 : 'General enquiry';
               return (
                 <li key={t.id}>
-                  <button
+                  <Button
+                    variant="outline"
                     type="button"
                     onClick={() => { setSelection({ key: listKey, id: t.id }); onSelectedThreadChange?.(t.id); }}
                     data-testid="conversation-thread-item"
                     aria-current={selectedId === t.id}
-                    className={`w-full min-h-[44px] rounded-xl border p-3 text-left ${
+                    className={`block h-auto w-full min-h-[44px] whitespace-normal rounded-xl border p-3 text-left ${
                       selectedId === t.id ? 'border-primary/50 bg-primary/5' : 'border-border/60'
                     }`}
                   >
@@ -216,7 +217,7 @@ export function RecruiterConversationInbox({
                         Started {startedLabel(t.created_at)}
                       </p>
                     )}
-                  </button>
+                  </Button>
                 </li>
               );
             })}

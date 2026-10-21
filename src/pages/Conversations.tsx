@@ -44,7 +44,7 @@ export default function Conversations() {
           <h1 className="text-2xl font-bold">Conversations</h1>
           <p className="text-sm text-muted-foreground">{workspace === 'recruiter' ? 'Your conversations with drivers.' : 'Your conversations with recruiters.'}</p>
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline"><Link to={workspace === 'recruiter' ? '/dashboard?page=recruiter-access' : '/dashboard'}>Return to Dashboard</Link></Button>
+            <Button asChild variant="outline"><Link onClick={() => { if (allowed && (workspace === 'driver' || workspace === 'recruiter')) access.setViewMode(workspace); }} to={workspace === 'recruiter' ? '/dashboard?page=recruiter-access' : '/dashboard'}>Return to Dashboard</Link></Button>
             <Button asChild variant="ghost"><Link to="/start">Workspaces</Link></Button>
             {driverAllowed && workspace !== 'driver' && <Button asChild variant="outline"><Link to={conversationUrl('driver')}>Driver Conversations</Link></Button>}
             {recruiterAllowed && workspace !== 'recruiter' && <Button asChild variant="outline"><Link to={conversationUrl('recruiter')}>Recruiter Conversations</Link></Button>}
