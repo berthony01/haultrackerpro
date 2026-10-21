@@ -89,8 +89,9 @@ beforeAll(async () => {
     CREATE TABLE public.opportunities(id uuid PRIMARY KEY, recruiter_id uuid, status text, admin_review_status text,
       hiring_state text, driver_type text, route_type text, featured boolean, published_at timestamptz, title text);
   `);
+  await db.exec(productionFunction('is_super_admin'));
   await db.exec(readFileSync(`${process.cwd()}/supabase/migration-candidates/20260821050000_phase_tg2e3_o6_qa_fixture_root_registry.sql`, 'utf8'));
-  for (const name of ['is_super_admin', '_owner_qa_persona_for', 'effective_recruiter_tier', 'recruiter_profile_can_manage_opportunities']) {
+  for (const name of ['_owner_qa_persona_for', 'effective_recruiter_tier', 'recruiter_profile_can_manage_opportunities']) {
     await db.exec(productionFunction(name));
   }
   await db.exec(baselineVisibility);
