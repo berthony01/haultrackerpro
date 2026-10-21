@@ -22,9 +22,11 @@ vi.mock('react-router-dom', async () => {
   return { ...actual, useNavigate: () => navigateSpy };
 });
 
-const roleState = { isDriver: true, isLoading: false };
-vi.mock('@/hooks/useUserRole', () => ({
-  useUserRole: () => roleState,
+const roleState = { driverWorkspaceAllowed: true, isLoading: false, error: null };
+vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => roleState }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'driver-1' }, loading: false }) }));
+vi.mock('@/hooks/useActingContext', () => ({
+  useActingContext: () => ({ isActingAsAssistant: false, isLoadingManagedDrivers: false }),
 }));
 
 const upsertMock = vi.fn();
@@ -69,7 +71,7 @@ import {
 
 const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const MERGE_SRC = read('src/lib/home/profileConversationMerge.ts');
-const FIND_WORK_SRC = read('src/pages/FindWork.tsx');
+const FIND_WORK_SRC = read('src/pages/FindWork.tsx') + read('src/components/home/DriverWorkConversation.tsx');
 const APP_SRC = read('src/App.tsx');
 
 const FULL_PROFILE = {
@@ -103,7 +105,7 @@ beforeEach(() => {
   navigateSpy.mockReset();
   upsertMock.mockReset();
   deleteMock.mockReset();
-  roleState.isDriver = true;
+  roleState.driverWorkspaceAllowed = true;
   roleState.isLoading = false;
   profileState.profile = null;
   profileState.isLoading = false;
@@ -315,7 +317,7 @@ describe('HP-4B FindWork page', () => {
   });
 
   it('shows a neutral not-available state for non-drivers and no profile data', () => {
-    roleState.isDriver = false;
+    roleState.driverWorkspaceAllowed = false;
     profileState.profile = FULL_PROFILE;
     renderFindWork();
     expect(screen.getByTestId('find-work-unavailable').textContent).toContain(

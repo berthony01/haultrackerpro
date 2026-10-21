@@ -36,6 +36,7 @@ import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOppo
 import { useReleaseNotesSeen } from '@/hooks/useReleaseNotesSeen';
 
 // Heavy / route-rare views and modals — lazy so they don't bloat the dashboard chunk.
+const DriverWorkConversation = lazy(() => import('@/components/home/DriverWorkConversation'));
 const LoadForm = lazy(() => import('@/components/LoadForm').then(m => ({ default: m.LoadForm })));
 const ExpenseForm = lazy(() => import('@/components/ExpenseForm').then(m => ({ default: m.ExpenseForm })));
 const FuelLogForm = lazy(() => import('@/components/FuelLogForm').then(m => ({ default: m.FuelLogForm })));
@@ -1023,6 +1024,17 @@ const Index = () => {
           <ViewFallback />
         ) : (
           <>
+        {page === 'dashboard' && effectiveRole === 'driver' && driverWorkspaceAllowed && !isActingAsAssistant && (
+          <section className="mb-8" aria-labelledby="driver-work-chat-heading">
+            <h2 id="driver-work-chat-heading" className="mb-2 text-xl font-bold text-foreground">Talk to HaulTracker</h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Find work that fits you. Talk through your job preferences, see real openings, and review your work profile before saving changes.
+            </p>
+            <Suspense fallback={<ViewFallback />}>
+              <DriverWorkConversation />
+            </Suspense>
+          </section>
+        )}
         {/* Smart Reminders */}
         {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">

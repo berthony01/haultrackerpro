@@ -37,6 +37,7 @@ type NavItem = {
 const driverItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
+  { id: 'nav:find-work', label: 'Talk to HaulTracker', icon: MessageSquare, href: '/find-work' },
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
   { id: 'nav:conversations', label: 'Conversations', icon: MessageSquare, href: '/conversations?workspace=driver' },
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
