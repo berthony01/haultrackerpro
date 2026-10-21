@@ -6,7 +6,6 @@
  * "Recruiter" — no profile, auth.users, or driver-profile lookup exists here.
  */
 import { useAuth } from '@/hooks/useAuth';
-import { Link } from 'react-router-dom';
 import { conversationUrl } from '@/lib/conversations/conversationNavigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -135,7 +134,7 @@ export function DriverConversationDialog({
         </DialogHeader>
 
         {thread && (
-          <Button asChild variant="outline" size="sm"><Link to={conversationUrl('driver', thread.id)}>Open Conversations</Link></Button>
+          <Button asChild variant="outline" size="sm"><a href={conversationUrl('driver', thread.id)}>Open Conversations</a></Button>
         )}
 
         {statusLabel && (

@@ -116,7 +116,7 @@ export function RecruiterConversationInbox({
     useRecruiterConversationActions(() => {
       refetch();
       refetchMessages();
-    });
+    }, replyKey);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' });
@@ -135,7 +135,7 @@ export function RecruiterConversationInbox({
   }
 
   const handleReply = async () => {
-    if (!selected) return;
+    if (!canView || !canReply || !selected || selected.status !== 'active') return;
     await replyToThread(selected.id, reply);
     if (currentReplyKey.current === replyKey) setReply('');
   };
@@ -225,7 +225,7 @@ export function RecruiterConversationInbox({
           <div className="min-w-0">
             {!selected ? (
               <p className="text-sm text-muted-foreground">
-                Select a conversation to read it.
+                {selectedId ? 'Conversation unavailable.' : 'Select a conversation to read it.'}
               </p>
             ) : (
               <div className="space-y-3" data-testid="conversation-thread-detail">

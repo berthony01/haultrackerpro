@@ -314,24 +314,32 @@ export interface RecruiterConversationActions {
 /** Recruiter mutations — RPC only. Authority is re-resolved server-side. */
 export function useRecruiterConversationActions(
   onChanged: () => void,
+  surfaceKey = '',
 ): RecruiterConversationActions {
-  const [isBusy, setIsBusy] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const { user } = useAuth();
+  const scope = JSON.stringify([user?.id, surfaceKey]);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const [busyScope, setBusyScope] = useState<string | null>(null);
+  const [errorState, setErrorState] = useState<{ scope: string; message: string } | null>(null);
+  const isBusy = busyScope === scope;
+  const actionError = errorState?.scope === scope ? errorState.message : null;
   const changedRef = useRef(onChanged);
   changedRef.current = onChanged;
 
   const run = useCallback(async (fn: () => Promise<void>) => {
-    setIsBusy(true);
-    setActionError(null);
+    if (currentScope.current !== scope) return;
+    setBusyScope(scope);
+    setErrorState(null);
     try {
       await fn();
-      changedRef.current();
+      if (currentScope.current === scope) changedRef.current();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Something went wrong.');
+      if (currentScope.current === scope) setErrorState({ scope, message: e instanceof Error ? e.message : 'Something went wrong.' });
     } finally {
-      setIsBusy(false);
+      if (currentScope.current === scope) setBusyScope(null);
     }
-  }, []);
+  }, [scope]);
 
   const acceptThread = useCallback(
     (threadId: string) =>
