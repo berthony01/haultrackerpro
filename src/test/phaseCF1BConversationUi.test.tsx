@@ -599,13 +599,14 @@ describe('CF-1B / scope guards', () => {
     }
   });
 
-  it('9b owner command center mounts the shared inbox on demand only', () => {
-    const src = read(ACCESS_PAGE_PATH);
-    expect(src).toContain('const [conversationsOpen, setConversationsOpen] = useState(false);');
-    expect(src).toContain('{conversationsOpen && profile?.id && (');
-    expect(src).toContain('<RecruiterConversationInbox');
-    expect(src).toContain('recruiterId={profile.id}');
-    expect(src).toContain('title="Conversation Inbox"');
+  it('9b active owner command center opens canonical Conversations navigation', () => {
+    const src = readCode(ACCESS_PAGE_PATH);
+    expect(src).toContain("{(state === 'active_billing' || state === 'active_no_billing') && (");
+    expect(src).toContain("onOpenConversations={() => navigate('/conversations?workspace=recruiter')}");
+    expect(src).toContain('cta="Open Conversations"');
+    expect(src).toContain('onClick={onOpenConversations}');
+    expect(src).not.toContain('<RecruiterConversationInbox');
+    expect(src).not.toContain('start_opportunity_conversation');
   });
 
   it('9c polling timers are cleared and the cadence stays modest', () => {

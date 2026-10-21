@@ -133,7 +133,7 @@ export function DriverConversationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {thread && (
+        {existingThreadId === undefined && thread && (
           <Button asChild variant="outline" size="sm"><a href={conversationUrl('driver', thread.id)}>Open Conversations</a></Button>
         )}
 
