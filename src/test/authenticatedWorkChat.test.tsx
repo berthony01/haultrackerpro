@@ -251,7 +251,7 @@ describe('actual Index settled dashboard integration', () => {
   it('switching to another dashboard page removes the chat and preserves navigation', async () => {
     state.loads = [{ id: 'existing' }]; render(tree(<Index />));
     expect(await screen.findByTestId('home-conversation-surface')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Loads' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Loads' })[0]);
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
   });
 });
