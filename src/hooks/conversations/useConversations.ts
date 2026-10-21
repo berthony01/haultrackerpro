@@ -11,9 +11,10 @@
  * no application, contact-request, offer, contract, referral, settlement,
  * billing, or Telegram coupling.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { validThreadId } from '@/lib/conversations/conversationNavigation';
 import type { Tables } from '@/integrations/supabase/types';
 
 export type ConversationThread = Tables<'conversation_threads'>;
@@ -123,142 +124,78 @@ export interface DriverConversationState {
 export function useDriverOpportunityConversation(
   opportunityId: string | null | undefined,
   enabled: boolean,
+  existingThreadId?: string | null,
 ): DriverConversationState {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const active = !!enabled && !!opportunityId && !!userId;
-
-  const [thread, setThread] = useState<ConversationThread | null>(null);
-  const [messages, setMessages] = useState<ConversationMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isBusy, setIsBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const exactMode = existingThreadId !== undefined;
+  const active = !!enabled && !!userId && (exactMode ? validThreadId(existingThreadId) : !!opportunityId);
+  const scope = JSON.stringify([userId, opportunityId, enabled, existingThreadId]);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const [snapshot, setSnapshot] = useState<{ scope: string; thread: ConversationThread | null; messages: ConversationMessage[]; error: string | null }>({ scope: '', thread: null, messages: [], error: null });
+  const [loadingScope, setLoadingScope] = useState<string | null>(null);
+  const [busyScope, setBusyScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
-  const generationRef = useRef(0);
-
-  const refetch = useCallback(() => setToken((t) => t + 1), []);
+  const refetch = useCallback(() => setToken(t => t + 1), []);
+  const visible = active && snapshot.scope === scope;
+  const thread = visible ? snapshot.thread : null;
 
   useEffect(() => {
-    generationRef.current += 1;
-    const generation = generationRef.current;
-
-    if (!active) {
-      setThread(null);
-      setMessages([]);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    setIsLoading(true);
+    let cancelled = false;
+    if (!active || !userId) return;
+    setLoadingScope(scope);
     void (async () => {
       try {
-        const { data, error: threadError } = await supabase
-          .from('conversation_threads')
-          .select('*')
-          .eq('opportunity_id', opportunityId as string)
-          .eq('driver_user_id', userId as string)
-          .in('status', [...CF1B_OPEN_STATUSES])
-          .order('updated_at', { ascending: false })
-          .limit(1);
-        if (threadError) throw friendlyError('Unable to load this conversation.');
-        const found = ((data ?? []) as ConversationThread[])[0] ?? null;
-        const list = found ? await fetchMessages(found.id) : [];
-        if (generation !== generationRef.current) return;
-        setThread(found);
-        setMessages(list);
-        setError(null);
-      } catch (e) {
-        if (generation !== generationRef.current) return;
-        setThread(null);
-        setMessages([]);
-        setError(e instanceof Error ? e.message : 'Unable to load this conversation.');
+        let query = supabase.from('conversation_threads').select('*').eq('driver_user_id', userId);
+        if (exactMode && existingThreadId) query = query.eq('id', existingThreadId);
+        else query = query.eq('opportunity_id', opportunityId as string).in('status', [...CF1B_OPEN_STATUSES]);
+        const { data, error } = await query.order('updated_at', { ascending: false }).limit(1);
+        if (cancelled || currentScope.current !== scope) return;
+        if (error) throw friendlyError('Unable to load this conversation.');
+        const found = ((data ?? []) as ConversationThread[]).find(t => t.driver_user_id === userId &&
+          (exactMode ? t.id === existingThreadId : t.opportunity_id === opportunityId)) ?? null;
+        const messages = found ? await fetchMessages(found.id) : [];
+        if (!cancelled && currentScope.current === scope) setSnapshot({ scope, thread: found, messages, error: null });
+      } catch {
+        if (!cancelled && currentScope.current === scope) setSnapshot({ scope, thread: null, messages: [], error: 'Unable to load this conversation.' });
       } finally {
-        if (generation === generationRef.current) setIsLoading(false);
+        if (!cancelled && currentScope.current === scope) setLoadingScope(null);
       }
     })();
-  }, [active, opportunityId, userId, token]);
-
+    return () => { cancelled = true; };
+  }, [scope, active, userId, exactMode, existingThreadId, opportunityId, token]);
   usePoll(active, refetch);
 
-  const run = useCallback(
-    async (fn: () => Promise<void>) => {
-      setIsBusy(true);
-      setError(null);
-      try {
-        await fn();
-        refetch();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Something went wrong.');
-        throw e;
-      } finally {
-        setIsBusy(false);
-      }
-    },
-    [refetch],
-  );
-
-  const startConversation = useCallback(
-    (body: string) =>
-      run(async () => {
-        if (!opportunityId) throw friendlyError('Opportunity unavailable.');
-        await rpc(
-          'start_opportunity_conversation',
-          {
-            _opportunity_id: opportunityId,
-            _initial_message: trimmedBodyOrThrow(body),
-            _client_message_id: newClientMessageId(),
-          },
-          'Unable to start this conversation.',
-        );
-      }),
-    [opportunityId, run],
-  );
-
-  const sendMessage = useCallback(
-    (body: string) =>
-      run(async () => {
-        if (!thread) throw friendlyError('Conversation unavailable.');
-        await rpc(
-          'conversation_post_message',
-          {
-            _thread_id: thread.id,
-            _body: trimmedBodyOrThrow(body),
-            _client_message_id: newClientMessageId(),
-          },
-          'Unable to send this message.',
-        );
-      }),
-    [thread, run],
-  );
-
-  const closeConversation = useCallback(
-    () =>
-      run(async () => {
-        if (!thread) throw friendlyError('Conversation unavailable.');
-        await rpc(
-          'close_conversation_thread',
-          { _thread_id: thread.id },
-          'Unable to close this conversation.',
-        );
-      }),
-    [thread, run],
-  );
-
-  return {
-    thread,
-    messages,
-    isLoading,
-    isBusy,
-    error,
-    refetch,
-    startConversation,
-    sendMessage,
-    closeConversation,
-  };
+  const run = useCallback(async (action: () => Promise<unknown>) => {
+    if (!active || currentScope.current !== scope) return;
+    setBusyScope(scope);
+    try {
+      await action();
+      if (currentScope.current === scope) refetch();
+    } catch (e) {
+      if (currentScope.current === scope) setSnapshot(previous => ({ ...previous, scope, error: e instanceof Error ? e.message : 'Conversation unavailable.' }));
+      throw e;
+    } finally {
+      if (currentScope.current === scope) setBusyScope(null);
+    }
+  }, [active, scope, refetch]);
+  const startConversation = useCallback((body: string) => run(async () => {
+    if (exactMode || !opportunityId || thread) throw friendlyError('Conversation unavailable.');
+    return rpc('start_opportunity_conversation', { _opportunity_id: opportunityId, _initial_message: trimmedBodyOrThrow(body), _client_message_id: newClientMessageId() }, 'Unable to start this conversation.');
+  }), [run, exactMode, opportunityId, thread]);
+  const sendMessage = useCallback((body: string) => run(async () => {
+    if (!thread || !CF1B_OPEN_STATUSES.includes(thread.status as 'requested' | 'active')) throw friendlyError('Conversation unavailable.');
+    return rpc('conversation_post_message', { _thread_id: thread.id, _body: trimmedBodyOrThrow(body), _client_message_id: newClientMessageId() }, 'Unable to send this message.');
+  }), [run, thread]);
+  const closeConversation = useCallback(() => run(async () => {
+    if (!thread || !CF1B_OPEN_STATUSES.includes(thread.status as 'requested' | 'active')) throw friendlyError('Conversation unavailable.');
+    return rpc('close_conversation_thread', { _thread_id: thread.id }, 'Unable to close this conversation.');
+  }), [run, thread]);
+  return { thread, messages: visible ? snapshot.messages : [], error: visible ? snapshot.error : null,
+    isLoading: active && (!visible || loadingScope === scope), isBusy: busyScope === scope,
+    refetch, startConversation, sendMessage, closeConversation };
 }
-
-/* ----------------------------- recruiter side ---------------------------- */
 
 export interface RecruiterConversationListState {
   threads: ConversationThread[];
@@ -269,88 +206,60 @@ export interface RecruiterConversationListState {
   refetch: () => void;
 }
 
-/**
- * Requested/active threads for one recruiter workspace. Read access is
- * governed entirely by the CF-1A SELECT policy; `enabled` is UX gating only.
- */
-export function useRecruiterConversationThreads(
-  recruiterId: string | null | undefined,
-  enabled: boolean,
-): RecruiterConversationListState {
-  const active = !!enabled && !!recruiterId;
-  const [threads, setThreads] = useState<ConversationThread[]>([]);
-  const [opportunityTitles, setOpportunityTitles] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/** Identity-bound reads; the filter narrows RLS, never replaces it. */
+function useScopedConversationThreads(recruiterId: string | null | undefined, enabled: boolean, includeHistory: boolean, driver: boolean): RecruiterConversationListState {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const active = !!enabled && !!userId && (driver || !!recruiterId);
+  const scope = JSON.stringify([userId, recruiterId, enabled, includeHistory, driver]);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const [snapshot, setSnapshot] = useState<{ scope: string; threads: ConversationThread[]; opportunityTitles: Record<string, string>; error: string | null }>({ scope: '', threads: [], opportunityTitles: {}, error: null });
+  const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
-  const generationRef = useRef(0);
-
-  const refetch = useCallback(() => setToken((t) => t + 1), []);
-
+  const refetch = useCallback(() => setToken(t => t + 1), []);
   useEffect(() => {
-    generationRef.current += 1;
-    const generation = generationRef.current;
-
-    if (!active) {
-      setThreads([]);
-      setOpportunityTitles({});
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    setIsLoading(true);
+    let cancelled = false;
+    if (!active || !userId) return;
+    setLoadingScope(scope);
     void (async () => {
       try {
-        const { data, error: listError } = await supabase
-          .from('conversation_threads')
-          .select('*')
-          .eq('recruiter_id', recruiterId as string)
-          .in('status', [...CF1B_OPEN_STATUSES])
-          .order('updated_at', { ascending: false });
-        if (listError) throw friendlyError('Unable to load conversations.');
-        const rows = (data ?? []) as ConversationThread[];
-
-        // Opportunity titles only — already readable context, no driver data.
-        const ids = Array.from(
-          new Set(rows.map((r) => r.opportunity_id).filter((v): v is string => !!v)),
-        );
-        let titles: Record<string, string> = {};
-        if (ids.length > 0) {
-          const { data: opps } = await supabase
-            .from('opportunities')
-            .select('id, title')
-            .in('id', ids);
-          titles = Object.fromEntries(
-            ((opps ?? []) as { id: string; title: string | null }[]).map((o) => [
-              o.id,
-              o.title ?? 'Opportunity',
-            ]),
-          );
+        let query = supabase.from('conversation_threads').select('*');
+        query = driver ? query.eq('driver_user_id', userId) : query.eq('recruiter_id', recruiterId as string);
+        if (!includeHistory) query = query.in('status', [...CF1B_OPEN_STATUSES]);
+        const { data, error } = await query.order('updated_at', { ascending: false });
+        if (cancelled || currentScope.current !== scope) return;
+        if (error) throw friendlyError('Unable to load conversations.');
+        const threads = ((data ?? []) as ConversationThread[]).filter(t => driver ? t.driver_user_id === userId : t.recruiter_id === recruiterId);
+        const ids = Array.from(new Set(threads.map(t => t.opportunity_id).filter((id): id is string => !!id)));
+        let opportunityTitles: Record<string, string> = {};
+        if (ids.length) {
+          const { data: opportunities } = await supabase.from('opportunities').select('id, title').in('id', ids);
+          opportunityTitles = Object.fromEntries((opportunities ?? []).map(o => [o.id, o.title ?? 'Opportunity']));
         }
-        if (generation !== generationRef.current) return;
-        setThreads(rows);
-        setOpportunityTitles(titles);
-        setError(null);
-      } catch (e) {
-        if (generation !== generationRef.current) return;
-        setThreads([]);
-        setOpportunityTitles({});
-        setError(e instanceof Error ? e.message : 'Unable to load conversations.');
+        if (!cancelled && currentScope.current === scope) setSnapshot({ scope, threads, opportunityTitles, error: null });
+      } catch {
+        if (!cancelled && currentScope.current === scope) setSnapshot({ scope, threads: [], opportunityTitles: {}, error: 'Unable to load conversations.' });
       } finally {
-        if (generation === generationRef.current) setIsLoading(false);
+        if (!cancelled && currentScope.current === scope) setLoadingScope(null);
       }
     })();
-  }, [active, recruiterId, token]);
-
+    return () => { cancelled = true; };
+  }, [scope, active, userId, recruiterId, includeHistory, driver, token]);
   usePoll(active, refetch);
+  const visible = active && snapshot.scope === scope;
+  const threads = visible ? snapshot.threads : [];
+  return { threads, requestedCount: threads.filter(t => t.status === 'requested').length,
+    opportunityTitles: visible ? snapshot.opportunityTitles : {}, error: visible ? snapshot.error : null,
+    isLoading: active && (!visible || loadingScope === scope), refetch };
+}
 
-  const requestedCount = useMemo(
-    () => threads.filter((t) => t.status === 'requested').length,
-    [threads],
-  );
+export function useDriverConversationThreads(enabled: boolean) {
+  return useScopedConversationThreads(null, enabled, true, true);
+}
 
-  return { threads, requestedCount, opportunityTitles, isLoading, error, refetch };
+export function useRecruiterConversationThreads(recruiterId: string | null | undefined, enabled: boolean, includeHistory = false) {
+  return useScopedConversationThreads(recruiterId, enabled, includeHistory, false);
 }
 
 export interface ConversationThreadMessagesState {
@@ -360,50 +269,37 @@ export interface ConversationThreadMessagesState {
   refetch: () => void;
 }
 
-export function useConversationMessages(
-  threadId: string | null | undefined,
-  enabled: boolean,
-): ConversationThreadMessagesState {
-  const active = !!enabled && !!threadId;
-  const [messages, setMessages] = useState<ConversationMessage[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+/** Caller must select from its currently validated, scoped thread list first. */
+export function useConversationMessages(threadId: string | null | undefined, enabled: boolean): ConversationThreadMessagesState {
+  const { user } = useAuth();
+  const active = !!enabled && !!threadId && !!user?.id;
+  const scope = JSON.stringify([user?.id, threadId, enabled]);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
+  const [snapshot, setSnapshot] = useState<{ scope: string; messages: ConversationMessage[]; error: string | null }>({ scope: '', messages: [], error: null });
+  const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
-  const generationRef = useRef(0);
-
-  const refetch = useCallback(() => setToken((t) => t + 1), []);
-
+  const refetch = useCallback(() => setToken(t => t + 1), []);
   useEffect(() => {
-    generationRef.current += 1;
-    const generation = generationRef.current;
-
-    if (!active) {
-      setMessages([]);
-      setIsLoading(false);
-      setError(null);
-      return;
-    }
-
-    setIsLoading(true);
+    let cancelled = false;
+    if (!active || !threadId) return;
+    setLoadingScope(scope);
     void (async () => {
       try {
-        const list = await fetchMessages(threadId as string);
-        if (generation !== generationRef.current) return;
-        setMessages(list);
-        setError(null);
-      } catch (e) {
-        if (generation !== generationRef.current) return;
-        setMessages([]);
-        setError(e instanceof Error ? e.message : 'Unable to load messages.');
+        const messages = await fetchMessages(threadId);
+        if (!cancelled && currentScope.current === scope) setSnapshot({ scope, messages, error: null });
+      } catch {
+        if (!cancelled && currentScope.current === scope) setSnapshot({ scope, messages: [], error: 'Unable to load messages.' });
       } finally {
-        if (generation === generationRef.current) setIsLoading(false);
+        if (!cancelled && currentScope.current === scope) setLoadingScope(null);
       }
     })();
-  }, [active, threadId, token]);
-
+    return () => { cancelled = true; };
+  }, [scope, active, threadId, token]);
   usePoll(active, refetch);
-
-  return { messages, isLoading, error, refetch };
+  const visible = active && snapshot.scope === scope;
+  return { messages: visible ? snapshot.messages : [], error: visible ? snapshot.error : null,
+    isLoading: active && (!visible || loadingScope === scope), refetch };
 }
 
 export interface RecruiterConversationActions {
