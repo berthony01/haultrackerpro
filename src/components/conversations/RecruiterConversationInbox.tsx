@@ -193,7 +193,7 @@ export function RecruiterConversationInbox({
                     onClick={() => { setSelection({ key: listKey, id: t.id }); onSelectedThreadChange?.(t.id); }}
                     data-testid="conversation-thread-item"
                     aria-current={selectedId === t.id}
-                    className={`block h-auto w-full min-h-[44px] whitespace-normal rounded-xl border p-3 text-left ${
+                    className={`block h-auto w-full min-h-[44px] whitespace-normal rounded-xl border p-3 text-left hover:bg-muted/50 hover:text-foreground ${
                       selectedId === t.id ? 'border-primary/50 bg-primary/5' : 'border-border/60'
                     }`}
                   >
