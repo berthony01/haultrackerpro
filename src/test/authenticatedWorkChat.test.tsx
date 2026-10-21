@@ -324,6 +324,46 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     expect(state.mutation).not.toHaveBeenCalled();
   });
 
+  it('ordinary Driver continues into the actual unsaved review and consumes the memory handoff once', async () => {
+    capability('active'); state.realWorkspace = true;
+    state.profiles['driver-a'] = fullProfile;
+    render(<QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/find-work']}><Location /><ReviewJourney /></MemoryRouter>
+    </QueryClientProvider>);
+    fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
+    fireEvent.click(await screen.findByTestId('home-conversation-continue'));
+    expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
+    expect(screen.getByDisplayValue('Houston')).toBeTruthy();
+    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(state.recruiterMount).not.toHaveBeenCalled();
+    expect(state.mutation).not.toHaveBeenCalled();
+    expect(state.model).not.toHaveBeenCalled();
+  });
+
+  it.each(['auth-swap', 'signout', 'revoked', 'error', 'loading', 'assistant'])('cancels a pending review on %s and does not resume it after recovery', async (condition) => {
+    capability('active', 'active'); state.access.effectiveRole = 'recruiter';
+    // Leave the canonical switch unresolved to exercise cancellation mid-handoff.
+    window.history.replaceState({}, '', HOME_INTAKE_NEXT_PATH);
+    const view = render(tree(<Index />));
+    expect(state.access.setViewMode).toHaveBeenCalledWith('driver');
+    expect(window.location.search).toContain('view=driver-profile');
+    if (condition === 'auth-swap') state.user = { id: 'driver-b' };
+    if (condition === 'signout') { state.user = null; state.access.effectiveRole = null; }
+    if (condition === 'revoked') capability('revoked', 'active');
+    if (condition === 'error') { state.access.error = new Error('unavailable'); state.access.effectiveRole = null; }
+    if (condition === 'loading') { state.access.isLoading = true; state.access.effectiveRole = null; }
+    if (condition === 'assistant') state.acting = true;
+    view.rerender(tree(<Index />));
+    expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
+    expect(sessionStorage.getItem('htp_opportunities_initial_view')).toBeNull();
+    expect(window.location.search).toBe('');
+    state.user = { id: 'driver-b' }; state.acting = false; capability('active');
+    view.rerender(tree(<Index />));
+    expect(await screen.findByTestId('existing-onboarding')).toBeTruthy();
+    expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
+    expect(state.mutation).not.toHaveBeenCalled();
+  });
+
   it('a generic Opportunities URL does not switch a dual-capability recruiter workspace', async () => {
     capability('active', 'active'); state.realWorkspace = true;
     localStorage.setItem('htp_view_mode:driver-a', 'recruiter');

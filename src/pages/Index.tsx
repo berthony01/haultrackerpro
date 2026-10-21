@@ -458,12 +458,6 @@ const Index = () => {
   // Requires an exact driver workspace: never infer driver from
   // !isRecruiterView or a null/unresolved effectiveRole.
   useEffect(() => {
-    const transition = driverProfileTransition.current;
-    if (transition) {
-      if (transition.phase === 'target') driverProfileTransition.current = null;
-      if (transition.userId === user?.id && !workspaceLoading && !workspaceError &&
-          driverWorkspaceAllowed && !isActingAsAssistant) return;
-    }
     if (workspaceLoading) return;
     if (workspaceError) return;
     if (effectiveRole !== 'driver') return;
@@ -714,6 +708,12 @@ const Index = () => {
   // through the pure dashboard policy. Replaces the exclusive-role guard
   // that used `useUserRole`.
   useEffect(() => {
+    const transition = driverProfileTransition.current;
+    if (transition) {
+      if (transition.phase === 'target') driverProfileTransition.current = null;
+      if (transition.userId === user?.id && !workspaceLoading && !workspaceError &&
+          driverWorkspaceAllowed && !isActingAsAssistant) return;
+    }
     if (workspaceLoading) return;
     if (!effectiveRole) return;
     const decision = resolveDashboardNavigation({
