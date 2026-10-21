@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
@@ -244,6 +244,8 @@ const Index = () => {
 
   // Handle checkout success return — refetch first, then track once subscription resolves
   const [pendingPurchaseTrack, setPendingPurchaseTrack] = useState(false);
+  // Navigation transaction only; current capability/render gates remain authoritative.
+  const driverProfileTransition = useRef<{ userId: string; phase: 'workspace' | 'target' } | null>(null);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
@@ -316,6 +318,17 @@ const Index = () => {
     // params only HINT; the pure dashboard policy authorizes the mount
     // once capabilities resolve. `htp_auth_intent` / `htp_recruiter_intent`
     // sessionStorage keys are no longer authorization inputs here.
+    const driverProfileHint = params.get('page') === 'opportunities' && params.get('view') === 'driver-profile';
+    if (driverProfileTransition.current && (
+      !driverProfileHint || driverProfileTransition.current.userId !== user?.id ||
+      workspaceLoading || workspaceError || !driverWorkspaceAllowed || !effectiveRole || isActingAsAssistant
+    )) {
+      driverProfileTransition.current = null;
+      if (driverProfileHint) {
+        window.history.replaceState({}, '', window.location.pathname);
+        return;
+      }
+    }
     if (workspaceLoading) return;
     const pageParam = params.get('page');
     const isRecruiterAccessParam =
@@ -365,7 +378,14 @@ const Index = () => {
           setPage('dashboard');
         }
       } else if (driverWorkspaceAllowed) {
-        if (view === 'driver-profile') setViewMode('driver');
+        if (view === 'driver-profile') {
+          if (!user?.id || workspaceError || !effectiveRole || isActingAsAssistant) return;
+          driverProfileTransition.current = { userId: user.id, phase: effectiveRole === 'driver' ? 'target' : 'workspace' };
+          if (effectiveRole !== 'driver') {
+            setViewMode('driver');
+            return; // Retain the hint until canonical Driver workspace resolution.
+          }
+        }
         setPage('opportunities');
         if (view === 'driver-profile') {
           try { sessionStorage.setItem('htp_opportunities_initial_view', 'driver-profile'); } catch {}
@@ -389,6 +409,8 @@ const Index = () => {
     subscription.isPro,
     subscription.planKey,
     workspaceLoading,
+    workspaceError,
+    isActingAsAssistant,
     effectiveRole,
     recruiterHubAllowed,
     recruiterOperationsAllowed,
@@ -686,6 +708,12 @@ const Index = () => {
   // through the pure dashboard policy. Replaces the exclusive-role guard
   // that used `useUserRole`.
   useEffect(() => {
+    const transition = driverProfileTransition.current;
+    if (transition) {
+      if (transition.phase === 'target') driverProfileTransition.current = null;
+      if (transition.userId === user?.id && !workspaceLoading && !workspaceError &&
+          driverWorkspaceAllowed && !isActingAsAssistant) return;
+    }
     if (workspaceLoading) return;
     if (!effectiveRole) return;
     const decision = resolveDashboardNavigation({
