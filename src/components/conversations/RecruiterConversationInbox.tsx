@@ -9,6 +9,7 @@
  * Peer identity is neutral ("Driver") — no profile, auth.users, or
  * driver_opportunity_profiles lookup exists in this component.
  */
+import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,9 @@ interface Props {
   canView: boolean;
   canReply: boolean;
   onBack?: () => void;
+  includeHistory?: boolean;
+  selectedThreadId?: string | null;
+  onSelectedThreadChange?: (id: string) => void;
 }
 
 /**
@@ -79,13 +83,24 @@ export function RecruiterConversationInbox({
   canView,
   canReply,
   onBack,
+  includeHistory = false,
+  selectedThreadId,
+  onSelectedThreadChange,
 }: Props) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [reply, setReply] = useState('');
+  const { user } = useAuth();
+  const listKey = JSON.stringify([user?.id, recruiterId, canView]);
+  const [selection, setSelection] = useState<{ key: string; id: string | null }>({ key: listKey, id: null });
+  const selectedId = selectedThreadId !== undefined ? selectedThreadId : selection.key === listKey ? selection.id : null;
+  const replyKey = JSON.stringify([listKey, selectedId, canReply]);
+  const currentReplyKey = useRef(replyKey);
+  currentReplyKey.current = replyKey;
+  const [replyState, setReplyState] = useState({ key: replyKey, value: '' });
+  const reply = replyState.key === replyKey ? replyState.value : '';
+  const setReply = (value: string) => setReplyState({ key: replyKey, value });
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const { threads, opportunityTitles, isLoading, error, refetch } =
-    useRecruiterConversationThreads(recruiterId, canView);
+    useRecruiterConversationThreads(recruiterId, canView, includeHistory);
   const selected = useMemo(
     () => threads.find((t) => t.id === selectedId) ?? null,
     [threads, selectedId],
@@ -93,6 +108,7 @@ export function RecruiterConversationInbox({
   const {
     messages,
     isLoading: messagesLoading,
+    error: messagesError,
     refetch: refetchMessages,
   } = useConversationMessages(selected?.id ?? null, canView && !!selected);
 
@@ -121,7 +137,7 @@ export function RecruiterConversationInbox({
   const handleReply = async () => {
     if (!selected) return;
     await replyToThread(selected.id, reply);
-    setReply('');
+    if (currentReplyKey.current === replyKey) setReply('');
   };
 
   return (
@@ -148,9 +164,9 @@ export function RecruiterConversationInbox({
         )}
       </div>
 
-      {(error || actionError) && (
+      {(error || actionError || messagesError) && (
         <p role="alert" className="mb-3 text-sm text-destructive break-words">
-          {error ?? actionError}
+          {error ?? messagesError ?? actionError}
         </p>
       )}
 
@@ -160,7 +176,7 @@ export function RecruiterConversationInbox({
         </div>
       ) : threads.length === 0 ? (
         <p className="text-sm text-muted-foreground" data-testid="conversation-empty">
-          No open driver conversations yet.
+          {includeHistory ? 'No driver conversations yet.' : 'No open driver conversations yet.'}
         </p>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_1fr]">
@@ -173,7 +189,7 @@ export function RecruiterConversationInbox({
                 <li key={t.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedId(t.id)}
+                    onClick={() => { setSelection({ key: listKey, id: t.id }); onSelectedThreadChange?.(t.id); }}
                     data-testid="conversation-thread-item"
                     aria-current={selectedId === t.id}
                     className={`w-full min-h-[44px] rounded-xl border p-3 text-left ${
@@ -191,7 +207,7 @@ export function RecruiterConversationInbox({
                         variant={t.status === 'requested' ? 'default' : 'outline'}
                         className="text-[10px]"
                       >
-                        {t.status === 'requested' ? 'Requested' : 'Active'}
+                        {t.status === 'requested' ? 'Requested' : t.status === 'active' ? 'Active' : t.status === 'closed' ? 'Closed' : 'Declined'}
                       </Badge>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground break-words">{title}</p>
