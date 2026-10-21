@@ -47,7 +47,7 @@ import { CarrierSettlementsPanel } from '@/components/settlements/CarrierSettlem
 // Phase RC-1J-D — owner Team panel, mounted on demand only.
 import { RecruiterTeamPanel } from '@/components/recruiter/RecruiterTeamPanel';
 // Phase CF-1B — owner Conversation Inbox, mounted on demand only.
-import { RecruiterConversationInbox } from '@/components/conversations/RecruiterConversationInbox';
+import { useNavigate } from 'react-router-dom';
 
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
@@ -82,6 +82,7 @@ interface Props {
 }
 
 export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onApplications }: Props) {
+  const navigate = useNavigate();
   const { profile, isLoading: profileLoading } = useRecruiterProfile();
   const billing = useRecruiterBilling();
   const { isBillingActive, plan, status, isLoading: billingLoading } = billing;
@@ -164,7 +165,6 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   const [teamOpen, setTeamOpen] = useState(false);
   // Phase CF-1B: owner Conversation Inbox mounts on demand only — same
   // low-risk pattern as settlements/team. Server RPC authority remains final.
-  const [conversationsOpen, setConversationsOpen] = useState(false);
   const readiness = resolveRecruiterReadiness(profile);
 
   const handlePost = () => {
@@ -358,8 +358,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               onToggleSettlements={() => setSettlementsOpen((v) => !v)}
               teamOpen={teamOpen}
               onToggleTeam={() => setTeamOpen((v) => !v)}
-              conversationsOpen={conversationsOpen}
-              onToggleConversations={() => setConversationsOpen((v) => !v)}
+              onOpenConversations={() => navigate('/conversations?workspace=recruiter')}
             />
 
             {settlementsOpen && (
@@ -384,19 +383,6 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                 />
               </div>
             )}
-
-            {conversationsOpen && profile?.id && (
-              <div data-testid="recruiter-conversations-anchor" className="scroll-mt-24">
-                <RecruiterConversationInbox
-                  recruiterId={profile.id}
-                  companyName={profile.company_name ?? 'Your workspace'}
-                  canView
-                  canReply
-                />
-              </div>
-            )}
-
-
 
             <RecentPosts
               loading={oppsLoading}
@@ -532,8 +518,7 @@ function ToolsGrid({
   onToggleSettlements,
   teamOpen,
   onToggleTeam,
-  conversationsOpen,
-  onToggleConversations,
+  onOpenConversations,
 }: {
   canPost: boolean;
   newRequests: number;
@@ -544,8 +529,7 @@ function ToolsGrid({
   onToggleSettlements: () => void;
   teamOpen: boolean;
   onToggleTeam: () => void;
-  conversationsOpen: boolean;
-  onToggleConversations: () => void;
+  onOpenConversations: () => void;
 }) {
   return (
     <Card className="p-5 border-border/60">
@@ -603,8 +587,8 @@ function ToolsGrid({
           icon={MessageSquare}
           title="Conversation Inbox"
           body="Talk directly with drivers who reached out about your opportunities."
-          cta={conversationsOpen ? 'Hide Conversations' : 'Open Conversations'}
-          onClick={onToggleConversations}
+          cta="Open Conversations"
+          onClick={onOpenConversations}
         />
 
 

@@ -1,3 +1,9 @@
+import { Link } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { useViewMode } from '@/hooks/useViewMode';
+import { useActingContext } from '@/hooks/useActingContext';
+import { useRecruiterConversationThreads } from '@/hooks/conversations/useConversations';
+import { conversationUrl, matchingConversation } from '@/lib/conversations/conversationNavigation';
 import { useMemo, useState } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -112,6 +118,13 @@ function fmtDate(d?: string | null) {
 
 export function RecruiterApplicationsDashboard({ onBack }: Props) {
   const { profile, canPost, isSuspended, isLoading: recruiterLoading } = useRecruiterProfile();
+  const { user } = useAuth();
+  const access = useViewMode();
+  const { isActingAsAssistant } = useActingContext();
+  const conversationsAllowed = !access.isLoading && !access.error && !isActingAsAssistant &&
+    access.recruiterAccessKind === 'capability' && access.recruiterCapabilityStatus === 'active' &&
+    access.recruiterOperationsAllowed && !recruiterLoading && !isSuspended && canPost && profile?.user_id === user?.id;
+  const { threads } = useRecruiterConversationThreads(profile?.id, conversationsAllowed, true);
   const recruiterBilling = useRecruiterBilling();
   const canUseContractWorkflow = recruiterBilling.canUseContractWorkflowTools === true;
   const {
@@ -260,6 +273,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
             opportunityFinancials: calculateOpportunityFinancials(opp),
           })
         : null;
+    const conversation = matchingConversation(threads, a.opportunity_id, a.driver_user_id, profile?.id);
     const allowed = getAllowedRecruiterTransitions(a.status);
     const isOpen = !!expandedTimeline[a.id];
     return (
@@ -347,6 +361,8 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
             </>
           );
         })()}
+
+        {conversation && <Button asChild variant="outline" size="sm" className="mb-3"><Link to={conversationUrl('recruiter', conversation.id)}>View Conversation</Link></Button>}
 
         {allowed.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">

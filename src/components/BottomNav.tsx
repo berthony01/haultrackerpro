@@ -19,6 +19,7 @@ import {
   BarChart3,
   ArrowLeftRight,
   ReceiptText,
+  MessageSquare,
 } from 'lucide-react';
 import {
   Sheet,
@@ -127,6 +128,7 @@ export function BottomNav(props: BottomNavProps) {
   type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
 
   const driverMoreItemsFull: MoreItem[] = [
+    { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=driver') },
     { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
     { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Review, approve, request changes, sign.' },
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
@@ -159,6 +161,7 @@ export function BottomNav(props: BottomNavProps) {
   ].filter(Boolean) as MoreItem[];
 
   const recruiterActiveMoreItems: MoreItem[] = [
+    { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=recruiter') },
     { label: 'Recruiter Command Center', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },

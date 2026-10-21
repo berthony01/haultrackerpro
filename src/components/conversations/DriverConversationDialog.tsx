@@ -5,6 +5,8 @@
  * through CF-1A RPCs via `useConversations`. The peer is labeled neutrally as
  * "Recruiter" — no profile, auth.users, or driver-profile lookup exists here.
  */
+import { useAuth } from '@/hooks/useAuth';
+import { conversationUrl } from '@/lib/conversations/conversationNavigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -25,6 +27,7 @@ interface Props {
   opportunityId: string;
   opportunityTitle: string;
   companyName?: string | null;
+  existingThreadId?: string | null;
 }
 
 function MessageRow({ message }: { message: ConversationMessage }) {
@@ -56,6 +59,7 @@ export function DriverConversationDialog({
   opportunityId,
   opportunityTitle,
   companyName,
+  existingThreadId,
 }: Props) {
   const {
     thread,
@@ -66,10 +70,18 @@ export function DriverConversationDialog({
     startConversation,
     sendMessage,
     closeConversation,
-  } = useDriverOpportunityConversation(opportunityId, open);
+  } = useDriverOpportunityConversation(opportunityId, open, existingThreadId);
 
-  const [draft, setDraft] = useState(DEFAULT_INITIAL_MESSAGE);
-  const [reply, setReply] = useState('');
+  const { user } = useAuth();
+  const inputKey = JSON.stringify([user?.id, opportunityId, existingThreadId, thread?.id, open]);
+  const currentInputKey = useRef(inputKey);
+  currentInputKey.current = inputKey;
+  const [draftState, setDraftState] = useState({ key: inputKey, value: DEFAULT_INITIAL_MESSAGE });
+  const [replyState, setReplyState] = useState({ key: inputKey, value: '' });
+  const draft = draftState.key === inputKey ? draftState.value : DEFAULT_INITIAL_MESSAGE;
+  const reply = replyState.key === inputKey ? replyState.value : '';
+  const setDraft = (value: string) => setDraftState({ key: inputKey, value });
+  const setReply = (value: string) => setReplyState({ key: inputKey, value });
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -87,7 +99,7 @@ export function DriverConversationDialog({
     if (!thread) return null;
     if (thread.status === 'requested') return 'Waiting for recruiter';
     if (thread.status === 'active') return 'Connected';
-    return null;
+    return thread.status === 'closed' ? 'Closed' : 'Declined';
   }, [thread]);
 
   const handleStart = async () => {
@@ -101,7 +113,7 @@ export function DriverConversationDialog({
   const handleSend = async () => {
     try {
       await sendMessage(reply);
-      setReply('');
+      if (currentInputKey.current === inputKey) setReply('');
     } catch {
       /* error surfaced through hook state */
     }
@@ -121,6 +133,10 @@ export function DriverConversationDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {thread && (
+          <Button asChild variant="outline" size="sm"><a href={conversationUrl('driver', thread.id)}>Open Conversations</a></Button>
+        )}
+
         {statusLabel && (
           <Badge variant="outline" className="w-fit" data-testid="conversation-status">
             {statusLabel}
@@ -137,6 +153,8 @@ export function DriverConversationDialog({
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading" />
           </div>
+        ) : !thread && (existingThreadId !== undefined || error) ? (
+          <p role="status" className="text-sm text-muted-foreground">Conversation unavailable.</p>
         ) : !thread ? (
           <div className="space-y-3">
             <label htmlFor="cf1b-initial-message" className="text-sm font-semibold text-foreground">
@@ -170,6 +188,7 @@ export function DriverConversationDialog({
               <div ref={bottomRef} />
             </div>
 
+            {(thread.status === 'active' || thread.status === 'requested') && <>
             <Textarea
               aria-label="Message the recruiter"
               value={reply}
@@ -189,13 +208,14 @@ export function DriverConversationDialog({
               </Button>
               <Button
                 variant="outline"
-                onClick={() => void closeConversation()}
+                onClick={() => void closeConversation().catch(() => undefined)}
                 disabled={isBusy}
                 className="flex-1 min-h-[44px]"
               >
                 Close Conversation
               </Button>
             </div>
+            </>}
           </div>
         )}
       </DialogContent>

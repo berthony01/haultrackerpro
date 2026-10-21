@@ -44,6 +44,7 @@ function lazyWithRetry<T extends React.ComponentType<any>>(
 }
 
 // Everything else — lazy loaded
+const Conversations = lazyWithRetry(() => import("./pages/Conversations"), "Conversations");
 const Index = lazyWithRetry(() => import("./pages/Index"), "Index");
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -219,6 +220,7 @@ const App = () => (
             <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/" element={<PublicRoute><Landing /></PublicRoute>} />
+              <Route path="/conversations" element={<ProtectedRoute><Conversations /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/landing" element={<Navigate to="/" replace />} />
               {/* Legacy/preview aliases — keep deep links and stale preview URLs working */}
