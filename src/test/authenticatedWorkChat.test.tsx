@@ -297,10 +297,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
     fireEvent.click(await screen.findByTestId('home-conversation-continue'));
     expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
-    await waitFor(() => {
-      if (!screen.queryByTestId('driver-profile-pending-review-note')) console.log('DESTINATION', document.body.textContent, localStorage.getItem('htp_view_mode:driver-a'), sessionStorage.getItem('htp_opportunities_initial_view'));
-      expect(screen.getByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
-    });
+    expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
     expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('driver');
     expect(screen.queryByTestId('recruiter-hub')).toBeNull();
