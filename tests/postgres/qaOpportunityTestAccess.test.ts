@@ -111,6 +111,8 @@ beforeAll(async () => {
       ('recruiter_profile','${qaR}','${admin}','${admin}'),('recruiter_profile','${qaR2}','${nonAdminQaOwner}','${admin}');`);
   baseline = await snapshot();
   aclBefore = (await db.query("SELECT p.oid::regprocedure::text s, p.proacl::text a, p.provolatile v, p.prosecdef d, p.proconfig c FROM pg_proc p WHERE proname IN ('list_driver_visible_opportunities','driver_can_access_opportunity') ORDER BY 1")).rows;
+  // Simulate production pg_default_acl for postgres-created functions in public.
+  await db.exec('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon, authenticated, service_role;');
   await db.exec(sql);
 }, 60000);
 afterAll(async () => { await db?.close(); });
@@ -150,6 +152,26 @@ describe('privileges', () => {
     await expect(as(null, () => db.query(`SELECT public._qa_opportunity_test_access_allowed('${oQa}')`), 'anon')).rejects.toThrow(/permission denied/);
     await expect(grant(null, oQa, tester, 30, 'anon')).rejects.toThrow(/permission denied/);
     await expect(as(null, () => db.query(`SELECT public.revoke_qa_opportunity_test_access('${oQa}','${tester}')`), 'anon')).rejects.toThrow(/permission denied/);
+  });
+});
+
+describe('function ACLs under production default privileges', () => {
+  const can = async (role: string, fn: string) =>
+    (await db.query<any>('SELECT has_function_privilege($1,$2,\'EXECUTE\') ok', [role, fn])).rows[0].ok;
+  it('internal helper has no direct EXECUTE for anon/authenticated/service_role/PUBLIC', async () => {
+    for (const r of ['anon', 'authenticated', 'service_role']) expect(await can(r, 'public._qa_opportunity_test_access_allowed(uuid)')).toBe(false);
+    const { rows } = await db.query<any>("SELECT proacl::text a FROM pg_proc WHERE oid='public._qa_opportunity_test_access_allowed(uuid)'::regprocedure");
+    expect(rows[0].a).not.toMatch(/(^|[{,])=X/);
+  });
+  it('management functions: authenticated/service_role yes, anon no', async () => {
+    for (const fn of ['public.grant_qa_opportunity_test_access(uuid,uuid,integer)', 'public.revoke_qa_opportunity_test_access(uuid,uuid)']) {
+      expect(await can('authenticated', fn)).toBe(true);
+      expect(await can('service_role', fn)).toBe(true);
+      expect(await can('anon', fn)).toBe(false);
+    }
+  });
+  it('direct service_role invocation of internal helper denied', async () => {
+    await expect(as(tester, () => db.query(`SELECT public._qa_opportunity_test_access_allowed('${oQa}')`), 'service_role')).rejects.toThrow(/permission denied/);
   });
 });
 

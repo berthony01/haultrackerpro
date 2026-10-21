@@ -153,7 +153,7 @@ AS $function$
   )
 $function$;
 
-REVOKE ALL ON FUNCTION public._qa_opportunity_test_access_allowed(uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public._qa_opportunity_test_access_allowed(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 -- ---------------------------------------------------------------------------
 -- Existing visibility functions: identical except the added OR branch.
