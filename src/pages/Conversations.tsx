@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -19,6 +20,10 @@ function OwnerInbox({ selectedThreadId, onSelect }: { selectedThreadId: string |
 }
 
 export default function Conversations() {
+  useEffect(() => {
+    document.body.classList.add('app-shell-active');
+    return () => document.body.classList.remove('app-shell-active');
+  }, []);
   const { user, loading } = useAuth();
   const access = useViewMode();
   const acting = useActingContext();
@@ -38,7 +43,7 @@ export default function Conversations() {
   };
   const allowed = workspace === 'driver' ? driverAllowed : workspace === 'recruiter' ? recruiterAllowed : false;
   return (
-    <main className="min-h-screen bg-background text-foreground">
+    <main className="app-shell min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
         <header className="space-y-3">
           <h1 className="text-2xl font-bold">Conversations</h1>
