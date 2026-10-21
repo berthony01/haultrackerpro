@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, renderHook, screen, waitFor, cleanup } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
@@ -337,5 +338,43 @@ describe('rendered application handoffs', () => {
     render(<MemoryRouter><DriverApplicationsPanel onBack={vi.fn()} /></MemoryRouter>);
     await waitFor(() => expect(state.calls.filter(c => c.table === 'conversation_threads')).toHaveLength(1));
     expect(screen.queryByRole('link', { name: 'View Conversation' })).toBeNull(); expect(state.rpc).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('additional lifecycle invariants', () => {
+  it('StrictMode replay still resolves current allowed threads', async () => {
+    state.threads = [thread()];
+    const hook = renderHook(() => useDriverConversationThreads(true), { wrapper: ({ children }) => <StrictMode>{children}</StrictMode> });
+    await waitFor(() => expect(hook.result.current.threads[0]?.id).toBe(T1));
+  });
+  it('auth change synchronously clears messages and disabled read stays empty', async () => {
+    state.messages = [{ id: 'm1', thread_id: T1, body: 'First account' }];
+    const hook = renderHook(({ enabled }) => useConversationMessages(T1, enabled), { initialProps: { enabled: true } });
+    await waitFor(() => expect(hook.result.current.messages).toHaveLength(1));
+    state.user = { id: 'driver-b' }; state.messages = []; hook.rerender({ enabled: true });
+    expect(hook.result.current.messages).toEqual([]);
+    hook.rerender({ enabled: false }); expect(hook.result.current.messages).toEqual([]);
+  });
+  it('late message completion after unmount is ignored', async () => {
+    const late = deferred(); state.deferred = { table: 'conversation_messages', promise: late.promise };
+    const hook = renderHook(() => useConversationMessages(T1, true));
+    await waitFor(() => expect(state.calls).toHaveLength(1)); hook.unmount();
+    await act(async () => late.resolve({ data: [{ id: 'late', body: 'Old' }], error: null }));
+    expect(state.calls).toHaveLength(1);
+  });
+  it('driver exact thread switch clears prior reply and messages', async () => {
+    state.threads = [thread(T1, 'driver-a', 'recruiter-a', 'active'), thread(T2, 'driver-a', 'recruiter-a', 'active')];
+    state.messages = [{ id: 'm1', thread_id: T1, sender_actor_type: 'recruiter', body: 'First driver thread' }];
+    const view = render(<DriverConversationDialog open onOpenChange={vi.fn()} opportunityId="opportunity-a" opportunityTitle="Listing" existingThreadId={T1} />);
+    await screen.findByText('First driver thread'); fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Old reply' } });
+    state.messages = [{ id: 'm2', thread_id: T2, sender_actor_type: 'recruiter', body: 'Second driver thread' }];
+    view.rerender(<DriverConversationDialog open onOpenChange={vi.fn()} opportunityId="opportunity-a" opportunityTitle="Listing" existingThreadId={T2} />);
+    expect(screen.queryByText('First driver thread')).toBeNull(); await screen.findByText('Second driver thread'); expect(screen.getByRole('textbox')).toHaveValue('');
+  });
+  it('selected owner message failure is surfaced without leaking server text', async () => {
+    state.threads = [thread()]; state.errorTable = 'conversation_messages';
+    render(<RecruiterConversationInbox recruiterId="recruiter-a" canView canReply includeHistory selectedThreadId={T1} />);
+    await screen.findByRole('alert'); expect(screen.getByRole('alert')).toHaveTextContent('Unable to load messages.'); expect(screen.queryByText('private SQL detail')).toBeNull();
   });
 });
