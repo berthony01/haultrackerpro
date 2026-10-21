@@ -276,7 +276,7 @@ describe('exact existing mode versus opportunity start mode', () => {
     expect(screen.queryByRole('link', { name: 'Open Conversations' })).toBeNull(); expect(state.rpc).not.toHaveBeenCalled();
   });
   it('opportunity mode links its existing thread without starting a conversation', async () => {
-    state.threads = [thread()];
+    state.threads = [thread(T1, 'driver-a', 'recruiter-a', 'active')];
     render(<DriverConversationDialog open onOpenChange={vi.fn()} opportunityId="opportunity-a" opportunityTitle="Opportunity" />);
     expect(await screen.findByRole('link', { name: 'Open Conversations' })).toHaveAttribute('href', conversationUrl('driver', T1));
     expect(screen.queryByRole('button', { name: 'Start Conversation' })).toBeNull();
