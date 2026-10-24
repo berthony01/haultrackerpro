@@ -91,12 +91,18 @@ describe('HJ-1A actual candidate owner-only SQL/roles/lifecycle',()=> {
    for(const table of ['driver_job_search_cards','job_search_card_events']) for(const privilege of ['SELECT','INSERT','UPDATE','DELETE']) expect((await db.query('SELECT has_table_privilege($1,$2,$3) AS allowed',[role,`job_search_private.${table}`,privilege])).rows[0].allowed).toBe(false);
    expect((await db.query("SELECT has_schema_privilege($1,'job_search_private','CREATE') AS allowed",[role])).rows[0].allowed).toBe(false);
   }
-  expect((await db.query("SELECT nspacl::text FROM pg_namespace WHERE nspname='job_search_private'")).rows[0].nspacl).not.toContain('=U/');
+  expect((await db.query("SELECT * FROM aclexplode((SELECT nspacl FROM pg_namespace WHERE nspname='job_search_private')) WHERE grantee=0")).rows).toEqual([]);
  });
  it('wrapper invoker/private definer with pinned path and only authenticated execute',async()=> {
   const rows=(await db.query("SELECT n.nspname,p.prosecdef,p.proconfig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE p.proname='manage_my_job_search_card' ORDER BY n.nspname")).rows;
   expect(rows).toEqual([{nspname:'job_search_private',prosecdef:true,proconfig:['search_path=pg_catalog, public, auth, job_search_private']},{nspname:'public',prosecdef:false,proconfig:['search_path=pg_catalog, public, auth, job_search_private']}]);
   for(const schema of ['public','job_search_private']) for(const role of ['anon','authenticated','service_role']) expect((await db.query('SELECT has_function_privilege($1,$2,\'EXECUTE\') AS allowed',[role,`${schema}.manage_my_job_search_card(text,jsonb,integer,uuid,text)`])).rows[0].allowed).toBe(role==='authenticated');
+ });
+ it('authenticated SQL cannot read or mutate either private table directly',async()=>{
+  for(const table of ['driver_job_search_cards','job_search_card_events']) {
+   await db.query('BEGIN');try {await db.query('SET LOCAL ROLE authenticated');await expect(db.query(`SELECT * FROM job_search_private.${table}`)).rejects.toMatchObject({code:'42501'});}finally{await db.query('ROLLBACK');}
+   await db.query('BEGIN');try {await db.query('SET LOCAL ROLE authenticated');await expect(db.query(`DELETE FROM job_search_private.${table}`)).rejects.toMatchObject({code:'42501'});}finally{await db.query('ROLLBACK');}
+  }
  });
  it('get missing is null and write free',async()=>{expect(await command(users.driver)).toBeNull();expect(await counts()).toEqual({cards:0,events:0});});
  it('publishes narrow owner snapshot, 14 days, positive revision and server consent',async()=>{const c=await publish();expect(c.payload).toEqual(payload);expect(c.revision).toBe(1);expect(c.status).toBe('published');expect(c.audience).toBe('approved_recruiters');expect(c.consent_version).toBe('job_search_card_v1');expect(new Date(c.expires_at).getTime()-new Date(c.published_at).getTime()).toBe(14*86400000);expect(c).not.toHaveProperty('owner_user_id');expect(c.payload).not.toHaveProperty('private_contact');});
@@ -121,6 +127,8 @@ describe('HJ-1A actual candidate owner-only SQL/roles/lifecycle',()=> {
  for(const [i,p] of invalid.entries()) it(`SQL/pure reject malformed payload ${i}`,async()=>{expect(()=>validateJobSearchCardPayload(p)).toThrow();await expect(publish(users.driver,p)).rejects.toMatchObject({code:'22023'});expect(await counts()).toEqual({cards:0,events:0});});
  for(const key of Object.keys(payload)) it(`SQL requires ${key}`,async()=>{const p:Record<string,unknown>={...payload};delete p[key];await expect(publish(users.driver,p)).rejects.toMatchObject({code:'22023'});});
  it('SQL optional/boundary values mirror pure review',async()=>{const p={...payload,state:'DC',years_experience:60,available_start_date:'2028-02-29',min_weekly_gross:100000,preferred_driver_type:'Team',trailer_experience:['Reefer','Dry Van']};expect((await publish(users.driver,p)).payload).toEqual(validateJobSearchCardPayload(p));});
+ it('SQL exact zero and omitted gross are not missing-value coercions',async()=>{const c=await publish(users.driver,{...payload,years_experience:0,experience_qualifier:'exact'});expect(c.payload.years_experience).toBe(0);expect(c.payload).not.toHaveProperty('min_weekly_gross');});
+ it('receipt for absent withdrawal cannot change a later publication',async()=>{const id=randomUUID();await command(users.driver,'withdraw',null,0,id);await publish();expect((await command(users.driver,'withdraw',null,0,id)).status).toBe('published');expect(await counts()).toEqual({cards:1,events:2});});
  it('unknown action/extra arguments/missing revision/command fail closed',async()=>{for(const action of ['edit','GET','',null]) await expect(command(users.driver,action as string)).rejects.toMatchObject({code:'22023'});await expect(command(users.driver,'get',payload)).rejects.toMatchObject({code:'22023'});await expect(command(users.driver,'publish',payload,null,randomUUID(),'job_search_card_v1')).rejects.toMatchObject({code:'22023'});await expect(command(users.driver,'publish',payload,0,null,'job_search_card_v1')).rejects.toMatchObject({code:'22023'});await expect(command(users.driver,'withdraw',payload,0,randomUUID())).rejects.toMatchObject({code:'22023'});});
  it('events contain only receipts, no arbitrary request/profile/contact/transcript',async()=>{await publish();const e=(await db.query('SELECT * FROM job_search_private.job_search_card_events')).rows[0];expect(Object.keys(e).sort()).toEqual(['action','card_id','client_command_id','consent_version','created_at','id','input_fingerprint','owner_user_id','revision'].sort());expect(e.input_fingerprint).toMatch(/^[0-9a-f]{32}$/);expect(JSON.stringify(e)).not.toContain('Weekly');expect(JSON.stringify(e)).not.toContain('never publish');});
  it('candidate preserves existing inventories and profile/sentinel rows',async()=>{await publish();await command(users.driver,'withdraw',null,1,randomUUID());expect(await inventory()).toEqual(before);expect((await db.query('SELECT * FROM public.existing_surface_sentinel')).rows).toEqual([{id:1,secret:'unchanged'}]);expect((await db.query('SELECT private_contact FROM public.driver_opportunity_profiles')).rows).toEqual([{private_contact:'never publish this contact'}]);});
@@ -131,4 +139,16 @@ describe('HJ-1A REAL PostgreSQL concurrent sessions',()=>{
  it('concurrent identical retry publishes once',async()=>{const [a,b]=await pair();try{const id=randomUUID();const r=await Promise.all([publish(users.driver,payload,0,id,false,a),publish(users.driver,payload,0,id,false,b)]);expect(r[0]).toEqual(r[1]);expect(await counts()).toEqual({cards:1,events:1});}finally{await a.end();await b.end();}});
  it('concurrent pause/withdraw exact revision serializes one winner',async()=>{await publish();const [a,b]=await pair();try{const r=await Promise.allSettled([command(users.driver,'pause',null,1,randomUUID(),null,'authenticated',false,a),command(users.driver,'withdraw',null,1,randomUUID(),null,'authenticated',false,b)]);expect(r.filter(x=>x.status==='fulfilled')).toHaveLength(1);expect((await command(users.driver)).revision).toBe(2);expect(await counts()).toEqual({cards:1,events:2});}finally{await a.end();await b.end();}});
  it('concurrent altered replay never silently overwrites',async()=>{const [a,b]=await pair();try{const id=randomUUID();const r=await Promise.allSettled([publish(users.driver,payload,0,id,false,a),publish(users.driver,{...payload,state:'CA'},0,id,false,b)]);expect(r.filter(x=>x.status==='fulfilled')).toHaveLength(1);const f=r.find(x=>x.status==='rejected');expect(f?.status==='rejected' && f.reason.code).toBe('22023');expect(await counts()).toEqual({cards:1,events:1});}finally{await a.end();await b.end();}});
+ it('late publication retry waits for withdrawal lock then reads withdrawn state',async()=>{
+  const id=randomUUID();await publish(users.driver,payload,0,id);const [a,b]=await pair();
+  try {
+   await a.query('BEGIN');await a.query('SET LOCAL ROLE authenticated');await a.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users.driver]);
+   await a.query("SELECT public.manage_my_job_search_card('withdraw',NULL,1,$1::uuid,NULL)",[randomUUID()]);
+   const retry=publish(users.driver,payload,0,id,false,b);
+   const pid=(await db.query("SELECT pid FROM pg_stat_activity WHERE application_name='hj1a_waiter'")).rows;
+   // Observe real lock contention rather than treating embedded serialization as proof.
+   let blocked=false;for(let i=0;i<100;i++){const r=await db.query("SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT public.manage_my_job_search_card%' AND pid<>pg_backend_pid()");if(r.rowCount){blocked=true;break;}await new Promise(resolve=>setTimeout(resolve,5));}
+   expect(blocked).toBe(true);expect(pid).toEqual([]);await a.query('COMMIT');expect((await retry).status).toBe('withdrawn');expect(await counts()).toEqual({cards:1,events:2});
+  }finally{await a.query('ROLLBACK');await a.end();await b.end();}
+ });
 });
