@@ -559,6 +559,18 @@ it('roles, owner scope, canonical recruiter gates, and metadata forgery are deni
   expect((await rpc('list_recruiter_job_search_cards', { _recruiter_id: workspace }, sessions.recruiter.access_token)).data.code).toBe('42501');
   await db.query("UPDATE public.recruiter_profiles SET verification_status='approved' WHERE id=$1", [workspace]);
   expect((await own('other'))).toBe(null);
+  // Live catalog parity proof for the canonical setup RPC: authenticated may
+  // execute, anon may not, and a real driver caller gets capability_missing
+  // with no mutation (mutation-freedom proven by the final inventory check).
+  const acl = (await db.query(`SELECT p.proacl::text AS acl FROM pg_proc p
+    JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.proname='ensure_my_recruiter_setup_state'`)).rows[0].acl;
+  expect(acl).toContain('authenticated=X');
+  expect(acl).not.toContain('anon=X');
+  const heal = await rpc('ensure_my_recruiter_setup_state', {}, sessions.driver.access_token);
+  expect(heal.status).toBe(200);
+  expect(heal.data[0].eligibility_state).toBe('capability_missing');
+  expect((await rpc('ensure_my_recruiter_setup_state', {}, jwt('anon'))).status).toBeGreaterThanOrEqual(400);
 });
 
 it('actual lifecycle HTTP receipts: validation, TTL, isolation, idempotency and current-state replay', async () => {
@@ -767,6 +779,8 @@ it('final fixture inventory and unrelated synthetic state unchanged; no external
   // those caller-only calls mutated nothing.
   console.log('Self-heal calls by actor:', [...selfHealActors].join(',') || 'none', `(total ${selfHealCalls})`);
   expect(selfHealActors.has('recruiter')).toBe(false);
+  // Only the expected synthetic driver/assistant may ever appear as callers.
+  expect([...selfHealActors].every(actor => actor === 'driver' || actor === 'assistant')).toBe(true);
 });
 
 afterAll(async () => {
