@@ -680,9 +680,14 @@ it('connected unknown publication retains exact command after real response loss
   try {
     await page.getByRole('button',{name:'Retry same request',exact:true}).click();
   } catch (failure) {
+    sampling = false;
+    await sampler;
+    console.log('[unknown-timeline]', JSON.stringify(timeline, null, 1));
     await dumpReviewDiagnostics(page, 'retry-absent');
     throw failure;
   }
+  sampling = false;
+  await sampler;
   await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
   expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
     [droppedCommand])).rows[0].n).toBe(1);
