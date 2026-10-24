@@ -661,7 +661,12 @@ it('connected unknown publication retains exact command after real response loss
   const card = await own('driver');
   expect(card.status).toBe('published');
   await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
-  await page.getByRole('button',{name:'Retry same request',exact:true}).click();
+  try {
+    await page.getByRole('button',{name:'Retry same request',exact:true}).click();
+  } catch (failure) {
+    await dumpReviewDiagnostics(page, 'retry-absent');
+    throw failure;
+  }
   await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
   expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
     [droppedCommand])).rows[0].n).toBe(1);
