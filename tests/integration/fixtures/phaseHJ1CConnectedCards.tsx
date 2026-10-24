@@ -117,7 +117,22 @@ function ConnectedShell() {
         {acting.isActingAsAssistant && <Button onClick={acting.exitActingAs}>Return to personal account</Button>}
       </nav>
       <p role="status">{notice}</p>
-      {reviewing && <DriverJobSearchCard key={auth.user.id} />}
+      {/* Test-only diagnostics: existing hook values only, no tokens/capability constants. */}
+      <div data-testid="hj1c-diag" style={{ display: 'none' }}>
+        {JSON.stringify({
+          authLoading: auth.loading,
+          sessionMatch: auth.session?.user.id === auth.user.id,
+          actingLoading: acting.isLoadingManagedDrivers,
+          actingAs: acting.isActingAsAssistant,
+          viewLoading: view.isLoading,
+          viewError: Boolean(view.error),
+          effectiveRole: view.effectiveRole,
+          driverCap: view.driverCapabilityStatus,
+          canSwitch: view.canSwitch,
+          reviewing,
+        })}
+      </div>
+      {reviewing && <MountProbe><DriverJobSearchCard key={auth.user.id} /></MountProbe>}
       {recruiter.profile && (
         <>
           <Button onClick={() => setPool(true)}>Open available drivers</Button>
