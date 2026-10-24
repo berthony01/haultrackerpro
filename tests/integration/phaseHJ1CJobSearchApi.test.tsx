@@ -327,8 +327,8 @@ beforeAll(async () => {
   originalInventory = await inventory();
   originalSentinels = await preservation();
   safeFile(HJ1C_ROOT + '/runtime/index.html', '<div id="root"></div><script type="module" src="/entry.tsx"></script>');
-  safeFile(HJ1C_ROOT + '/runtime/entry.tsx', `import React from '/dev-server/node_modules/react';
-    import {createRoot} from '/dev-server/node_modules/react-dom/client';
+  safeFile(HJ1C_ROOT + '/runtime/entry.tsx', `import React from 'react';
+    import {createRoot} from 'react-dom/client';
     import Shell from '/dev-server/tests/integration/fixtures/phaseHJ1CConnectedCards.tsx';
     import '/dev-server/src/index.css';
     createRoot(document.getElementById('root')).render(<Shell/>);`);
