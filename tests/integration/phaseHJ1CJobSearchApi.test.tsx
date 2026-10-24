@@ -51,6 +51,7 @@ let heldRequest: (() => void) | undefined;
 let holdNextPublish = false;
 let forbiddenNetwork = 0;
 let selfHealCalls = 0;
+let selfHealAnonAllowed = 0;
 const selfHealActors = new Set<string>();
 let originalInventory: Record<string, unknown[]>;
 let preCandidateInventory: Record<string, unknown[]>;
@@ -308,7 +309,8 @@ beforeAll(async () => {
       } catch { return ''; }
     })();
     const actor = Object.entries(ids).find(([, id]) => id === sub)?.[0] ?? 'anon/other';
-    if (req.url?.includes('ensure_my_recruiter_setup_state')) { selfHealCalls++; selfHealActors.add(actor); }
+    const isSelfHeal = req.url?.includes('ensure_my_recruiter_setup_state');
+    if (isSelfHeal) { selfHealCalls++; selfHealActors.add(actor); }
     const arrived = Date.now();
     const chunks: Buffer[] = [];
     req.on('data', chunk => chunks.push(chunk));
