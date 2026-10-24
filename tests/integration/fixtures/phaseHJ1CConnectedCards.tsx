@@ -1,5 +1,5 @@
 /** Test-only shell: actual providers, connected components, and generated client. */
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { ActingContextProvider, useActingContext } from '@/hooks/useActingContext';
@@ -16,6 +16,20 @@ import { Label } from '@/components/ui/label';
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
+
+// Test-only mount probe: records ConnectedDriverCard mount/unmount transitions
+// so harness failures can distinguish seed-consumed-then-remounted from
+// never-mounted. No app code is touched.
+function MountProbe({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const log = ((window as unknown as { __hj1cMounts?: string[] }).__hj1cMounts ??= []);
+    log.push(`mount@${Date.now()}`);
+    return () => {
+      log.push(`unmount@${Date.now()}`);
+    };
+  }, []);
+  return <>{children}</>;
+}
 
 function ConnectedShell() {
   const auth = useAuth();
