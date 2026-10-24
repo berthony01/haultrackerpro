@@ -341,10 +341,12 @@ beforeAll(async () => {
         'react-dom/client':'/dev-server/node_modules/react-dom/client.js',
         'react-dom':'/dev-server/node_modules/react-dom',
         'react':'/dev-server/node_modules/react'},dedupe:['react','react-dom']},
-      define:{'import.meta.env.VITE_SUPABASE_URL':${JSON.stringify(endpoint)},
-        'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':${JSON.stringify(jwt('anon'))}},
       server:{host:'127.0.0.1',port:55445,strictPort:true,fs:{allow:['/dev-server','${HJ1C_ROOT}']}}});`);
-  run('/bin/node', [ROOT + '/node_modules/vite/bin/vite.js', '--config', HJ1C_ROOT + '/runtime/vite.config.mjs']);
+  // Synthetic local endpoint/key arrive via the child process environment:
+  // Vite serializes VITE_* process env into import.meta.env correctly, while
+  // `define` values for import.meta.env.* are inlined unquoted in dev.
+  run('/bin/node', [ROOT + '/node_modules/vite/bin/vite.js', '--config', HJ1C_ROOT + '/runtime/vite.config.mjs'],
+    { VITE_SUPABASE_URL: endpoint, VITE_SUPABASE_PUBLISHABLE_KEY: jwt('anon') });
   await waitFor(async () => (await fetch(origin)).ok, 'isolated Vite health');
   console.log('Native boundary ready: PG17.9 Unix-only; PostgREST13.0.7/Auth2.195.0/proxy/Vite loopback-only');
 }, 60000);
