@@ -452,13 +452,26 @@ async function dumpReviewDiagnostics(page: Page, step: string) {
   const statuses = await page.locator('strong[role="status"]').allTextContents().catch(() => []);
   console.log(`[review-diag] step=${step} diag=${diag} mounts=${JSON.stringify(mounts)} counts=${JSON.stringify(counts)} statuses=${JSON.stringify(statuses)}`);
 }
+async function settledAuthority(page: Page) {
+  // Legitimate observable precondition: the real intake flow only offers the
+  // handoff after sign-in authority has settled. Clicking earlier mounts the
+  // card while personal=false, and the fail-closed handoff clear wipes the
+  // one-shot seed before ConnectedDriverCard can consume it (traced cause of
+  // the intermittent review-settle failure). Wait on existing hook values
+  // exposed by the test-only shell; no sleeps, retries or reseeding.
+  await waitFor(async () => {
+    const text = await page.getByTestId('hj1c-diag').textContent().catch(() => null);
+    if (!text) return false;
+    const diag = JSON.parse(text);
+    return diag.authLoading === false && diag.sessionMatch === true
+      && diag.actingLoading === false && diag.viewLoading === false
+      && diag.viewError === false && diag.effectiveRole !== null;
+  }, 'settled sign-in authority');
+}
 async function review(page: Page) {
   try {
-    const preClick = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
-    console.log(`[review-diag] pre-click diag=${preClick}`);
+    await settledAuthority(page);
     await page.getByRole('button', { name: 'Review my job-search card', exact: true }).click();
-    const postClick = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
-    console.log(`[review-diag] post-click diag=${postClick}`);
     await page.getByRole('heading', { name: 'My job-search card', exact: true }).waitFor();
     await waitFor(async () => await page.getByRole('button', { name: 'Review exact card' }).isEnabled(), 'settled owner status');
   } catch (failure) {
