@@ -327,10 +327,14 @@ beforeAll(async () => {
   originalInventory = await inventory();
   originalSentinels = await preservation();
   safeFile(HJ1C_ROOT + '/runtime/index.html', '<div id="root"></div><script type="module" src="/entry.tsx"></script>');
+  // Serve the real stylesheet minus its external font @import: the isolated
+  // browser must never attempt external egress, and index.css is frozen.
+  safeFile(HJ1C_ROOT + '/runtime/sanitized.css', readFileSync(ROOT + '/src/index.css', 'utf8')
+    .split('\n').filter(line => !line.includes('@import')).join('\n'));
   safeFile(HJ1C_ROOT + '/runtime/entry.tsx', `import React from 'react';
     import {createRoot} from 'react-dom/client';
     import Shell from '/dev-server/tests/integration/fixtures/phaseHJ1CConnectedCards.tsx';
-    import '/dev-server/src/index.css';
+    import './sanitized.css';
     createRoot(document.getElementById('root')).render(<Shell/>);`);
   safeFile(HJ1C_ROOT + '/runtime/vite.config.mjs', `import {defineConfig} from '/dev-server/node_modules/vite/dist/node/index.js';
     import react from '/dev-server/node_modules/@vitejs/plugin-react-swc/index.js';
@@ -591,7 +595,9 @@ it('connected unknown publication retains exact command after real response loss
   delayNextPublish = true;
   await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
   await page.getByText('Outcome not confirmed',{exact:true}).waitFor();
-  expect(droppedCommand).not.toBe(null);
+  // The uncertain state appears at dispatch time; wait until the proxy has
+  // actually dropped the real upstream publish response before asserting.
+  await waitFor(async () => droppedCommand !== null, 'dropped real publish response');
   const card = await own('driver');
   expect(card.status).toBe('published');
   await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
