@@ -108,7 +108,9 @@ for (const [code, kind] of [
   ], [
     '42501', 'denied'
   ], [
-    '40001', 'stale'
+    'PT409', 'stale'
+  ], [
+    '40001', 'unknown'
   ], [
     '22023', 'invalid'
   ], [

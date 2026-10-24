@@ -292,7 +292,7 @@ it('timeout retains exact command and payload; get-null does not imply private; 
   expect(writes[0][1]).toEqual(writes[1][1]);
 });
 for (const code of [
-  '40001', '22023'
+  'PT409', '22023'
 ])
   it(`${code} refetches without auto-write and retains dirty draft`, async () => {
     fixture.rpc.mockImplementation((_n, a) => a._action === 'get' ? response(own) : Promise.resolve({
