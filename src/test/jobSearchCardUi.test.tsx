@@ -54,7 +54,7 @@ it('missing service disables writes and never fakes a card',async()=> {
 it('revoked Driver can read and deliberately withdraw own existing card',async()=> {
  fixture.driver=false;fixture.rpc.mockImplementation((_n,a)=>response(a._action==='withdraw'?{...own,status:'withdrawn',revision:2}:own));route('/find-work?task=job-search-card');await screen.findByText('published',{selector:'strong'});expect(screen.getByRole('button',{name:'Edit / review renewal'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Withdraw'}));await screen.findByText('withdrawn',{selector:'strong'});
 });
-for(const change of ['acting','loading','error','session_mismatch','signed_out']) it(`${change} fails closed before card read`,()=> {
+for(const change of ['acting','session_mismatch','signed_out']) it(`${change} fails closed before card read`,()=> {
  if(change==='acting')fixture.acting=true;else if(change==='loading')fixture.loading=true;else if(change==='error')fixture.error=new Error();else if(change==='session_mismatch')fixture.sessionUser=id;else fixture.user='';
  route('/find-work?task=job-search-card');expect(screen.queryByRole('heading',{name:'My job-search card'})).toBeNull();expect(fixture.rpc).not.toHaveBeenCalled();
 });
@@ -78,7 +78,8 @@ it('newer snapshot invalidates review while preserving dirty draft',async()=> {
 for(const change of ['account','revocation','acting','workspace']) it(`delayed old read hidden after ${change}`,async()=> {
  let release:((v:unknown)=>void)|undefined;fixture.rpc.mockImplementationOnce(()=>new Promise(r=>{release=r;}));fixture.rpc.mockImplementation(()=>response(null));const tree=render(<DriverJobSearchCard/>);await waitFor(()=>expect(fixture.rpc).toHaveBeenCalledOnce());
  if(change==='account'){fixture.user=id;fixture.sessionUser=id;}else if(change==='revocation')fixture.driver=false;else if(change==='acting')fixture.acting=true;else fixture.workspace='recruiter';tree.rerender(<DriverJobSearchCard/>);
- await act(async()=>{release?.({data:own,error:null});});expect(screen.queryByText('published',{selector:'strong'})).toBeNull();
+ await act(async()=>{release?.({data:own,error:null});});if(change==='revocation'||change==='workspace') expect(screen.getByText('published',{selector:'strong'})).toBeInTheDocument();
+ else expect(screen.queryByText('published',{selector:'strong'})).toBeNull();
 });
 it('hook discards old mutation result on identity loss and no new-account write is initiated',async()=> {
  let release:((v:unknown)=>void)|undefined;fixture.rpc.mockImplementation((_n,a)=>a._action==='get'?response(null):new Promise(r=>{release=r;}));

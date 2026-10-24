@@ -20,7 +20,7 @@ export function RecruiterJobSearchCardsView({ state }: { state: RecruiterCardsSt
     {state.busy && <p role="status">Loading…</p>}
     {state.error && <p role="alert" className="text-sm text-muted-foreground">{state.error === 'denied' ? 'Discovery requires an eligible approved owner workspace with an active approved opening.' : CARD_ERRORS[state.error]}</p>}
     {state.loaded && !state.busy && !state.rows.length && <p role="status" className="text-muted-foreground">No eligible available-driver cards on this page.</p>}
-    <div className="grid min-w-0 gap-4 lg:grid-cols-2">{state.rows.map(card => <Card key={card.id} className="min-w-0 space-y-4 rounded-lg p-4"><EmploymentCardDetails payload={card.payload} /><p className="text-xs text-muted-foreground">Available until {new Date(card.expires_at).toLocaleDateString('en-US')}</p></Card>)}</div>
+    <div className="grid min-w-0 gap-4 lg:grid-cols-2">{state.rows.map(card => <Card key={card.id} className="min-w-0 space-y-4 rounded-lg p-4"><p className="text-xs font-medium text-muted-foreground">Card reference {card.id.slice(0, 8).toUpperCase()}</p><EmploymentCardDetails payload={card.payload} /><p className="text-xs text-muted-foreground">Available until {new Date(card.expires_at).toLocaleDateString('en-US')}</p></Card>)}</div>
     {state.more && <Button variant="outline" disabled={state.busy} onClick={() => void state.load(true)}>Next page</Button>}
   </section>;
 }
