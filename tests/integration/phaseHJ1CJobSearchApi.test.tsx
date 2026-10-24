@@ -335,7 +335,12 @@ beforeAll(async () => {
   safeFile(HJ1C_ROOT + '/runtime/vite.config.mjs', `import {defineConfig} from '/dev-server/node_modules/vite/dist/node/index.js';
     import react from '/dev-server/node_modules/@vitejs/plugin-react-swc/index.js';
     export default defineConfig({root:'${HJ1C_ROOT}/runtime',envDir:false,cacheDir:'${HJ1C_ROOT}/vite-cache',
-      plugins:[react()],resolve:{alias:{'@':'/dev-server/src'},dedupe:['react','react-dom']},
+      plugins:[react()],resolve:{alias:{'@':'/dev-server/src',
+        'react/jsx-dev-runtime':'/dev-server/node_modules/react/jsx-dev-runtime.js',
+        'react/jsx-runtime':'/dev-server/node_modules/react/jsx-runtime.js',
+        'react-dom/client':'/dev-server/node_modules/react-dom/client.js',
+        'react-dom':'/dev-server/node_modules/react-dom',
+        'react':'/dev-server/node_modules/react'},dedupe:['react','react-dom']},
       define:{'import.meta.env.VITE_SUPABASE_URL':${JSON.stringify(endpoint)},
         'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':${JSON.stringify(jwt('anon'))}},
       server:{host:'127.0.0.1',port:55445,strictPort:true,fs:{allow:['/dev-server','${HJ1C_ROOT}']}}});`);
