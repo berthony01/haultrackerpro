@@ -12,11 +12,11 @@ import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { createServer, request, type Server } from 'node:http';
 import { createConnection, createServer as createNetServer } from 'node:net';
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = '/dev-server';
-const HOME = '/tmp/hj1c';
+const HJ1C_ROOT = '/tmp/hj1c';
 const SOCKET = '/tmp/hj1c/socket';
 const ports = { pg: 55441, rest: 55442, auth: 55443, proxy: 55444, vite: 55445 };
 const endpoint = 'http://127.0.0.1:55444';
@@ -31,7 +31,7 @@ const sqlPaths = [
 const secret = randomBytes(48).toString('hex');
 const dbPassword = randomBytes(24).toString('hex');
 const password = randomBytes(24).toString('hex');
-const childEnv = { PATH: '/bin:/usr/bin', HOME, LANG: 'C.UTF-8', TZ: 'UTC' };
+const childEnv = { PATH: '/usr/local/bin:/bin:/usr/bin', HOME: HJ1C_ROOT, LANG: 'C.UTF-8', TZ: 'UTC' };
 const children: ChildProcess[] = [];
 const ids: Record<string, string> = {};
 const sessions: Record<string, { access_token: string; refresh_token: string }> = {};
@@ -60,13 +60,13 @@ function jwt(role: string, sub?: string, exp = Math.floor(Date.now() / 1000) + 3
   return `${body}.${createHmac('sha256', secret).update(body).digest('base64url')}`;
 }
 function safeFile(file: string, text: string) {
-  if (!file.startsWith(HOME + '/')) throw new Error('Nonlocal temporary file');
+  if (!file.startsWith(HJ1C_ROOT + '/')) throw new Error('Nonlocal temporary file');
   writeFileSync(file, text, { mode: 0o600 });
   chmodSync(file, 0o600);
 }
 function run(binary: string, args: string[], extra: Record<string, string> = {}) {
   const child = spawn(binary, args, {
-    cwd: HOME + '/runtime', env: { ...childEnv, ...extra }, stdio: 'ignore',
+    cwd: HJ1C_ROOT + '/runtime', env: { ...childEnv, ...extra }, stdio: 'ignore',
   });
   children.push(child);
   return child;
@@ -147,19 +147,19 @@ beforeAll(async () => {
     ['postgrest', '4153f81ccc40e7b735edc89cd84b49da25ba27eb37d57c7f6a82c9005a0b762b'],
     ['auth', '6f8065fcd708df7c09c83e1fb96b0c9507f6e2600e6a78a540153b92a49cd1f9'],
   ]) {
-    expect(createHash('sha256').update(readFileSync(`${HOME}/bin/${archive}.tar.xz`)).digest('hex')).toBe(expected);
+    expect(createHash('sha256').update(readFileSync(`${HJ1C_ROOT}/bin/${archive}.tar.xz`)).digest('hex')).toBe(expected);
   }
   for (const port of Object.values(ports)) await portFree(port);
-  rmSync(HOME + '/cluster', { recursive: true, force: true });
-  for (const dir of ['runtime', 'cluster', 'socket', 'screenshots']) mkdirSync(`${HOME}/${dir}`, { recursive: true });
+  rmSync(HJ1C_ROOT + '/cluster', { recursive: true, force: true });
+  for (const dir of ['runtime', 'cluster', 'socket', 'screenshots']) mkdirSync(`${HJ1C_ROOT}/${dir}`, { recursive: true });
   // PostgreSQL cannot run as root. Only its disposable directories belong to lovable.
-  chmodSync(HOME, 0o711);
-  execFileSync('/bin/chown', ['-R', 'lovable:lovable', HOME + '/cluster', SOCKET]);
-  execFileSync('/bin/initdb', ['-D', HOME + '/cluster',
+  chmodSync(HJ1C_ROOT, 0o711);
+  execFileSync('/bin/chown', ['-R', 'lovable:lovable', HJ1C_ROOT + '/cluster', SOCKET]);
+  execFileSync('/bin/initdb', ['-D', HJ1C_ROOT + '/cluster',
     '--username=lovable', '--auth-local=trust', '--auth-host=reject', '--no-locale'],
   { env: childEnv, uid: 1000, gid: 1000 });
-  execFileSync('/bin/pg_ctl', ['-D', HOME + '/cluster',
-    '-l', HOME + '/cluster/server.log', '-o', `-k ${SOCKET} -p 55441 -c listen_addresses=''`, '-w', 'start'],
+  execFileSync('/bin/pg_ctl', ['-D', HJ1C_ROOT + '/cluster',
+    '-l', HJ1C_ROOT + '/cluster/server.log', '-o', `-k ${SOCKET} -p 55441 -c listen_addresses=''`, '-w', 'start'],
   { env: childEnv, uid: 1000, gid: 1000 });
   clusterStarted = true;
   db = new Client({ host: SOCKET, port: 55441, user: 'lovable', database: 'postgres', password: '', ssl: false });
@@ -183,7 +183,7 @@ beforeAll(async () => {
     API_EXTERNAL_URL: endpoint + '/auth/v1', GOTRUE_SITE_URL: origin,
     GOTRUE_DB_DRIVER: 'postgres', GOTRUE_DB_NAMESPACE: 'auth',
     DATABASE_URL: `postgresql://supabase_auth_admin:${dbPassword}@/postgres?host=${SOCKET}&port=55441&sslmode=disable`,
-    GOTRUE_DB_MIGRATIONS_PATH: HOME + '/bin/auth/migrations',
+    GOTRUE_DB_MIGRATIONS_PATH: HJ1C_ROOT + '/bin/auth/migrations',
     GOTRUE_JWT_SECRET: secret, GOTRUE_JWT_AUD: 'authenticated',
     GOTRUE_JWT_DEFAULT_GROUP_NAME: 'authenticated', GOTRUE_JWT_EXP: '3600',
     GOTRUE_DISABLE_SIGNUP: 'true', GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true',
@@ -191,8 +191,8 @@ beforeAll(async () => {
     GOTRUE_TRACING_ENABLED: 'false', GOTRUE_METRICS_ENABLED: 'false', LOG_LEVEL: 'error',
   };
   try {
-    execFileSync(HOME + '/bin/auth/auth', ['migrate'], {
-      cwd: HOME + '/runtime', env: { ...childEnv, ...authEnv }, stdio: 'pipe',
+    execFileSync(HJ1C_ROOT + '/bin/auth/auth', ['migrate'], {
+      cwd: HJ1C_ROOT + '/runtime', env: { ...childEnv, ...authEnv }, stdio: 'pipe',
     });
   } catch (failure) {
     const error = failure as { stdout?: Buffer; stderr?: Buffer };
@@ -200,7 +200,7 @@ beforeAll(async () => {
       .toString().replaceAll(secret, '[redacted]').replaceAll(dbPassword, '[redacted]');
     throw new Error('Local Auth migration failed: ' + redacted);
   }
-  run(HOME + '/bin/auth/auth', ['serve'], authEnv);
+  run(HJ1C_ROOT + '/bin/auth/auth', ['serve'], authEnv);
   await waitFor(async () => (await fetch('http://127.0.0.1:55443/health')).ok, 'real Auth health');
   await db.query(`GRANT SELECT,REFERENCES ON auth.users TO postgres;
     GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO postgres;
@@ -247,7 +247,7 @@ beforeAll(async () => {
       USING (public.is_admin(auth.uid()));`);
   for (const file of sqlPaths) await db.query(source(file));
   await db.query('RESET ROLE');
-  safeFile(HOME + '/runtime/postgrest.conf', `db-uri = "postgresql://authenticator:${dbPassword}@/postgres?host=${SOCKET}&port=55441&sslmode=disable"
+  safeFile(HJ1C_ROOT + '/runtime/postgrest.conf', `db-uri = "postgresql://authenticator:${dbPassword}@/postgres?host=${SOCKET}&port=55441&sslmode=disable"
     db-schemas = "public"
     db-anon-role = "anon"
     jwt-secret = "${secret}"
@@ -256,7 +256,7 @@ beforeAll(async () => {
     db-config = false
     log-level = "crit"
   `);
-  run(HOME + '/bin/postgrest/postgrest', [HOME + '/runtime/postgrest.conf']);
+  run(HJ1C_ROOT + '/bin/postgrest/postgrest', [HJ1C_ROOT + '/runtime/postgrest.conf']);
   await waitFor(async () => (await fetch('http://127.0.0.1:55442/')).ok, 'real PostgREST health');
   proxy = createServer((req, res) => {
     const auth = req.url?.startsWith('/auth/v1/');
@@ -326,20 +326,20 @@ beforeAll(async () => {
     VALUES($1,$2,'staff@hj1c.invalid','recruiter_staff','active')`, [workspace, ids.staff]);
   originalInventory = await inventory();
   originalSentinels = await preservation();
-  safeFile(HOME + '/runtime/index.html', '<div id="root"></div><script type="module" src="/entry.tsx"></script>');
-  safeFile(HOME + '/runtime/entry.tsx', `import React from '/dev-server/node_modules/react';
+  safeFile(HJ1C_ROOT + '/runtime/index.html', '<div id="root"></div><script type="module" src="/entry.tsx"></script>');
+  safeFile(HJ1C_ROOT + '/runtime/entry.tsx', `import React from '/dev-server/node_modules/react';
     import {createRoot} from '/dev-server/node_modules/react-dom/client';
     import Shell from '/dev-server/tests/integration/fixtures/phaseHJ1CConnectedCards.tsx';
     import '/dev-server/src/index.css';
     createRoot(document.getElementById('root')).render(<Shell/>);`);
-  safeFile(HOME + '/runtime/vite.config.mjs', `import {defineConfig} from '/dev-server/node_modules/vite/dist/node/index.js';
+  safeFile(HJ1C_ROOT + '/runtime/vite.config.mjs', `import {defineConfig} from '/dev-server/node_modules/vite/dist/node/index.js';
     import react from '/dev-server/node_modules/@vitejs/plugin-react-swc/index.js';
-    export default defineConfig({root:'${HOME}/runtime',envDir:false,cacheDir:'${HOME}/vite-cache',
+    export default defineConfig({root:'${HJ1C_ROOT}/runtime',envDir:false,cacheDir:'${HJ1C_ROOT}/vite-cache',
       plugins:[react()],resolve:{alias:{'@':'/dev-server/src'},dedupe:['react','react-dom']},
       define:{'import.meta.env.VITE_SUPABASE_URL':${JSON.stringify(endpoint)},
         'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY':${JSON.stringify(jwt('anon'))}},
-      server:{host:'127.0.0.1',port:55445,strictPort:true,fs:{allow:['/dev-server','${HOME}']}}});`);
-  run('/bin/node', [ROOT + '/node_modules/vite/bin/vite.js', '--config', HOME + '/runtime/vite.config.mjs']);
+      server:{host:'127.0.0.1',port:55445,strictPort:true,fs:{allow:['/dev-server','${HJ1C_ROOT}']}}});`);
+  run('/bin/node', [ROOT + '/node_modules/vite/bin/vite.js', '--config', HJ1C_ROOT + '/runtime/vite.config.mjs']);
   await waitFor(async () => (await fetch(origin)).ok, 'isolated Vite health');
   console.log('Native boundary ready: PG17.9 Unix-only; PostgREST13.0.7/Auth2.195.0/proxy/Vite loopback-only');
 }, 60000);
@@ -358,9 +358,21 @@ async function preservation() {
 }
 async function localPage(width = 1280, height = 1800) {
   if (!browser) {
-    const existingDriver = execFileSync('/bin/python3', ['-c',
-      'import pathlib,playwright; print(pathlib.Path(playwright.__file__).parent/"driver"/"package"/"index.mjs")'],
-    { env: { PATH: '/bin:/usr/bin' } }).toString().trim();
+    let existingDriver: string | undefined;
+    const pythonCandidates = ['/usr/local/bin/python3', '/usr/bin/python3', '/bin/python3'];
+    for (const python of pythonCandidates) {
+      if (!existsSync(python)) continue;
+      try {
+        existingDriver = execFileSync(python, ['-c',
+          'import pathlib,playwright; print(pathlib.Path(playwright.__file__).parent/"driver"/"package"/"index.mjs")'],
+        { cwd: HJ1C_ROOT + '/runtime', env: childEnv }).toString().trim();
+        if (existingDriver && existsSync(existingDriver)) break;
+        existingDriver = undefined;
+      } catch {
+        existingDriver = undefined;
+      }
+    }
+    if (!existingDriver) throw new Error('An installed Python Playwright runtime is required');
     const { chromium } = await import(existingDriver);
     browser = await chromium.launch({ headless: true });
   }
@@ -542,7 +554,7 @@ it('desktop and mobile real UI sign-in, exact review, publish, pause/withdraw an
     expect(await driver.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await driver.page.getByRole('button',{ name:'Refresh session',exact:true }).click();
     await driver.page.getByText('Session refreshed',{ exact:true }).waitFor();
-    await driver.page.screenshot({ path:`${HOME}/screenshots/${width}-driver.png` });
+    await driver.page.screenshot({ path:`${HJ1C_ROOT}/screenshots/${width}-driver.png` });
     const recruiter = await localPage(width,height);
     await login(recruiter.page,'recruiter');
     await recruiter.page.getByRole('button',{ name:'Open available drivers' }).click();
@@ -550,7 +562,7 @@ it('desktop and mobile real UI sign-in, exact review, publish, pause/withdraw an
     await recruiter.page.getByText(/^Card reference /).waitFor();
     expect(await recruiter.page.getByRole('button',{ name:/offer|message|contact/i }).count()).toBe(0);
     expect(await recruiter.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await recruiter.page.screenshot({ path:`${HOME}/screenshots/${width}-recruiter.png` });
+    await recruiter.page.screenshot({ path:`${HJ1C_ROOT}/screenshots/${width}-recruiter.png` });
     await driver.page.getByRole('button',{ name:'Pause',exact:true }).click();
     await driver.page.locator('strong[role="status"]').filter({ hasText:/^paused$/ }).waitFor();
     await recruiter.page.getByRole('button',{ name:'Refresh cards',exact:true }).click();
@@ -643,7 +655,7 @@ afterAll(async () => {
   }
   await db?.end().catch(() => {});
   if (clusterStarted) {
-    execFileSync('/bin/pg_ctl',['-D',HOME+'/cluster','-m','immediate','-w','stop'],
+    execFileSync('/bin/pg_ctl',['-D',HJ1C_ROOT+'/cluster','-m','immediate','-w','stop'],
       {env:childEnv,uid:1000,gid:1000});
   }
   for (const port of Object.values(ports)) await portFree(port);
