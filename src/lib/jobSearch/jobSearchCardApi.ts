@@ -134,7 +134,7 @@ function failure(error: unknown): JobSearchCardError {
     message?: string;
   } | null;
   const kind: CardFailure = e?.code === 'PGRST202' || e?.code === '42883' ? 'unavailable'
-    : e?.code === '42501' ? 'denied' : e?.code === '40001' ? 'stale'
+    : e?.code === '42501' ? 'denied' : e?.code === 'PT409' ? 'stale'
       : e?.code === '22023' ? (e.message === 'No card' ? 'no_card' : 'invalid') : 'unknown';
   return new JobSearchCardError(kind);
 }
