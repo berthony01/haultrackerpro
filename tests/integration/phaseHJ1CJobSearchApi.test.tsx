@@ -401,6 +401,11 @@ async function localPage(width = 1280, height = 1800) {
     route.connectToServer();
   });
   const page = await context.newPage();
+  page.on('console', message => {
+    if (message.type() === 'error' || message.type() === 'warning')
+      console.log(`[browser:${message.type()}]`, message.text().slice(0, 300));
+  });
+  page.on('pageerror', error => console.log('[browser:pageerror]', String(error).slice(0, 300)));
   await page.goto(origin);
   return { page, context };
 }
