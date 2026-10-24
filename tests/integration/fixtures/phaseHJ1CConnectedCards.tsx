@@ -37,6 +37,15 @@ function ConnectedShell() {
   const view = useViewMode();
   const recruiter = useRecruiterProfile();
   const cache = useQueryClient();
+  // Test-only auth event recorder: proves whether any null-session or
+  // mismatched-user event fires during the uncertain-publication window.
+  useEffect(() => {
+    const log = ((window as unknown as { __hj1cAuthEvents?: string[] }).__hj1cAuthEvents ??= []);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      log.push(`${event}@${Date.now()}:user=${session?.user.id === auth.user?.id ? 'same' : session ? 'other' : 'null'}`);
+    });
+    return () => subscription.unsubscribe();
+  }, [auth.user?.id]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
