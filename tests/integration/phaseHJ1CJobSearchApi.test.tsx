@@ -173,6 +173,7 @@ beforeAll(async () => {
     ALTER SCHEMA public OWNER TO postgres;
     GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role,postgres;
     GRANT CREATE ON SCHEMA public TO postgres;
+    GRANT CREATE ON DATABASE postgres TO postgres;
     CREATE EXTENSION citext WITH SCHEMA public;`);
   const authEnv = {
     GOTRUE_API_HOST: '127.0.0.1', PORT: '55443',
