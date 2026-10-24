@@ -245,7 +245,8 @@ beforeAll(async () => {
     GRANT EXECUTE ON FUNCTION public.is_admin(uuid),public.is_super_admin(uuid),
       public.get_my_user_capabilities(),public.get_my_managed_drivers(),
       public.get_my_recruiter_profile_safe(),public.is_current_user_recruiter(),
-      public.get_my_recruiter_staff_workspaces(),public.is_recruiter_workspace_owner(uuid) TO authenticated;
+      public.get_my_recruiter_staff_workspaces(),public.is_recruiter_workspace_owner(uuid),
+      public.ensure_my_recruiter_setup_state() TO authenticated;
     CREATE POLICY admin_self_read ON public.admin_users FOR SELECT TO authenticated
       USING (public.is_admin(auth.uid()));`);
   for (const file of sqlPaths) await db.query(source(file));
@@ -669,8 +670,6 @@ it('desktop and mobile real UI sign-in, exact review, publish, pause/withdraw an
 
 it('connected unknown publication retains exact command after real response loss and current-state withdrawal', async () => {
   const {page,context} = await localPage();
-  await login(page,'driver');
-  await review(page);
   // Test-only timeline sampler: pinpoints exactly which UI state transition
   // clears the uncertain publication (remount vs auth reset vs refresh).
   const timeline: string[] = [];
@@ -687,30 +686,41 @@ it('connected unknown publication retains exact command after real response loss
       await new Promise(resolve => setTimeout(resolve, 150));
     }
   })();
-  delayNextPublish = true;
-  await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
-  await page.getByText('Outcome not confirmed',{exact:true}).waitFor();
-  // The uncertain state appears at dispatch time; wait until the proxy has
-  // actually dropped the real upstream publish response before asserting.
-  await waitFor(async () => droppedCommand !== null, 'dropped real publish response');
-  const card = await own('driver');
-  expect(card.status).toBe('published');
-  await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
   try {
-    await page.getByRole('button',{name:'Retry same request',exact:true}).click();
+    await login(page,'driver');
+    await review(page);
+    delayNextPublish = true;
+    await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
+    await page.getByText('Outcome not confirmed',{exact:true}).waitFor();
+    // The uncertain state appears at dispatch time; wait until the proxy has
+    // actually dropped the real upstream publish response before asserting.
+    await waitFor(async () => droppedCommand !== null, 'dropped real publish response');
+    const card = await own('driver');
+    expect(card.status).toBe('published');
+    await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
+    // The explicit user replay is legitimate: Retry enabled proves the
+    // original fetch fully settled (busy cleared). Disarm ONLY this command's
+    // fault so the real replay reaches the backend untouched.
+    const retryButton = page.getByRole('button',{name:'Retry same request',exact:true});
+    await waitFor(async () => await retryButton.isEnabled(), 'settled unknown publication');
+    droppedIds.delete(droppedCommand!);
+    await retryButton.click();
+    await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
+    expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
+      [droppedCommand])).rows[0].n).toBe(1);
   } catch (failure) {
+    console.log('[unknown-timeline]', JSON.stringify(timeline, null, 1));
+    await dumpReviewDiagnostics(page, 'unknown-flow');
+    throw failure;
+  } finally {
     sampling = false;
     await sampler;
-    console.log('[unknown-timeline]', JSON.stringify(timeline, null, 1));
-    await dumpReviewDiagnostics(page, 'retry-absent');
-    throw failure;
+    // Clear owned fault state so later cases are never contaminated.
+    delayNextPublish = false;
+    droppedIds.clear();
+    droppedCommand = null;
+    await context.close();
   }
-  sampling = false;
-  await sampler;
-  await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
-  expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
-    [droppedCommand])).rows[0].n).toBe(1);
-  await context.close();
 });
 
 it('same-owner workspace switch with real held first-publication/get-null never falsely confirms privacy', async () => {
