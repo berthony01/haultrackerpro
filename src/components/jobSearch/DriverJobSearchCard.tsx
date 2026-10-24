@@ -189,9 +189,7 @@ export function DriverJobSearchCardView({ state, canPublish, seed, canManage = t
     {state.card && <div className="space-y-4 border-y border-border py-4">
       <EmploymentCardDetails payload={state.card.payload} />
       <p className="text-sm text-muted-foreground">
-        Expires
-        {new Date(state.card.expires_at).toLocaleDateString('en-US')}
-        . Audience: approved recruiters.
+        {`Expires ${new Date(state.card.expires_at).toLocaleDateString('en-US')}. Audience: approved recruiters.`}
       </p>
     </div>}
     <div className="flex flex-wrap gap-2">
