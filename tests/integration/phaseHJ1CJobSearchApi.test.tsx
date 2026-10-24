@@ -338,7 +338,6 @@ beforeAll(async () => {
       server:{host:'127.0.0.1',port:55445,strictPort:true,fs:{allow:['/dev-server','${HOME}']}}});`);
   run('/bin/node', [ROOT + '/node_modules/vite/bin/vite.js', '--config', HOME + '/runtime/vite.config.mjs']);
   await waitFor(async () => (await fetch(origin)).ok, 'isolated Vite health');
-  browser = await chromium.launch({ headless: true });
   console.log('Native boundary ready: PG17.9 Unix-only; PostgREST13.0.7/Auth2.195.0/proxy/Vite loopback-only');
 }, 60000);
 
@@ -355,6 +354,7 @@ async function preservation() {
   return result;
 }
 async function localPage(width = 1280, height = 1800) {
+  if (!browser) browser = await chromium.launch({ headless: true });
   if (!browser) throw new Error('Real browser absent');
   const context = await browser.newContext({ viewport: { width, height } });
   await context.route('**/*', route => {
