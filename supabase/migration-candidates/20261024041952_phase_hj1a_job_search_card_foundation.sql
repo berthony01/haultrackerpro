@@ -138,7 +138,7 @@ BEGIN
     END IF;
   END IF;
   IF _action <> 'get' AND _receipt.id IS NULL THEN
-    IF coalesce(_card.revision,0) <> _expected_revision THEN RAISE EXCEPTION 'Stale revision' USING ERRCODE='40001'; END IF;
+    IF coalesce(_card.revision,0) <> _expected_revision THEN RAISE EXCEPTION 'Stale revision' USING ERRCODE='PT409'; END IF;
     _now := pg_catalog.clock_timestamp();
     IF _action = 'publish' THEN
       INSERT INTO job_search_private.driver_job_search_cards AS c (owner_user_id,payload,revision,status,created_at,updated_at,published_at,expires_at,consent_version)

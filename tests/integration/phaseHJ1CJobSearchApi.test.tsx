@@ -469,18 +469,12 @@ it('actual lifecycle HTTP receipts: validation, TTL, isolation, idempotency and 
   expect(Date.parse(first.data.expires_at) - Date.parse(first.data.published_at)).toBe(14 * 86400000);
   expect(await own('other')).toBe(null);
   console.log('Lifecycle: publication and isolation complete');
-  const stale = jsonRequest('http://127.0.0.1:55444/rest/v1/rpc/manage_my_job_search_card',
+  const staleStarted = performance.now();
+  const stale = await jsonRequest('http://127.0.0.1:55444/rest/v1/rpc/manage_my_job_search_card',
     sessions.driver.access_token, command('pause',0));
-  const activity = await Promise.race([
-    stale,
-    new Promise<null>(resolve => setTimeout(() => resolve(null), 1000)),
-  ]);
-  if (!activity) {
-    const evidence = (await db.query(`SELECT state,wait_event_type,wait_event FROM pg_stat_activity
-      WHERE usename='authenticator' AND state <> 'idle'`)).rows;
-    console.log('Stale HTTP runtime diagnostic:', JSON.stringify(evidence));
-  }
-  expect((await stale).data.code).toBe('40001');
+  expect(stale.status).toBe(409);
+  expect(stale.data.code).toBe('PT409');
+  expect(performance.now() - staleStarted).toBeLessThan(3000);
   await rpc('manage_my_job_search_card', command('withdraw',first.data.revision), sessions.driver.access_token);
   console.log('Lifecycle: withdrawal complete');
   const replay = await rpc('manage_my_job_search_card', publish, sessions.driver.access_token);
