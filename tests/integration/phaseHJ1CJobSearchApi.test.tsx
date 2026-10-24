@@ -92,7 +92,7 @@ async function portFree(port: number) {
 function source(file: string) { return readFileSync(path.join(ROOT, file), 'utf8'); }
 function helper(file: string, name: string) {
   const match = source(file).match(new RegExp(
-    'CREATE OR REPLACE FUNCTION public\\.' + name + '\\([\\s\\S]*?AS (\\$\\w*\\$)[\\s\\S]*?\\1;', 'i',
+    'CREATE (?:OR REPLACE )?FUNCTION public\\.' + name + '\\([\\s\\S]*?AS (\\$\\w*\\$)[\\s\\S]*?\\1;', 'i',
   ));
   if (!match) throw new Error(`Canonical helper missing: ${name}`);
   return match[0];
