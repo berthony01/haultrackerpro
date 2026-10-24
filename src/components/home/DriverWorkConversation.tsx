@@ -8,6 +8,8 @@ import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOppo
 import { HOME_INTAKE_NEXT_PATH, type IntakeAnswers } from '@/lib/home/conversationIntake';
 import { describeProfileReuse, mapProfileToIntakeAnswers } from '@/lib/home/profileConversationMerge';
 import { setPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
+import { clearJobSearchCardHandoff, setJobSearchCardHandoff, JOB_SEARCH_CARD_PATH } from '@/lib/jobSearch/jobSearchCardHandoff';
+import { useEffect, useRef } from 'react';
 
 export const FIND_WORK_CONTINUE_LABEL = 'Review/update my work profile';
 export const FIND_WORK_PROFILE_ERROR_LINE =
@@ -19,6 +21,9 @@ export default function DriverWorkConversation() {
   const { user, loading: authLoading } = useAuth();
   const { driverWorkspaceAllowed, isLoading, error } = useViewMode();
   const { isActingAsAssistant, isLoadingManagedDrivers } = useActingContext();
+  useEffect(() => {
+    if (authLoading || isLoading || error || isLoadingManagedDrivers || !user || driverWorkspaceAllowed !== true || isActingAsAssistant) clearJobSearchCardHandoff();
+  }, [user?.id, authLoading, isLoading, error, isLoadingManagedDrivers, driverWorkspaceAllowed, isActingAsAssistant]);
 
   if (authLoading || isLoading || isLoadingManagedDrivers) {
     return <p data-testid="find-work-loading" className="text-sm text-muted-foreground">Loading…</p>;
@@ -31,6 +36,9 @@ export default function DriverWorkConversation() {
 
 function ProfileConversation() {
   const navigate = useNavigate();
+  const { user, session } = useAuth();
+  const liveOwner = useRef(user?.id);
+  liveOwner.current = user?.id;
   const { profile, isLoading: profileLoading, isError } = useDriverOpportunityProfile();
   const seed = useMemo(() => isError ? {} : mapProfileToIntakeAnswers(profile), [isError, profile]);
   const reuseLabels = useMemo(() => describeProfileReuse(seed), [seed]);
@@ -57,6 +65,11 @@ function ProfileConversation() {
         initialAnswers={hasSeed ? seed : undefined}
         profileReuseLabels={hasSeed ? reuseLabels : undefined}
         continueLabel={FIND_WORK_CONTINUE_LABEL}
+        onReviewJobSearchCard={(answers) => {
+          if (!user || session?.user.id !== user.id || liveOwner.current !== user.id) return;
+          setJobSearchCardHandoff(user.id, answers);
+          navigate(JOB_SEARCH_CARD_PATH);
+        }}
         onContinue={(answers: IntakeAnswers) => {
           setPendingProfileAnswers(answers);
           navigate(HOME_INTAKE_NEXT_PATH);

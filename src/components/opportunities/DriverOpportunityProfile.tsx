@@ -393,6 +393,11 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
         </p>
       </Card>
 
+      <div className="space-y-1 text-sm">
+        <a href="/find-work?task=job-search-card" className="font-medium text-primary underline underline-offset-4">Manage my job-search card</a>
+        <p className="text-muted-foreground">Unsaved work-profile edits are not included in your job-search card.</p>
+      </div>
+
       {seedApplied && (
         <p
           data-testid="driver-profile-homepage-seed-note"
