@@ -52,7 +52,7 @@ export function useJobSearchCard(scope: CardScope): OwnCardState {
   const serial = useRef(0);
   const inFlight = useRef(false);
   const pending = useRef<CardCommand | null>(null);
-  const allowed = () => mounted.current && live.current.current();
+  const allowed = () => mounted.current && live.current.key === scope.key && scope.current();
   useEffect(() => {
     mounted.current = true;
     const owner = scope.owner;
@@ -128,7 +128,7 @@ export function useRecruiterJobSearchCards(scope: ReturnType<typeof useRecruiter
   const live = useRef(scope);
   live.current = scope;
   const mounted = useRef(true), busy = useRef(false), generation = useRef(0);
-  const current = () => mounted.current && live.current.current();
+  const current = () => mounted.current && live.current.key === scope.key && scope.current();
   useEffect(() => {
     mounted.current = true;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
