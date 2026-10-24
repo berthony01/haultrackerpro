@@ -279,6 +279,8 @@ beforeAll(async () => {
       public.ensure_my_recruiter_setup_state() TO authenticated;
     CREATE POLICY admin_self_read ON public.admin_users FOR SELECT TO authenticated
       USING (public.is_admin(auth.uid()));`);
+  // Baseline catalog of preexisting objects BEFORE the candidates apply.
+  preCandidateInventory = await inventory();
   for (const file of sqlPaths) await db.query(source(file));
   await db.query('RESET ROLE');
   safeFile(HJ1C_ROOT + '/runtime/postgrest.conf', `db-uri = "postgresql://authenticator:${dbPassword}@/postgres?host=${SOCKET}&port=55441&sslmode=disable"
@@ -420,7 +422,8 @@ async function preservation() {
   const names = ['profiles','admin_users','subscriptions','recruiter_profiles','opportunities',
     'driver_opportunity_profiles','driver_assistants','recruiter_members','agency_profiles',
     'agency_members','agency_entitlements','agency_client_requests','agency_delegation_requests',
-    'owner_qa_sessions','qa_fixture_roots','marketplace_user_restrictions','hj1c_preservation_sentinels'];
+    'owner_qa_sessions','qa_fixture_roots','marketplace_user_restrictions','user_capabilities',
+    'hj1c_preservation_sentinels'];
   const result: Record<string, unknown> = {};
   for (const name of names) {
     result[name] = (await db.query(`SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]') AS x
@@ -890,7 +893,13 @@ it('actual missing RPC is classified unavailable through the real SDK path and r
 });
 
 it('final fixture inventory and unrelated synthetic state unchanged; no external requests or self-heal calls', async () => {
-  expect(await inventory()).toEqual(originalInventory);
+  const finalInventory = await inventory();
+  expect(finalInventory).toEqual(originalInventory);
+  // The candidates and the full runtime must not alter any preexisting
+  // catalog object (schemas, table ACLs/RLS, columns, constraints, policies,
+  // triggers, function definitions/ACLs); only new card objects may appear.
+  assertCatalogPreserved(preCandidateInventory, originalInventory);
+  assertCatalogPreserved(preCandidateInventory, finalInventory);
   expect(await preservation()).toEqual(originalSentinels);
   expect(forbiddenNetwork).toBe(0);
   // The preseeded approved recruiter must never trigger the self-heal RPC.
