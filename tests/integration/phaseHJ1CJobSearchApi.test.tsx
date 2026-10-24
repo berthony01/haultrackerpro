@@ -330,7 +330,7 @@ beforeAll(async () => {
     import '/dev-server/src/index.css';
     createRoot(document.getElementById('root')).render(<Shell/>);`);
   safeFile(HOME + '/runtime/vite.config.mjs', `import {defineConfig} from '/dev-server/node_modules/vite/dist/node/index.js';
-    import react from '/dev-server/node_modules/@vitejs/plugin-react-swc/index.mjs';
+    import react from '/dev-server/node_modules/@vitejs/plugin-react-swc/index.js';
     export default defineConfig({root:'${HOME}/runtime',envDir:false,cacheDir:'${HOME}/vite-cache',
       plugins:[react()],resolve:{alias:{'@':'/dev-server/src'},dedupe:['react','react-dom']},
       define:{'import.meta.env.VITE_SUPABASE_URL':${JSON.stringify(endpoint)},
