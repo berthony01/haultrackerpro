@@ -298,7 +298,16 @@ beforeAll(async () => {
             delayNextPublish = false;
             droppedCommand = commandId ?? null;
             upstream.resume();
-            upstream.on('end', () => res.destroy());
+            upstream.on('end', () => {
+              // Real response loss AFTER headers: a bare res.destroy() before
+              // any response bytes lets Chromium transparently replay the
+              // in-memory POST (traced: identical _client_command_id arrived
+              // twice), so the client never observed the unknown outcome.
+              // Headers + truncated body is non-replayable and rejects fetch.
+              res.writeHead(200, { 'content-type': 'application/json', 'content-length': '1048576' });
+              res.write('{"truncated"');
+              res.destroy();
+            });
             return;
           }
           res.writeHead(upstream.statusCode ?? 502, upstream.headers);
