@@ -25,11 +25,11 @@ const id='22222222-2222-2222-2222-222222222222';
 const payload={state:'TX',cdl_class:'A',years_experience:5,experience_qualifier:'at_least',preferred_route_type:'Regional',preferred_home_time:'Weekly'};
 const own={id,revision:1,status:'published',audience:'approved_recruiters',consent_version:'job_search_card_v1',payload,published_at:'2026-10-24T00:00:00Z',expires_at:'2099-11-07T00:00:00Z',created_at:'2026-10-24T00:00:00Z',updated_at:'2026-10-24T00:00:00Z'};
 const response=(data:unknown)=>Promise.resolve({data,error:null});
-beforeEach(()=>{fixture.user='11111111-1111-1111-1111-111111111111';fixture.sessionUser=fixture.user;fixture.driver=true;fixture.recruiter=false;fixture.acting=false;fixture.loading=false;fixture.error=null;fixture.workspace='driver';fixture.profile=null;fixture.rpc.mockReset();fixture.rpc.mockImplementation(()=>response(null));clearJobSearchCardHandoff();clearPendingProfileAnswers();});
+beforeEach(()=>{vi.stubGlobal('ResizeObserver',class { observe() {} unobserve() {} disconnect() {} }); Element.prototype.scrollIntoView=vi.fn(); Element.prototype.hasPointerCapture=()=>false; Element.prototype.setPointerCapture=vi.fn(); Element.prototype.releasePointerCapture=vi.fn(); fixture.user='11111111-1111-1111-1111-111111111111';fixture.sessionUser=fixture.user;fixture.driver=true;fixture.recruiter=false;fixture.acting=false;fixture.loading=false;fixture.error=null;fixture.workspace='driver';fixture.profile=null;fixture.rpc.mockReset();fixture.rpc.mockImplementation(()=>response(null));clearJobSearchCardHandoff();clearPendingProfileAnswers();});
 afterEach(()=>{cleanup();clearJobSearchCardHandoff();});
 function Location(){const l=useLocation();return <output aria-label="Current path">{l.pathname}{l.search}</output>;}
 function route(path='/find-work'){return render(<MemoryRouter initialEntries={[path]}><FindWork/><Location/></MemoryRouter>);}
-async function choose(label:string,value:string){const u=userEvent.setup();await u.click(screen.getByRole('combobox',{name:label}));await u.click(screen.getByRole('option',{name:value,exact:true}));}
+async function choose(label:string,value:string){const u=userEvent.setup();await u.click(screen.getByRole('combobox',{name:label}));await u.click(screen.getByRole('option',{name:new RegExp(`^${value}$`)}));}
 async function reviewSeed(){await screen.findByText('No published card');await choose('Experience qualifier','At least');fireEvent.click(screen.getByRole('button',{name:'Review exact card'}));await screen.findByRole('heading',{name:'Review before sharing'});}
 it('actual chat task route uses owner-bound memory, explicit qualifier, separate consent and current returned status',async()=> {
  fixture.rpc.mockImplementation((_name,args)=>args._action==='get'?response(null):response(own));
@@ -76,7 +76,7 @@ it('newer snapshot invalidates review while preserving dirty draft',async()=> {
  setJobSearchCardHandoff(fixture.user,payload);let gets=0;fixture.rpc.mockImplementation(()=>response(++gets===1?null:{...own,revision:2}));route('/find-work?task=job-search-card');await reviewSeed();fireEvent.click(screen.getByRole('button',{name:'Refresh status'}));await screen.findByText('published',{selector:'strong'});expect(screen.queryByRole('heading',{name:'Review before sharing'})).toBeNull();expect(screen.getByLabelText('Years of experience')).toHaveValue(5);
 });
 for(const change of ['account','revocation','acting','workspace']) it(`delayed old read hidden after ${change}`,async()=> {
- let release:((v:unknown)=>void)|undefined;fixture.rpc.mockImplementation(()=>new Promise(r=>{release=r;}));const tree=render(<DriverJobSearchCard/>);await waitFor(()=>expect(fixture.rpc).toHaveBeenCalledOnce());
+ let release:((v:unknown)=>void)|undefined;fixture.rpc.mockImplementationOnce(()=>new Promise(r=>{release=r;}));fixture.rpc.mockImplementation(()=>response(null));const tree=render(<DriverJobSearchCard/>);await waitFor(()=>expect(fixture.rpc).toHaveBeenCalledOnce());
  if(change==='account'){fixture.user=id;fixture.sessionUser=id;}else if(change==='revocation')fixture.driver=false;else if(change==='acting')fixture.acting=true;else fixture.workspace='recruiter';tree.rerender(<DriverJobSearchCard/>);
  await act(async()=>{release?.({data:own,error:null});});expect(screen.queryByText('published',{selector:'strong'})).toBeNull();
 });
