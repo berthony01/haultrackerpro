@@ -35,16 +35,44 @@ function record(value: unknown, keys: string[]): Record<string, unknown> {
   if (Object.keys(r).length !== keys.length || keys.some(k => !Object.prototype.hasOwnProperty.call(r, k))) throw new JobSearchCardError('unknown');
   return r;
 }
+// PostgreSQL precision is microseconds. Normalize only for comparison; retain
+// the original string for exact cursor round trips. Reject Date.parse rollover.
+function timestampMicros(value: unknown): bigint {
+  if (typeof value !== 'string') throw new JobSearchCardError('unknown');
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,6}))?(Z|[+-]\d{2}:\d{2})$/.exec(value);
+  if (!match) throw new JobSearchCardError('unknown');
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fraction, zone] = match;
+  const year = Number(yearText), month = Number(monthText), day = Number(dayText);
+  const hour = Number(hourText), minute = Number(minuteText), second = Number(secondText);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (year < 1 || month < 1 || month > 12 || day < 1 || day > days[month - 1] || hour > 23 || minute > 59 || second > 59) throw new JobSearchCardError('unknown');
+  const zoneHour = zone === 'Z' ? 0 : Number(zone.slice(1, 3));
+  const zoneMinute = zone === 'Z' ? 0 : Number(zone.slice(4, 6));
+  if (zoneHour > 23 || zoneMinute > 59) throw new JobSearchCardError('unknown');
+  const offsetMinutes = (zoneHour * 60 + zoneMinute) * (zone.startsWith('-') ? -1 : 1);
+  const date = new Date(0);
+  date.setUTCFullYear(year, month - 1, day);
+  date.setUTCHours(hour, minute, second, 0);
+  return BigInt(date.getTime() - offsetMinutes * 60000) * BigInt(1000) + BigInt((fraction ?? '').padEnd(6, '0'));
+}
 function timestamp(value: unknown): string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(value) || !Number.isFinite(Date.parse(value))) throw new JobSearchCardError('unknown');
-  return value;
+  timestampMicros(value);
+  return value as string;
+}
+export function compareCardTuple(a: Pick<DiscoveryCard, 'published_at' | 'id'>, b: Pick<DiscoveryCard, 'published_at' | 'id'>): number {
+  if (!uuid.test(a.id) || !uuid.test(b.id)) throw new JobSearchCardError('unknown');
+  const left = timestampMicros(a.published_at), right = timestampMicros(b.published_at);
+  if (left !== right) return left < right ? -1 : 1;
+  const leftId = a.id.toLowerCase(), rightId = b.id.toLowerCase();
+  return leftId === rightId ? 0 : leftId < rightId ? -1 : 1;
 }
 function base(r: Record<string, unknown>): DiscoveryCard {
   if (typeof r.id !== 'string' || !uuid.test(r.id) || typeof r.revision !== 'number' || !Number.isInteger(r.revision) || r.revision < 1) throw new JobSearchCardError('unknown');
   let payload: JobSearchCardPayload;
   try { payload = validateJobSearchCardPayload(r.payload); } catch { throw new JobSearchCardError('unknown'); }
   const published_at = timestamp(r.published_at), expires_at = timestamp(r.expires_at);
-  if (Date.parse(expires_at) <= Date.parse(published_at)) throw new JobSearchCardError('unknown');
+  if (timestampMicros(expires_at) <= timestampMicros(published_at)) throw new JobSearchCardError('unknown');
   return { id: r.id, revision: r.revision, published_at, expires_at, payload };
 }
 export function parseOwnCard(value: unknown): OwnCard | null {
@@ -59,8 +87,8 @@ export function parseDiscoveryCards(value: unknown, limit = 20): DiscoveryCard[]
   const ids = new Set<string>();
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i], previous = rows[i - 1];
-    if (ids.has(row.id) || (previous && (Date.parse(row.published_at) > Date.parse(previous.published_at) || (row.published_at === previous.published_at && row.id >= previous.id)))) throw new JobSearchCardError('unknown');
-    ids.add(row.id);
+    if (ids.has(row.id.toLowerCase()) || (previous && compareCardTuple(row, previous) >= 0)) throw new JobSearchCardError('unknown');
+    ids.add(row.id.toLowerCase());
   }
   return rows;
 }
@@ -99,6 +127,6 @@ export async function listRecruiterCards(recruiterId: string, cursor: DiscoveryC
     _recruiter_id: recruiterId, _limit: 20,
     _after_published_at: cursor?.published_at ?? null, _after_card_id: cursor?.id ?? null,
   }, identity, current));
-  if (cursor && rows.some(r => Date.parse(r.published_at) > Date.parse(cursor.published_at) || (r.published_at === cursor.published_at && r.id >= cursor.id))) throw new JobSearchCardError('unknown');
+  if (cursor && rows.some(r => compareCardTuple(r, cursor) >= 0)) throw new JobSearchCardError('unknown');
   return rows;
 }

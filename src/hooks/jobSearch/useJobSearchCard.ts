@@ -15,9 +15,12 @@ export function useCardScope() {
   const view = useViewMode();
   const acting = useActingContext();
   const owner = auth.user?.id ?? null;
-  const settled = !auth.loading && !view.isLoading && !view.error && !acting.isLoadingManagedDrivers;
-  const personal = settled && !!owner && auth.session?.user.id === owner && !acting.isActingAsAssistant;
-  const key = personal ? `${owner}:${view.driverCapabilityStatus}:${view.recruiterCapabilityStatus}:${view.effectiveRole}` : null;
+  // Ownership survives capability/workspace transitions, never auth/acting loss.
+  const personal = !auth.loading && !acting.isLoadingManagedDrivers && !!owner
+    && auth.session?.user.id === owner && !acting.isActingAsAssistant;
+  const settled = personal && !view.isLoading && !view.error;
+  const key = personal ? owner : null;
+  const authorityKey = `${view.isLoading}:${Boolean(view.error)}:${view.driverCapabilityStatus}:${view.recruiterCapabilityStatus}:${view.effectiveRole}`;
   const live = useRef(key);
   live.current = key;
   const identity = (): RequestIdentity => {
@@ -27,8 +30,9 @@ export function useCardScope() {
   useEffect(() => {
     if (!personal) clearJobSearchCardHandoff();
   }, [personal, owner]);
-  return { owner, key, personal, canPublish: personal && view.driverWorkspaceAllowed === true,
-    recruiterAllowed: personal && view.recruiterOperationsAllowed === true && view.recruiterAccessKind === 'capability',
+  return { owner, key, authorityKey, personal, canManage: settled,
+    canPublish: settled && view.driverWorkspaceAllowed === true,
+    recruiterAllowed: settled && view.recruiterOperationsAllowed === true && view.recruiterAccessKind === 'capability',
     loading: !settled, identity, current: () => key !== null && live.current === key };
 }
 export type CardScope = ReturnType<typeof useCardScope>;
@@ -43,7 +47,7 @@ export interface OwnCardState {
   submit: (command: CardCommand) => Promise<boolean>;
   retry: () => Promise<boolean>;
 }
-/** Local state only: no globally cached card, token, draft or command. */
+/** Owner-bound local state. Authority changes invalidate review, not receipts. */
 export function useJobSearchCard(scope: CardScope): OwnCardState {
   const [state, setState] = useState({ card: null as OwnCard | null, ready: false, busy: false, error: null as CardFailure | null, uncertain: false, pending: null as CardCommand | null });
   const live = useRef(scope);
@@ -67,39 +71,47 @@ export function useJobSearchCard(scope: CardScope): OwnCardState {
     return () => { mounted.current = false; serial.current++; pending.current = null; subscription.unsubscribe(); };
   }, [scope.owner]);
   async function refresh() {
-    if (!allowed()) return;
+    if (!allowed() || !live.current.canManage) return;
     const seq = ++serial.current;
-    setState(s => ({ ...s, ready: false, busy: true }));
+    setState(s => ({ ...s, ready: false }));
     try {
       const card = await getOwnCard(live.current.identity(), allowed);
       if (!allowed() || seq !== serial.current) return;
-      setState(s => ({ ...s, card, ready: true, busy: false, error: s.uncertain || s.error === 'stale' || s.error === 'no_card' ? s.error : null }));
+      // A read, including null, cannot resolve an already-dispatched command.
+      setState(s => ({ ...s, card, ready: true, error: s.uncertain || s.error === 'stale' || s.error === 'no_card' ? s.error : null }));
     } catch (e) {
       if (!allowed() || seq !== serial.current) return;
       const error = e instanceof JobSearchCardError ? e.kind : 'unknown';
-      setState(s => ({ ...s, ready: false, busy: false, error }));
+      setState(s => ({ ...s, ready: false, error }));
     }
   }
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { if (scope.canManage && !state.ready) void refresh(); }, [scope.canManage]);
   async function submit(command: CardCommand): Promise<boolean> {
-    if (!allowed() || inFlight.current || (command.action === 'publish' && !live.current.canPublish) || !state.ready || state.error === 'unavailable') return false;
-    if (pending.current && command !== pending.current) return false;
+    if (!allowed() || !live.current.canManage || inFlight.current || (command.action === 'publish' && !live.current.canPublish) || !state.ready || state.error === 'unavailable') return false;
+    const unresolved = pending.current;
+    // A deliberate current-revision withdrawal can resolve an uncertain publish.
+    // Never allow another fresh publish to replace an unresolved receipt.
+    const stopSharing = command.action === 'withdraw' && unresolved?.action === 'publish' && !!state.card;
+    if (unresolved && command !== unresolved && !stopSharing) return false;
     inFlight.current = true;
+    serial.current++;
     pending.current = command;
-    setState(s => ({ ...s, busy: true, error: null, pending: command }));
+    setState(s => ({ ...s, busy: true, uncertain: true, error: null, pending: command }));
     try {
       const card = await manageOwnCard(command, live.current.identity(), allowed);
       if (!allowed()) return false;
       if (!card) throw new JobSearchCardError('unknown');
+      serial.current++;
       pending.current = null;
       setState({ card, ready: true, busy: false, error: null, pending: null, uncertain: false });
       return true;
     } catch (e) {
       if (!allowed()) return false;
       const error = e instanceof JobSearchCardError ? e.kind : 'unknown';
-      const uncertain = error === 'unknown';
-      if (!uncertain) pending.current = null;
-      setState(s => ({ ...s, busy: false, error, uncertain, pending: uncertain ? command : null }));
+      // A rejected replay cannot disprove the original unknown publication.
+      const retained = error === 'unknown' ? command : unresolved;
+      pending.current = retained;
+      setState(s => ({ ...s, busy: false, error, uncertain: retained !== null, pending: retained }));
       if (error === 'stale' || error === 'no_card') await refresh();
       return false;
     } finally { inFlight.current = false; }
