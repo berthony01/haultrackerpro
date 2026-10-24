@@ -1,0 +1,20 @@
+import { describe, it, expect } from 'vitest';
+import { buildJobSearchCardReview, validateJobSearchCardPayload, JOB_SEARCH_STATES } from '../lib/jobSearch/jobSearchCardContract';
+const base = { state:'TX',cdl_class:'A',years_experience:5,experience_qualifier:'at_least',preferred_route_type:'Regional',preferred_home_time:'Weekly' };
+describe('HJ-1A explicit employment card contract', () => {
+  it('requires explicit qualification and preserves at-least meaning', () => expect(buildJobSearchCardReview(base).experience).toBe('At least 5 years'));
+  it('allows exact zero, never invents missing optional gross', () => { const p=validateJobSearchCardPayload({...base,years_experience:0,experience_qualifier:'exact'}); expect(p.years_experience).toBe(0); expect(p).not.toHaveProperty('min_weekly_gross'); });
+  for (const key of Object.keys(base)) it(`requires ${key}`, () => { const p:Record<string,unknown>={...base}; delete p[key]; expect(()=>validateJobSearchCardPayload(p)).toThrow(); });
+  for (const key of ['city','name','email','phone','telegram','owner_user_id','driver_user_id','recruiter_id','notes','transcript','profile','contact_consent','unknown']) it(`rejects forbidden ${key}`, () => expect(()=>validateJobSearchCardPayload({...base,[key]:'private'})).toThrow());
+  for (const value of ['5+','5',-1,61,0.5,NaN,Infinity,null]) it(`rejects ambiguous/range experience ${String(value)}`, () => expect(()=>validateJobSearchCardPayload({...base,years_experience:value})).toThrow());
+  it('less-than requires a positive explicit value', () => { expect(()=>validateJobSearchCardPayload({...base,years_experience:0,experience_qualifier:'less_than'})).toThrow(); expect(buildJobSearchCardReview({...base,years_experience:1,experience_qualifier:'less_than'}).experience).toBe('Less than 1 years'); });
+  it('upper experience boundary is 60', () => expect(validateJobSearchCardPayload({...base,years_experience:60}).years_experience).toBe(60));
+  for (const date of ['2026-02-29','2026-02-31','2026-13-01','0000-01-01','2026-1-01','tomorrow',null]) it(`rejects calendar ${date}`, () => expect(()=>validateJobSearchCardPayload({...base,available_start_date:date})).toThrow());
+  it('accepts leap date and optional values without changing caller array', () => { const p={...base,available_start_date:'2028-02-29',trailer_experience:['Reefer','Dry Van'],preferred_driver_type:'Team',min_weekly_gross:100000}; expect(validateJobSearchCardPayload(p).trailer_experience).toEqual(['Dry Van','Reefer']); expect(p.trailer_experience).toEqual(['Reefer','Dry Van']); });
+  for (const gross of [0,-1,100001,'1500',null,Infinity]) it(`rejects gross ${gross}`, () => expect(()=>validateJobSearchCardPayload({...base,min_weekly_gross:gross})).toThrow());
+  for (const trailers of [['Reefer','Reefer'],['Other'],[1],null,Array(9).fill('Reefer')]) it(`rejects invalid trailers ${JSON.stringify(trailers)}`, () => expect(()=>validateJobSearchCardPayload({...base,trailer_experience:trailers})).toThrow());
+  for (const p of [{state:'tx'},{state:'XX'},{cdl_class:'D'},{preferred_route_type:'Team'},{preferred_home_time:'Whenever'},{preferred_driver_type:'Solo'},{experience_qualifier:'approximate'}]) it(`rejects choices ${JSON.stringify(p)}`,()=>expect(()=>validateJobSearchCardPayload({...base,...p})).toThrow());
+  for (const p of [null,[],5,'card']) it(`rejects nonobject ${JSON.stringify(p)}`,()=>expect(()=>validateJobSearchCardPayload(p)).toThrow());
+  it('copies the validator state/DC set exactly',()=> { expect(JOB_SEARCH_STATES).toHaveLength(51); expect(JOB_SEARCH_STATES).toContain('DC'); });
+  it('review is deterministic, narrow and has exactly 14-day consent/audience',()=> { const a=buildJobSearchCardReview({...base,trailer_experience:['Reefer','Dry Van']}); const b=buildJobSearchCardReview({...base,trailer_experience:['Dry Van','Reefer']}); expect(a).toEqual(b); expect(a).toEqual({payload:{...base,trailer_experience:['Dry Van','Reefer']},experience:'At least 5 years',audience:'approved_recruiters',consent_version:'job_search_card_v1',review_days:14}); });
+});
