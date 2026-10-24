@@ -45,6 +45,7 @@ let proxy: Server | undefined;
 let browser: Browser | undefined;
 let clusterStarted = false;
 let droppedCommand: string | null = null;
+const droppedIds = new Set<string>();
 let delayNextPublish = false;
 let heldRequest: (() => void) | undefined;
 let holdNextPublish = false;
@@ -275,6 +276,7 @@ beforeAll(async () => {
     })();
     const actor = Object.entries(ids).find(([, id]) => id === sub)?.[0] ?? 'anon/other';
     if (req.url?.includes('ensure_my_recruiter_setup_state')) { selfHealCalls++; selfHealActors.add(actor); }
+    const arrived = Date.now();
     const chunks: Buffer[] = [];
     req.on('data', chunk => chunks.push(chunk));
     req.on('end', () => {
@@ -285,6 +287,7 @@ beforeAll(async () => {
         const parsed = JSON.parse(body.toString() || '{}');
         action = parsed._action;
         commandId = parsed._client_command_id;
+        console.log('[proxy-arrive]', arrived, actor, `action=${action}`, `cmd=${String(commandId).slice(0, 8)}`, `reqport=${req.socket.remotePort}`);
       }
       const forward = () => {
         const target = request({
@@ -292,12 +295,26 @@ beforeAll(async () => {
           path: req.url?.replace(auth ? '/auth/v1' : '/rest/v1', ''),
           method: req.method, headers: { ...req.headers, host: '127.0.0.1' },
         }, upstream => {
-          console.log('[proxy]', actor, req.method, req.url?.split('?')[0], '->', upstream.statusCode);
-          if (delayNextPublish && action === 'publish') {
+          console.log('[proxy]', Date.now(), actor, req.method, req.url?.split('?')[0], '->', upstream.statusCode,
+            action ? `action=${action}` : '', commandId ? `cmd=${commandId.slice(0, 8)}` : '',
+            `reqport=${req.socket.remotePort}`);
+          // Traced: the browser transport transparently replays the in-memory
+          // POST on a fresh socket ~6ms after a destroyed response (identical
+          // _client_command_id, no application resubmit). The unknown-outcome
+          // simulation must therefore poison the original response AND every
+          // transport replay of the same command; the server still executes
+          // each one, and the canonical RPC's client_command_id idempotency
+          // (asserted below: exactly one event) absorbs the duplicate.
+          if (action === 'publish' && commandId && (delayNextPublish || droppedIds.has(commandId))) {
             delayNextPublish = false;
-            droppedCommand = commandId ?? null;
+            droppedCommand = commandId;
+            droppedIds.add(commandId);
             upstream.resume();
-            upstream.on('end', () => res.destroy());
+            upstream.on('end', () => {
+              res.writeHead(200, { 'content-type': 'application/json', 'content-length': '1048576' });
+              res.write('{"truncated"');
+              res.destroy();
+            });
             return;
           }
           res.writeHead(upstream.statusCode ?? 502, upstream.headers);
@@ -383,7 +400,11 @@ async function preservation() {
 async function localPage(width = 1280, height = 1800) {
   if (!browser) {
     let existingDriver: string | undefined;
-    const pythonCandidates = ['/usr/local/bin/python3', '/usr/bin/python3', '/bin/python3'];
+    // Bounded discovery: standard locations, then the exact observed Nix store
+    // Python of this sandbox (validated with existsSync before use; a portability
+    // limit reported in the final evidence, never a global symlink/alias).
+    const pythonCandidates = ['/usr/local/bin/python3', '/usr/bin/python3', '/bin/python3',
+      '/nix/store/a3czxrfpqrw5zrcbl7lw573qyaygxv0s-sandbox-python-env/bin/python3'];
     for (const python of pythonCandidates) {
       if (!existsSync(python)) continue;
       try {
@@ -432,10 +453,50 @@ async function select(page: Page, label: string, value: string) {
   await page.getByRole('combobox', { name: label, exact: true }).click();
   await page.getByRole('option', { name: value, exact: true }).click();
 }
+async function dumpReviewDiagnostics(page: Page, step: string) {
+  // Sanitized harness state only: hook flags, mount transitions, element
+  // counts. Never tokens, emails, passwords or capability constants.
+  const diag = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
+  const mounts = await page.evaluate(() => (window as unknown as { __hj1cMounts?: string[] }).__hj1cMounts ?? []).catch(() => []);
+  const authEvents = await page.evaluate(() => (window as unknown as { __hj1cAuthEvents?: string[] }).__hj1cAuthEvents ?? []).catch(() => []);
+  console.log('[review-diag] auth-events=', JSON.stringify(authEvents));
+  const counts = {
+    reviewButton: await page.getByRole('button', { name: 'Review my job-search card', exact: true }).count(),
+    heading: await page.getByRole('heading', { name: 'My job-search card', exact: true }).count(),
+    reviewExact: await page.getByRole('button', { name: 'Review exact card' }).count(),
+    reviewExactEnabled: await page.getByRole('button', { name: 'Review exact card' }).isEnabled().catch(() => false),
+    loading: await page.getByText('Loading…', { exact: true }).count(),
+    unavailable: await page.getByText('Job-search card management is unavailable in this account context.').count(),
+  };
+  const statuses = await page.locator('strong[role="status"]').allTextContents().catch(() => []);
+  console.log(`[review-diag] step=${step} diag=${diag} mounts=${JSON.stringify(mounts)} counts=${JSON.stringify(counts)} statuses=${JSON.stringify(statuses)}`);
+}
+async function settledAuthority(page: Page) {
+  // Legitimate observable precondition: the real intake flow only offers the
+  // handoff after sign-in authority has settled. Clicking earlier mounts the
+  // card while personal=false, and the fail-closed handoff clear wipes the
+  // one-shot seed before ConnectedDriverCard can consume it (traced cause of
+  // the intermittent review-settle failure). Wait on existing hook values
+  // exposed by the test-only shell; no sleeps, retries or reseeding.
+  await waitFor(async () => {
+    const text = await page.getByTestId('hj1c-diag').textContent().catch(() => null);
+    if (!text) return false;
+    const diag = JSON.parse(text);
+    return diag.authLoading === false && diag.sessionMatch === true
+      && diag.actingLoading === false && diag.viewLoading === false
+      && diag.viewError === false && diag.effectiveRole !== null;
+  }, 'settled sign-in authority');
+}
 async function review(page: Page) {
-  await page.getByRole('button', { name: 'Review my job-search card', exact: true }).click();
-  await page.getByRole('heading', { name: 'My job-search card', exact: true }).waitFor();
-  await waitFor(async () => await page.getByRole('button', { name: 'Review exact card' }).isEnabled(), 'settled owner status');
+  try {
+    await settledAuthority(page);
+    await page.getByRole('button', { name: 'Review my job-search card', exact: true }).click();
+    await page.getByRole('heading', { name: 'My job-search card', exact: true }).waitFor();
+    await waitFor(async () => await page.getByRole('button', { name: 'Review exact card' }).isEnabled(), 'settled owner status');
+  } catch (failure) {
+    await dumpReviewDiagnostics(page, 'settle');
+    throw failure;
+  }
   await select(page, 'Experience qualifier', 'At least');
   await page.getByRole('button', { name: 'Review exact card', exact: true }).click();
   expect(await page.getByRole('heading', { name: 'Review before sharing' }).evaluate(el => el === document.activeElement)).toBe(true);
@@ -610,6 +671,22 @@ it('connected unknown publication retains exact command after real response loss
   const {page,context} = await localPage();
   await login(page,'driver');
   await review(page);
+  // Test-only timeline sampler: pinpoints exactly which UI state transition
+  // clears the uncertain publication (remount vs auth reset vs refresh).
+  const timeline: string[] = [];
+  let sampling = true;
+  const sampler = (async () => {
+    let last = '';
+    while (sampling) {
+      const status = await page.locator('strong[role="status"]').first().textContent().catch(() => '<gone>');
+      const retry = await page.getByRole('button',{name:'Retry same request',exact:true}).count().catch(() => -1);
+      const diag = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
+      const mounts = await page.evaluate(() => ((window as unknown as { __hj1cMounts?: string[] }).__hj1cMounts ?? []).length).catch(() => -1);
+      const snap = `status=${status} retry=${retry} mounts=${mounts} diag=${diag}`;
+      if (snap !== last) { timeline.push(`${Date.now()}: ${snap}`); last = snap; }
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+  })();
   delayNextPublish = true;
   await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
   await page.getByText('Outcome not confirmed',{exact:true}).waitFor();
@@ -619,7 +696,17 @@ it('connected unknown publication retains exact command after real response loss
   const card = await own('driver');
   expect(card.status).toBe('published');
   await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
-  await page.getByRole('button',{name:'Retry same request',exact:true}).click();
+  try {
+    await page.getByRole('button',{name:'Retry same request',exact:true}).click();
+  } catch (failure) {
+    sampling = false;
+    await sampler;
+    console.log('[unknown-timeline]', JSON.stringify(timeline, null, 1));
+    await dumpReviewDiagnostics(page, 'retry-absent');
+    throw failure;
+  }
+  sampling = false;
+  await sampler;
   await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
   expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
     [droppedCommand])).rows[0].n).toBe(1);

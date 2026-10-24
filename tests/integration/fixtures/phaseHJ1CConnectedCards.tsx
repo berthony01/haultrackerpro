@@ -1,5 +1,5 @@
 /** Test-only shell: actual providers, connected components, and generated client. */
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from '@/hooks/useAuth';
 import { ActingContextProvider, useActingContext } from '@/hooks/useActingContext';
@@ -17,12 +17,35 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false } },
 });
 
+// Test-only mount probe: records ConnectedDriverCard mount/unmount transitions
+// so harness failures can distinguish seed-consumed-then-remounted from
+// never-mounted. No app code is touched.
+function MountProbe({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const log = ((window as unknown as { __hj1cMounts?: string[] }).__hj1cMounts ??= []);
+    log.push(`mount@${Date.now()}`);
+    return () => {
+      log.push(`unmount@${Date.now()}`);
+    };
+  }, []);
+  return <>{children}</>;
+}
+
 function ConnectedShell() {
   const auth = useAuth();
   const acting = useActingContext();
   const view = useViewMode();
   const recruiter = useRecruiterProfile();
   const cache = useQueryClient();
+  // Test-only auth event recorder: proves whether any null-session or
+  // mismatched-user event fires during the uncertain-publication window.
+  useEffect(() => {
+    const log = ((window as unknown as { __hj1cAuthEvents?: string[] }).__hj1cAuthEvents ??= []);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      log.push(`${event}@${Date.now()}:user=${session?.user.id === auth.user?.id ? 'same' : session ? 'other' : 'null'}`);
+    });
+    return () => subscription.unsubscribe();
+  }, [auth.user?.id]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [notice, setNotice] = useState('');
@@ -103,7 +126,22 @@ function ConnectedShell() {
         {acting.isActingAsAssistant && <Button onClick={acting.exitActingAs}>Return to personal account</Button>}
       </nav>
       <p role="status">{notice}</p>
-      {reviewing && <DriverJobSearchCard key={auth.user.id} />}
+      {/* Test-only diagnostics: existing hook values only, no tokens/capability constants. */}
+      <div data-testid="hj1c-diag" style={{ display: 'none' }}>
+        {JSON.stringify({
+          authLoading: auth.loading,
+          sessionMatch: auth.session?.user.id === auth.user.id,
+          actingLoading: acting.isLoadingManagedDrivers,
+          actingAs: acting.isActingAsAssistant,
+          viewLoading: view.isLoading,
+          viewError: Boolean(view.error),
+          effectiveRole: view.effectiveRole,
+          driverCap: view.driverCapabilityStatus,
+          canSwitch: view.canSwitch,
+          reviewing,
+        })}
+      </div>
+      {reviewing && <MountProbe><DriverJobSearchCard key={auth.user.id} /></MountProbe>}
       {recruiter.profile && (
         <>
           <Button onClick={() => setPool(true)}>Open available drivers</Button>
