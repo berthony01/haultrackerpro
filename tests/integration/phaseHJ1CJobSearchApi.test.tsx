@@ -292,8 +292,9 @@ beforeAll(async () => {
           path: req.url?.replace(auth ? '/auth/v1' : '/rest/v1', ''),
           method: req.method, headers: { ...req.headers, host: '127.0.0.1' },
         }, upstream => {
-          console.log('[proxy]', actor, req.method, req.url?.split('?')[0], '->', upstream.statusCode,
-            action ? `action=${action}` : '', commandId ? `cmd=${commandId.slice(0, 8)}` : '');
+          console.log('[proxy]', Date.now(), actor, req.method, req.url?.split('?')[0], '->', upstream.statusCode,
+            action ? `action=${action}` : '', commandId ? `cmd=${commandId.slice(0, 8)}` : '',
+            `reqport=${req.socket.remotePort}`);
           if (delayNextPublish && action === 'publish') {
             delayNextPublish = false;
             droppedCommand = commandId ?? null;
