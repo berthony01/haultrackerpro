@@ -463,7 +463,17 @@ it('actual lifecycle HTTP receipts: validation, TTL, isolation, idempotency and 
   expect(Date.parse(first.data.expires_at) - Date.parse(first.data.published_at)).toBe(14 * 86400000);
   expect(await own('other')).toBe(null);
   console.log('Lifecycle: publication and isolation complete');
-  expect((await rpc('manage_my_job_search_card', command('pause',0), sessions.driver.access_token)).data.code).toBe('40001');
+  const stale = rpc('manage_my_job_search_card', command('pause',0), sessions.driver.access_token);
+  const activity = await Promise.race([
+    stale,
+    new Promise<null>(resolve => setTimeout(() => resolve(null), 1000)),
+  ]);
+  if (!activity) {
+    const evidence = (await db.query(`SELECT state,wait_event_type,wait_event FROM pg_stat_activity
+      WHERE usename='authenticator' AND state <> 'idle'`)).rows;
+    console.log('Stale HTTP runtime diagnostic:', JSON.stringify(evidence));
+  }
+  expect((await stale).data.code).toBe('40001');
   await rpc('manage_my_job_search_card', command('withdraw',first.data.revision), sessions.driver.access_token);
   console.log('Lifecycle: withdrawal complete');
   const replay = await rpc('manage_my_job_search_card', publish, sessions.driver.access_token);
