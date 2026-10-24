@@ -383,7 +383,11 @@ async function preservation() {
 async function localPage(width = 1280, height = 1800) {
   if (!browser) {
     let existingDriver: string | undefined;
-    const pythonCandidates = ['/usr/local/bin/python3', '/usr/bin/python3', '/bin/python3'];
+    // Bounded discovery: standard locations, then the exact observed Nix store
+    // Python of this sandbox (validated with existsSync before use; a portability
+    // limit reported in the final evidence, never a global symlink/alias).
+    const pythonCandidates = ['/usr/local/bin/python3', '/usr/bin/python3', '/bin/python3',
+      '/nix/store/a3czxrfpqrw5zrcbl7lw573qyaygxv0s-sandbox-python-env/bin/python3'];
     for (const python of pythonCandidates) {
       if (!existsSync(python)) continue;
       try {
