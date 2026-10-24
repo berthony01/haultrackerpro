@@ -463,7 +463,8 @@ it('actual lifecycle HTTP receipts: validation, TTL, isolation, idempotency and 
   expect(Date.parse(first.data.expires_at) - Date.parse(first.data.published_at)).toBe(14 * 86400000);
   expect(await own('other')).toBe(null);
   console.log('Lifecycle: publication and isolation complete');
-  const stale = rpc('manage_my_job_search_card', command('pause',0), sessions.driver.access_token);
+  const stale = jsonRequest('http://127.0.0.1:55444/rest/v1/rpc/manage_my_job_search_card',
+    sessions.driver.access_token, command('pause',0));
   const activity = await Promise.race([
     stale,
     new Promise<null>(resolve => setTimeout(() => resolve(null), 1000)),
