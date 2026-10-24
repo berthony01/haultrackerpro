@@ -20,6 +20,10 @@ CREATE TYPE public.agency_member_status AS ENUM ('pending', 'active', 'revoked')
 
 CREATE TYPE public.agency_delegation_status AS ENUM ('pending_driver_approval', 'approved', 'declined', 'revoked', 'expired');
 
+CREATE TYPE public.agency_client_request_status AS ENUM (
+  'pending', 'approved', 'declined', 'cancelled', 'converted_to_client'
+);
+
 -- Source: 20260225000407_e32358b0-923e-4e45-adcd-1e0a2977790f.sql
 
 CREATE TABLE public.profiles (
@@ -433,6 +437,23 @@ ALTER TABLE public.recruiter_members ADD COLUMN permissions jsonb NOT NULL DEFAU
 
 
 -- Source: 20260628114250_fe0250b1-6527-477c-be9a-ac5e21467e0a.sql
+
+CREATE TABLE public.agency_service_packages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  agency_id uuid NOT NULL REFERENCES public.agency_profiles(id) ON DELETE CASCADE,
+  name text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 120),
+  description text,
+  price_display_text text,
+  billing_frequency_display_text text,
+  included_services jsonb NOT NULL DEFAULT '[]'::jsonb,
+  recommended_permissions jsonb NOT NULL DEFAULT '{}'::jsonb,
+  is_active boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+GRANT ALL ON public.agency_service_packages TO service_role;
+ALTER TABLE public.agency_service_packages ENABLE ROW LEVEL SECURITY;
 
 CREATE TABLE IF NOT EXISTS public.agency_client_requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
