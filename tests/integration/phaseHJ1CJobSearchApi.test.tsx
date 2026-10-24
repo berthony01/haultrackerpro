@@ -51,8 +51,10 @@ let heldRequest: (() => void) | undefined;
 let holdNextPublish = false;
 let forbiddenNetwork = 0;
 let selfHealCalls = 0;
+let selfHealAnonAllowed = 0;
 const selfHealActors = new Set<string>();
-let originalInventory: unknown;
+let originalInventory: Record<string, unknown[]>;
+let preCandidateInventory: Record<string, unknown[]>;
 let originalSentinels: unknown;
 let workspace = randomUUID();
 
@@ -91,7 +93,7 @@ async function portFree(port: number) {
 function source(file: string) { return readFileSync(path.join(ROOT, file), 'utf8'); }
 function helper(file: string, name: string) {
   const match = source(file).match(new RegExp(
-    'CREATE OR REPLACE FUNCTION public\\.' + name + '\\([\\s\\S]*?AS (\\$\\w*\\$)[\\s\\S]*?\\1;', 'i',
+    'CREATE (?:OR REPLACE )?FUNCTION public\\.' + name + '\\([\\s\\S]*?AS (\\$\\w*\\$)[\\s\\S]*?\\1;', 'i',
   ));
   if (!match) throw new Error(`Canonical helper missing: ${name}`);
   return match[0];
@@ -133,15 +135,44 @@ async function seedAccount(name: string) {
   sessions[name] = signed.data;
 }
 async function inventory() {
+  // Expanded catalog: schema/table ACLs, RLS/force-RLS flags, constraints,
+  // triggers (internal cross-schema FK triggers excluded), policies, columns,
+  // and function definitions/ACLs. Column-level privileges are not used by the
+  // candidate or fixture and are out of scope.
   return (await db.query(`SELECT jsonb_build_object(
+    'schemas', (SELECT jsonb_agg(jsonb_build_object('name',n.nspname,'acl',n.nspacl::text) ORDER BY n.nspname)
+      FROM pg_namespace n WHERE n.nspname IN ('public','job_search_private')),
+    'tables', (SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,'acl',c.relacl::text,
+        'rls',c.relrowsecurity,'force',c.relforcerowsecurity) ORDER BY n.nspname,c.relname)
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname IN ('public','job_search_private') AND c.relkind='r'),
     'columns', (SELECT jsonb_agg(to_jsonb(x) ORDER BY table_name,ordinal_position)
       FROM information_schema.columns x WHERE table_schema IN ('public','job_search_private')),
+    'constraints', (SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'table',c.relname,'name',con.conname,
+        'definition',pg_get_constraintdef(con.oid)) ORDER BY n.nspname,c.relname,con.conname)
+      FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname IN ('public','job_search_private')),
     'policies', (SELECT jsonb_agg(to_jsonb(x) ORDER BY schemaname,tablename,policyname)
       FROM pg_policies x WHERE schemaname IN ('public','job_search_private')),
+    'triggers', (SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'table',c.relname,'name',t.tgname,
+        'definition',pg_get_triggerdef(t.oid)) ORDER BY n.nspname,c.relname,t.tgname)
+      FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname IN ('public','job_search_private') AND NOT t.tgisinternal),
     'functions', (SELECT jsonb_agg(jsonb_build_object('def',pg_get_functiondef(p.oid),'acl',p.proacl::text)
       ORDER BY n.nspname,p.proname) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname IN ('public','job_search_private') AND p.prokind='f')
   ) AS x`)).rows[0].x;
+}
+function assertCatalogPreserved(before: Record<string, unknown[]>, after: Record<string, unknown[]>) {
+  // Every preexisting catalog object must be byte-identical after the candidate
+  // and after the full runtime; additions (the new card objects) are allowed.
+  for (const key of Object.keys(before)) {
+    const afterEntries = new Set((after[key] ?? []).map(entry => JSON.stringify(entry)));
+    for (const entry of before[key] ?? []) {
+      expect(afterEntries.has(JSON.stringify(entry)),
+        `${key} preexisting entry preserved: ${JSON.stringify(entry).slice(0, 200)}`).toBe(true);
+    }
+  }
 }
 
 beforeAll(async () => {
@@ -245,9 +276,12 @@ beforeAll(async () => {
     GRANT EXECUTE ON FUNCTION public.is_admin(uuid),public.is_super_admin(uuid),
       public.get_my_user_capabilities(),public.get_my_managed_drivers(),
       public.get_my_recruiter_profile_safe(),public.is_current_user_recruiter(),
-      public.get_my_recruiter_staff_workspaces(),public.is_recruiter_workspace_owner(uuid) TO authenticated;
+      public.get_my_recruiter_staff_workspaces(),public.is_recruiter_workspace_owner(uuid),
+      public.ensure_my_recruiter_setup_state() TO authenticated;
     CREATE POLICY admin_self_read ON public.admin_users FOR SELECT TO authenticated
       USING (public.is_admin(auth.uid()));`);
+  // Baseline catalog of preexisting objects BEFORE the candidates apply.
+  preCandidateInventory = await inventory();
   for (const file of sqlPaths) await db.query(source(file));
   await db.query('RESET ROLE');
   safeFile(HJ1C_ROOT + '/runtime/postgrest.conf', `db-uri = "postgresql://authenticator:${dbPassword}@/postgres?host=${SOCKET}&port=55441&sslmode=disable"
@@ -275,7 +309,8 @@ beforeAll(async () => {
       } catch { return ''; }
     })();
     const actor = Object.entries(ids).find(([, id]) => id === sub)?.[0] ?? 'anon/other';
-    if (req.url?.includes('ensure_my_recruiter_setup_state')) { selfHealCalls++; selfHealActors.add(actor); }
+    const isSelfHeal = req.url?.includes('ensure_my_recruiter_setup_state');
+    if (isSelfHeal) { selfHealCalls++; selfHealActors.add(actor); }
     const arrived = Date.now();
     const chunks: Buffer[] = [];
     req.on('data', chunk => chunks.push(chunk));
@@ -295,6 +330,7 @@ beforeAll(async () => {
           path: req.url?.replace(auth ? '/auth/v1' : '/rest/v1', ''),
           method: req.method, headers: { ...req.headers, host: '127.0.0.1' },
         }, upstream => {
+          if (isSelfHeal && actor === 'anon/other' && (upstream.statusCode ?? 500) < 400) selfHealAnonAllowed++;
           console.log('[proxy]', Date.now(), actor, req.method, req.url?.split('?')[0], '->', upstream.statusCode,
             action ? `action=${action}` : '', commandId ? `cmd=${commandId.slice(0, 8)}` : '',
             `reqport=${req.socket.remotePort}`);
@@ -389,7 +425,8 @@ async function preservation() {
   const names = ['profiles','admin_users','subscriptions','recruiter_profiles','opportunities',
     'driver_opportunity_profiles','driver_assistants','recruiter_members','agency_profiles',
     'agency_members','agency_entitlements','agency_client_requests','agency_delegation_requests',
-    'owner_qa_sessions','qa_fixture_roots','marketplace_user_restrictions','hj1c_preservation_sentinels'];
+    'owner_qa_sessions','qa_fixture_roots','marketplace_user_restrictions','user_capabilities',
+    'hj1c_preservation_sentinels'];
   const result: Record<string, unknown> = {};
   for (const name of names) {
     result[name] = (await db.query(`SELECT coalesce(jsonb_agg(to_jsonb(t) ORDER BY to_jsonb(t)::text),'[]') AS x
@@ -471,7 +508,7 @@ async function dumpReviewDiagnostics(page: Page, step: string) {
   const statuses = await page.locator('strong[role="status"]').allTextContents().catch(() => []);
   console.log(`[review-diag] step=${step} diag=${diag} mounts=${JSON.stringify(mounts)} counts=${JSON.stringify(counts)} statuses=${JSON.stringify(statuses)}`);
 }
-async function settledAuthority(page: Page) {
+async function settledAuthority(page: Page, requireRole = true) {
   // Legitimate observable precondition: the real intake flow only offers the
   // handoff after sign-in authority has settled. Clicking earlier mounts the
   // card while personal=false, and the fail-closed handoff clear wipes the
@@ -484,7 +521,7 @@ async function settledAuthority(page: Page) {
     const diag = JSON.parse(text);
     return diag.authLoading === false && diag.sessionMatch === true
       && diag.actingLoading === false && diag.viewLoading === false
-      && diag.viewError === false && diag.effectiveRole !== null;
+      && diag.viewError === false && (!requireRole || diag.effectiveRole !== null);
   }, 'settled sign-in authority');
 }
 async function review(page: Page) {
@@ -558,6 +595,18 @@ it('roles, owner scope, canonical recruiter gates, and metadata forgery are deni
   expect((await rpc('list_recruiter_job_search_cards', { _recruiter_id: workspace }, sessions.recruiter.access_token)).data.code).toBe('42501');
   await db.query("UPDATE public.recruiter_profiles SET verification_status='approved' WHERE id=$1", [workspace]);
   expect((await own('other'))).toBe(null);
+  // Live catalog parity proof for the canonical setup RPC: authenticated may
+  // execute, anon may not, and a real driver caller gets capability_missing
+  // with no mutation (mutation-freedom proven by the final inventory check).
+  const acl = (await db.query(`SELECT p.proacl::text AS acl FROM pg_proc p
+    JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.proname='ensure_my_recruiter_setup_state'`)).rows[0].acl;
+  expect(acl).toContain('authenticated=X');
+  expect(acl).not.toContain('anon=X');
+  const heal = await rpc('ensure_my_recruiter_setup_state', {}, sessions.driver.access_token);
+  expect(heal.status).toBe(200);
+  expect(heal.data[0].eligibility_state).toBe('capability_missing');
+  expect((await rpc('ensure_my_recruiter_setup_state', {}, jwt('anon'))).status).toBeGreaterThanOrEqual(400);
 });
 
 it('actual lifecycle HTTP receipts: validation, TTL, isolation, idempotency and current-state replay', async () => {
@@ -669,8 +718,6 @@ it('desktop and mobile real UI sign-in, exact review, publish, pause/withdraw an
 
 it('connected unknown publication retains exact command after real response loss and current-state withdrawal', async () => {
   const {page,context} = await localPage();
-  await login(page,'driver');
-  await review(page);
   // Test-only timeline sampler: pinpoints exactly which UI state transition
   // clears the uncertain publication (remount vs auth reset vs refresh).
   const timeline: string[] = [];
@@ -687,30 +734,41 @@ it('connected unknown publication retains exact command after real response loss
       await new Promise(resolve => setTimeout(resolve, 150));
     }
   })();
-  delayNextPublish = true;
-  await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
-  await page.getByText('Outcome not confirmed',{exact:true}).waitFor();
-  // The uncertain state appears at dispatch time; wait until the proxy has
-  // actually dropped the real upstream publish response before asserting.
-  await waitFor(async () => droppedCommand !== null, 'dropped real publish response');
-  const card = await own('driver');
-  expect(card.status).toBe('published');
-  await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
   try {
-    await page.getByRole('button',{name:'Retry same request',exact:true}).click();
+    await login(page,'driver');
+    await review(page);
+    delayNextPublish = true;
+    await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
+    await page.getByText('Outcome not confirmed',{exact:true}).waitFor();
+    // The uncertain state appears at dispatch time; wait until the proxy has
+    // actually dropped the real upstream publish response before asserting.
+    await waitFor(async () => droppedCommand !== null, 'dropped real publish response');
+    const card = await own('driver');
+    expect(card.status).toBe('published');
+    await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
+    // The explicit user replay is legitimate: Retry enabled proves the
+    // original fetch fully settled (busy cleared). Disarm ONLY this command's
+    // fault so the real replay reaches the backend untouched.
+    const retryButton = page.getByRole('button',{name:'Retry same request',exact:true});
+    await waitFor(async () => await retryButton.isEnabled(), 'settled unknown publication');
+    droppedIds.delete(droppedCommand!);
+    await retryButton.click();
+    await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
+    expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
+      [droppedCommand])).rows[0].n).toBe(1);
   } catch (failure) {
+    console.log('[unknown-timeline]', JSON.stringify(timeline, null, 1));
+    await dumpReviewDiagnostics(page, 'unknown-flow');
+    throw failure;
+  } finally {
     sampling = false;
     await sampler;
-    console.log('[unknown-timeline]', JSON.stringify(timeline, null, 1));
-    await dumpReviewDiagnostics(page, 'retry-absent');
-    throw failure;
+    // Clear owned fault state so later cases are never contaminated.
+    delayNextPublish = false;
+    droppedIds.clear();
+    droppedCommand = null;
+    await context.close();
   }
-  sampling = false;
-  await sampler;
-  await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
-  expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
-    [droppedCommand])).rows[0].n).toBe(1);
-  await context.close();
 });
 
 it('same-owner workspace switch with real held first-publication/get-null never falsely confirms privacy', async () => {
@@ -747,8 +805,112 @@ it('actual assistant delegation denies connected personal card while preserving 
   await context.close();
 });
 
+it('held first-account publication during real sign-out/sign-in swap never confirms or leaks under the second account', async () => {
+  const {page,context} = await localPage();
+  try {
+    await login(page,'driver');
+    await review(page);
+    holdNextPublish = true;
+    await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
+    await waitFor(async () => !!heldRequest,'held real publication');
+    // Real sign-out of A while its publish is still held, then real sign-in as B.
+    await page.getByRole('button',{name:'Sign out',exact:true}).click();
+    await page.getByRole('button',{name:'Sign in',exact:true}).waitFor();
+    await login(page,'other');
+    // B must never see A's card, A's pending acknowledgment, or A's card status.
+    // B may own a withdrawn card from earlier cases; it must never be published.
+    expect(await page.getByRole('heading',{name:'My job-search card'}).count()).toBe(0);
+    expect(await page.getByText('Outcome not confirmed',{exact:true}).count()).toBe(0);
+    const otherBefore = await own('other');
+    expect(otherBefore === null || otherBefore.status !== 'published').toBe(true);
+    // Release A's held request: it finishes for A only, under A's identity.
+    heldRequest?.(); heldRequest = undefined;
+    await waitFor(async () => (await own('driver'))?.status === 'published', 'held publication completes for A');
+    const otherAfter = await own('other');
+    expect(otherAfter === null || otherAfter.status !== 'published').toBe(true);
+    expect(await page.getByText('Outcome not confirmed',{exact:true}).count()).toBe(0);
+    expect(await page.locator('strong[role="status"]').filter({hasText:/^published$/}).count()).toBe(0);
+    const card = await own('driver');
+    await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
+  } finally {
+    holdNextPublish = false;
+    if (heldRequest) { heldRequest(); heldRequest = undefined; }
+    await context.close();
+  }
+});
+
+it('revoked driver capability keeps real read/withdraw but denies fresh publish over HTTP and in the connected UI', async () => {
+  const current = await own('driver');
+  const first = await rpc('manage_my_job_search_card', command('publish', current?.revision ?? 0), sessions.driver.access_token);
+  expect(first.status).toBe(200);
+  await db.query("UPDATE public.user_capabilities SET status='revoked' WHERE user_id=$1 AND capability='driver'", [ids.driver]);
+  try {
+    // Read and withdraw remain available to the owner (canonical behavior).
+    const card = await own('driver');
+    expect(card.status).toBe('published');
+    const withdrawn = await rpc('manage_my_job_search_card', command('withdraw', card.revision), sessions.driver.access_token);
+    expect(withdrawn.data.status).toBe('withdrawn');
+    // Fresh publish is denied by the canonical RPC over real HTTP.
+    const denied = await rpc('manage_my_job_search_card', command('publish'), sessions.driver.access_token);
+    expect(denied.data.code).toBe('42501');
+    // Connected UI: publish control disabled, read/withdraw still presented.
+    const {page,context} = await localPage();
+    try {
+      await login(page,'driver');
+      // Revoked capability legitimately yields effectiveRole null; wait for
+      // settled loading flags without requiring a workspace role.
+      await settledAuthority(page, false);
+      await page.getByRole('button',{name:'Review my job-search card',exact:true}).click();
+      await page.getByRole('heading',{name:'My job-search card',exact:true}).waitFor();
+      await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
+      expect(await page.getByRole('button',{name:'Edit / review renewal'}).isDisabled()).toBe(true);
+      expect(await page.getByText('You can still read and withdraw your own card.').count()).toBe(1);
+    } finally { await context.close(); }
+  } finally {
+    // Restore the temporary local capability edit before preservation comparison.
+    await db.query("UPDATE public.user_capabilities SET status='active' WHERE user_id=$1 AND capability='driver'", [ids.driver]);
+  }
+});
+
+it('actual missing RPC is classified unavailable through the real SDK path and recovers after restore', async () => {
+  await db.query('DROP FUNCTION public.manage_my_job_search_card(text,jsonb,integer,uuid,text)');
+  await db.query("NOTIFY pgrst,'reload schema'");
+  try {
+    // Real PostgREST: function absent from the schema cache -> 404 PGRST202.
+    await waitFor(async () => (await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token)).status === 404, 'schema cache drop');
+    const missing = await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token);
+    expect(missing.status).toBe(404);
+    // PostgREST reports the absent function as PGRST202 or SQLSTATE 42883;
+    // the real SDK failure() mapping classifies both as 'unavailable'.
+    expect(['PGRST202', '42883']).toContain(missing.data.code);
+    // Connected UI through the real SDK classifies it as unavailable.
+    const {page,context} = await localPage();
+    try {
+      await login(page,'driver');
+      await settledAuthority(page);
+      await page.getByRole('button',{name:'Review my job-search card',exact:true}).click();
+      await page.getByText('Job-search cards are not available right now.',{exact:true}).waitFor();
+    } finally { await context.close(); }
+  } finally {
+    // Restore the exact canonical function and its candidate ACL, then reload.
+    await db.query('SET ROLE postgres');
+    await db.query(helper(sqlPaths[0], 'manage_my_job_search_card'));
+    await db.query(`REVOKE ALL ON FUNCTION public.manage_my_job_search_card(text,jsonb,integer,uuid,text) FROM PUBLIC, anon, authenticated, service_role;
+      GRANT EXECUTE ON FUNCTION public.manage_my_job_search_card(text,jsonb,integer,uuid,text) TO authenticated;`);
+    await db.query('RESET ROLE');
+    await db.query("NOTIFY pgrst,'reload schema'");
+    await waitFor(async () => (await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token)).status === 200, 'schema cache restore');
+  }
+});
+
 it('final fixture inventory and unrelated synthetic state unchanged; no external requests or self-heal calls', async () => {
-  expect(await inventory()).toEqual(originalInventory);
+  const finalInventory = await inventory();
+  expect(finalInventory).toEqual(originalInventory);
+  // The candidates and the full runtime must not alter any preexisting
+  // catalog object (schemas, table ACLs/RLS, columns, constraints, policies,
+  // triggers, function definitions/ACLs); only new card objects may appear.
+  assertCatalogPreserved(preCandidateInventory, originalInventory);
+  assertCatalogPreserved(preCandidateInventory, finalInventory);
   expect(await preservation()).toEqual(originalSentinels);
   expect(forbiddenNetwork).toBe(0);
   // The preseeded approved recruiter must never trigger the self-heal RPC.
@@ -757,6 +919,12 @@ it('final fixture inventory and unrelated synthetic state unchanged; no external
   // those caller-only calls mutated nothing.
   console.log('Self-heal calls by actor:', [...selfHealActors].join(',') || 'none', `(total ${selfHealCalls})`);
   expect(selfHealActors.has('recruiter')).toBe(false);
+  // Authenticated callers are only the synthetic accounts that actually signed
+  // into the shell without a recruiter profile (driver/assistant/other); the
+  // preseeded approved recruiter never calls it, and every anonymous attempt
+  // must have been denied (fail-closed, observed 401).
+  expect([...selfHealActors].every(actor => ['driver', 'assistant', 'other', 'anon/other'].includes(actor))).toBe(true);
+  expect(selfHealAnonAllowed).toBe(0);
 });
 
 afterAll(async () => {
