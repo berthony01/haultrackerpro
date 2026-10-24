@@ -169,6 +169,7 @@ beforeAll(async () => {
     GRANT anon,authenticated,service_role TO authenticator WITH INHERIT FALSE, SET TRUE;
     CREATE ROLE supabase_auth_admin LOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS PASSWORD '${dbPassword}';
     CREATE SCHEMA auth AUTHORIZATION supabase_auth_admin;
+    ALTER ROLE supabase_auth_admin SET search_path TO auth;
     ALTER SCHEMA public OWNER TO postgres;
     GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role,postgres;
     GRANT CREATE ON SCHEMA public TO postgres;
