@@ -432,10 +432,31 @@ async function select(page: Page, label: string, value: string) {
   await page.getByRole('combobox', { name: label, exact: true }).click();
   await page.getByRole('option', { name: value, exact: true }).click();
 }
+async function dumpReviewDiagnostics(page: Page, step: string) {
+  // Sanitized harness state only: hook flags, mount transitions, element
+  // counts. Never tokens, emails, passwords or capability constants.
+  const diag = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
+  const mounts = await page.evaluate(() => (window as unknown as { __hj1cMounts?: string[] }).__hj1cMounts ?? []).catch(() => []);
+  const counts = {
+    reviewButton: await page.getByRole('button', { name: 'Review my job-search card', exact: true }).count(),
+    heading: await page.getByRole('heading', { name: 'My job-search card', exact: true }).count(),
+    reviewExact: await page.getByRole('button', { name: 'Review exact card' }).count(),
+    reviewExactEnabled: await page.getByRole('button', { name: 'Review exact card' }).isEnabled().catch(() => false),
+    loading: await page.getByText('Loading…', { exact: true }).count(),
+    unavailable: await page.getByText('Job-search card management is unavailable in this account context.').count(),
+  };
+  const statuses = await page.locator('strong[role="status"]').allTextContents().catch(() => []);
+  console.log(`[review-diag] step=${step} diag=${diag} mounts=${JSON.stringify(mounts)} counts=${JSON.stringify(counts)} statuses=${JSON.stringify(statuses)}`);
+}
 async function review(page: Page) {
-  await page.getByRole('button', { name: 'Review my job-search card', exact: true }).click();
-  await page.getByRole('heading', { name: 'My job-search card', exact: true }).waitFor();
-  await waitFor(async () => await page.getByRole('button', { name: 'Review exact card' }).isEnabled(), 'settled owner status');
+  try {
+    await page.getByRole('button', { name: 'Review my job-search card', exact: true }).click();
+    await page.getByRole('heading', { name: 'My job-search card', exact: true }).waitFor();
+    await waitFor(async () => await page.getByRole('button', { name: 'Review exact card' }).isEnabled(), 'settled owner status');
+  } catch (failure) {
+    await dumpReviewDiagnostics(page, 'settle');
+    throw failure;
+  }
   await select(page, 'Experience qualifier', 'At least');
   await page.getByRole('button', { name: 'Review exact card', exact: true }).click();
   expect(await page.getByRole('heading', { name: 'Review before sharing' }).evaluate(el => el === document.activeElement)).toBe(true);
