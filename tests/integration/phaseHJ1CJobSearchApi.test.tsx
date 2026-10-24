@@ -442,6 +442,8 @@ async function dumpReviewDiagnostics(page: Page, step: string) {
   // counts. Never tokens, emails, passwords or capability constants.
   const diag = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
   const mounts = await page.evaluate(() => (window as unknown as { __hj1cMounts?: string[] }).__hj1cMounts ?? []).catch(() => []);
+  const authEvents = await page.evaluate(() => (window as unknown as { __hj1cAuthEvents?: string[] }).__hj1cAuthEvents ?? []).catch(() => []);
+  console.log('[review-diag] auth-events=', JSON.stringify(authEvents));
   const counts = {
     reviewButton: await page.getByRole('button', { name: 'Review my job-search card', exact: true }).count(),
     heading: await page.getByRole('heading', { name: 'My job-search card', exact: true }).count(),
