@@ -151,11 +151,12 @@ beforeAll(async () => {
   // PostgreSQL cannot run as root. Only its disposable directories belong to lovable.
   chmodSync(HOME, 0o711);
   execFileSync('/bin/chown', ['-R', 'lovable:lovable', HOME + '/cluster', SOCKET]);
-  execFileSync('/bin/runuser', ['-u', 'lovable', '--', '/bin/initdb', '-D', HOME + '/cluster',
-    '--username=lovable', '--auth-local=trust', '--auth-host=reject', '--no-locale'], { env: childEnv });
-  execFileSync('/bin/runuser', ['-u', 'lovable', '--', '/bin/pg_ctl', '-D', HOME + '/cluster',
+  execFileSync('/bin/initdb', ['-D', HOME + '/cluster',
+    '--username=lovable', '--auth-local=trust', '--auth-host=reject', '--no-locale'],
+  { env: childEnv, uid: 1000, gid: 1000 });
+  execFileSync('/bin/pg_ctl', ['-D', HOME + '/cluster',
     '-l', HOME + '/cluster/server.log', '-o', `-k ${SOCKET} -p 55441 -c listen_addresses=''`, '-w', 'start'],
-  { env: childEnv });
+  { env: childEnv, uid: 1000, gid: 1000 });
   clusterStarted = true;
   db = new Client({ host: SOCKET, port: 55441, user: 'lovable', database: 'postgres', password: '', ssl: false });
   await db.connect();
@@ -608,8 +609,8 @@ afterAll(async () => {
   }
   await db?.end().catch(() => {});
   if (clusterStarted) {
-    execFileSync('/bin/runuser',['-u','lovable','--','/bin/pg_ctl','-D',HOME+'/cluster','-m','immediate','-w','stop'],
-      {env:childEnv});
+    execFileSync('/bin/pg_ctl',['-D',HOME+'/cluster','-m','immediate','-w','stop'],
+      {env:childEnv,uid:1000,gid:1000});
   }
   for (const port of Object.values(ports)) await portFree(port);
   console.log('Owned native processes stopped; all five reserved ports free');
