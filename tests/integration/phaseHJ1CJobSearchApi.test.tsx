@@ -769,6 +769,96 @@ it('actual assistant delegation denies connected personal card while preserving 
   await context.close();
 });
 
+it('held first-account publication during real sign-out/sign-in swap never confirms or leaks under the second account', async () => {
+  const {page,context} = await localPage();
+  try {
+    await login(page,'driver');
+    await review(page);
+    holdNextPublish = true;
+    await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
+    await waitFor(async () => !!heldRequest,'held real publication');
+    // Real sign-out of A while its publish is still held, then real sign-in as B.
+    await page.getByRole('button',{name:'Sign out',exact:true}).click();
+    await page.getByRole('button',{name:'Sign in',exact:true}).waitFor();
+    await login(page,'other');
+    // B must never see A's card, A's pending acknowledgment, or A's card status.
+    expect(await page.getByRole('heading',{name:'My job-search card'}).count()).toBe(0);
+    expect(await page.getByText('Outcome not confirmed',{exact:true}).count()).toBe(0);
+    expect(await own('other')).toBe(null);
+    // Release A's held request: it finishes for A only, under A's identity.
+    heldRequest?.(); heldRequest = undefined;
+    await waitFor(async () => (await own('driver'))?.status === 'published', 'held publication completes for A');
+    expect(await own('other')).toBe(null);
+    expect(await page.getByText('Outcome not confirmed',{exact:true}).count()).toBe(0);
+    expect(await page.locator('strong[role="status"]').filter({hasText:/^published$/}).count()).toBe(0);
+    const card = await own('driver');
+    await rpc('manage_my_job_search_card',command('withdraw',card.revision),sessions.driver.access_token);
+  } finally {
+    holdNextPublish = false;
+    if (heldRequest) { heldRequest(); heldRequest = undefined; }
+    await context.close();
+  }
+});
+
+it('revoked driver capability keeps real read/withdraw but denies fresh publish over HTTP and in the connected UI', async () => {
+  const first = await rpc('manage_my_job_search_card', command('publish'), sessions.driver.access_token);
+  expect(first.status).toBe(200);
+  await db.query("UPDATE public.user_capabilities SET status='revoked' WHERE user_id=$1 AND capability='driver'", [ids.driver]);
+  try {
+    // Read and withdraw remain available to the owner (canonical behavior).
+    const card = await own('driver');
+    expect(card.status).toBe('published');
+    const withdrawn = await rpc('manage_my_job_search_card', command('withdraw', card.revision), sessions.driver.access_token);
+    expect(withdrawn.data.status).toBe('withdrawn');
+    // Fresh publish is denied by the canonical RPC over real HTTP.
+    const denied = await rpc('manage_my_job_search_card', command('publish'), sessions.driver.access_token);
+    expect(denied.data.code).toBe('42501');
+    // Connected UI: publish control disabled, read/withdraw still presented.
+    const {page,context} = await localPage();
+    try {
+      await login(page,'driver');
+      await settledAuthority(page);
+      await page.getByRole('button',{name:'Review my job-search card',exact:true}).click();
+      await page.getByRole('heading',{name:'My job-search card',exact:true}).waitFor();
+      await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
+      expect(await page.getByRole('button',{name:'Edit / review renewal'}).isDisabled()).toBe(true);
+      expect(await page.getByText('You can still read and withdraw your own card.').count()).toBe(1);
+    } finally { await context.close(); }
+  } finally {
+    // Restore the temporary local capability edit before preservation comparison.
+    await db.query("UPDATE public.user_capabilities SET status='active' WHERE user_id=$1 AND capability='driver'", [ids.driver]);
+  }
+});
+
+it('actual missing RPC is classified unavailable through the real SDK path and recovers after restore', async () => {
+  await db.query('DROP FUNCTION public.manage_my_job_search_card(text,jsonb,integer,uuid,text)');
+  await db.query("NOTIFY pgrst,'reload schema'");
+  try {
+    // Real PostgREST: function absent from the schema cache -> 404 PGRST202.
+    await waitFor(async () => (await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token)).status === 404, 'schema cache drop');
+    const missing = await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token);
+    expect(missing.status).toBe(404);
+    expect(missing.data.code).toBe('PGRST202');
+    // Connected UI through the real SDK classifies it as unavailable.
+    const {page,context} = await localPage();
+    try {
+      await login(page,'driver');
+      await settledAuthority(page);
+      await page.getByRole('button',{name:'Review my job-search card',exact:true}).click();
+      await page.getByText('Job-search cards are not available right now.',{exact:true}).waitFor();
+    } finally { await context.close(); }
+  } finally {
+    // Restore the exact canonical function and its candidate ACL, then reload.
+    await db.query('SET ROLE postgres');
+    await db.query(helper(sqlPaths[0], 'manage_my_job_search_card'));
+    await db.query(`REVOKE ALL ON FUNCTION public.manage_my_job_search_card(text,jsonb,integer,uuid,text) FROM PUBLIC, anon, authenticated, service_role;
+      GRANT EXECUTE ON FUNCTION public.manage_my_job_search_card(text,jsonb,integer,uuid,text) TO authenticated;`);
+    await db.query('RESET ROLE');
+    await db.query("NOTIFY pgrst,'reload schema'");
+    await waitFor(async () => (await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token)).status === 200, 'schema cache restore');
+  }
+});
+
 it('final fixture inventory and unrelated synthetic state unchanged; no external requests or self-heal calls', async () => {
   expect(await inventory()).toEqual(originalInventory);
   expect(await preservation()).toEqual(originalSentinels);
