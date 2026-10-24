@@ -731,3 +731,189 @@ INSERT INTO public.hj1c_preservation_sentinels VALUES
   ('applications','{"unchanged":true}'), ('conversations','{"unchanged":true}'),
   ('billing','{"unchanged":true}'), ('telegram','{"unchanged":true}');
 
+CREATE OR REPLACE FUNCTION public.ensure_my_recruiter_setup_state()
+RETURNS TABLE (
+  user_id              uuid,
+  profile_id           uuid,
+  profile_created      boolean,
+  capability_status    text,
+  eligibility_state    text,
+  missing_requirements text[]
+)
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  _uid         uuid := auth.uid();
+  _cap_status  text;
+  _rp          public.recruiter_profiles;
+  _created     boolean := false;
+  _name        text;
+  _email       text;
+  _phone       text;
+  _missing     text[] := ARRAY[]::text[];
+  _elig        text;
+  _inserted_id uuid;
+BEGIN
+  IF _uid IS NULL THEN
+    RAISE EXCEPTION 'authentication required'
+      USING ERRCODE = '42501';
+  END IF;
+
+  SELECT uc.status::text
+    INTO _cap_status
+    FROM public.user_capabilities uc
+   WHERE uc.user_id = _uid
+     AND uc.capability = 'recruiter';
+
+  IF _cap_status IS NULL THEN
+    RETURN QUERY
+      SELECT _uid,
+             NULL::uuid,
+             false,
+             NULL::text,
+             'capability_missing'::text,
+             ARRAY[]::text[];
+    RETURN;
+  END IF;
+
+  SELECT * INTO _rp
+    FROM public.recruiter_profiles rp
+   WHERE rp.user_id = _uid;
+
+  IF _cap_status = 'revoked' THEN
+    RETURN QUERY
+      SELECT _uid, _rp.id, false, _cap_status, 'revoked'::text, ARRAY[]::text[];
+    RETURN;
+  END IF;
+
+  IF _cap_status = 'suspended' THEN
+    RETURN QUERY
+      SELECT _uid, _rp.id, false, _cap_status, 'suspended'::text, ARRAY[]::text[];
+    RETURN;
+  END IF;
+
+  IF _cap_status = 'active' AND _rp.id IS NULL THEN
+    RAISE EXCEPTION
+      'active recruiter capability without recruiter_profiles row for user %',
+      _uid
+      USING ERRCODE = 'raise_exception';
+  END IF;
+
+  IF _cap_status = 'setup' AND _rp.id IS NULL THEN
+    SELECT
+      COALESCE(
+        NULLIF(btrim(p.display_name), ''),
+        NULLIF(btrim(u.raw_user_meta_data ->> 'display_name'), ''),
+        NULLIF(btrim(u.raw_user_meta_data ->> 'full_name'), ''),
+        NULLIF(btrim(u.raw_user_meta_data ->> 'name'), ''),
+        ''
+      ),
+      CASE
+        WHEN btrim(u.email) ~ '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$'
+          THEN btrim(u.email)
+        ELSE NULL
+      END,
+      NULLIF(btrim(u.raw_user_meta_data ->> 'phone'), '')
+    INTO _name, _email, _phone
+    FROM auth.users u
+    LEFT JOIN public.profiles p ON p.user_id = u.id
+    WHERE u.id = _uid;
+
+    -- NOTE: company_type is NEVER inferred or written here. Legacy rows
+    -- stay NULL until the user chooses one in onboarding.
+    INSERT INTO public.recruiter_profiles(
+      user_id,
+      recruiter_name,
+      recruiter_email,
+      recruiter_phone,
+      company_name
+    ) VALUES (
+      _uid,
+      _name,
+      _email,
+      _phone,
+      ''
+    )
+    ON CONFLICT DO NOTHING
+    RETURNING id INTO _inserted_id;
+
+    IF _inserted_id IS NOT NULL THEN
+      _created := true;
+    END IF;
+
+    SELECT * INTO _rp
+      FROM public.recruiter_profiles rp
+     WHERE rp.user_id = _uid;
+  END IF;
+
+  SELECT uc.status::text
+    INTO _cap_status
+    FROM public.user_capabilities uc
+   WHERE uc.user_id = _uid
+     AND uc.capability = 'recruiter';
+
+  IF _cap_status = 'revoked' THEN
+    RETURN QUERY
+      SELECT _uid, _rp.id, _created, _cap_status, 'revoked'::text, ARRAY[]::text[];
+    RETURN;
+  END IF;
+
+  IF _cap_status = 'suspended' THEN
+    RETURN QUERY
+      SELECT _uid, _rp.id, _created, _cap_status, 'suspended'::text, ARRAY[]::text[];
+    RETURN;
+  END IF;
+
+  -- Deterministic missing-requirement calculation (canonical posting rule).
+  IF COALESCE(btrim(_rp.recruiter_name), '') = '' THEN
+    _missing := array_append(_missing, 'recruiter_name');
+  END IF;
+  IF COALESCE(btrim(_rp.company_name), '') = '' THEN
+    _missing := array_append(_missing, 'company_name');
+  END IF;
+  IF COALESCE(btrim(_rp.recruiter_email), '') = '' THEN
+    _missing := array_append(_missing, 'recruiter_email_missing');
+  ELSIF btrim(_rp.recruiter_email) !~
+        '^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$' THEN
+    _missing := array_append(_missing, 'recruiter_email_invalid');
+  END IF;
+  IF _rp.company_type IS NULL
+     OR _rp.company_type NOT IN (
+       'carrier',
+       'third_party_recruiter',
+       'staffing_agency',
+       'independent_recruiter'
+     )
+  THEN
+    _missing := array_append(_missing, 'company_type');
+  END IF;
+  -- dot_or_mc is only a missing requirement for carrier accounts.
+  IF _rp.company_type = 'carrier'
+     AND COALESCE(btrim(_rp.dot_number), '') = ''
+     AND COALESCE(btrim(_rp.mc_number), '') = '' THEN
+    _missing := array_append(_missing, 'dot_or_mc');
+  END IF;
+  IF _rp.posting_terms_accepted_at IS NULL
+     AND _rp.legacy_terms_grandfathered_at IS NULL THEN
+    _missing := array_append(_missing, 'posting_terms');
+  END IF;
+
+  IF _cap_status = 'active'
+     AND public.recruiter_profile_can_manage_opportunities(_rp.id) THEN
+    _elig := 'active';
+  ELSE
+    _elig := 'setup_incomplete';
+  END IF;
+
+  RETURN QUERY
+    SELECT _uid, _rp.id, _created, _cap_status, _elig, _missing;
+END;
+$$;
+
+REVOKE ALL     ON FUNCTION public.ensure_my_recruiter_setup_state() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.ensure_my_recruiter_setup_state() FROM anon;
+GRANT  EXECUTE ON FUNCTION public.ensure_my_recruiter_setup_state()
+  TO authenticated, service_role;

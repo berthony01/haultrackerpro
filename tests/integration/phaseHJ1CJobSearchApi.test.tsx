@@ -152,6 +152,7 @@ beforeAll(async () => {
   }
   for (const port of Object.values(ports)) await portFree(port);
   rmSync(HJ1C_ROOT + '/cluster', { recursive: true, force: true });
+  rmSync(HJ1C_ROOT + '/vite-cache', { recursive: true, force: true });
   for (const dir of ['runtime', 'cluster', 'socket', 'screenshots']) mkdirSync(`${HJ1C_ROOT}/${dir}`, { recursive: true });
   // PostgreSQL cannot run as root. Only its disposable directories belong to lovable.
   chmodSync(HJ1C_ROOT, 0o711);
@@ -266,7 +267,13 @@ beforeAll(async () => {
     // Classify the caller by exact in-memory session token match. Tokens are
     // never logged; only the synthetic actor name and request line are.
     const bearer = String(req.headers.authorization ?? '');
-    const actor = Object.entries(sessions).find(([, s]) => bearer === `Bearer ${s.access_token}`)?.[0] ?? 'other';
+    // Classify by JWT subject claim only; the token itself is never logged.
+    const sub = (() => {
+      try {
+        return String(JSON.parse(Buffer.from(bearer.split(' ')[1].split('.')[1], 'base64url').toString()).sub ?? '');
+      } catch { return ''; }
+    })();
+    const actor = Object.entries(ids).find(([, id]) => id === sub)?.[0] ?? 'anon/other';
     if (req.url?.includes('ensure_my_recruiter_setup_state')) { selfHealCalls++; selfHealActors.add(actor); }
     const chunks: Buffer[] = [];
     req.on('data', chunk => chunks.push(chunk));
