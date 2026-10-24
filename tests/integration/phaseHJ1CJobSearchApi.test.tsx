@@ -12,7 +12,7 @@ import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { createServer, request, type Server } from 'node:http';
 import { createConnection, createServer as createNetServer } from 'node:net';
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 
 const ROOT = '/dev-server';
@@ -147,6 +147,7 @@ beforeAll(async () => {
     expect(createHash('sha256').update(readFileSync(`${HOME}/bin/${archive}.tar.xz`)).digest('hex')).toBe(expected);
   }
   for (const port of Object.values(ports)) await portFree(port);
+  rmSync(HOME + '/cluster', { recursive: true, force: true });
   for (const dir of ['runtime', 'cluster', 'socket', 'screenshots']) mkdirSync(`${HOME}/${dir}`, { recursive: true });
   // PostgreSQL cannot run as root. Only its disposable directories belong to lovable.
   chmodSync(HOME, 0o711);
@@ -172,7 +173,7 @@ beforeAll(async () => {
     GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role,postgres;
     GRANT CREATE ON SCHEMA public TO postgres;
     CREATE EXTENSION citext WITH SCHEMA public;`);
-  run(HOME + '/bin/auth/auth', ['serve'], {
+  const authEnv = {
     GOTRUE_API_HOST: '127.0.0.1', PORT: '55443',
     API_EXTERNAL_URL: endpoint + '/auth/v1', GOTRUE_SITE_URL: origin,
     GOTRUE_DB_DRIVER: 'postgres', GOTRUE_DB_NAMESPACE: 'auth',
@@ -183,7 +184,11 @@ beforeAll(async () => {
     GOTRUE_DISABLE_SIGNUP: 'true', GOTRUE_EXTERNAL_EMAIL_ENABLED: 'true',
     GOTRUE_MAILER_AUTOCONFIRM: 'false', GOTRUE_SMTP_HOST: '127.0.0.1', GOTRUE_SMTP_PORT: '55446',
     GOTRUE_TRACING_ENABLED: 'false', GOTRUE_METRICS_ENABLED: 'false', LOG_LEVEL: 'error',
+  };
+  execFileSync(HOME + '/bin/auth/auth', ['migrate'], {
+    cwd: HOME + '/runtime', env: { ...childEnv, ...authEnv }, stdio: 'ignore',
   });
+  run(HOME + '/bin/auth/auth', ['serve'], authEnv);
   await waitFor(async () => (await fetch('http://127.0.0.1:55443/health')).ok, 'real Auth health');
   await db.query(`GRANT SELECT,REFERENCES ON auth.users TO postgres;
     GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA auth TO postgres;
