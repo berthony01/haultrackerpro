@@ -275,6 +275,7 @@ beforeAll(async () => {
     })();
     const actor = Object.entries(ids).find(([, id]) => id === sub)?.[0] ?? 'anon/other';
     if (req.url?.includes('ensure_my_recruiter_setup_state')) { selfHealCalls++; selfHealActors.add(actor); }
+    const arrived = Date.now();
     const chunks: Buffer[] = [];
     req.on('data', chunk => chunks.push(chunk));
     req.on('end', () => {
@@ -285,6 +286,7 @@ beforeAll(async () => {
         const parsed = JSON.parse(body.toString() || '{}');
         action = parsed._action;
         commandId = parsed._client_command_id;
+        console.log('[proxy-arrive]', arrived, actor, `action=${action}`, `cmd=${String(commandId).slice(0, 8)}`, `reqport=${req.socket.remotePort}`);
       }
       const forward = () => {
         const target = request({
