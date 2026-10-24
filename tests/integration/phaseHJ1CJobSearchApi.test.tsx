@@ -135,7 +135,7 @@ async function inventory() {
       FROM pg_policies x WHERE schemaname IN ('public','job_search_private')),
     'functions', (SELECT jsonb_agg(jsonb_build_object('def',pg_get_functiondef(p.oid),'acl',p.proacl::text)
       ORDER BY n.nspname,p.proname) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-      WHERE n.nspname IN ('public','job_search_private'))
+      WHERE n.nspname IN ('public','job_search_private') AND p.prokind='f')
   ) AS x`)).rows[0].x;
 }
 
