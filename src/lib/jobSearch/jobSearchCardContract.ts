@@ -46,5 +46,5 @@ export function buildJobSearchCardReview(input: unknown) {
   const payload = validateJobSearchCardPayload(input);
   const prefix = payload.experience_qualifier === 'at_least' ? 'At least ' : payload.experience_qualifier === 'less_than' ? 'Less than ' : '';
   return { payload, audience: JOB_SEARCH_CARD_AUDIENCE, consent_version: JOB_SEARCH_CARD_CONSENT_VERSION,
-    review_days: JOB_SEARCH_CARD_REVIEW_DAYS, experience: `${prefix}${payload.years_experience} years` };
+    review_days: JOB_SEARCH_CARD_REVIEW_DAYS, experience: `${prefix}${payload.years_experience} ${payload.years_experience === 1 ? 'year' : 'years'}` };
 }

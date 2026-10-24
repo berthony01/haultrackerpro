@@ -126,6 +126,17 @@ BEGIN
     IF FOUND AND _receipt.input_fingerprint <> _fingerprint THEN RAISE EXCEPTION 'Command input changed' USING ERRCODE='22023'; END IF;
   END IF;
   SELECT * INTO _card FROM job_search_private.driver_job_search_cards c WHERE c.owner_user_id = _uid;
+  -- Re-resolve publication authority AFTER any owner-lock wait, before either
+  -- applying a publication or returning its replay. At READ COMMITTED this
+  -- sees moderation/capability changes committed before this fresh statement.
+  -- Other writers do not share this lock: this is not globally serialized
+  -- moderation, nor a guarantee against changes committed after this check.
+  IF _action = 'publish' THEN
+    IF NOT EXISTS (SELECT 1 FROM public.user_capabilities c WHERE c.user_id = _uid AND c.capability = 'driver' AND c.status = 'active')
+      OR public.user_has_blocking_messaging_restriction(_uid) THEN
+      RAISE EXCEPTION 'Driver publication unavailable' USING ERRCODE = '42501';
+    END IF;
+  END IF;
   IF _action <> 'get' AND _receipt.id IS NULL THEN
     IF coalesce(_card.revision,0) <> _expected_revision THEN RAISE EXCEPTION 'Stale revision' USING ERRCODE='40001'; END IF;
     _now := pg_catalog.clock_timestamp();
@@ -137,7 +148,7 @@ BEGIN
     ELSIF _card.id IS NOT NULL THEN
       UPDATE job_search_private.driver_job_search_cards c SET status=CASE WHEN _action='pause' THEN 'paused' ELSE 'withdrawn' END,revision=c.revision+1,updated_at=_now
       WHERE c.owner_user_id=_uid RETURNING * INTO _card;
-    ELSIF _action='pause' THEN RAISE EXCEPTION 'No card' USING ERRCODE='22023';
+    ELSE RAISE EXCEPTION 'No card' USING ERRCODE='22023';
     END IF;
     INSERT INTO job_search_private.job_search_card_events(card_id,owner_user_id,action,revision,client_command_id,input_fingerprint,consent_version,created_at)
     VALUES (_card.id,_uid,_action,coalesce(_card.revision,0),_client_command_id,_fingerprint,_consent_version,_now);
