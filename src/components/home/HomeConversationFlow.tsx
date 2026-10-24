@@ -240,6 +240,7 @@ export interface HomeConversationFlowProps {
   profileReuseLabels?: readonly string[];
   /** HP-4B — label for the completion CTA when the route is not the public homepage. */
   continueLabel?: string;
+  onReviewJobSearchCard?: (answers: IntakeAnswers) => void;
 }
 
 export default function HomeConversationFlow({
@@ -253,6 +254,7 @@ export default function HomeConversationFlow({
   initialAnswers,
   profileReuseLabels,
   continueLabel,
+  onReviewJobSearchCard,
 }: HomeConversationFlowProps) {
   const [seedIgnored, setSeedIgnored] = useState(false);
   const [state, setState] = useState<FlowState>(() =>
@@ -719,8 +721,8 @@ export default function HomeConversationFlow({
               {summary.join(' • ')}
             </p>
             <p className="mt-3 text-sm leading-relaxed" style={{ color: INK_SOFT }}>
-              You’re ready to continue to real HaulTracker opportunities. We’ll use these answers to
-              prefill your Driver Work Profile so you don’t have to start over.
+              {onReviewJobSearchCard ? 'Review your work-profile updates, or prepare a separate employment-only job-search card. Neither action saves or shares anything yet.' : <>You’re ready to continue to real HaulTracker opportunities. We’ll use these answers to
+              prefill your Driver Work Profile so you don’t have to start over.</>}
             </p>
             <HomeOpportunityPreview answers={answers} />
             <Button
@@ -735,8 +737,9 @@ export default function HomeConversationFlow({
             >
               {continueLabel ?? 'Continue to real opportunities'} <ArrowRight className="h-5 w-5" />
             </Button>
+            {onReviewJobSearchCard && <Button variant="outline" onClick={() => onReviewJobSearchCard(answers)} className="mt-3 h-auto min-h-12 w-full whitespace-normal">Review my job-search card</Button>}
             <p className="mt-3 text-xs" style={{ color: INK_MUTED }}>
-              Nothing is shared with anyone until you review and save your preferences. Free for drivers.
+              {onReviewJobSearchCard ? 'Publishing a card does not change your work-profile/contact sharing settings. The card contains no name, phone or email.' : 'Nothing is shared with anyone until you review and save your preferences. Free for drivers.'}
             </p>
           </div>
         )}

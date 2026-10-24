@@ -48,6 +48,7 @@ import { CarrierSettlementsPanel } from '@/components/settlements/CarrierSettlem
 import { RecruiterTeamPanel } from '@/components/recruiter/RecruiterTeamPanel';
 // Phase CF-1B — owner Conversation Inbox, mounted on demand only.
 import { useNavigate } from 'react-router-dom';
+import RecruiterJobSearchCards from '@/components/jobSearch/RecruiterJobSearchCards';
 
 
 // Phase 1F-A.2.2: presentation state derived from the canonical eligibility
@@ -163,6 +164,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
   // pattern as settlements. Never gated by client plan/capability logic —
   // the server seat-status RPC is authoritative.
   const [teamOpen, setTeamOpen] = useState(false);
+  const [driverCardsOpen, setDriverCardsOpen] = useState(false);
   // Phase CF-1B: owner Conversation Inbox mounts on demand only — same
   // low-risk pattern as settlements/team. Server RPC authority remains final.
   const readiness = resolveRecruiterReadiness(profile);
@@ -371,6 +373,11 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                 <CarrierSettlementsPanel onManagePlan={() => scrollTo(billingRef)} />
               </div>
             )}
+
+            {profile?.status === 'active' && profile.verification_status === 'approved' && canPost && <div className="space-y-4">
+              <Button variant="outline" onClick={() => setDriverCardsOpen(v => !v)}><Users className="mr-2 h-4 w-4" />{driverCardsOpen ? 'Close available drivers' : 'Find available drivers'}</Button>
+              {driverCardsOpen && <RecruiterJobSearchCards recruiterId={profile.id} />}
+            </div>}
 
             {teamOpen && profile?.id && (
               <div data-testid="recruiter-team-anchor" className="scroll-mt-24">
