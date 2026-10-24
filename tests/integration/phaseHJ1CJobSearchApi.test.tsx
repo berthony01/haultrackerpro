@@ -652,6 +652,22 @@ it('connected unknown publication retains exact command after real response loss
   const {page,context} = await localPage();
   await login(page,'driver');
   await review(page);
+  // Test-only timeline sampler: pinpoints exactly which UI state transition
+  // clears the uncertain publication (remount vs auth reset vs refresh).
+  const timeline: string[] = [];
+  let sampling = true;
+  const sampler = (async () => {
+    let last = '';
+    while (sampling) {
+      const status = await page.locator('strong[role="status"]').first().textContent().catch(() => '<gone>');
+      const retry = await page.getByRole('button',{name:'Retry same request',exact:true}).count().catch(() => -1);
+      const diag = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
+      const mounts = await page.evaluate(() => ((window as unknown as { __hj1cMounts?: string[] }).__hj1cMounts ?? []).length).catch(() => -1);
+      const snap = `status=${status} retry=${retry} mounts=${mounts} diag=${diag}`;
+      if (snap !== last) { timeline.push(`${Date.now()}: ${snap}`); last = snap; }
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+  })();
   delayNextPublish = true;
   await page.getByRole('button',{name:'Make me available to approved recruiters'}).click();
   await page.getByText('Outcome not confirmed',{exact:true}).waitFor();
