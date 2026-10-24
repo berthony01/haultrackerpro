@@ -119,3 +119,107 @@ it('recruiter pagination replaces bounded page and clears a delayed page on work
  fixture.profile={...fixture.profile as object,id:'33333333-3333-3333-3333-333333333333'};tree.rerender(<RecruiterJobSearchCards recruiterId={id}/>);
  await act(async()=>{release?.({data:[],error:null});});expect(screen.queryByRole('button',{name:'Next page'})).toBeNull();expect(fixture.rpc.mock.calls[1][1]._after_card_id).toBe(rows[19].id);
 });
+
+it('same-owner workspace switch preserves unknown command through get-null and same-command withdrawn replay', async () => {
+  setJobSearchCardHandoff(fixture.user, payload);
+  let writes = 0;
+  fixture.rpc.mockImplementation((_n, a) => a._action === 'get' ? response(null) : ++writes === 1 ? Promise.reject(new Error('synthetic timeout')) : response({ ...own, status: 'withdrawn', revision: 2 }));
+  const tree = render(<DriverJobSearchCard />);
+  await reviewSeed();
+  fireEvent.click(screen.getByRole('checkbox', { name: /I choose/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Make me available to approved recruiters' }));
+  await screen.findByText('Outcome not confirmed');
+  fixture.workspace = 'recruiter';
+  tree.rerender(<DriverJobSearchCard />);
+  await waitFor(() => expect(screen.queryByText('No published card')).toBeNull());
+  expect(screen.getByText('Outcome not confirmed')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Retry same request' })).not.toBeDisabled());
+  expect(screen.queryByText('No published card')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Retry same request' }));
+  await screen.findByText('withdrawn', { selector: 'strong' });
+  const commands = fixture.rpc.mock.calls.filter(([, a]) => a._action === 'publish');
+  expect(commands).toHaveLength(2);
+  expect(commands[0][1]).toEqual(commands[1][1]);
+});
+for (const transition of ['revocation', 'loading', 'error']) {
+  it(`same-owner ${transition} preserves dispatched acknowledgment then deliberate withdrawal without new publish grant`, async () => {
+    setJobSearchCardHandoff(fixture.user, payload);
+    let release: ((v: unknown) => void) | undefined;
+    fixture.rpc.mockImplementation((_n, a) => a._action === 'get' ? response(null) : a._action === 'publish' ? new Promise(r => { release = r; }) : response({ ...own, status: 'withdrawn', revision: 2 }));
+    const tree = render(<DriverJobSearchCard />);
+    await reviewSeed();
+    fireEvent.click(screen.getByRole('checkbox', { name: /I choose/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Make me available to approved recruiters' }));
+    await waitFor(() => expect(fixture.rpc.mock.calls.some(([, a]) => a._action === 'publish')).toBe(true));
+    if (transition === 'revocation') fixture.driver = false;
+    if (transition === 'loading') fixture.loading = true;
+    if (transition === 'error') fixture.error = new Error('capability unavailable');
+    tree.rerender(<DriverJobSearchCard />);
+    expect(screen.queryByText('No published card')).toBeNull();
+    await act(async () => { release?.({ data: own, error: null }); });
+    expect(screen.getByText('published', { selector: 'strong' })).toBeInTheDocument();
+    fixture.driver = false;
+    fixture.loading = false;
+    fixture.error = null;
+    tree.rerender(<DriverJobSearchCard />);
+    expect(screen.getByRole('button', { name: 'Edit / review renewal' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
+    await screen.findByText('withdrawn', { selector: 'strong' });
+    expect(fixture.rpc.mock.calls.filter(([, a]) => a._action === 'publish')).toHaveLength(1);
+  });
+}
+it('unknown publish after revocation resolves status and deliberately withdraws without replaying publication', async () => {
+  setJobSearchCardHandoff(fixture.user, payload);
+  let gets = 0;
+  fixture.rpc.mockImplementation((_n, a) => a._action === 'get' ? response(++gets === 1 ? null : own) : a._action === 'publish' ? Promise.reject(new Error('timeout')) : response({ ...own, status: 'withdrawn', revision: 2 }));
+  const tree = render(<DriverJobSearchCard />);
+  await reviewSeed();
+  fireEvent.click(screen.getByRole('checkbox', { name: /I choose/ }));
+  fireEvent.click(screen.getByRole('button', { name: 'Make me available to approved recruiters' }));
+  await screen.findByText('Outcome not confirmed');
+  fixture.driver = false;
+  tree.rerender(<DriverJobSearchCard />);
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Withdraw' })).not.toBeDisabled());
+  fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
+  await screen.findByText('withdrawn', { selector: 'strong' });
+  expect(fixture.rpc.mock.calls.filter(([, a]) => a._action === 'publish')).toHaveLength(1);
+});
+for (const transition of ['account', 'acting', 'signed_out']) {
+  it(`${transition} synchronously hides reviewed pending publication and discards its acknowledgment`, async () => {
+    setJobSearchCardHandoff(fixture.user, payload);
+    let release: ((v: unknown) => void) | undefined;
+    fixture.rpc.mockImplementation((_n, a) => a._action === 'get' ? response(null) : new Promise(r => { release = r; }));
+    const tree = render(<DriverJobSearchCard />);
+    await reviewSeed();
+    fireEvent.click(screen.getByRole('checkbox', { name: /I choose/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Make me available to approved recruiters' }));
+    if (transition === 'account') { fixture.user = id; fixture.sessionUser = id; }
+    if (transition === 'acting') fixture.acting = true;
+    if (transition === 'signed_out') { fixture.user = ''; fixture.sessionUser = ''; }
+    tree.rerender(<DriverJobSearchCard />);
+    expect(screen.queryByRole('heading', { name: 'Review before sharing' })).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /I choose/ })).toBeNull();
+    await act(async () => { release?.({ data: own, error: null }); });
+    expect(screen.queryByText('published', { selector: 'strong' })).toBeNull();
+    expect(fixture.rpc.mock.calls.filter(([, a]) => a._action === 'publish')).toHaveLength(1);
+  });
+}
+for (const transition of ['capability', 'acting', 'account']) {
+  it(`recruiter delayed page is discarded on ${transition} loss`, async () => {
+    fixture.recruiter = true;
+    fixture.profile = { id, user_id: fixture.user, status: 'active', verification_status: 'approved' };
+    let release: ((v: unknown) => void) | undefined;
+    fixture.rpc.mockImplementation(() => new Promise(r => { release = r; }));
+    const tree = render(<RecruiterJobSearchCards recruiterId={id} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Find available drivers' }));
+    if (transition === 'capability') fixture.recruiter = false;
+    if (transition === 'acting') fixture.acting = true;
+    if (transition === 'account') { fixture.user = id; fixture.sessionUser = id; }
+    tree.rerender(<RecruiterJobSearchCards recruiterId={id} />);
+    await act(async () => { release?.({ data: [{ id, revision: 1, published_at: own.published_at, expires_at: own.expires_at, payload }], error: null }); });
+    expect(screen.queryByText('TX')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Next page' })).toBeNull();
+  });
+}

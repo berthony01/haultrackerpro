@@ -81,3 +81,48 @@ it('synchronous subscription invalidation unsubscribes the returned handle',()=>
  const unsubscribe=vi.fn();fixture.client={auth:{onAuthStateChange:(cb:(e:string,s:null)=>void)=>{cb('SIGNED_OUT',null);return {data:{subscription:{unsubscribe}}};}}};
  setJobSearchCardHandoff(owner,payload);expect(consumeJobSearchCardHandoff(owner)).toBeNull();expect(unsubscribe).toHaveBeenCalledOnce();
 });
+
+it('rejects increasing fractional microseconds inside one millisecond', () => {
+  expect(() => parseDiscoveryCards([
+    { ...card, published_at: '2026-10-24T00:00:00.000001Z' },
+    { ...card, id: owner, published_at: '2026-10-24T00:00:00.000002Z' },
+  ])).toThrow();
+});
+it('accepts decreasing fractional microseconds even when UUID order increases', () => {
+  expect(parseDiscoveryCards([
+    { ...card, id: owner, published_at: '2026-10-24T00:00:00.000002Z' },
+    { ...card, published_at: '2026-10-24T00:00:00.000001Z' },
+  ])).toHaveLength(2);
+});
+it('equal normalized instants use UUID ordering across Z and offset strings', () => {
+  expect(() => parseDiscoveryCards([
+    { ...card, id: owner, published_at: '2026-10-24T00:00:00.000001Z' },
+    { ...card, published_at: '2026-10-24T00:00:00.000001+00:00' },
+  ])).toThrow();
+  expect(parseDiscoveryCards([
+    { ...card, published_at: '2026-10-24T01:00:00.000001+01:00' },
+    { ...card, id: owner, published_at: '2026-10-24T00:00:00.000001Z' },
+  ])).toHaveLength(2);
+});
+it('UUID case is normalized for ordering and duplicate detection', () => {
+  const upper = 'AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA';
+  expect(() => parseDiscoveryCards([{ ...card, id: upper }, { ...card, id: upper.toLowerCase() }])).toThrow();
+  expect(parseDiscoveryCards([{ ...card, id: upper }, card])).toHaveLength(2);
+});
+for (const date of ['2026-02-30T00:00:00Z', '2026-10-24T24:00:00Z', '2026-10-24T00:60:00Z', '2026-10-24T00:00:00+24:00', '2026-10-24T00:00:00.0000001Z', '2026-10-24T00:00:00', '0000-10-24T00:00:00Z', 'infinity']) {
+  it(`strict timestamps reject ${date}`, () => {
+    expect(() => parseDiscoveryCards([{ ...card, published_at: date }])).toThrow();
+  });
+}
+it('wrong-side microsecond cursor rejects and correct page round-trips original timestamp', async () => {
+  const cursor = { ...card, published_at: '2026-10-24T00:00:00.000001+00:00' };
+  let args: Record<string, unknown> | undefined;
+  fixture.client = { rpc: (_name: string, a: Record<string, unknown>) => {
+    args = a;
+    return { setHeader: () => Promise.resolve({ data: [{ ...card, id: owner, published_at: '2026-10-24T00:00:00.000002Z' }], error: null }) };
+  } };
+  await expect(listRecruiterCards(owner, cursor as never, identity, () => true)).rejects.toMatchObject({ kind: 'unknown' });
+  expect(args?._after_published_at).toBe(cursor.published_at);
+  fixture.client = { rpc: () => ({ setHeader: () => Promise.resolve({ data: [{ ...card, id: owner, published_at: '2026-10-24T00:00:00.000000Z' }], error: null }) }) };
+  expect(await listRecruiterCards(owner, cursor as never, identity, () => true)).toHaveLength(1);
+});
