@@ -454,7 +454,11 @@ async function dumpReviewDiagnostics(page: Page, step: string) {
 }
 async function review(page: Page) {
   try {
+    const preClick = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
+    console.log(`[review-diag] pre-click diag=${preClick}`);
     await page.getByRole('button', { name: 'Review my job-search card', exact: true }).click();
+    const postClick = await page.getByTestId('hj1c-diag').textContent().catch(() => '<absent>');
+    console.log(`[review-diag] post-click diag=${postClick}`);
     await page.getByRole('heading', { name: 'My job-search card', exact: true }).waitFor();
     await waitFor(async () => await page.getByRole('button', { name: 'Review exact card' }).isEnabled(), 'settled owner status');
   } catch (failure) {
