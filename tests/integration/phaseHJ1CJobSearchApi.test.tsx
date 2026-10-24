@@ -505,7 +505,7 @@ async function dumpReviewDiagnostics(page: Page, step: string) {
   const statuses = await page.locator('strong[role="status"]').allTextContents().catch(() => []);
   console.log(`[review-diag] step=${step} diag=${diag} mounts=${JSON.stringify(mounts)} counts=${JSON.stringify(counts)} statuses=${JSON.stringify(statuses)}`);
 }
-async function settledAuthority(page: Page) {
+async function settledAuthority(page: Page, requireRole = true) {
   // Legitimate observable precondition: the real intake flow only offers the
   // handoff after sign-in authority has settled. Clicking earlier mounts the
   // card while personal=false, and the fail-closed handoff clear wipes the
@@ -518,7 +518,7 @@ async function settledAuthority(page: Page) {
     const diag = JSON.parse(text);
     return diag.authLoading === false && diag.sessionMatch === true
       && diag.actingLoading === false && diag.viewLoading === false
-      && diag.viewError === false && diag.effectiveRole !== null;
+      && diag.viewError === false && (!requireRole || diag.effectiveRole !== null);
   }, 'settled sign-in authority');
 }
 async function review(page: Page) {
@@ -854,7 +854,9 @@ it('revoked driver capability keeps real read/withdraw but denies fresh publish 
     const {page,context} = await localPage();
     try {
       await login(page,'driver');
-      await settledAuthority(page);
+      // Revoked capability legitimately yields effectiveRole null; wait for
+      // settled loading flags without requiring a workspace role.
+      await settledAuthority(page, false);
       await page.getByRole('button',{name:'Review my job-search card',exact:true}).click();
       await page.getByRole('heading',{name:'My job-search card',exact:true}).waitFor();
       await page.locator('strong[role="status"]').filter({hasText:/^withdrawn$/}).waitFor();
@@ -914,8 +916,10 @@ it('final fixture inventory and unrelated synthetic state unchanged; no external
   // those caller-only calls mutated nothing.
   console.log('Self-heal calls by actor:', [...selfHealActors].join(',') || 'none', `(total ${selfHealCalls})`);
   expect(selfHealActors.has('recruiter')).toBe(false);
-  // Only the expected synthetic driver/assistant may ever appear as callers.
-  expect([...selfHealActors].every(actor => actor === 'driver' || actor === 'assistant')).toBe(true);
+  // Only the synthetic accounts that actually signed into the shell without a
+  // recruiter profile may appear (driver/assistant/other); no unknown actors,
+  // and the preseeded approved recruiter must never trigger the RPC.
+  expect([...selfHealActors].every(actor => ['driver', 'assistant', 'other'].includes(actor))).toBe(true);
 });
 
 afterAll(async () => {
