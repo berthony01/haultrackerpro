@@ -330,6 +330,7 @@ beforeAll(async () => {
           path: req.url?.replace(auth ? '/auth/v1' : '/rest/v1', ''),
           method: req.method, headers: { ...req.headers, host: '127.0.0.1' },
         }, upstream => {
+          if (isSelfHeal && actor === 'anon/other' && (upstream.statusCode ?? 500) < 400) selfHealAnonAllowed++;
           console.log('[proxy]', Date.now(), actor, req.method, req.url?.split('?')[0], '->', upstream.statusCode,
             action ? `action=${action}` : '', commandId ? `cmd=${commandId.slice(0, 8)}` : '',
             `reqport=${req.socket.remotePort}`);
@@ -918,10 +919,12 @@ it('final fixture inventory and unrelated synthetic state unchanged; no external
   // those caller-only calls mutated nothing.
   console.log('Self-heal calls by actor:', [...selfHealActors].join(',') || 'none', `(total ${selfHealCalls})`);
   expect(selfHealActors.has('recruiter')).toBe(false);
-  // Only the synthetic accounts that actually signed into the shell without a
-  // recruiter profile may appear (driver/assistant/other); no unknown actors,
-  // and the preseeded approved recruiter must never trigger the RPC.
-  expect([...selfHealActors].every(actor => ['driver', 'assistant', 'other'].includes(actor))).toBe(true);
+  // Authenticated callers are only the synthetic accounts that actually signed
+  // into the shell without a recruiter profile (driver/assistant/other); the
+  // preseeded approved recruiter never calls it, and every anonymous attempt
+  // must have been denied (fail-closed, observed 401).
+  expect([...selfHealActors].every(actor => ['driver', 'assistant', 'other', 'anon/other'].includes(actor))).toBe(true);
+  expect(selfHealAnonAllowed).toBe(0);
 });
 
 afterAll(async () => {
