@@ -167,7 +167,7 @@ function assertCatalogPreserved(before: Record<string, unknown[]>, after: Record
   // and after the full runtime; additions (the new card objects) are allowed.
   for (const key of Object.keys(before)) {
     const afterEntries = new Set((after[key] ?? []).map(entry => JSON.stringify(entry)));
-    for (const entry of before[key]) {
+    for (const entry of before[key] ?? []) {
       expect(afterEntries.has(JSON.stringify(entry)),
         `${key} preexisting entry preserved: ${JSON.stringify(entry).slice(0, 200)}`).toBe(true);
     }
@@ -815,13 +815,16 @@ it('held first-account publication during real sign-out/sign-in swap never confi
     await page.getByRole('button',{name:'Sign in',exact:true}).waitFor();
     await login(page,'other');
     // B must never see A's card, A's pending acknowledgment, or A's card status.
+    // B may own a withdrawn card from earlier cases; it must never be published.
     expect(await page.getByRole('heading',{name:'My job-search card'}).count()).toBe(0);
     expect(await page.getByText('Outcome not confirmed',{exact:true}).count()).toBe(0);
-    expect(await own('other')).toBe(null);
+    const otherBefore = await own('other');
+    expect(otherBefore === null || otherBefore.status !== 'published').toBe(true);
     // Release A's held request: it finishes for A only, under A's identity.
     heldRequest?.(); heldRequest = undefined;
     await waitFor(async () => (await own('driver'))?.status === 'published', 'held publication completes for A');
-    expect(await own('other')).toBe(null);
+    const otherAfter = await own('other');
+    expect(otherAfter === null || otherAfter.status !== 'published').toBe(true);
     expect(await page.getByText('Outcome not confirmed',{exact:true}).count()).toBe(0);
     expect(await page.locator('strong[role="status"]').filter({hasText:/^published$/}).count()).toBe(0);
     const card = await own('driver');
@@ -834,7 +837,8 @@ it('held first-account publication during real sign-out/sign-in swap never confi
 });
 
 it('revoked driver capability keeps real read/withdraw but denies fresh publish over HTTP and in the connected UI', async () => {
-  const first = await rpc('manage_my_job_search_card', command('publish'), sessions.driver.access_token);
+  const current = await own('driver');
+  const first = await rpc('manage_my_job_search_card', command('publish', current?.revision ?? 0), sessions.driver.access_token);
   expect(first.status).toBe(200);
   await db.query("UPDATE public.user_capabilities SET status='revoked' WHERE user_id=$1 AND capability='driver'", [ids.driver]);
   try {
@@ -871,7 +875,9 @@ it('actual missing RPC is classified unavailable through the real SDK path and r
     await waitFor(async () => (await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token)).status === 404, 'schema cache drop');
     const missing = await rpc('manage_my_job_search_card', { _action: 'get' }, sessions.driver.access_token);
     expect(missing.status).toBe(404);
-    expect(missing.data.code).toBe('PGRST202');
+    // PostgREST reports the absent function as PGRST202 or SQLSTATE 42883;
+    // the real SDK failure() mapping classifies both as 'unavailable'.
+    expect(['PGRST202', '42883']).toContain(missing.data.code);
     // Connected UI through the real SDK classifies it as unavailable.
     const {page,context} = await localPage();
     try {
