@@ -8,7 +8,7 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { validateJobSearchCardPayload } from '../../src/lib/jobSearch/jobSearchCardContract';
 const socket=process.env.HJ1A_LOCAL_PG_SOCKET;
 if (!socket || !socket.startsWith('/tmp/hj1a-pg/') || !socket.endsWith('/socket')) throw new Error('HJ1A_LOCAL_PG_SOCKET must explicitly target the isolated /tmp/hj1a-pg/ socket; no production or silent skip');
-const config={host:socket,port:55439,user:'lovable',database:'postgres'};
+const config={host:socket,port:55439,user:'lovable',database:'postgres',password:'',ssl:false};
 const candidatePath='supabase/migration-candidates/20261024041952_phase_hj1a_job_search_card_foundation.sql';
 const sql=readFileSync(candidatePath,'utf8');
 const restrictionSource=readFileSync('supabase/migrations/20260719183725_ee7ffc53-dcdc-4666-bcba-1aeac0f5d0cf.sql','utf8');
