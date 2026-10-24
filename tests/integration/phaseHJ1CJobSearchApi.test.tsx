@@ -52,7 +52,8 @@ let holdNextPublish = false;
 let forbiddenNetwork = 0;
 let selfHealCalls = 0;
 const selfHealActors = new Set<string>();
-let originalInventory: unknown;
+let originalInventory: Record<string, unknown[]>;
+let preCandidateInventory: Record<string, unknown[]>;
 let originalSentinels: unknown;
 let workspace = randomUUID();
 
@@ -133,15 +134,44 @@ async function seedAccount(name: string) {
   sessions[name] = signed.data;
 }
 async function inventory() {
+  // Expanded catalog: schema/table ACLs, RLS/force-RLS flags, constraints,
+  // triggers (internal cross-schema FK triggers excluded), policies, columns,
+  // and function definitions/ACLs. Column-level privileges are not used by the
+  // candidate or fixture and are out of scope.
   return (await db.query(`SELECT jsonb_build_object(
+    'schemas', (SELECT jsonb_agg(jsonb_build_object('name',n.nspname,'acl',n.nspacl::text) ORDER BY n.nspname)
+      FROM pg_namespace n WHERE n.nspname IN ('public','job_search_private')),
+    'tables', (SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,'acl',c.relacl::text,
+        'rls',c.relrowsecurity,'force',c.relforcerowsecurity) ORDER BY n.nspname,c.relname)
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname IN ('public','job_search_private') AND c.relkind='r'),
     'columns', (SELECT jsonb_agg(to_jsonb(x) ORDER BY table_name,ordinal_position)
       FROM information_schema.columns x WHERE table_schema IN ('public','job_search_private')),
+    'constraints', (SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'table',c.relname,'name',con.conname,
+        'definition',pg_get_constraintdef(con.oid)) ORDER BY n.nspname,c.relname,con.conname)
+      FROM pg_constraint con JOIN pg_class c ON c.oid=con.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname IN ('public','job_search_private')),
     'policies', (SELECT jsonb_agg(to_jsonb(x) ORDER BY schemaname,tablename,policyname)
       FROM pg_policies x WHERE schemaname IN ('public','job_search_private')),
+    'triggers', (SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'table',c.relname,'name',t.tgname,
+        'definition',pg_get_triggerdef(t.oid)) ORDER BY n.nspname,c.relname,t.tgname)
+      FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname IN ('public','job_search_private') AND NOT t.tgisinternal),
     'functions', (SELECT jsonb_agg(jsonb_build_object('def',pg_get_functiondef(p.oid),'acl',p.proacl::text)
       ORDER BY n.nspname,p.proname) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname IN ('public','job_search_private') AND p.prokind='f')
   ) AS x`)).rows[0].x;
+}
+function assertCatalogPreserved(before: Record<string, unknown[]>, after: Record<string, unknown[]>) {
+  // Every preexisting catalog object must be byte-identical after the candidate
+  // and after the full runtime; additions (the new card objects) are allowed.
+  for (const key of Object.keys(before)) {
+    const afterEntries = new Set((after[key] ?? []).map(entry => JSON.stringify(entry)));
+    for (const entry of before[key]) {
+      expect(afterEntries.has(JSON.stringify(entry)),
+        `${key} preexisting entry preserved: ${JSON.stringify(entry).slice(0, 200)}`).toBe(true);
+    }
+  }
 }
 
 beforeAll(async () => {
