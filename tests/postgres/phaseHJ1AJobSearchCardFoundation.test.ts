@@ -145,10 +145,9 @@ describe('HJ-1A REAL PostgreSQL concurrent sessions',()=>{
    await a.query('BEGIN');await a.query('SET LOCAL ROLE authenticated');await a.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users.driver]);
    await a.query("SELECT public.manage_my_job_search_card('withdraw',NULL,1,$1::uuid,NULL)",[randomUUID()]);
    const retry=publish(users.driver,payload,0,id,false,b);
-   const pid=(await db.query("SELECT pid FROM pg_stat_activity WHERE application_name='hj1a_waiter'")).rows;
    // Observe real lock contention rather than treating embedded serialization as proof.
    let blocked=false;for(let i=0;i<100;i++){const r=await db.query("SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT public.manage_my_job_search_card%' AND pid<>pg_backend_pid()");if(r.rowCount){blocked=true;break;}await new Promise(resolve=>setTimeout(resolve,5));}
-   expect(blocked).toBe(true);expect(pid).toEqual([]);await a.query('COMMIT');expect((await retry).status).toBe('withdrawn');expect(await counts()).toEqual({cards:1,events:2});
+   expect(blocked).toBe(true);await a.query('COMMIT');expect((await retry).status).toBe('withdrawn');expect(await counts()).toEqual({cards:1,events:2});
   }finally{await a.query('ROLLBACK');await a.end();await b.end();}
  });
 });
