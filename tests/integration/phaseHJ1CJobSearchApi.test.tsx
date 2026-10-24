@@ -45,6 +45,7 @@ let proxy: Server | undefined;
 let browser: Browser | undefined;
 let clusterStarted = false;
 let droppedCommand: string | null = null;
+const droppedIds = new Set<string>();
 let delayNextPublish = false;
 let heldRequest: (() => void) | undefined;
 let holdNextPublish = false;
@@ -297,16 +298,19 @@ beforeAll(async () => {
           console.log('[proxy]', Date.now(), actor, req.method, req.url?.split('?')[0], '->', upstream.statusCode,
             action ? `action=${action}` : '', commandId ? `cmd=${commandId.slice(0, 8)}` : '',
             `reqport=${req.socket.remotePort}`);
-          if (delayNextPublish && action === 'publish') {
+          // Traced: the browser transport transparently replays the in-memory
+          // POST on a fresh socket ~6ms after a destroyed response (identical
+          // _client_command_id, no application resubmit). The unknown-outcome
+          // simulation must therefore poison the original response AND every
+          // transport replay of the same command; the server still executes
+          // each one, and the canonical RPC's client_command_id idempotency
+          // (asserted below: exactly one event) absorbs the duplicate.
+          if (action === 'publish' && commandId && (delayNextPublish || droppedIds.has(commandId))) {
             delayNextPublish = false;
-            droppedCommand = commandId ?? null;
+            droppedCommand = commandId;
+            droppedIds.add(commandId);
             upstream.resume();
             upstream.on('end', () => {
-              // Real response loss AFTER headers: a bare res.destroy() before
-              // any response bytes lets Chromium transparently replay the
-              // in-memory POST (traced: identical _client_command_id arrived
-              // twice), so the client never observed the unknown outcome.
-              // Headers + truncated body is non-replayable and rejects fetch.
               res.writeHead(200, { 'content-type': 'application/json', 'content-length': '1048576' });
               res.write('{"truncated"');
               res.destroy();
