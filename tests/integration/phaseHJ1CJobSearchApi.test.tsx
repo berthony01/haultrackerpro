@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { Client } from 'pg';
-import { chromium, type Browser, type Page } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { createServer, request, type Server } from 'node:http';
 import { createConnection, createServer as createNetServer } from 'node:net';
@@ -357,7 +357,13 @@ async function preservation() {
   return result;
 }
 async function localPage(width = 1280, height = 1800) {
-  if (!browser) browser = await chromium.launch({ headless: true });
+  if (!browser) {
+    const existingDriver = execFileSync('/bin/python3', ['-c',
+      'import pathlib,playwright; print(pathlib.Path(playwright.__file__).parent/"driver"/"package"/"index.mjs")'],
+    { env: { PATH: '/bin:/usr/bin' } }).toString().trim();
+    const { chromium } = await import(existingDriver);
+    browser = await chromium.launch({ headless: true });
+  }
   if (!browser) throw new Error('Real browser absent');
   const context = await browser.newContext({ viewport: { width, height } });
   await context.route('**/*', route => {
