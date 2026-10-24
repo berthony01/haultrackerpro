@@ -73,7 +73,7 @@ export function useJobSearchCard(scope: CardScope): OwnCardState {
     try {
       const card = await getOwnCard(live.current.identity(), allowed);
       if (!allowed() || seq !== serial.current) return;
-      setState(s => ({ ...s, card, ready: true, busy: false, error: s.uncertain ? s.error : null }));
+      setState(s => ({ ...s, card, ready: true, busy: false, error: s.uncertain || s.error === 'stale' || s.error === 'no_card' ? s.error : null }));
     } catch (e) {
       if (!allowed() || seq !== serial.current) return;
       const error = e instanceof JobSearchCardError ? e.kind : 'unknown';

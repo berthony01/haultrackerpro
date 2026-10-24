@@ -74,6 +74,7 @@ export function DriverJobSearchCardView({ state, canPublish, seed }: { state: Ow
     if (success) { setEditing(false); setDirty(false); }
   }
   const snapshotStatus = state.card?.status === 'published' && Date.parse(state.card.expires_at) <= Date.now() ? 'expired' : state.card?.status;
+  if (!state.ready && state.error === 'denied') return <p role="status" className="text-muted-foreground">Job-search card management is unavailable in this account context.</p>;
   return <section className="min-w-0 space-y-6 text-foreground" aria-label="My job-search card">
     <header className="space-y-2"><ShieldCheck className="h-7 w-7 text-primary" /><h1 className="text-2xl font-bold">My job-search card</h1>
       <p className="text-sm text-muted-foreground">This card contains no name, phone or email. Publishing this card does not change your work-profile/contact sharing settings.</p>

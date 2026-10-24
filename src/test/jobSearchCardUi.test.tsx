@@ -97,3 +97,25 @@ it('malformed/leaking recruiter response never renders',async()=> {
 it('publication cannot begin before actual get succeeds',async()=> {
  const submit=vi.fn();render(<DriverJobSearchCardView canPublish seed={payload as never} state={{card:null,ready:false,busy:false,error:null,uncertain:false,pending:null,refresh:vi.fn(),submit,retry:vi.fn()}}/>);expect(screen.getByRole('button',{name:'Review exact card'})).toBeDisabled();expect(submit).not.toHaveBeenCalled();
 });
+it('sign-out subscription immediately hides the draft and card before auth context rerender',async()=> {
+ setJobSearchCardHandoff(fixture.user,payload);route('/find-work?task=job-search-card');await reviewSeed();
+ act(()=>{for(const cb of fixture.callbacks)cb('SIGNED_OUT',null);});
+ expect(screen.queryByLabelText('Years of experience')).toBeNull();expect(screen.queryByRole('heading',{name:'Review before sharing'})).toBeNull();
+});
+it('real presentation edit, pause and withdrawal use deliberate commands and returned status',async()=> {
+ let card={...own};fixture.rpc.mockImplementation((_n,a)=>{if(a._action!=='get')card={...card,revision:card.revision+1,status:a._action==='pause'?'paused':'withdrawn'};return response(card);});
+ route('/find-work?task=job-search-card');await screen.findByText('published',{selector:'strong'});
+ fireEvent.click(screen.getByRole('button',{name:'Pause'}));await screen.findByText('paused',{selector:'strong'});
+ fireEvent.click(screen.getByRole('button',{name:'Withdraw'}));await screen.findByText('withdrawn',{selector:'strong'});
+ expect(fixture.rpc.mock.calls.filter(([,a])=>a._action!=='get').map(([,a])=>a._expected_revision)).toEqual([1,2]);
+});
+it('recruiter pagination replaces bounded page and clears a delayed page on workspace loss',async()=> {
+ fixture.recruiter=true;fixture.profile={id,user_id:fixture.user,status:'active',verification_status:'approved'};
+ const rows=Array.from({length:20},(_,i)=>({id:`22222222-2222-2222-2222-${String(99-i).padStart(12,'0')}`,revision:1,published_at:own.published_at,expires_at:own.expires_at,payload}));
+ let release:((v:unknown)=>void)|undefined;
+ fixture.rpc.mockResolvedValueOnce({data:rows,error:null}).mockImplementationOnce(()=>new Promise(r=>{release=r;}));
+ const tree=render(<RecruiterJobSearchCards recruiterId={id}/>);fireEvent.click(screen.getByRole('button',{name:'Find available drivers'}));await screen.findByRole('button',{name:'Next page'});expect(screen.getAllByText('TX')).toHaveLength(20);
+ fireEvent.click(screen.getByRole('button',{name:'Next page'}));expect(screen.queryByText('TX')).toBeNull();
+ fixture.profile={...fixture.profile as object,id:'33333333-3333-3333-3333-333333333333'};tree.rerender(<RecruiterJobSearchCards recruiterId={id}/>);
+ await act(async()=>{release?.({data:[],error:null});});expect(screen.queryByRole('button',{name:'Next page'})).toBeNull();expect(fixture.rpc.mock.calls[1][1]._after_card_id).toBe(rows[19].id);
+});
