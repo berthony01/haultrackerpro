@@ -101,7 +101,10 @@ async function jsonRequest(url: string, token: string | null, body?: unknown, me
   }
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(url, {
+    method, headers, body: body === undefined ? undefined : JSON.stringify(body),
+    signal: AbortSignal.timeout(10000),
+  });
   const data = await response.json().catch(() => null);
   return { status: response.status, data };
 }
@@ -454,12 +457,15 @@ it('actual lifecycle HTTP receipts: validation, TTL, isolation, idempotency and 
   const invalid = command('publish');
   expect((await rpc('manage_my_job_search_card', { ...invalid, _payload: { ...payload, phone:'not allowed' } }, sessions.driver.access_token)).data.code).toBe('22023');
   const publish = command('publish');
+  console.log('Lifecycle: validation complete');
   const first = await rpc('manage_my_job_search_card', publish, sessions.driver.access_token);
   expect(first.status).toBe(200);
   expect(Date.parse(first.data.expires_at) - Date.parse(first.data.published_at)).toBe(14 * 86400000);
   expect(await own('other')).toBe(null);
+  console.log('Lifecycle: publication and isolation complete');
   expect((await rpc('manage_my_job_search_card', command('pause',0), sessions.driver.access_token)).data.code).toBe('40001');
   await rpc('manage_my_job_search_card', command('withdraw',first.data.revision), sessions.driver.access_token);
+  console.log('Lifecycle: withdrawal complete');
   const replay = await rpc('manage_my_job_search_card', publish, sessions.driver.access_token);
   expect(replay.data.status).toBe('withdrawn');
   expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events WHERE client_command_id=$1',
@@ -610,7 +616,10 @@ it('final fixture inventory and unrelated synthetic state unchanged; no external
 afterAll(async () => {
   heldRequest = undefined;
   await browser?.close();
-  if (proxy) await new Promise<void>(resolve => proxy?.close(() => resolve()));
+  if (proxy) {
+    proxy.closeAllConnections();
+    await new Promise<void>(resolve => proxy?.close(() => resolve()));
+  }
   for (const child of children.reverse()) {
     if (child.exitCode === null) {
       child.kill('SIGTERM');
