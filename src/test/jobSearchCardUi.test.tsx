@@ -13,7 +13,7 @@ vi.mock('@/hooks/useActingContext',()=>({useActingContext:()=>({isActingAsAssist
 vi.mock('@/hooks/opportunities/useRecruiterProfile',()=>({useRecruiterProfile:()=>({profile:fixture.profile,isLoading:false})}));
 vi.mock('@/hooks/opportunities/useDriverOpportunityProfile',()=>({useDriverOpportunityProfile:()=>({profile:{state:'TX',cdl_class:'A',years_experience:5,preferred_route_type:'Regional',preferred_home_time:'Weekly',trailer_experience:['Reefer'],min_weekly_gross:2000,city:'Houston'},isLoading:false,isError:false})}));
 vi.mock('@/components/home/HomeOpportunityPreview',()=>({default:()=>null}));
-vi.mock('@/integrations/supabase/client',()=>({supabase:{rpc:(name:string,args:unknown)=>({setHeader:()=>fixture.rpc(name,args)}),auth:{onAuthStateChange:(callback:(e:string,s:unknown)=>void)=>{fixture.callbacks.add(callback);return {data:{subscription:{unsubscribe:()=>fixture.callbacks.delete(callback)}}};}}}));
+vi.mock('@/integrations/supabase/client',()=>({supabase:{rpc:(name:string,args:unknown)=>({setHeader:()=>fixture.rpc(name,args)}),auth:{onAuthStateChange:(callback:(e:string,s:unknown)=>void)=>{fixture.callbacks.add(callback);return {data:{subscription:{unsubscribe:()=>fixture.callbacks.delete(callback)}}};}}}}));
 import FindWork from '@/pages/FindWork';
 import DriverJobSearchCard, { DriverJobSearchCardView } from '@/components/jobSearch/DriverJobSearchCard';
 import RecruiterJobSearchCards from '@/components/jobSearch/RecruiterJobSearchCards';
