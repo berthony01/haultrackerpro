@@ -185,9 +185,16 @@ beforeAll(async () => {
     GOTRUE_MAILER_AUTOCONFIRM: 'false', GOTRUE_SMTP_HOST: '127.0.0.1', GOTRUE_SMTP_PORT: '55446',
     GOTRUE_TRACING_ENABLED: 'false', GOTRUE_METRICS_ENABLED: 'false', LOG_LEVEL: 'error',
   };
-  execFileSync(HOME + '/bin/auth/auth', ['migrate'], {
-    cwd: HOME + '/runtime', env: { ...childEnv, ...authEnv }, stdio: 'ignore',
-  });
+  try {
+    execFileSync(HOME + '/bin/auth/auth', ['migrate'], {
+      cwd: HOME + '/runtime', env: { ...childEnv, ...authEnv }, stdio: 'pipe',
+    });
+  } catch (failure) {
+    const error = failure as { stdout?: Buffer; stderr?: Buffer };
+    const redacted = Buffer.concat([error.stdout ?? Buffer.alloc(0), error.stderr ?? Buffer.alloc(0)])
+      .toString().replaceAll(secret, '[redacted]').replaceAll(dbPassword, '[redacted]');
+    throw new Error('Local Auth migration failed: ' + redacted);
+  }
   run(HOME + '/bin/auth/auth', ['serve'], authEnv);
   await waitFor(async () => (await fetch('http://127.0.0.1:55443/health')).ok, 'real Auth health');
   await db.query(`GRANT SELECT,REFERENCES ON auth.users TO postgres;
