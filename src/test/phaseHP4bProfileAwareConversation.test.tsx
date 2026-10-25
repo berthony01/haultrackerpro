@@ -24,7 +24,7 @@ vi.mock('react-router-dom', async () => {
 
 const roleState = { driverWorkspaceAllowed: true, isLoading: false, error: null };
 vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => roleState }));
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'driver-1' }, loading: false }) }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'driver-1' }, session: { user: { id: 'driver-1' } }, loading: false }) }));
 vi.mock('@/hooks/useActingContext', () => ({
   useActingContext: () => ({ isActingAsAssistant: false, isLoadingManagedDrivers: false }),
 }));

@@ -14,8 +14,13 @@
  *    (`mapProfileToIntakeAnswers`) unchanged, so `initialMessage` and every
  *    identity, contact, consent, visibility and My Trucking field are
  *    structurally incapable of entering the store. No new coercions.
+ *  - OWNER-BOUND. Answers are stored with the signed-in user's id; only that
+ *    same id can consume them. A bounded auth listener (alive only while
+ *    answers are pending) drops them on sign-out or any account change. No
+ *    session or token is stored.
  */
 
+import { supabase } from '@/integrations/supabase/client';
 import type { IntakeAnswers } from '@/lib/home/conversationIntake';
 import {
   mapProfileToIntakeAnswers,
@@ -35,31 +40,49 @@ export const PENDING_HANDOFF_FIELDS = [
   'min_weekly_gross',
 ] as const;
 
-let pendingAnswers: IntakeAnswers | null = null;
+let pending: { owner: string; answers: IntakeAnswers } | null = null;
+let unsubscribe: (() => void) | null = null;
 
-/**
- * Validate and store the conversation's final answers. Anything outside the
- * approved employment set, or failing the existing validation, is dropped.
- * An empty result stores nothing.
- */
-export function setPendingProfileAnswers(answers: IntakeAnswers | null | undefined): void {
-  const filtered = mapProfileToIntakeAnswers(answers as StoredProfileLike | null | undefined);
-  pendingAnswers = Object.keys(filtered).length > 0 ? filtered : null;
+/** Drops any pending answers without consuming them (Back, save success, auth change). */
+export function clearPendingProfileAnswers(): void {
+  pending = null;
+  const stop = unsubscribe;
+  unsubscribe = null;
+  stop?.();
 }
 
-/** Returns the pending answers at most once, then clears the store. */
-export function consumePendingProfileAnswers(): IntakeAnswers | null {
-  const value = pendingAnswers;
-  pendingAnswers = null;
+/**
+ * Validate and store the conversation's final answers for `owner`. Anything
+ * outside the approved employment set, or failing the existing validation, is
+ * dropped. A missing owner or an empty result stores nothing.
+ */
+export function setPendingProfileAnswers(owner: string, answers: IntakeAnswers | null | undefined): void {
+  clearPendingProfileAnswers();
+  if (typeof owner !== 'string' || owner.length === 0) return;
+  const filtered = mapProfileToIntakeAnswers(answers as StoredProfileLike | null | undefined);
+  if (Object.keys(filtered).length === 0) return;
+  pending = { owner, answers: filtered };
+  // Listen only while answers are pending; fail closed if unavailable.
+  const auth = supabase.auth;
+  if (!auth?.onAuthStateChange) {
+    clearPendingProfileAnswers();
+    return;
+  }
+  const { data: { subscription } } = auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || !session || session.user.id !== owner) clearPendingProfileAnswers();
+  });
+  if (pending?.owner === owner) unsubscribe = () => subscription.unsubscribe();
+  else subscription.unsubscribe();
+}
+
+/** Returns `owner`'s pending answers at most once; always clears the store. */
+export function consumePendingProfileAnswers(owner: string | null | undefined): IntakeAnswers | null {
+  const value = owner && pending?.owner === owner ? pending.answers : null;
+  clearPendingProfileAnswers();
   return value;
 }
 
-/** Drops any pending answers without consuming them (Back, save success). */
-export function clearPendingProfileAnswers(): void {
-  pendingAnswers = null;
-}
-
 /** Read-only probe, for tests and guards. Does not clear. */
-export function hasPendingProfileAnswers(): boolean {
-  return pendingAnswers !== null;
+export function hasPendingProfileAnswers(owner?: string): boolean {
+  return pending !== null && (owner === undefined || pending.owner === owner);
 }

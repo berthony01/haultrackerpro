@@ -14,8 +14,15 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 const rpcMock = vi.fn();
+const authListeners = vi.hoisted(() => new Set<(event: string, session: unknown) => void>());
 vi.mock('@/integrations/supabase/client', () => ({
-  supabase: { rpc: (...args: unknown[]) => rpcMock(...args) },
+  supabase: {
+    rpc: (...args: unknown[]) => rpcMock(...args),
+    auth: { onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
+      authListeners.add(cb);
+      return { data: { subscription: { unsubscribe: () => authListeners.delete(cb) } } };
+    } },
+  },
 }));
 
 const navigateSpy = vi.fn();
@@ -28,7 +35,7 @@ const roleState = { isDriver: true, isLoading: false };
 vi.mock('@/hooks/useUserRole', () => ({ useUserRole: () => roleState }));
 
 const AUTH_USER = { id: 'driver-1', email: 'driver@example.com', user_metadata: {} };
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: AUTH_USER }) }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: AUTH_USER, session: { user: { id: AUTH_USER.id } } }) }));
 
 const upsertMutate = vi.fn();
 const profileState: { profile: unknown; isLoading: boolean; isError: boolean } = {
@@ -94,6 +101,7 @@ const STORED_PROFILE = {
 
 beforeEach(() => {
   clearPendingProfileAnswers();
+  authListeners.clear();
   rpcMock.mockReset();
   rpcMock.mockResolvedValue({ data: [], error: null });
   navigateSpy.mockReset();
@@ -117,8 +125,34 @@ const renderProfile = (onBack = vi.fn()) => {
 /* ------------------------------------------------------------------ */
 
 describe('HP-4B2 pending handoff module', () => {
+  it('is owner-bound: missing owner stores nothing, a mismatched owner gets nothing and clears', () => {
+    setPendingProfileAnswers('', { city: 'Dallas' });
+    expect(hasPendingProfileAnswers()).toBe(false);
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
+    expect(consumePendingProfileAnswers('driver-2')).toBeNull();
+    expect(hasPendingProfileAnswers()).toBe(false);
+    expect(consumePendingProfileAnswers('driver-1')).toBeNull();
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
+    expect(consumePendingProfileAnswers(null)).toBeNull();
+    expect(authListeners.size).toBe(0);
+  });
+
+  it('auth listener lives only while pending and clears on sign-out or another account', () => {
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
+    expect(authListeners.size).toBe(1);
+    [...authListeners].forEach((cb) => cb('TOKEN_REFRESHED', { user: { id: 'driver-1' } }));
+    expect(hasPendingProfileAnswers('driver-1')).toBe(true);
+    [...authListeners].forEach((cb) => cb('SIGNED_IN', { user: { id: 'driver-2' } }));
+    expect(hasPendingProfileAnswers()).toBe(false);
+    expect(authListeners.size).toBe(0);
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
+    [...authListeners].forEach((cb) => cb('SIGNED_OUT', null));
+    expect(hasPendingProfileAnswers()).toBe(false);
+    expect(authListeners.size).toBe(0);
+  });
+
   it('accepts only the approved employment fields', () => {
-    setPendingProfileAnswers({
+    setPendingProfileAnswers('driver-1', {
       city: 'Dallas',
       state: 'TX',
       cdl_class: 'A',
@@ -141,7 +175,7 @@ describe('HP-4B2 pending handoff module', () => {
       min_effective_rpm: 2.1,
     } as never);
 
-    const stored = consumePendingProfileAnswers()!;
+    const stored = consumePendingProfileAnswers('driver-1')!;
     expect(Object.keys(stored).sort()).toEqual([...PENDING_HANDOFF_FIELDS].sort());
     expect(stored).not.toHaveProperty('initialMessage');
     expect(stored).not.toHaveProperty('full_name');
@@ -150,7 +184,7 @@ describe('HP-4B2 pending handoff module', () => {
   });
 
   it('drops out-of-vocabulary values instead of coercing them', () => {
-    setPendingProfileAnswers({
+    setPendingProfileAnswers('driver-1', {
       preferred_driver_type: 'Company Driver',
       preferred_route_type: 'Whatever',
       years_experience: 4.5,
@@ -158,32 +192,34 @@ describe('HP-4B2 pending handoff module', () => {
       min_weekly_gross: 0,
       cdl_class: 'A',
     } as never);
-    expect(consumePendingProfileAnswers()).toEqual({ cdl_class: 'A' });
+    expect(consumePendingProfileAnswers('driver-1')).toEqual({ cdl_class: 'A' });
   });
 
   it('stores nothing when no approved field survives validation', () => {
-    setPendingProfileAnswers({ initialMessage: 'hello', full_name: 'Jane' } as never);
+    setPendingProfileAnswers('driver-1', { initialMessage: 'hello', full_name: 'Jane' } as never);
     expect(hasPendingProfileAnswers()).toBe(false);
-    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(consumePendingProfileAnswers('driver-1')).toBeNull();
   });
 
   it('is one-shot: consume clears the module store', () => {
-    setPendingProfileAnswers({ city: 'Dallas' });
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
     expect(hasPendingProfileAnswers()).toBe(true);
-    expect(consumePendingProfileAnswers()).toEqual({ city: 'Dallas' });
+    expect(consumePendingProfileAnswers('driver-1')).toEqual({ city: 'Dallas' });
     expect(hasPendingProfileAnswers()).toBe(false);
-    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(consumePendingProfileAnswers('driver-1')).toBeNull();
   });
 
   it('clear drops pending answers without consuming them', () => {
-    setPendingProfileAnswers({ city: 'Dallas' });
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
     clearPendingProfileAnswers();
-    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(consumePendingProfileAnswers('driver-1')).toBeNull();
   });
 
   it('uses no browser persistence of any kind', () => {
     expect(HANDOFF_SRC).not.toMatch(/sessionStorage|localStorage|document\.cookie|indexedDB/);
-    expect(HANDOFF_SRC).not.toMatch(/supabase|fetch\(/i);
+    // No network/backend: the only client surface is the bounded auth listener.
+    expect(HANDOFF_SRC).not.toMatch(/\.rpc\(|\.from\(|\.functions|\.storage|fetch\(|getSession|access_token|refresh_token/);
+    expect(HANDOFF_SRC.match(/supabase\.[a-zA-Z]+/g)).toEqual(['supabase.auth']);
   });
 });
 
@@ -205,7 +241,7 @@ describe('HP-4B2 FindWork continuation', () => {
     fireEvent.click(screen.getByTestId('home-conversation-continue'));
     expect(navigateSpy).toHaveBeenCalledWith(HOME_INTAKE_NEXT_PATH);
 
-    const pending = consumePendingProfileAnswers()!;
+    const pending = consumePendingProfileAnswers('driver-1')!;
     expect(pending.city).toBe('Houston');
     expect(pending.cdl_class).toBe('A');
     expect(pending).not.toHaveProperty('initialMessage');
@@ -229,7 +265,7 @@ describe('HP-4B2 FindWork continuation', () => {
 describe('HP-4B2 pending review in the profile form', () => {
   it('shows pending answers over an existing stored profile, with banner and markers', () => {
     profileState.profile = STORED_PROFILE;
-    setPendingProfileAnswers({
+    setPendingProfileAnswers('driver-1', {
       preferred_route_type: 'Regional',
       city: 'Dallas',
       min_weekly_gross: 2200,
@@ -260,7 +296,7 @@ describe('HP-4B2 pending review in the profile form', () => {
 
   it('applies the overlay once and a later profile refetch does not erase it', () => {
     profileState.profile = STORED_PROFILE;
-    setPendingProfileAnswers({ city: 'Dallas' });
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
     const { rerender } = renderProfile();
     expect(screen.getByDisplayValue('Dallas')).toBeTruthy();
 
@@ -273,7 +309,7 @@ describe('HP-4B2 pending review in the profile form', () => {
 
   it('saves the reviewed values through the existing save path and clears pending on success', async () => {
     profileState.profile = STORED_PROFILE;
-    setPendingProfileAnswers({ city: 'Dallas' });
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
     renderProfile();
 
     fireEvent.click(screen.getByText('Save Preferences'));
@@ -292,7 +328,7 @@ describe('HP-4B2 pending review in the profile form', () => {
 
   it('Back clears the pending state and the module store', () => {
     profileState.profile = STORED_PROFILE;
-    setPendingProfileAnswers({ city: 'Dallas' });
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
     const onBack = vi.fn();
     renderProfile(onBack);
     fireEvent.click(screen.getByText('Back to Opportunities'));
@@ -303,7 +339,7 @@ describe('HP-4B2 pending review in the profile form', () => {
 
   it('a later manual visit shows no stale pending values', () => {
     profileState.profile = STORED_PROFILE;
-    setPendingProfileAnswers({ city: 'Dallas' });
+    setPendingProfileAnswers('driver-1', { city: 'Dallas' });
     const first = renderProfile();
     expect(screen.getByDisplayValue('Dallas')).toBeTruthy();
     first.unmount();

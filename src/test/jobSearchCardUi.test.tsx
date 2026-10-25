@@ -192,8 +192,8 @@ it('original profile CTA still performs only the existing one-shot handoff', () 
   fireEvent.click(screen.getByRole('button', {
     name: 'Review/update my work profile'
   }));
-  expect(consumePendingProfileAnswers()?.city).toBe('Houston');
-  expect(consumePendingProfileAnswers()).toBeNull();
+  expect(consumePendingProfileAnswers(fixture.user)?.city).toBe('Houston');
+  expect(consumePendingProfileAnswers(fixture.user)).toBeNull();
   expect(fixture.rpc).not.toHaveBeenCalled();
 });
 it('public flow without optional callback has no card CTA', () => {
