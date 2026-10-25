@@ -14,7 +14,7 @@ const state = vi.hoisted(() => ({
   acting: false, actingLoading: false, loads: [] as any[],
   profiles: {} as Record<string, any>, profileLoading: false, profileError: false,
   profileRead: vi.fn(), mutation: vi.fn(), rpc: vi.fn(), model: vi.fn(),
-  realWorkspace: false, capabilityRows: [] as any[], recruiterMount: vi.fn(),
+  realWorkspace: false, realOpportunities: false, capabilityRows: [] as any[], recruiterMount: vi.fn(),
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: state.user, loading: state.authLoading, signOut: vi.fn() }) }));
 vi.mock('@/hooks/useViewMode', async (importOriginal) => {
@@ -73,7 +73,7 @@ vi.mock('@/components/AlertsView', () => ({ AlertsView: () => null }));
 vi.mock('@/components/opportunities/OpportunitiesPage', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/components/opportunities/OpportunitiesPage')>();
   return { ...actual, OpportunitiesPage: (props: React.ComponentProps<typeof actual.OpportunitiesPage>) =>
-    state.realWorkspace ? <actual.OpportunitiesPage {...props} /> : null };
+    state.realWorkspace || state.realOpportunities ? <actual.OpportunitiesPage {...props} /> : null };
 });
 vi.mock('@/hooks/opportunities/useOpportunities', () => ({ useOpportunities: () => ({ opportunities: [], isLoading: false }) }));
 vi.mock('@/hooks/opportunities/useSavedOpportunities', () => ({ useSavedOpportunities: () => ({ saved: [], save: { mutate: state.mutation }, unsave: { mutate: state.mutation } }) }));
@@ -124,7 +124,7 @@ function tree(child: React.ReactNode) {
 }
 beforeEach(() => {
   cleanup(); vi.clearAllMocks(); state.user = { id: 'driver-a' }; state.authLoading = false;
-  state.realWorkspace = false;
+  state.realWorkspace = false; state.realOpportunities = false;
   state.acting = false; state.actingLoading = false; state.loads = [];
   state.profiles = {}; state.profileLoading = false; state.profileError = false;
   state.rpc.mockResolvedValue({ data: [], error: null }); capability('active');
@@ -377,5 +377,26 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     expect(localStorage.getItem('htp_view_mode:driver-a')).toBe('recruiter');
     expect(sessionStorage.getItem('htp_opportunities_initial_view')).toBeNull();
     expect(state.mutation).not.toHaveBeenCalled();
+  });
+
+  it('dashboard-embedded chat Continue opens the unsaved review on the same mounted Index', async () => {
+    // Settled workspace (no dependency churn after click) with the real destination page.
+    capability('active'); state.realOpportunities = true; state.loads = [{ id: 'existing' }];
+    state.profiles['driver-a'] = fullProfile;
+    render(<QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/dashboard']}><Location /><ReviewJourney /></MemoryRouter>
+    </QueryClientProvider>);
+    expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
+    fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
+    fireEvent.click(await screen.findByTestId('home-conversation-continue'));
+    expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
+    expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
+    expect(screen.getByDisplayValue('Houston')).toBeTruthy();
+    expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
+    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(window.location.search).toBe('');
+    expect(state.mutation).not.toHaveBeenCalled();
+    expect(state.rpc.mock.calls.every(([name]) => name === 'list_public_opportunity_teasers')).toBe(true);
+    expect(state.model).not.toHaveBeenCalled();
   });
 });
