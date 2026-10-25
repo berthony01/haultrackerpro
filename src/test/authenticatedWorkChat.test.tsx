@@ -424,7 +424,9 @@ describe('pending profile handoff is isolated per account (same tab, no reload)'
     expect(hasPendingProfileAnswers()).toBe(true);
   }
   function expectBSeesNothingFromA() {
+    state.profiles['driver-b'] = { ...fullProfile, city: 'Austin', full_name: 'B NAME', phone: 'B PHONE' };
     render(tree(<DriverOpportunityProfile onBack={vi.fn()} />));
+    expect(screen.getByDisplayValue('Austin')).toBeTruthy(); // B's own saved form rendered
     expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
     expect(screen.queryByTestId('driver-profile-pending-badge')).toBeNull();
     expect(screen.queryByDisplayValue('Houston')).toBeNull();
