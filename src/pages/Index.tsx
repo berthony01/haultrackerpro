@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import SEOHead from '@/components/SEOHead';
@@ -246,6 +246,10 @@ const Index = () => {
   const [pendingPurchaseTrack, setPendingPurchaseTrack] = useState(false);
   // Navigation transaction only; current capability/render gates remain authoritative.
   const driverProfileTransition = useRef<{ userId: string; phase: 'workspace' | 'target' } | null>(null);
+  // Re-run URL hint handling on in-app navigation while Index stays mounted.
+  // Params are still read from window.location: consumed hints are cleared
+  // with history.replaceState, which Router state does not observe.
+  const routerSearch = useLocation().search;
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
@@ -404,6 +408,7 @@ const Index = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
+    routerSearch,
     user?.id,
     subscription.isLoading,
     subscription.isPro,

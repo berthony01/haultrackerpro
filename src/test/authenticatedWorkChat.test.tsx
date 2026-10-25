@@ -378,4 +378,24 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     expect(sessionStorage.getItem('htp_opportunities_initial_view')).toBeNull();
     expect(state.mutation).not.toHaveBeenCalled();
   });
+
+  it('dashboard-embedded chat Continue opens the unsaved review on the same mounted Index', async () => {
+    capability('active'); state.realWorkspace = true; state.loads = [{ id: 'existing' }];
+    state.profiles['driver-a'] = fullProfile;
+    render(<QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={['/dashboard']}><Location /><ReviewJourney /></MemoryRouter>
+    </QueryClientProvider>);
+    expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
+    fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
+    fireEvent.click(await screen.findByTestId('home-conversation-continue'));
+    expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
+    expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
+    expect(screen.getByDisplayValue('Houston')).toBeTruthy();
+    expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
+    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(window.location.search).toBe('');
+    expect(state.mutation).not.toHaveBeenCalled();
+    expect(state.rpc.mock.calls.every(([name]) => name === 'list_public_opportunity_teasers')).toBe(true);
+    expect(state.model).not.toHaveBeenCalled();
+  });
 });
