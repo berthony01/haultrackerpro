@@ -254,7 +254,7 @@ export function DriverOpportunityProfile({ onBack, onSaveSuccess }: Props) {
   useEffect(() => {
     if (isLoading || pendingConsumedRef.current) return;
     pendingConsumedRef.current = true;
-    const pending = consumePendingProfileAnswers();
+    const pending = consumePendingProfileAnswers(user?.id);
     if (!pending) return;
 
     const overlay: Partial<FormState> = {};

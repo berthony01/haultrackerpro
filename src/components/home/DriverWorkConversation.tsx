@@ -71,7 +71,8 @@ function ProfileConversation() {
           navigate(JOB_SEARCH_CARD_PATH);
         }}
         onContinue={(answers: IntakeAnswers) => {
-          setPendingProfileAnswers(answers);
+          if (!user || session?.user.id !== user.id || liveOwner.current !== user.id) return;
+          setPendingProfileAnswers(user.id, answers);
           navigate(HOME_INTAKE_NEXT_PATH);
         }}
       />
