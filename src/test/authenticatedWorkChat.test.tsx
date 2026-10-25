@@ -380,7 +380,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
   });
 
   it('dashboard-embedded chat Continue opens the unsaved review on the same mounted Index', async () => {
-    capability('active'); state.realWorkspace = true; state.loads = [{ id: 'existing' }];
+    capability('active'); state.loads = [{ id: 'existing' }]; // settled static workspace: no dependency churn
     state.profiles['driver-a'] = fullProfile;
     render(<QueryClientProvider client={new QueryClient()}>
       <MemoryRouter initialEntries={['/dashboard']}><Location /><ReviewJourney /></MemoryRouter>
