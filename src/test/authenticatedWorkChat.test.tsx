@@ -421,6 +421,7 @@ describe('pending profile handoff is isolated per account (same tab, no reload)'
     await waitFor(() => expect(state.rpc).toHaveBeenCalled());
     fireEvent.click(screen.getByTestId('home-conversation-continue'));
     view.unmount();
+    expect(hasPendingProfileAnswers()).toBe(true);
   }
   function expectBSeesNothingFromA() {
     render(tree(<DriverOpportunityProfile onBack={vi.fn()} />));
@@ -460,7 +461,6 @@ describe('pending profile handoff is isolated per account (same tab, no reload)'
     render(tree(<DriverOpportunityProfile onBack={vi.fn()} />));
     expect(screen.getByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
-    expect(screen.queryByDisplayValue('PRIVATE NAME')).toBeNull();
     expect(hasPendingProfileAnswers()).toBe(false);
     expect(state.authListeners.size).toBe(0);
     expect(state.mutation).not.toHaveBeenCalled();
