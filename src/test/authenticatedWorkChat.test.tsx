@@ -9,14 +9,18 @@ import { HOME_INTAKE_NEXT_PATH, INTAKE_OPENING_PROMPT } from '@/lib/home/convers
 import { consumePendingProfileAnswers, clearPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
 
 const state = vi.hoisted(() => ({
-  user: { id: 'driver-a' } as { id: string } | null,
+  user: { id: 'driver-a' } as { id: string } | null, sessionUser: undefined as string | null | undefined,
+  authListeners: new Set<(event: string, session: unknown) => void>(),
   authLoading: false, access: {} as Record<string, any>,
   acting: false, actingLoading: false, loads: [] as any[],
   profiles: {} as Record<string, any>, profileLoading: false, profileError: false,
   profileRead: vi.fn(), mutation: vi.fn(), rpc: vi.fn(), model: vi.fn(),
   realWorkspace: false, realOpportunities: false, capabilityRows: [] as any[], recruiterMount: vi.fn(),
 }));
-vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: state.user, loading: state.authLoading, signOut: vi.fn() }) }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => {
+  const sid = state.sessionUser === undefined ? state.user?.id : state.sessionUser;
+  return { user: state.user, session: sid ? { user: { id: sid } } : null, loading: state.authLoading, signOut: vi.fn() };
+} }));
 vi.mock('@/hooks/useViewMode', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useViewMode')>();
   return { ...actual, useViewMode: () => state.realWorkspace ? actual.useViewMode() : state.access };
@@ -40,6 +44,10 @@ vi.mock('@/hooks/opportunities/useDriverOpportunityProfile', () => ({ useDriverO
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {
   rpc: (...args: unknown[]) => state.rpc(...args), from: (...args: unknown[]) => state.mutation(...args),
   functions: { invoke: (...args: unknown[]) => state.model(...args) },
+  auth: { onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
+    state.authListeners.add(cb);
+    return { data: { subscription: { unsubscribe: () => state.authListeners.delete(cb) } } };
+  } },
 } }));
 vi.mock('@/hooks/useLoads', () => ({ useLoads: () => ({ loads: state.loads, isLoading: false,
   addLoad: { mutate: state.mutation }, updateLoad: { mutate: state.mutation }, deleteLoad: { mutate: state.mutation } }) }));
@@ -101,6 +109,8 @@ configure({ asyncUtilTimeout: 5000 });
 import DriverWorkConversation from '@/components/home/DriverWorkConversation';
 import FindWork from '@/pages/FindWork';
 import Index from '@/pages/Index';
+import { DriverOpportunityProfile } from '@/components/opportunities/DriverOpportunityProfile';
+import { hasPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
 import { AppSidebar } from '@/components/premium/AppSidebar';
 import { BottomNav } from '@/components/BottomNav';
 
@@ -123,7 +133,7 @@ function tree(child: React.ReactNode) {
   </QueryClientProvider>;
 }
 beforeEach(() => {
-  cleanup(); vi.clearAllMocks(); state.user = { id: 'driver-a' }; state.authLoading = false;
+  cleanup(); vi.clearAllMocks(); state.user = { id: 'driver-a' }; state.sessionUser = undefined; state.authLoading = false;
   state.realWorkspace = false; state.realOpportunities = false;
   state.acting = false; state.actingLoading = false; state.loads = [];
   state.profiles = {}; state.profileLoading = false; state.profileError = false;
@@ -208,8 +218,8 @@ describe('read-only profile-aware flow and review handoff', () => {
     expect(state.rpc.mock.calls.every(([name]) => name === 'list_public_opportunity_teasers')).toBe(true);
     fireEvent.click(screen.getByTestId('home-conversation-continue'));
     expect(screen.getByTestId('location').textContent).toBe(HOME_INTAKE_NEXT_PATH);
-    expect(consumePendingProfileAnswers()).toMatchObject({ city: 'Houston', preferred_route_type: 'Regional' });
-    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(consumePendingProfileAnswers('driver-a')).toMatchObject({ city: 'Houston', preferred_route_type: 'Regional' });
+    expect(consumePendingProfileAnswers('driver-a')).toBeNull();
     expect(state.mutation).not.toHaveBeenCalled(); expect(state.model).not.toHaveBeenCalled();
     expect(writes).not.toHaveBeenCalled();
   });
@@ -337,7 +347,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     fireEvent.click(await screen.findByTestId('home-conversation-continue'));
     expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
-    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(consumePendingProfileAnswers('driver-a')).toBeNull();
     expect(state.recruiterMount).not.toHaveBeenCalled();
     expect(state.mutation).not.toHaveBeenCalled();
     expect(state.model).not.toHaveBeenCalled();
@@ -393,10 +403,66 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
-    expect(consumePendingProfileAnswers()).toBeNull();
+    expect(consumePendingProfileAnswers('driver-a')).toBeNull();
     expect(window.location.search).toBe('');
     expect(state.mutation).not.toHaveBeenCalled();
     expect(state.rpc.mock.calls.every(([name]) => name === 'list_public_opportunity_teasers')).toBe(true);
     expect(state.model).not.toHaveBeenCalled();
+  });
+});
+
+describe('pending profile handoff is isolated per account (same tab, no reload)', () => {
+  const emit = (event: string, id: string | null) =>
+    [...state.authListeners].forEach((cb) => cb(event, id ? { user: { id } } : null));
+  async function continueAsA() {
+    state.profiles['driver-a'] = fullProfile;
+    const view = render(tree(<DriverWorkConversation />));
+    fireEvent.click(screen.getByTestId('home-conversation-confirm-yes'));
+    await waitFor(() => expect(state.rpc).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('home-conversation-continue'));
+    view.unmount();
+  }
+  function expectBSeesNothingFromA() {
+    render(tree(<DriverOpportunityProfile onBack={vi.fn()} />));
+    expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
+    expect(screen.queryByTestId('driver-profile-pending-badge')).toBeNull();
+    expect(screen.queryByDisplayValue('Houston')).toBeNull();
+    expect(state.mutation).not.toHaveBeenCalled();
+  }
+  it.each(['switch-no-event', 'switch-with-event', 'signout-then-b'])('account B never receives A answers: %s', async (mode) => {
+    await continueAsA();
+    if (mode === 'switch-with-event') emit('SIGNED_IN', 'driver-b');
+    if (mode === 'signout-then-b') { state.user = null; emit('SIGNED_OUT', null); }
+    state.user = { id: 'driver-b' };
+    expectBSeesNothingFromA();
+    expect(hasPendingProfileAnswers()).toBe(false);
+  });
+  it('sign-out alone drops A answers before any profile mount', async () => {
+    await continueAsA();
+    expect(hasPendingProfileAnswers()).toBe(true);
+    emit('SIGNED_OUT', null);
+    expect(hasPendingProfileAnswers()).toBe(false);
+    expect(state.authListeners.size).toBe(0);
+  });
+  it('stale Continue after the session changed to B stores nothing', async () => {
+    state.profiles['driver-a'] = fullProfile;
+    const view = render(tree(<DriverWorkConversation />));
+    fireEvent.click(screen.getByTestId('home-conversation-confirm-yes'));
+    await waitFor(() => expect(state.rpc).toHaveBeenCalled());
+    state.sessionUser = 'driver-b'; view.rerender(tree(<DriverWorkConversation />));
+    fireEvent.click(screen.getByTestId('home-conversation-continue'));
+    expect(hasPendingProfileAnswers()).toBe(false);
+    state.user = { id: 'driver-b' }; state.sessionUser = undefined; view.unmount();
+    expectBSeesNothingFromA();
+  });
+  it('same owner still receives the exact unsaved employment answers once', async () => {
+    await continueAsA();
+    render(tree(<DriverOpportunityProfile onBack={vi.fn()} />));
+    expect(screen.getByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
+    expect(screen.getByDisplayValue('Houston')).toBeTruthy();
+    expect(screen.queryByDisplayValue('PRIVATE NAME')).toBeNull();
+    expect(hasPendingProfileAnswers()).toBe(false);
+    expect(state.authListeners.size).toBe(0);
+    expect(state.mutation).not.toHaveBeenCalled();
   });
 });
