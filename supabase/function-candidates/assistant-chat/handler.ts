@@ -39,6 +39,18 @@ const SCOPES = ['driver_self', 'driver_delegate', 'recruiter', 'agency'] as cons
 type Scope = (typeof SCOPES)[number];
 const ACTIONS = ['bootstrap', 'threads', 'messages', 'send', 'delete', 'clear'] as const;
 type Action = (typeof ACTIONS)[number];
+/** Exact field allowlist per action. Unknown keys (actor, isPro, ...) are rejected. */
+const ALLOWED_KEYS: Record<Action, string[]> = {
+  bootstrap: ['action', 'offset'],
+  threads: ['action', 'cursor'],
+  messages: ['action', 'threadId', 'cursor'],
+  send: ['action', 'requestId', 'content', 'threadId', 'scope', 'targetId'],
+  delete: ['action', 'threadId'],
+  clear: ['action', 'confirm'],
+};
+export const MAX_PROVIDER_BYTES = 200_000;
+export const MAX_CONTEXT_OFFSET = 10_000;
+export const CONTEXT_PAGE = 50;
 
 /** Fixed source registry. hrefs are server-generated, never model-provided. */
 export const SOURCE_REGISTRY: Record<string, { label: string; href: string; scopes: Scope[] }> = {
