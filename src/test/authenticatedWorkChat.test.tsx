@@ -294,6 +294,12 @@ describe('actual Index settled dashboard integration', () => {
     state.loads = [{ id: 'existing' }]; render(tree(<Index />));
     expect(await screen.findByTestId('home-conversation-surface')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Loads' })[0]);
+    console.log('DEBUG after Loads click:', {
+      dashboard: !!screen.queryByTestId('existing-dashboard'),
+      chat: !!screen.queryByTestId('home-conversation-surface'),
+      detailsOpen: [...document.querySelectorAll('details')].map((d) => d.open),
+      chatParentChain: (() => { let el = screen.queryByTestId('home-conversation-surface'); const chain: string[] = []; while (el) { chain.push(el.tagName + (el.getAttribute('data-testid') ?? '')); el = el.parentElement as any; } return chain.join(' < '); })(),
+    });
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
   });
 });
