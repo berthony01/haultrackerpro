@@ -435,6 +435,9 @@ export default function Landing() {
                         <Button
                           key={action.testid}
                           data-testid={action.testid}
+                          {...(action.testid === 'hero-path-my-trucking'
+                            ? { 'data-testid': undefined, 'data-testids': undefined }
+                            : {})}
                           onClick={action.onClick}
                           variant={action.primary ? 'default' : 'secondary'}
                           className="min-h-[44px] h-auto whitespace-normal rounded-lg font-bold gap-2"
