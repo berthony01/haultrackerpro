@@ -63,7 +63,10 @@ vi.mock('@/hooks/useAdmin', () => ({ useAdmin: () => ({ isAdmin: false }) }));
 vi.mock('@/hooks/useDriverReportSettings', () => ({ useDriverReportSettings: () => ({ data: null }) }));
 vi.mock('@/hooks/useReleaseNotesSeen', () => ({ useReleaseNotesSeen: () => ({ ready: false, hasSeenLatest: true }) }));
 vi.mock('@/components/SEOHead', () => ({ default: () => null }));
-vi.mock('@/components/DashboardView', () => ({ DashboardView: () => <div data-testid="existing-dashboard" /> }));
+// Financial-first contract: the mocked DashboardView renders its real
+// embeddedChat slot so mounted Index route tests still exercise the chat.
+vi.mock('@/components/DashboardView', () => ({ DashboardView: ({ embeddedChat }: { embeddedChat?: React.ReactNode }) =>
+  <div data-testid="existing-dashboard">{embeddedChat}</div> }));
 vi.mock('@/components/Onboarding', () => ({ Onboarding: () => <div data-testid="existing-onboarding" /> }));
 vi.mock('@/components/LoadForm', () => ({ LoadForm: () => null }));
 vi.mock('@/components/ExpenseForm', () => ({ ExpenseForm: () => null }));
@@ -262,12 +265,18 @@ describe('persistent navigation remains separate from human Conversations', () =
 });
 
 describe('actual Index settled dashboard integration', () => {
-  it.each([0, 4])('expanded chat appears before the preserved content branch with %s loads', async (count) => {
+  it.each([0, 4])('eligible self-driver dashboard keeps the guided chat available with %s loads', async (count) => {
     state.loads = Array.from({ length: count }, (_, i) => ({ id: String(i) }));
     render(tree(<Index />));
-    expect(await screen.findByTestId('home-conversation-surface')).toBeTruthy();
-    const content = screen.getByTestId(count === 0 ? 'existing-onboarding' : 'existing-dashboard');
-    expect(screen.getByTestId('home-conversation-surface').compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const content = await screen.findByTestId(count === 0 ? 'existing-onboarding' : 'existing-dashboard');
+    const chat = await screen.findByTestId('home-conversation-surface');
+    if (count === 0) {
+      // Zero-load onboarding still offers the same collapsed chat after it.
+      expect(chat.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+    } else {
+      // The chat lives inside the financial dashboard slot, not above it.
+      expect(content.contains(chat)).toBe(true);
+    }
   });
   it.each(['recruiter', 'loading', 'error', 'null', 'assistant', 'no-driver', 'acting-pending'])('never mounts chat for %s', (condition) => {
     state.loads = [{ id: 'existing' }];
@@ -285,6 +294,8 @@ describe('actual Index settled dashboard integration', () => {
     state.loads = [{ id: 'existing' }]; render(tree(<Index />));
     expect(await screen.findByTestId('home-conversation-surface')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Loads' })[0]);
+    // The lazy chat chunk resolving can delay the page-swap commit; wait for it.
+    await waitFor(() => expect(screen.queryByTestId('existing-dashboard')).toBeNull());
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
   });
 });
@@ -409,6 +420,9 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     </QueryClientProvider>);
     expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
     for (const cycle of [1, 2]) {
+    // The production dashboard wraps the slot in a native details element that
+    // starts closed; open it explicitly each cycle, as a user would.
+    fireEvent.click(await screen.findByTestId('dashboard-chat-toggle'));
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
     await waitFor(() => expect(state.rpc).toHaveBeenCalled());
     expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();

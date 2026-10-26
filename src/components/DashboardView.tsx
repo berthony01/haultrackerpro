@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { getEffectiveDate } from '@/lib/loadUtils';
 import {
@@ -52,7 +52,6 @@ import { DriverScoreGauge } from '@/components/premium/DriverScoreGauge';
 import { RecentLoadsPanel } from '@/components/premium/RecentLoadsPanel';
 import { ExpenseDonut } from '@/components/premium/ExpenseDonut';
 import { ProfitByLoadTable } from '@/components/premium/ProfitByLoadTable';
-import { DashboardFooterCTA } from '@/components/premium/DashboardFooterCTA';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { RecommendedOpportunityCard } from '@/components/opportunities/RecommendedOpportunityCard';
 
@@ -83,7 +82,12 @@ interface DashboardViewProps {
    * tier-up, reminders, closeout, add/action controls).
    */
   isAssistantView?: boolean;
-
+  /**
+   * Optional embedded guided Find Work conversation. Index supplies the full
+   * collapsed wrapper only for the canonical self-driver dashboard (same gate
+   * as before); DashboardView simply renders the slot in position.
+   */
+  embeddedChat?: ReactNode;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
@@ -213,7 +217,7 @@ export function SelfTierUpDetector() {
   return null;
 }
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false, embeddedChat = null }: DashboardViewProps) {
   const { settings: ownSettings } = useUserSettings();
   // Phase DA-1 — managed-driver safe settings win whenever provided.
   const settings: any = settingsOverride ?? ownSettings;
@@ -422,15 +426,16 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       {/* Phase DA-1 — self-only tier-up detection (signed-in user's own state) */}
       {showPersonalWidgets && <SelfTierUpDetector />}
 
-      {/* Date Range Filter — moved above premium hero so it scopes the new charts */}
+      {/* Selected period — the date controls scope every total in this region */}
       <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Selected period</p>
         <div className="flex flex-wrap gap-1.5">
           {presets.map(p => (
             <Button
               key={p.key}
               variant={activePreset === p.key ? 'default' : 'outline'}
               size="sm"
-              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
+              className={`text-xs min-h-[44px] px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
               onClick={() => setActivePreset(p.key)}
             >
               {p.label}
@@ -450,9 +455,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             <p className="text-[11px] text-muted-foreground font-medium pl-0.5">{label}</p>
           ) : null;
         })()}
+        <p className="text-[11px] text-muted-foreground pl-0.5">These totals follow the selected date range.</p>
       </div>
 
-      {/* === PREMIUM ANALYTICS HERO === */}
+      {/* === PRIMARY FINANCIALS (scoped to the selected period) === */}
       {!isLoading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -483,33 +489,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
               <p className="text-[11px] text-muted-foreground -mt-2">{footnote}</p>
             ) : null;
           })()}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
-              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
-              <ExpenseDonut expenses={filteredExpenses} />
-            </div>
-            <div className="space-y-4">
-              <DriverScoreGauge
-                score={scorecard.totalScore}
-                tier={scorecard.tier}
-                percentileLabel={scorecard.totalScore >= 80 ? 'Top 14% of drivers' : scorecard.totalScore >= 60 ? 'Top 35% of drivers' : 'Keep going!'}
-              />
-              <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
-            </div>
-          </div>
-
-          {showRecommendedOpportunity && onNavigate && (
-            <RecommendedOpportunityCard onNavigate={onNavigate} />
-          )}
-
-          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
-
-          {showPersonalWidgets && <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />}
         </>
       )}
 
-      {/* === ZONE 1 · ACTION ZONE === */}
+      {/* === QUICK ACTIONS === */}
       {!isLoading && showPersonalWidgets && onNavigate && (
         <div className="grid grid-cols-4 gap-2">
           <Button
@@ -547,21 +530,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       )}
 
-      {/* Driver Intelligence */}
-      {!isLoading && showPersonalWidgets && <DriverIntelligenceCard isPro={isPro} />}
-
-      {/* === ZONE 2 · COMPETITION === */}
-      {!isLoading && showPersonalWidgets && (
-        <DriverLeaderboardCard
-          limit={5}
-          onCustomize={onNavigate ? () => {
-            try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
-            onNavigate('settings');
-          } : undefined}
-        />
-      )}
-
-      {/* === ZONE 3 · ALERTS === */}
+      {/* === ALERTS === */}
       {!isLoading && showPersonalWidgets && <TaxReminderBanner settings={settings} isPro={isPro} />}
       {!isLoading && showPersonalWidgets && smartAlerts && (
         <SmartAlertsCard
@@ -572,6 +541,64 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           isPro={isPro}
         />
       )}
+
+      {/* Embedded guided Find Work conversation — Index supplies the collapsed
+          wrapper (native details, child stays mounted while closed) only for
+          the canonical self-driver dashboard. */}
+      {!isLoading && embeddedChat}
+
+      {/* === PERIOD DETAIL (charts, score, recent loads) === */}
+      {!isLoading && (
+        <>
+          {filteredLoads.length === 0 && (
+            <Card className="border-dashed border-muted-foreground/20 shadow-card">
+              <CardContent className="py-6 text-center">
+                <p className="font-bold text-sm">No loads in this period</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {loads.length > 0
+                    ? 'Choose another period to review your recorded loads.'
+                    : 'Log your first load to start seeing earnings, miles, and profit here.'}
+                </p>
+                {loads.length === 0 && showPersonalWidgets && onNavigate && (
+                  <Button className="mt-3 gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
+                    <Plus className="h-4 w-4" /> Log Your First Load
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {(filteredLoads.length > 0 || filteredExpenses.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2 space-y-4">
+                {filteredLoads.length > 0 && (
+                  <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
+                )}
+                {filteredExpenses.length > 0 && <ExpenseDonut expenses={filteredExpenses} />}
+              </div>
+              <div className="space-y-4">
+                <DriverScoreGauge
+                  score={scorecard.totalScore}
+                  tier={scorecard.tier}
+                  percentileLabel="Based on your full recorded history, not the selected period."
+                />
+                {filteredLoads.length > 0 && (
+                  <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {showRecommendedOpportunity && onNavigate && (
+            <RecommendedOpportunityCard onNavigate={onNavigate} />
+          )}
+
+          {filteredLoads.length > 0 && (
+            <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
+          )}
+        </>
+      )}
+
       {!isLoading && <WeeklyFocusCard loads={loads} />}
 
       {/* === ZONE 4 · QUICK SHORTCUTS === */}
@@ -748,36 +775,60 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </Button>
           )}
 
-          {/* === ZONE 6 · INSIGHTS (AI + trends) === */}
-          {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
-          {showPersonalWidgets && <WeeklyPulseCard isPro={isPro} />}
+          {/* === HISTORICAL AND ROLLING INSIGHTS — these hooks use their own
+              history windows and intentionally do NOT follow the date selector. === */}
+          <section className="space-y-4" aria-label="Historical and rolling insights">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Historical and rolling insights</p>
+              <p className="text-[11px] text-muted-foreground">These insights use their own history windows and do not follow the date selector.</p>
+            </div>
 
-          {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
-          {showPersonalWidgets && <PersonalIntelligenceBlocks isPro={isPro} />}
+            {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
+            {showPersonalWidgets && <WeeklyPulseCard isPro={isPro} />}
 
-          {/* Smart Load Advisor — promoted */}
-          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} />
+            {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
+            {showPersonalWidgets && <PersonalIntelligenceBlocks isPro={isPro} />}
 
-          {/* Personalized Pro Insight — free users only */}
+            {/* Smart Load Advisor — promoted */}
+            <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} />
+
+            {/* Personalized Pro Insight — free users only */}
+            {showPersonalWidgets && (
+              <ProInsightCard
+                loads={loads}
+                expenses={expenses}
+                isPro={isPro}
+                onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
+              />
+            )}
+
+            {/* Pro Time Saved */}
+            {showPersonalWidgets && <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />}
+          </section>
+
+          {/* === ENGAGEMENT — activity rewards and community, below core operations === */}
           {showPersonalWidgets && (
-            <ProInsightCard
-              loads={loads}
-              expenses={expenses}
-              isPro={isPro}
-              onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
-            />
+            <section className="space-y-4" aria-label="Activity and community">
+              <DriverIntelligenceCard isPro={isPro} />
+              <DriverLeaderboardCard
+                limit={5}
+                onCustomize={onNavigate ? () => {
+                  try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
+                  onNavigate('settings');
+                } : undefined}
+              />
+            </section>
           )}
 
-          {/* Pro Time Saved */}
-          {showPersonalWidgets && <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />}
+
 
 
           {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
 
-          {/* Last Updated */}
+          {/* Latest load record update — reflects load records only, not a full app refresh */}
           {loads.length > 0 && (
             <p className="text-[10px] text-muted-foreground/50 text-center">
-              Last updated: {format(
+              Latest load record update: {format(
                 new Date(Math.max(...loads.map(l => new Date(l.updated_at).getTime()))),
                 'MMM d, h:mm a'
               )}
@@ -795,26 +846,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </div>
           </div>
 
-          {/* Empty State */}
-          {!isLoading && filteredLoads.length === 0 && (
-            <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
-              <CardContent className="py-14 text-center">
-                <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
-                  <Truck className="h-12 w-12 text-muted-foreground/30" />
-                </div>
-                <p className="font-bold text-lg">No loads for this period</p>
-                <p className="text-sm text-muted-foreground mt-1.5 mb-5 leading-relaxed">
-                  You haven't logged any loads for this date range.<br />
-                  Start tracking to see your earnings here.
-                </p>
-                {showPersonalWidgets && onNavigate && (
-                  <Button className="gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
-                    <Plus className="h-4 w-4" /> Log Your First Load
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </>
       )}
     </div>

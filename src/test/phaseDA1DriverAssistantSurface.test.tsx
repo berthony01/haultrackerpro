@@ -423,10 +423,6 @@ vi.mock('@/components/premium/RecentLoadsPanel', () => ({
 vi.mock('@/components/premium/ProfitByLoadTable', () => ({
   ProfitByLoadTable: ({ onViewAll }: any) => <div data-testid="w-profit-by-load" data-has-view-all={onViewAll ? 'true' : 'false'} />,
 }));
-vi.mock('@/components/premium/DashboardFooterCTA', () => ({
-  DashboardFooterCTA: () => <div data-testid="w-footer-cta" />,
-}));
-
 import { DashboardView } from '@/components/DashboardView';
 
 const PERSONAL_WIDGETS = [
@@ -439,7 +435,6 @@ const PERSONAL_WIDGETS = [
   'w-pro-insight',
   'w-smart-alerts',
   'w-tax-reminder',
-  'w-footer-cta',
 ];
 
 const CORE_WIDGETS = [
@@ -456,9 +451,19 @@ const CORE_WIDGETS = [
   'w-load-advisor',
 ];
 
+// In-current-week fixture so the default 'this_week' preset sees populated
+// widgets (the Jan-2026 LOAD above falls outside the selected period).
+const WEEK_LOAD: any = {
+  ...LOAD,
+  id: 'w1',
+  pickup_date: iso(today),
+  dropoff_date: iso(today),
+};
+const WEEK_EXPENSE: any = { id: 'we1', expense_date: iso(today), amount: 100, category: 'Fuel' };
+
 const dashboardProps: any = {
-  loads: [{ ...LOAD, updated_at: '2026-01-06T00:00:00.000Z' }],
-  expenses: [],
+  loads: [{ ...WEEK_LOAD, updated_at: `${iso(today)}T00:00:00.000Z` }],
+  expenses: [WEEK_EXPENSE],
   fuelLogs: [],
   isLoading: false,
   onNavigate: () => {},
@@ -543,12 +548,28 @@ describe('DA-1 · dashboard assistant-context sanitation', () => {
   });
 
   it('assistant mode hides the empty-state "Log Your First Load" button', () => {
-    const emptyProps: any = { ...dashboardProps, loads: [], fuelLogs: [] };
+    const emptyProps: any = { ...dashboardProps, loads: [], expenses: [], fuelLogs: [] };
     render(<DashboardView {...emptyProps} isAssistantView />);
     expect(screen.queryByRole('button', { name: /Log Your First Load/i })).toBeNull();
     // Self mode still shows it.
     const { unmount } = render(<DashboardView {...emptyProps} />);
     expect(screen.queryByRole('button', { name: /Log Your First Load/i })).toBeTruthy();
     unmount();
+  });
+
+  it('selected period with expenses but no loads keeps the donut and suppresses load-only widgets', () => {
+    render(<DashboardView {...dashboardProps} loads={[]} />);
+    expect(screen.queryByTestId('w-expense-donut')).toBeTruthy();
+    expect(screen.queryByTestId('w-profit-overview')).toBeNull();
+    expect(screen.queryByTestId('w-recent-loads')).toBeNull();
+    expect(screen.queryByTestId('w-profit-by-load')).toBeNull();
+    expect(screen.getByText('No loads in this period')).toBeTruthy();
+  });
+
+  it('loads outside the selected period show the other-period notice without the first-load CTA', () => {
+    render(<DashboardView {...dashboardProps} loads={[{ ...LOAD, updated_at: '2026-01-06T00:00:00.000Z' }]} expenses={[]} />);
+    expect(screen.getByText(/Choose another period/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Log Your First Load/i })).toBeNull();
+    expect(screen.queryByTestId('w-profit-overview')).toBeNull();
   });
 });
