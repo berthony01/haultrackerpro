@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { getEffectiveDate } from '@/lib/loadUtils';
 import {
@@ -52,7 +52,6 @@ import { DriverScoreGauge } from '@/components/premium/DriverScoreGauge';
 import { RecentLoadsPanel } from '@/components/premium/RecentLoadsPanel';
 import { ExpenseDonut } from '@/components/premium/ExpenseDonut';
 import { ProfitByLoadTable } from '@/components/premium/ProfitByLoadTable';
-import { DashboardFooterCTA } from '@/components/premium/DashboardFooterCTA';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { RecommendedOpportunityCard } from '@/components/opportunities/RecommendedOpportunityCard';
 
@@ -83,7 +82,12 @@ interface DashboardViewProps {
    * tier-up, reminders, closeout, add/action controls).
    */
   isAssistantView?: boolean;
-
+  /**
+   * Optional embedded guided Find Work conversation. Index supplies the full
+   * collapsed wrapper only for the canonical self-driver dashboard (same gate
+   * as before); DashboardView simply renders the slot in position.
+   */
+  embeddedChat?: ReactNode;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
@@ -213,7 +217,7 @@ export function SelfTierUpDetector() {
   return null;
 }
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false, embeddedChat = null }: DashboardViewProps) {
   const { settings: ownSettings } = useUserSettings();
   // Phase DA-1 — managed-driver safe settings win whenever provided.
   const settings: any = settingsOverride ?? ownSettings;
