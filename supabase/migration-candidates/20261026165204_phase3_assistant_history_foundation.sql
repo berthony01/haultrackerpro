@@ -345,17 +345,21 @@ BEGIN
  IF NOT FOUND OR _t.expires_at<=statement_timestamp() OR NOT public.assistant_scope_authorized(_t.scope_kind,_t.scope_target_id,_t.required_permissions) THEN
   RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
  _tgt:=_t.scope_target_id;
+ -- One ordering (date, created_at, id) ranks rows; only ranks 1..20 are kept and
+ -- created_at/rank are stripped from the final allowed projection.
  IF public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,'loads') THEN
-  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.load_date DESC,x.id DESC),'[]'),count(*) INTO _rows,_n FROM (
-   SELECT l.id,l.load_date,l.status,l.payment_status,l.estimated_pay,l.actual_pay_received FROM public.loads l
+  SELECT coalesce(jsonb_agg(to_jsonb(x)-'created_at'-'rn' ORDER BY x.rn) FILTER (WHERE x.rn<=20),'[]'),count(*) INTO _rows,_n FROM (
+   SELECT l.id,l.load_date,l.status,l.payment_status,l.estimated_pay,l.actual_pay_received,l.created_at,
+    row_number() OVER (ORDER BY l.load_date DESC,l.created_at DESC,l.id DESC) rn FROM public.loads l
    WHERE l.user_id=_tgt ORDER BY l.load_date DESC,l.created_at DESC,l.id DESC LIMIT 21) x;
-  _out:=_out||jsonb_build_object('key','loads','kind','recent','limit',20,'has_more',_n>20,'rows',CASE WHEN _n>20 THEN _rows-20 ELSE _rows END);
+  _out:=_out||jsonb_build_object('key','loads','kind','recent','limit',20,'has_more',_n>20,'rows',_rows);
  END IF;
  IF public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,'expenses') THEN
-  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.expense_date DESC,x.id DESC),'[]'),count(*) INTO _rows,_n FROM (
-   SELECT e.id,e.expense_date,e.category,e.amount,e.expense_type FROM public.expenses e
+  SELECT coalesce(jsonb_agg(to_jsonb(x)-'created_at'-'rn' ORDER BY x.rn) FILTER (WHERE x.rn<=20),'[]'),count(*) INTO _rows,_n FROM (
+   SELECT e.id,e.expense_date,e.category,e.amount,e.expense_type,e.created_at,
+    row_number() OVER (ORDER BY e.expense_date DESC,e.created_at DESC,e.id DESC) rn FROM public.expenses e
    WHERE e.user_id=_tgt ORDER BY e.expense_date DESC,e.created_at DESC,e.id DESC LIMIT 21) x;
-  _out:=_out||jsonb_build_object('key','expenses','kind','recent','limit',20,'has_more',_n>20,'rows',CASE WHEN _n>20 THEN _rows-20 ELSE _rows END);
+  _out:=_out||jsonb_build_object('key','expenses','kind','recent','limit',20,'has_more',_n>20,'rows',_rows);
  END IF;
  IF public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,'opportunities') THEN
   SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.updated_at DESC,x.id DESC),'[]'),count(*) INTO _rows,_n FROM (
