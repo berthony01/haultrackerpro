@@ -15,7 +15,8 @@ export interface BootstrapData {
   contexts: AssistantContext[]; contextsTruncated: boolean;
 }
 
-export type ApiResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string };
+/** Flat shape (project TS is non-strict, so discriminated narrowing is not relied on). */
+export interface ApiResult<T> { ok: boolean; data: T | null; status: number; code: string }
 
 export type AssistantRequest =
   | { action: 'bootstrap' }
@@ -28,14 +29,14 @@ export type AssistantRequest =
 export async function invokeAssistant<T>(body: AssistantRequest): Promise<ApiResult<T>> {
   try {
     const { data, error } = await supabase.functions.invoke('assistant-chat', { body });
-    if (!error) return { ok: true, data: data as T };
+    if (!error) return { ok: true, data: data as T, status: 200, code: '' };
     const ctx = (error as { context?: Response }).context;
     const status = ctx && typeof ctx.status === 'number' ? ctx.status : 0;
     let code = 'unavailable';
     try { const j = ctx ? await ctx.clone().json() : null; if (j && typeof j.error === 'string') code = j.error; if (j && typeof j.reason === 'string') code = j.reason; } catch { /* non-JSON */ }
-    return { ok: false, status, code };
+    return { ok: false, data: null, status, code };
   } catch {
-    return { ok: false, status: 0, code: 'unavailable' };
+    return { ok: false, data: null, status: 0, code: 'unavailable' };
   }
 }
 
