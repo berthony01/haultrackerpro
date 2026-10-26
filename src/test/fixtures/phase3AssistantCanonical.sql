@@ -47,7 +47,12 @@ CREATE TABLE public.recruiter_billing_profiles(
 -- + RC1B permission-object constraint; RC1JB seat accounting.
 CREATE TYPE public.recruiter_member_role AS ENUM('recruiter_owner','recruiter_admin','recruiter_staff');
 CREATE TYPE public.recruiter_member_status AS ENUM('pending','active','revoked');
-CREATE TYPE public.recruiter_workspace_permission AS ENUM('opportunities_view','applications_view','conversations_view');
+CREATE TYPE public.recruiter_workspace_permission AS ENUM(
+ 'opportunities_view','opportunities_create','opportunities_edit','opportunities_change_status','opportunities_delete',
+ 'applications_view','applications_manage_status','applications_request_contact','applications_manage_notes',
+ 'contracts_view','contracts_manage','referrals_view','referrals_manage_status','referral_terms_manage',
+ 'reports_view','reports_export','settlements_view','settlements_prepare','settlements_finalize','team_view','team_manage',
+ 'loads_view','loads_dispatch','loads_update_status','conversations_view','conversations_reply');
 CREATE TABLE public.recruiter_members(
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),recruiter_id uuid NOT NULL REFERENCES public.recruiter_profiles(id) ON DELETE CASCADE,
  member_user_id uuid,role public.recruiter_member_role NOT NULL DEFAULT 'recruiter_staff',
@@ -63,7 +68,9 @@ CREATE UNIQUE INDEX recruiter_members_active_owner_unique ON public.recruiter_me
 CREATE TYPE public.agency_status AS ENUM('active','disabled');
 CREATE TYPE public.agency_member_role AS ENUM('agency_owner','agency_admin','agency_member');
 CREATE TYPE public.agency_member_status AS ENUM('pending','active','revoked');
-CREATE TYPE public.agency_workspace_permission AS ENUM('packages_view','client_requests_view','work_items_view_all');
+CREATE TYPE public.agency_workspace_permission AS ENUM(
+ 'packages_view','packages_manage','client_requests_view','client_requests_manage','clients_view','delegations_view',
+ 'delegations_manage','work_items_view_all','work_items_manage','audit_view','team_view');
 CREATE TABLE public.agency_profiles(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),owner_user_id uuid NOT NULL UNIQUE,status public.agency_status NOT NULL DEFAULT 'active');
 CREATE TABLE public.agency_members(
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),agency_id uuid NOT NULL REFERENCES public.agency_profiles(id) ON DELETE CASCADE,
@@ -104,3 +111,8 @@ CREATE TABLE public.qa_fixture_roots(root_kind text NOT NULL CHECK(root_kind IN(
  qa_owner_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,registered_by_user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE RESTRICT,
  active boolean NOT NULL DEFAULT true,revoked_at timestamptz,PRIMARY KEY(root_kind,root_id),
  CHECK((active AND revoked_at IS NULL) OR(NOT active AND revoked_at IS NOT NULL)),CHECK(root_kind<>'user' OR root_id<>qa_owner_user_id));
+-- Additional accepted partial uniqueness relevant to identity and occupied seats.
+-- RC1A + AM1A; recruiter billing user uniqueness from 20260730060000.
+CREATE UNIQUE INDEX recruiter_members_invite_token_hash_unique ON public.recruiter_members(invite_token_hash) WHERE invite_token_hash IS NOT NULL;
+CREATE UNIQUE INDEX agency_members_invite_token_hash_uq ON public.agency_members(invite_token_hash) WHERE invite_token_hash IS NOT NULL;
+CREATE UNIQUE INDEX recruiter_billing_profiles_user_id_uniq ON public.recruiter_billing_profiles(user_id) WHERE user_id IS NOT NULL;
