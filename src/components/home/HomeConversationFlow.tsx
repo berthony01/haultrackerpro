@@ -241,6 +241,22 @@ export interface HomeConversationFlowProps {
   /** HP-4B — label for the completion CTA when the route is not the public homepage. */
   continueLabel?: string;
   onReviewJobSearchCard?: (answers: IntakeAnswers) => void;
+  /** Phase 3 — optional same-tab memory adapter. Absent => ephemeral (public homepage). */
+  draftAdapter?: ConversationDraftAdapter;
+}
+
+/** Immutable same-tab runtime snapshot. No identity, contact or consent fields. */
+export interface ConversationDraftSnapshot {
+  readonly version: 1;
+  readonly state: Readonly<FlowState>;
+  readonly history: readonly FlowState[];
+  readonly draft: string;
+  readonly seedIgnored: boolean;
+}
+
+export interface ConversationDraftAdapter {
+  read(): ConversationDraftSnapshot | null;
+  write(snapshot: ConversationDraftSnapshot): void;
 }
 
 export default function HomeConversationFlow({
@@ -255,14 +271,31 @@ export default function HomeConversationFlow({
   profileReuseLabels,
   continueLabel,
   onReviewJobSearchCard,
+  draftAdapter,
 }: HomeConversationFlowProps) {
-  const [seedIgnored, setSeedIgnored] = useState(false);
+  // Phase 3 — read a retained same-tab snapshot exactly once, only from a valid adapter.
+  const [restored] = useState<ConversationDraftSnapshot | null>(() => {
+    const snap = draftAdapter?.read() ?? null;
+    if (!snap || snap.version !== 1) return null;
+    let max = -1;
+    for (const s of [snap.state, ...snap.history]) for (const b of s.bubbles) if (b.id > max) max = b.id;
+    if (bubbleSeq <= max) bubbleSeq = max + 1; // keep bubble ids unique after restore
+    return snap;
+  });
+  const [seedIgnored, setSeedIgnored] = useState(() => restored?.seedIgnored ?? false);
   const [state, setState] = useState<FlowState>(() =>
-    makeInitialState(openingNote, initialAnswers, profileReuseLabels),
+    restored?.state ?? makeInitialState(openingNote, initialAnswers, profileReuseLabels),
   );
 
-  const [history, setHistory] = useState<FlowState[]>([]);
-  const [draft, setDraft] = useState('');
+  const [history, setHistory] = useState<FlowState[]>(() => (restored ? [...restored.history] : []));
+  const [draft, setDraft] = useState(() => restored?.draft ?? '');
+
+  // Write-through to the adapter (memory only, owner-checked by the provider).
+  useEffect(() => {
+    draftAdapter?.write(
+      Object.freeze({ version: 1 as const, state, history: Object.freeze([...history]), draft, seedIgnored }),
+    );
+  }, [draftAdapter, state, history, draft, seedIgnored]);
 
   const { answers, bubbles, current, confirming } = state;
   const transcriptRef = useRef<HTMLDivElement>(null);
