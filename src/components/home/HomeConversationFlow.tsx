@@ -489,7 +489,7 @@ export default function HomeConversationFlow({
   return (
     <div
       data-testid="home-conversation-surface"
-      className="relative mx-auto w-full max-w-3xl rounded-3xl border p-4 sm:p-5 text-left"
+      className="relative mx-auto w-full max-w-3xl rounded-lg border p-3 sm:p-4 text-left"
       style={{
         background: surface,
         borderColor: amber,
@@ -505,7 +505,7 @@ export default function HomeConversationFlow({
           >
             <MessageSquare className="h-4 w-4" style={{ color: amber }} />
           </div>
-          <span className="text-sm font-bold text-white">Talk to HaulTracker</span>
+          <span className="text-sm font-bold text-white">Guided driver conversation</span>
         </div>
         <div className="flex items-center gap-1">
           {seedActive && (
@@ -513,7 +513,7 @@ export default function HomeConversationFlow({
               type="button"
               data-testid="home-conversation-change-saved"
               onClick={changeSavedAnswers}
-              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold min-h-[32px] transition-colors hover:bg-white/5"
+              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold min-h-[44px] transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{ color: textMuted }}
             >
               <Pencil className="h-3.5 w-3.5" /> {PROFILE_CHANGE_LABEL}
@@ -524,7 +524,7 @@ export default function HomeConversationFlow({
               type="button"
               data-testid="home-conversation-back"
               onClick={back}
-              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold min-h-[32px] transition-colors hover:bg-white/5"
+              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold min-h-[44px] transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{ color: textMuted }}
             >
               <Undo2 className="h-3.5 w-3.5" /> Back
@@ -535,7 +535,7 @@ export default function HomeConversationFlow({
               type="button"
               data-testid="home-conversation-restart"
               onClick={restart}
-              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold min-h-[32px] transition-colors hover:bg-white/5"
+              className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold min-h-[44px] transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{ color: textMuted }}
             >
               <RotateCcw className="h-3.5 w-3.5" /> {PROFILE_START_OVER_LABEL}
@@ -546,12 +546,12 @@ export default function HomeConversationFlow({
 
       {/* HP-2R1 — warm off-white conversation canvas inside the dark shell. */}
       <div
-        className="mt-3 rounded-2xl border p-3 sm:p-4"
+        className="mt-3 rounded-lg border p-3 sm:p-4"
         style={{ background: CANVAS_BG, borderColor: CANVAS_BORDER }}
       >
         <div
           data-testid="home-conversation-transcript"
-          className="space-y-2 overflow-y-auto pr-1 min-h-[260px] max-h-[54vh]"
+          className="h-[220px] sm:h-[240px] space-y-2 overflow-y-auto overscroll-contain pr-1"
           aria-live="polite"
         >
           {bubbles.map((b) => (
@@ -576,7 +576,7 @@ export default function HomeConversationFlow({
               type="button"
               data-testid="home-conversation-confirm-yes"
               onClick={acceptProfile}
-              className="rounded-full border px-3 py-2 text-xs font-semibold min-h-[36px] transition-colors hover:bg-white"
+              className="rounded-full border px-3 py-2 text-xs font-semibold min-h-[44px] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={chipStyle}
               onMouseEnter={chipHover}
               onMouseLeave={chipReset}
@@ -589,7 +589,7 @@ export default function HomeConversationFlow({
               type="button"
               data-testid="home-conversation-confirm-change"
               onClick={changeSavedAnswers}
-              className="rounded-full border px-3 py-2 text-xs font-semibold min-h-[36px] transition-colors hover:bg-white"
+              className="rounded-full border px-3 py-2 text-xs font-semibold min-h-[44px] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={chipStyle}
               onMouseEnter={chipHover}
               onMouseLeave={chipReset}
@@ -611,7 +611,7 @@ export default function HomeConversationFlow({
                     type="button"
                     data-testid={`home-conversation-chip-${chip.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
                     onClick={() => submitChip(chip)}
-                    className="rounded-full border px-3 py-2 text-xs font-semibold min-h-[36px] transition-colors hover:bg-white"
+                    className="rounded-full border px-3 py-2 text-xs font-semibold min-h-[44px] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     style={{
                       borderColor: CHIP_BORDER,
                       color: INK_SOFT,
@@ -658,7 +658,7 @@ export default function HomeConversationFlow({
                 rows={2}
                 maxLength={500}
                 placeholder={current.placeholder}
-                className="w-full resize-none rounded-2xl border px-4 py-3 text-base outline-none focus:ring-2"
+                className="min-w-0 w-full resize-none rounded-lg border px-4 py-3 text-base outline-none focus:ring-2"
                 style={{
                   background: FIELD_BG,
                   borderColor: FIELD_BORDER,
@@ -692,7 +692,7 @@ export default function HomeConversationFlow({
                 type="button"
                 data-testid="home-conversation-skip"
                 onClick={skip}
-                className="mt-2 text-xs font-semibold underline-offset-4 hover:underline min-h-[32px]"
+                className="mt-2 text-xs font-semibold underline-offset-4 hover:underline min-h-[44px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 style={{ color: INK_MUTED }}
               >
                 Skip this one

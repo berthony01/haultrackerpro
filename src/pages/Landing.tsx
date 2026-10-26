@@ -145,7 +145,7 @@ export default function Landing() {
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <button
             onClick={() => navigate('/')}
-            className="flex items-center gap-2"
+            className="flex min-h-[44px] items-center gap-2 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="HaulTrackerPro home"
           >
             <Truck className="h-6 w-6" style={{ color: AMBER }} />
@@ -276,7 +276,7 @@ export default function Landing() {
                 <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
                   Find work that fits your preferences, or organize loads, expenses, fuel, and profit.
                 </p>
-                <div className="mt-auto pt-5 flex flex-col gap-2">
+                <div className="mt-auto pt-5 flex flex-col gap-2 md:min-h-[116px]">
                   <Button data-testid="hero-path-find-work" onClick={focusConversation} className="min-h-[44px] h-auto whitespace-normal font-bold">
                     Find Work <ArrowRight aria-hidden="true" />
                   </Button>
@@ -291,9 +291,9 @@ export default function Landing() {
                 <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
                   Post opportunities and manage driver inquiries in your recruiter workspace.
                 </p>
-                <div className="mt-auto pt-5">
+                <div className="mt-auto pt-5 md:min-h-[116px]">
                   <Button data-testid="hero-path-hire-drivers" onClick={() => navigate('/recruiters')} className="w-full min-h-[44px] h-auto whitespace-normal font-bold">
-                    Explore Recruiter Tools <ArrowRight aria-hidden="true" />
+                    Recruiting Tools <ArrowRight aria-hidden="true" />
                   </Button>
                 </div>
               </article>
@@ -303,17 +303,38 @@ export default function Landing() {
                 <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
                   Organize approved driver clients' records with the permissions they grant.
                 </p>
-                <div className="mt-auto pt-5">
+                <div className="mt-auto pt-5 md:min-h-[116px]">
                   <Button data-testid="hero-path-assistants-agencies" onClick={() => navigate('/assistants-agencies')} className="w-full min-h-[44px] h-auto whitespace-normal font-bold">
-                    Explore Support Tools <ArrowRight aria-hidden="true" />
+                    Assistant &amp; Agency Tools <ArrowRight aria-hidden="true" />
                   </Button>
                 </div>
               </article>
             </div>
 
-            <div className="mt-10 text-left max-w-3xl mx-auto">
+            <section className="mt-8 border-y border-sidebar-border py-6 text-left" aria-labelledby="work-fit-heading">
+              <h2 id="work-fit-heading" className="text-xl sm:text-2xl font-bold text-secondary-foreground">How HaulTracker Pro fits your work</h2>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-5 text-sidebar-foreground">
+                <div>
+                  <h3 className="font-bold text-secondary-foreground">Find work and track trucking</h3>
+                  <p className="mt-2 text-sm leading-relaxed">Describe your work preferences. Keep loads, expenses, fuel, and profit organized.</p>
+                  <Button variant="link" onClick={goToDriver} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start">My Trucking <ArrowRight aria-hidden="true" /></Button>
+                </div>
+                <div>
+                  <h3 className="font-bold text-secondary-foreground">Post opportunities, manage inquiries</h3>
+                  <p className="mt-2 text-sm leading-relaxed">Post trucking opportunities and organize driver inquiries in your recruiter workspace.</p>
+                  <Button variant="link" onClick={() => navigate('/recruiters')} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start">Recruiting Tools <ArrowRight aria-hidden="true" /></Button>
+                </div>
+                <div>
+                  <h3 className="font-bold text-secondary-foreground">Support driver-approved records</h3>
+                  <p className="mt-2 text-sm leading-relaxed">Help organize driver clients’ records, limited to the permissions each driver grants.</p>
+                  <Button variant="link" onClick={() => navigate('/assistants-agencies')} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start">Assistant &amp; Agency Tools <ArrowRight aria-hidden="true" /></Button>
+                </div>
+              </div>
+            </section>
+
+            <div className="mt-8 text-left max-w-3xl mx-auto">
               <h2 className="text-xl sm:text-2xl font-bold text-secondary-foreground">
-                Drivers: start with the work you want.
+                Find trucking work
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
                 Use the free guided Find Work conversation to describe your preferences, then review them before saving.
@@ -356,21 +377,21 @@ export default function Landing() {
           style={{ borderColor: 'hsl(220, 16%, 14%)' }}
           data-testid="how-it-works-section"
         >
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <h2 className="text-xl sm:text-2xl font-black text-white text-center">
               How finding work works.
             </h2>
-            <ol className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
+            <ol className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               {[
-                { key: 'talk', text: 'Talk — say what work you want, in your own words.' },
-                { key: 'ask', text: 'HaulTracker asks what’s missing to understand your profile.' },
-                { key: 'continue', text: 'Continue to real opportunities with your answers prefilled.' },
-                { key: 'recruiter', text: 'Talk to a recruiter when you’re ready — no application forms to start.' },
+                { key: 'talk', text: 'Describe the trucking work you want.' },
+                { key: 'ask', text: 'Answer a few guided follow-up questions.' },
+                { key: 'continue', text: 'Review your preferences before saving.' },
+                { key: 'recruiter', text: 'Explore opportunities and contact recruiters.' },
               ].map((s, i) => (
                 <li
                   key={s.key}
                   data-testid={`how-it-works-step-${s.key}`}
-                  className="rounded-2xl border p-4 text-left"
+                  className="border-l pl-3 text-left"
                   style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
                 >
                   <span
@@ -393,17 +414,20 @@ export default function Landing() {
           data-testid="my-trucking-section"
         >
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14 grid gap-6 md:grid-cols-2 md:items-center">
-            <div className="rounded-2xl border overflow-hidden" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
+            <figure className="rounded-lg border overflow-hidden" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
               <img
                 src={dashboardMockup}
-                alt="Driver workspace showing load tracking, real RPM, expenses, and net profit"
+                alt="Illustrative trucking dashboard with example charts and figures, not a current-interface screenshot"
                 className="w-full"
                 width={1536}
                 height={1024}
                 loading="lazy"
                 decoding="async"
               />
-            </div>
+              <figcaption className="border-t border-sidebar-border px-4 py-3 text-sm text-sidebar-foreground">
+                <span className="font-semibold text-secondary-foreground">Illustrative dashboard. Example figures.</span> Layout and depicted features may differ from the current app.
+              </figcaption>
+            </figure>
             <div className="text-left">
               <h2 className="text-xl sm:text-2xl font-black text-white">
                 My Trucking — know what every load really earns.
@@ -415,7 +439,7 @@ export default function Landing() {
               <Button
                 data-testid="my-trucking-cta"
                 onClick={goToDriver}
-                className="mt-5 rounded-xl font-bold gap-2"
+                className="mt-5 min-h-[44px] rounded-lg font-bold gap-2"
                 style={{ background: AMBER, color: 'white' }}
               >
                 Open My Trucking <ArrowRight className="h-4 w-4" />
@@ -431,21 +455,7 @@ export default function Landing() {
           data-testid="secondary-tools-section"
         >
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
-            <h2 className="text-xl font-bold text-secondary-foreground">Connected work, practical tools.</h2>
-            <div className="mt-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sidebar-foreground">
-              <div>
-                <Button variant="link" onClick={focusConversation} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start font-bold">Find work <ArrowRight aria-hidden="true" /></Button>
-                <p className="text-sm">Drivers describe their preferences; recruiters manage opportunities and inquiries.</p>
-              </div>
-              <div>
-                <Button variant="link" onClick={goToDriver} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start font-bold">Run your trucking business <ArrowRight aria-hidden="true" /></Button>
-                <p className="text-sm">Keep loads, expenses, fuel, and profit in your driver workspace.</p>
-              </div>
-              <div>
-                <Button variant="link" onClick={() => navigate('/assistants-agencies')} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start font-bold">Support drivers <ArrowRight aria-hidden="true" /></Button>
-                <p className="text-sm">Assistants and agencies work within driver-approved permissions.</p>
-              </div>
-            </div>
+            <h2 className="text-xl font-bold text-secondary-foreground mb-4">More tools for your work</h2>
             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: TEXT_DIM }}>
               Also inside HaulTracker Pro
             </p>
@@ -461,7 +471,7 @@ export default function Landing() {
                   key={s.key}
                   data-testid={`secondary-tool-${s.key}`}
                   onClick={() => navigate(s.href)}
-                  className="flex items-center gap-2 rounded-xl border px-3 py-3 min-h-[44px] text-left hover:border-[hsl(25,95%,53%)] transition-colors"
+                  className="flex items-center gap-2 rounded-lg border px-3 py-3 min-h-[44px] text-left hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
                   style={{ background: 'transparent', borderColor: NAVY_BORDER }}
                 >
                   <s.icon className="h-4 w-4 shrink-0" style={{ color: TEXT_DIM }} />
@@ -561,8 +571,7 @@ export default function Landing() {
                       onClick={() => {
                         if ((link as { track?: boolean }).track) trackStarterKitCTAClicked('footer');
                       }}
-                      className="block text-xs font-medium hover:underline"
-                      style={{ color: 'hsl(220, 10%, 50%)' }}
+                      className="flex min-h-[44px] items-center rounded text-xs font-medium text-sidebar-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       {link.label}
                     </a>
