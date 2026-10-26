@@ -431,18 +431,26 @@ export default function Landing() {
                       ))}
                     </ul>
                     <div className="mt-6 flex flex-col sm:flex-row gap-3">
-                      {a.actions.map((action) => (
-                        <Button
-                          key={action.testid}
-                          data-testid={action.testid}
-                          onClick={action.onClick}
-                          variant={action.primary ? 'default' : 'secondary'}
-                          className="min-h-[44px] h-auto whitespace-normal rounded-lg font-bold gap-2"
-                          style={action.primary ? { background: AMBER, color: 'white' } : undefined}
-                        >
-                          {action.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                      ))}
+                      {a.actions.map((action) => {
+                        const button = (
+                          <Button
+                            data-testid={action.testid}
+                            onClick={action.onClick}
+                            variant={action.primary ? 'default' : 'secondary'}
+                            className="min-h-[44px] h-auto whitespace-normal rounded-lg font-bold gap-2"
+                            style={action.primary ? { background: AMBER, color: 'white' } : undefined}
+                          >
+                            {action.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                          </Button>
+                        );
+                        return action.testid === 'hero-path-my-trucking' ? (
+                          <span key={action.testid} data-testid="my-trucking-cta" className="inline-flex">
+                            {button}
+                          </span>
+                        ) : (
+                          <span key={action.testid} className="inline-flex">{button}</span>
+                        );
+                      })}
                     </div>
                   </div>
                   <div
