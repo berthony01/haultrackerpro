@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup, configure } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { computeWorkspaceAccess } from '@/lib/workspaceAccess';
 import { deriveUserCapabilitiesView, type UserCapabilityStatus } from '@/lib/userCapabilities';
@@ -390,25 +390,51 @@ describe('canonical workspace handoff reaches the actual review destination', ()
   });
 
   it('dashboard-embedded chat Continue opens the unsaved review on the same mounted Index', async () => {
-    // Settled workspace (no dependency churn after click) with the real destination page.
+    // Use the browser-backed router directly: ReviewJourney's render-time
+    // replaceState bridge is not part of the production dashboard journey.
+    // All URL-effect auth/workspace/subscription dependencies remain settled;
+    // only Router's search changes when the real Continue action navigates.
     capability('active'); state.realOpportunities = true; state.loads = [{ id: 'existing' }];
     state.profiles['driver-a'] = fullProfile;
+    const settledUser = state.user;
+    const settledAccess = state.access;
+    const mounts = vi.fn();
+    function MountedDashboard() {
+      React.useEffect(() => { mounts(); }, []);
+      return <Index />;
+    }
     render(<QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={['/dashboard']}><Location /><ReviewJourney /></MemoryRouter>
+      <BrowserRouter><Location /><MountedDashboard /></BrowserRouter>
     </QueryClientProvider>);
     expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
+    await waitFor(() => expect(state.rpc).toHaveBeenCalled());
+    expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
+    expect(hasPendingProfileAnswers('driver-a')).toBe(false);
     fireEvent.click(await screen.findByTestId('home-conversation-continue'));
     expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
-    expect(await screen.findByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
+    expect(state.user).toBe(settledUser);
+    expect(state.access).toBe(settledAccess);
+    // A bounded assertion failure (not the test runner's generic timeout)
+    // must identify the absent unsaved form in the missing-dependency control.
+    await waitFor(() => {
+      expect(state.mutation).not.toHaveBeenCalled();
+      expect(state.model).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('driver-profile-pending-review-note'),
+        'Continue navigated, but the unsaved profile review form is absent').not.toBeNull();
+    }, { timeout: 1500 });
+    expect(screen.getByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save Preferences' })).toBeTruthy();
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
     expect(consumePendingProfileAnswers('driver-a')).toBeNull();
+    expect(hasPendingProfileAnswers()).toBe(false);
+    expect(mounts).toHaveBeenCalledTimes(1);
     expect(window.location.search).toBe('');
     expect(state.mutation).not.toHaveBeenCalled();
     expect(state.rpc.mock.calls.every(([name]) => name === 'list_public_opportunity_teasers')).toBe(true);
     expect(state.model).not.toHaveBeenCalled();
-  });
+  }, 10000);
 });
 
 describe('pending profile handoff is isolated per account (same tab, no reload)', () => {
