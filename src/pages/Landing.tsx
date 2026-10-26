@@ -11,13 +11,11 @@ import {
   ClipboardList,
   Receipt,
   BarChart3,
-  MessageSquare,
   Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect, useCallback } from 'react';
-import dashboardMockup from '@/assets/dashboard-mockup.png';
 import HomeConversationHero, {
   HOME_CONVERSATION_NEXT_PATH,
 } from '@/components/home/HomeConversationHero';
@@ -28,7 +26,6 @@ import { saveIntakeSnapshot, type IntakeAnswers } from '@/lib/home/conversationI
 import SEOHead from '@/components/SEOHead';
 import { trackStarterKitCTAClicked } from '@/lib/analytics';
 
-
 const NAVY_BG = 'hsl(220, 20%, 8%)';
 const NAVY_SURFACE = 'hsl(220, 20%, 11%)';
 const NAVY_BORDER = 'hsl(220, 16%, 18%)';
@@ -36,6 +33,11 @@ const AMBER = 'hsl(25, 95%, 53%)';
 const AMBER_BRIGHT = 'hsl(25, 95%, 60%)';
 const TEXT_MUTED = 'hsl(220, 10%, 65%)';
 const TEXT_DIM = 'hsl(220, 10%, 50%)';
+const OFFWHITE = 'hsl(42, 33%, 96%)';
+const OFFWHITE_ALT = 'hsl(42, 25%, 92%)';
+const INK = 'hsl(220, 25%, 14%)';
+const INK_MUTED = 'hsl(220, 12%, 38%)';
+const TEAL = 'hsl(185, 65%, 38%)';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -56,7 +58,6 @@ export default function Landing() {
 
   const goToDriver = () => navigate('/auth?intent=driver');
 
-
   const focusConversation = useCallback(() => {
     const el = document.getElementById('home-conversation-input');
     if (!el) return;
@@ -64,6 +65,13 @@ export default function Landing() {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
     (el as HTMLTextAreaElement).focus();
+  }, []);
+
+  const scrollToAudiences = useCallback(() => {
+    const el = document.getElementById('audiences');
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, []);
 
   /**
@@ -109,6 +117,61 @@ export default function Landing() {
     { label: 'For Recruiters', kind: 'link', href: '/recruiters' },
     { label: 'Assistants & Agencies', kind: 'link', href: '/assistants-agencies' },
     { label: 'Log In', kind: 'link', href: '/auth' },
+  ];
+
+  const audiences = [
+    {
+      key: 'drivers',
+      icon: Truck,
+      eyebrow: 'Drivers & Owner-Operators',
+      heading: 'Find your next opportunity. Keep your numbers in view.',
+      capabilities: [
+        'Describe the work you want in a free guided conversation, then review your answers before saving.',
+        'Organize loads, expenses, fuel, and profit in one place.',
+        'See real RPM and weekly closeouts instead of guessing from gross pay.',
+      ],
+      workflow: ['Describe your preferences', 'Review your answers', 'Explore opportunities'],
+      actions: [
+        { testid: 'hero-path-find-work', label: 'Find Work', onClick: focusConversation, primary: true },
+        { testid: 'hero-path-my-trucking', label: 'Track My Trucking', onClick: goToDriver, primary: false },
+      ],
+      sectionTestId: 'my-trucking-section',
+      ctaTestId: 'my-trucking-cta',
+    },
+    {
+      key: 'recruiters',
+      icon: Users,
+      eyebrow: 'Carriers & Recruiters',
+      heading: 'Put your opportunities in front of drivers.',
+      capabilities: [
+        'Post trucking opportunities from your recruiter workspace.',
+        'Manage driver inquiries in one organized queue.',
+        'Continue the conversation with interested drivers.',
+      ],
+      workflow: ['Post an opportunity', 'Manage inquiries', 'Continue the conversation'],
+      actions: [
+        { testid: 'hero-path-hire-drivers', label: 'Recruiting Tools', onClick: () => navigate('/recruiters'), primary: true },
+      ],
+      sectionTestId: undefined,
+      ctaTestId: undefined,
+    },
+    {
+      key: 'assistants',
+      icon: Briefcase,
+      eyebrow: 'Assistants & Agencies',
+      heading: 'Help drivers keep their business organized.',
+      capabilities: [
+        'Work with authorized client records after the driver approves access.',
+        'Support records and paperwork within the permissions each driver grants.',
+        'Keep every client relationship clearly separated.',
+      ],
+      workflow: ['Driver approves access', 'Support their records', 'Work within granted permissions'],
+      actions: [
+        { testid: 'hero-path-assistants-agencies', label: 'Assistant & Agency Tools', onClick: () => navigate('/assistants-agencies'), primary: true },
+      ],
+      sectionTestId: undefined,
+      ctaTestId: undefined,
+    },
   ];
 
   return (
@@ -236,116 +299,229 @@ export default function Landing() {
       </nav>
 
       <main>
-        {/* Audience entry, followed by the driver-only guided conversation */}
+        {/* 1 — Asymmetric hero: editorial headline left, workspace visual right */}
         <section className="relative overflow-hidden" data-testid="landing-hero">
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                'radial-gradient(ellipse 80% 55% at 50% -5%, hsl(25, 95%, 53%, 0.20) 0%, transparent 65%), radial-gradient(ellipse 60% 40% at 15% 20%, hsl(25, 95%, 53%, 0.07) 0%, transparent 70%)',
+                'radial-gradient(ellipse 70% 55% at 20% -5%, hsl(25, 95%, 53%, 0.18) 0%, transparent 65%), radial-gradient(ellipse 45% 40% at 90% 30%, hsl(185, 65%, 38%, 0.10) 0%, transparent 70%)',
             }}
           />
           <div
             className="absolute inset-x-0 top-0 h-px pointer-events-none"
             style={{ background: 'linear-gradient(90deg, transparent, hsl(25, 95%, 53%, 0.5), transparent)' }}
           />
-          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-12 pb-10 sm:pb-14 text-center">
-            <div
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-3"
-              style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
-            >
-              <Sparkles className="h-3.5 w-3.5" /> For the people behind every haul
-            </div>
-            <h1 className="text-[1.9rem] leading-[1.08] sm:text-5xl font-black tracking-tight text-white max-w-3xl mx-auto">
-              Trucking work and business, <span className="text-primary">connected.</span>
-            </h1>
-            <p
-              className="mt-3 text-sm sm:text-lg leading-relaxed max-w-xl mx-auto"
-              style={{ color: TEXT_MUTED }}
-            >
-              Find trucking opportunities, track your numbers, manage recruiting, or support approved driver clients. Choose where you want to start.
-            </p>
-
-            <div
-              className="mt-7 grid grid-cols-1 md:grid-cols-3 gap-4 text-left"
-              data-testid="hero-audience-paths"
-            >
-              <article className="flex flex-col rounded-lg border border-sidebar-border bg-secondary p-5 text-secondary-foreground">
-                <Truck className="h-6 w-6 text-primary" aria-hidden="true" />
-                <h2 className="mt-4 text-lg font-bold">Drivers &amp; Owner-Operators</h2>
-                <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
-                  Find work that fits your preferences, or organize loads, expenses, fuel, and profit.
-                </p>
-                <div className="mt-auto pt-5 flex flex-col gap-2 md:min-h-[116px]">
-                  <Button data-testid="hero-path-find-work" onClick={focusConversation} className="min-h-[44px] h-auto whitespace-normal font-bold">
-                    Find Work <ArrowRight aria-hidden="true" />
-                  </Button>
-                  <Button data-testid="hero-path-my-trucking" variant="secondary" onClick={goToDriver} className="min-h-[44px] h-auto whitespace-normal border border-sidebar-border">
-                    Track My Trucking
-                  </Button>
-                </div>
-              </article>
-              <article className="flex flex-col rounded-lg border border-sidebar-border bg-secondary p-5 text-secondary-foreground">
-                <Users className="h-6 w-6 text-primary" aria-hidden="true" />
-                <h2 className="mt-4 text-lg font-bold">Carriers &amp; Recruiters</h2>
-                <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
-                  Post opportunities and manage driver inquiries in your recruiter workspace.
-                </p>
-                <div className="mt-auto pt-5 md:min-h-[116px]">
-                  <Button data-testid="hero-path-hire-drivers" onClick={() => navigate('/recruiters')} className="w-full min-h-[44px] h-auto whitespace-normal font-bold">
-                    Recruiting Tools <ArrowRight aria-hidden="true" />
-                  </Button>
-                </div>
-              </article>
-              <article className="flex flex-col rounded-lg border border-sidebar-border bg-secondary p-5 text-secondary-foreground">
-                <Briefcase className="h-6 w-6 text-primary" aria-hidden="true" />
-                <h2 className="mt-4 text-lg font-bold">Assistants &amp; Agencies</h2>
-                <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
-                  Organize approved driver clients' records with the permissions they grant.
-                </p>
-                <div className="mt-auto pt-5 md:min-h-[116px]">
-                  <Button data-testid="hero-path-assistants-agencies" onClick={() => navigate('/assistants-agencies')} className="w-full min-h-[44px] h-auto whitespace-normal font-bold">
-                    Assistant &amp; Agency Tools <ArrowRight aria-hidden="true" />
-                  </Button>
-                </div>
-              </article>
-            </div>
-
-            <section className="mt-8 border-y border-sidebar-border py-6 text-left" aria-labelledby="work-fit-heading">
-              <h2 id="work-fit-heading" className="text-xl sm:text-2xl font-bold text-secondary-foreground">How HaulTracker Pro fits your work</h2>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-5 text-sidebar-foreground">
-                <div>
-                  <h3 className="font-bold text-secondary-foreground">Find work and track trucking</h3>
-                  <p className="mt-2 text-sm leading-relaxed">Describe your work preferences. Keep loads, expenses, fuel, and profit organized.</p>
-                  <Button variant="link" onClick={goToDriver} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start">My Trucking <ArrowRight aria-hidden="true" /></Button>
-                </div>
-                <div>
-                  <h3 className="font-bold text-secondary-foreground">Post opportunities, manage inquiries</h3>
-                  <p className="mt-2 text-sm leading-relaxed">Post trucking opportunities and organize driver inquiries in your recruiter workspace.</p>
-                  <Button variant="link" onClick={() => navigate('/recruiters')} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start">Recruiting Tools <ArrowRight aria-hidden="true" /></Button>
-                </div>
-                <div>
-                  <h3 className="font-bold text-secondary-foreground">Support driver-approved records</h3>
-                  <p className="mt-2 text-sm leading-relaxed">Help organize driver clients’ records, limited to the permissions each driver grants.</p>
-                  <Button variant="link" onClick={() => navigate('/assistants-agencies')} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start">Assistant &amp; Agency Tools <ArrowRight aria-hidden="true" /></Button>
-                </div>
+          <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-10 sm:pt-16 pb-12 sm:pb-16 grid gap-10 lg:grid-cols-[55%_45%] lg:items-center">
+            <div className="text-left">
+              <div
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-4"
+                style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
+              >
+                <Sparkles className="h-3.5 w-3.5" /> For the people behind every haul
               </div>
-            </section>
-
-            <div className="mt-8 text-left max-w-3xl mx-auto">
-              <h2 className="text-xl sm:text-2xl font-bold text-secondary-foreground">
-                Find trucking work
-              </h2>
-              <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
-                Use the free guided Find Work conversation to describe your preferences, then review them before saving.
+              <h1 className="text-4xl leading-[1.05] sm:text-6xl font-black tracking-tight text-white">
+                Find work. Run your business. Support the people who move it.
+              </h1>
+              <p
+                className="mt-4 text-base sm:text-lg leading-relaxed max-w-xl"
+                style={{ color: TEXT_MUTED }}
+              >
+                HaulTracker Pro connects drivers, recruiters, and approved support teams in one
+                place: find trucking opportunities, keep your numbers organized, and manage the
+                work around every load.
+              </p>
+              <div className="mt-7 flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={focusConversation}
+                  className="min-h-[44px] h-auto whitespace-normal rounded-lg font-bold gap-2 px-6"
+                  style={{ background: AMBER, color: 'white' }}
+                >
+                  Find Work <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={scrollToAudiences}
+                  className="min-h-[44px] h-auto whitespace-normal rounded-lg border border-sidebar-border"
+                >
+                  Explore the platform
+                </Button>
+              </div>
+              <p className="mt-5 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
+                The business platform behind every truck. Drivers start free, no credit card.
               </p>
             </div>
 
-            <div className="mt-5">
+            <div
+              className="rounded-xl border p-5 sm:p-7 text-left"
+              style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+              aria-label="One platform. Three connected workspaces."
+            >
+              <p
+                className="text-xs font-bold uppercase tracking-widest"
+                style={{ color: TEAL }}
+              >
+                One platform. Three connected workspaces.
+              </p>
+              <div className="mt-5 space-y-3">
+                {[
+                  { icon: Truck, label: 'Drivers', note: 'Find work and track the business', inset: 'ml-0', accent: AMBER_BRIGHT },
+                  { icon: Users, label: 'Carriers & Recruiters', note: 'Post opportunities, manage inquiries', inset: 'ml-4 sm:ml-8', accent: TEAL },
+                  { icon: Briefcase, label: 'Assistants & Agencies', note: 'Support drivers with granted access', inset: 'ml-8 sm:ml-16', accent: AMBER_BRIGHT },
+                ].map((row) => (
+                  <div
+                    key={row.label}
+                    className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${row.inset}`}
+                    style={{ background: 'hsl(220, 20%, 9%)', borderColor: NAVY_BORDER }}
+                  >
+                    <span
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                      style={{ background: 'hsl(220, 16%, 16%)', color: row.accent }}
+                    >
+                      <row.icon className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <span>
+                      <span className="block text-sm font-bold text-white">{row.label}</span>
+                      <span className="block text-xs" style={{ color: TEXT_MUTED }}>{row.note}</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 2 — Equal audience showcase: three substantial alternating rows */}
+        <section
+          id="audiences"
+          data-testid="hero-audience-paths"
+          style={{ background: OFFWHITE }}
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+            <h2 className="text-2xl sm:text-4xl font-black tracking-tight" style={{ color: INK }}>
+              Built around the work you do.
+            </h2>
+            <div className="mt-8 space-y-6">
+              {audiences.map((a, i) => (
+                <article
+                  key={a.key}
+                  data-testid={a.sectionTestId}
+                  className="grid gap-6 md:grid-cols-2 md:items-center rounded-xl border px-5 py-7 sm:px-8 sm:py-9"
+                  style={{
+                    background: i % 2 === 0 ? 'hsl(0, 0%, 100%)' : OFFWHITE_ALT,
+                    borderColor: 'hsl(42, 15%, 85%)',
+                  }}
+                >
+                  <div className={i % 2 === 1 ? 'md:order-2' : ''}>
+                    <p
+                      className="text-xs font-bold uppercase tracking-widest"
+                      style={{ color: TEAL }}
+                    >
+                      {a.eyebrow}
+                    </p>
+                    <h2 className="mt-2 text-xl sm:text-2xl font-black" style={{ color: INK }}>
+                      {a.heading}
+                    </h2>
+                    <ul className="mt-4 space-y-2">
+                      {a.capabilities.map((c) => (
+                        <li key={c} className="flex gap-2 text-sm leading-relaxed" style={{ color: INK_MUTED }}>
+                          <span aria-hidden="true" style={{ color: AMBER }}>•</span>
+                          <span>{c}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="mt-6 flex flex-col sm:flex-row gap-3">
+                      {a.actions.map((action) => (
+                        <Button
+                          key={action.testid}
+                          data-testid={action.testid}
+                          onClick={action.onClick}
+                          variant={action.primary ? 'default' : 'secondary'}
+                          className="min-h-[44px] h-auto whitespace-normal rounded-lg font-bold gap-2"
+                          style={action.primary ? { background: AMBER, color: 'white' } : undefined}
+                        >
+                          {action.label} <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div
+                    className={`rounded-lg border px-5 py-6 ${i % 2 === 1 ? 'md:order-1' : ''}`}
+                    style={{ background: OFFWHITE, borderColor: 'hsl(42, 15%, 85%)' }}
+                  >
+                    <p
+                      className="text-xs font-bold uppercase tracking-widest"
+                      style={{ color: INK_MUTED }}
+                    >
+                      Example workflow
+                    </p>
+                    <ol className="mt-4 space-y-3">
+                      {a.workflow.map((step, si) => (
+                        <li key={step} className="flex items-center gap-3">
+                          <span
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                            style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: AMBER }}
+                          >
+                            {si + 1}
+                          </span>
+                          <span className="text-sm font-semibold" style={{ color: INK }}>{step}</span>
+                          {si < a.workflow.length - 1 && (
+                            <ArrowRight className="h-3.5 w-3.5" style={{ color: TEAL }} aria-hidden="true" />
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* 3 — Driver guided conversation, below the equal audience showcase */}
+        <section
+          className="border-t"
+          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
+          data-testid="how-it-works-section"
+        >
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 grid gap-8 lg:grid-cols-[40%_60%]">
+            <div className="text-left">
+              <h2 className="text-2xl sm:text-3xl font-black text-white">
+                Find trucking work
+              </h2>
+              <p className="mt-3 text-sm sm:text-base leading-relaxed" style={{ color: TEXT_MUTED }}>
+                Use the free guided Find Work conversation to describe your preferences, then
+                review them before saving.
+              </p>
+              <h3 className="mt-8 text-lg font-bold text-white">How finding work works.</h3>
+              <ol className="mt-4 space-y-3">
+                {[
+                  { key: 'talk', text: 'Describe the trucking work you want.' },
+                  { key: 'ask', text: 'Answer a few guided follow-up questions.' },
+                  { key: 'continue', text: 'Review your preferences before saving.' },
+                  { key: 'recruiter', text: 'Explore opportunities and contact recruiters.' },
+                ].map((s, i) => (
+                  <li
+                    key={s.key}
+                    data-testid={`how-it-works-step-${s.key}`}
+                    className="flex items-center gap-3 border-l pl-3 text-left"
+                    style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+                  >
+                    <span
+                      className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-black"
+                      style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: AMBER_BRIGHT }}
+                    >
+                      {i + 1}
+                    </span>
+                    <p className="py-2 text-sm text-white/90">{s.text}</p>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div>
               {deepLink.jobRequested && (
                 <HomeTargetedJobContext
                   jobId={deepLink.jobId}
-
                   amber={AMBER}
                   surface={NAVY_SURFACE}
                   border={NAVY_BORDER}
@@ -363,87 +539,32 @@ export default function Landing() {
                 openingNote={openingNote}
               />
             </div>
-
-
-            <p className="mt-5 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
-              The business platform behind every truck. Drivers start free — no credit card.
-            </p>
           </div>
         </section>
 
-        {/* 3 — ONE concise "How finding work works" */}
+        {/* 4 — Connective band */}
         <section
           className="border-t"
-          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
-          data-testid="how-it-works-section"
+          style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 10%)' }}
         >
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-            <h2 className="text-xl sm:text-2xl font-black text-white text-center">
-              How finding work works.
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-12 text-center">
+            <h2 className="text-xl sm:text-2xl font-black text-white">
+              Connected when you need it. Permissioned where it matters.
             </h2>
-            <ol className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
               {[
-                { key: 'talk', text: 'Describe the trucking work you want.' },
-                { key: 'ask', text: 'Answer a few guided follow-up questions.' },
-                { key: 'continue', text: 'Review your preferences before saving.' },
-                { key: 'recruiter', text: 'Explore opportunities and contact recruiters.' },
-              ].map((s, i) => (
-                <li
-                  key={s.key}
-                  data-testid={`how-it-works-step-${s.key}`}
-                  className="border-l pl-3 text-left"
-                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
+                'Drivers review their preferences before anything is saved.',
+                'Recruiters manage their own opportunities and inquiries.',
+                'Assistants act only with access each driver has granted.',
+              ].map((line) => (
+                <p
+                  key={line}
+                  className="rounded-lg border px-4 py-4 text-sm leading-relaxed"
+                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER, color: TEXT_MUTED }}
                 >
-                  <span
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-black"
-                    style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: AMBER_BRIGHT }}
-                  >
-                    {i + 1}
-                  </span>
-                  <p className="mt-2 text-sm text-white/90">{s.text}</p>
-                </li>
+                  {line}
+                </p>
               ))}
-            </ol>
-          </div>
-        </section>
-
-        {/* 4 — ONE concise My Trucking proof */}
-        <section
-          className="border-t"
-          style={{ borderColor: 'hsl(220, 16%, 14%)' }}
-          data-testid="my-trucking-section"
-        >
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14 grid gap-6 md:grid-cols-2 md:items-center">
-            <figure className="rounded-lg border overflow-hidden" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
-              <img
-                src={dashboardMockup}
-                alt="Illustrative trucking dashboard with example charts and figures, not a current-interface screenshot"
-                className="w-full"
-                width={1536}
-                height={1024}
-                loading="lazy"
-                decoding="async"
-              />
-              <figcaption className="border-t border-sidebar-border px-4 py-3 text-sm text-sidebar-foreground">
-                <span className="font-semibold text-secondary-foreground">Illustrative dashboard. Example figures.</span> Layout and depicted features may differ from the current app.
-              </figcaption>
-            </figure>
-            <div className="text-left">
-              <h2 className="text-xl sm:text-2xl font-black text-white">
-                My Trucking — know what every load really earns.
-              </h2>
-              <p className="mt-3 text-sm sm:text-base leading-relaxed" style={{ color: TEXT_MUTED }}>
-                Log loads, fuel, and expenses in seconds. See real RPM, weekly closeouts, and net
-                profit instead of gross pay. Drivers start free.
-              </p>
-              <Button
-                data-testid="my-trucking-cta"
-                onClick={goToDriver}
-                className="mt-5 min-h-[44px] rounded-lg font-bold gap-2"
-                style={{ background: AMBER, color: 'white' }}
-              >
-                Open My Trucking <ArrowRight className="h-4 w-4" />
-              </Button>
             </div>
           </div>
         </section>
