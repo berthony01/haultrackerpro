@@ -65,8 +65,8 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     const support = within(paths).getByTestId('hero-path-assistants-agencies');
     expect(findWork).toHaveTextContent(/Find Work/);
     expect(myTrucking).toHaveTextContent(/My Trucking/);
-    expect(hire).toHaveTextContent('Explore Recruiter Tools');
-    expect(support).toHaveTextContent('Explore Support Tools');
+    expect(hire).toHaveTextContent('Recruiting Tools');
+    expect(support).toHaveTextContent('Assistant & Agency Tools');
 
     fireEvent.click(findWork);
     expect(screen.getByTestId('home-conversation-input')).toHaveFocus();
