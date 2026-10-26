@@ -1090,17 +1090,6 @@ const Index = () => {
           <ViewFallback />
         ) : (
           <>
-        {page === 'dashboard' && effectiveRole === 'driver' && driverWorkspaceAllowed && !isActingAsAssistant && (
-          <section className="mb-8" aria-labelledby="driver-work-chat-heading">
-            <h2 id="driver-work-chat-heading" className="mb-2 text-xl font-bold text-foreground">Talk to HaulTracker</h2>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Find work that fits you. Talk through your job preferences, see real openings, and review your work profile before saving changes.
-            </p>
-            <Suspense fallback={<ViewFallback />}>
-              <DriverWorkConversation />
-            </Suspense>
-          </section>
-        )}
         {/* Smart Reminders */}
         {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">
@@ -1114,7 +1103,10 @@ const Index = () => {
         )}
 
         {showOnboarding ? (
-          <Onboarding onGetStarted={() => { setEditingLoad(null); setPage('add'); }} />
+          <>
+            <Onboarding onGetStarted={() => { setEditingLoad(null); setPage('add'); }} />
+            {dashboardChatSlot}
+          </>
         ) : isActingAsAssistant && !isAssistantPageAllowed(page, actingPermissions) ? (
           <AssistantBlockedNotice
             driverName={actingDriver?.driver_name || actingDriver?.driver_email || 'this driver'}
@@ -1190,6 +1182,7 @@ const Index = () => {
                   settingsOverride={isActingAsAssistant ? driverReportSettings ?? null : null}
                   isAssistantView={isActingAsAssistant}
                   showRecommendedOpportunity={!isActingAsAssistant && effectiveRole === 'driver' && driverWorkspaceAllowed}
+                  embeddedChat={dashboardChatSlot}
                 />
 
               </>
