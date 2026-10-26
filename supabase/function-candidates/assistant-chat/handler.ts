@@ -22,11 +22,11 @@ export const RETENTION_DAYS = 30;
 
 export type RpcResult = { data: unknown; error: { code?: string; message?: string } | null };
 export interface HandlerDeps {
-  /** Existing Supabase auth.getUser(token) — returns verified user id or null. */
+  /** Existing Supabase auth.getUser(token) - returns verified user id or null. */
   verifyToken(token: string): Promise<string | null>;
   /** User-token client RPC (publishable key + caller JWT). RLS + auth.uid apply. */
   userRpc(token: string, fn: string, args: Record<string, unknown>): Promise<RpcResult>;
-  /** Service client RPC — ONLY used for assistant_finalize_turn. */
+  /** Service client RPC - ONLY used for assistant_finalize_turn. */
   serviceFinalize(args: { reservationId: string; leaseId: string; success: boolean; content: string | null; sources: string[] | null }): Promise<RpcResult>;
   /** Raw gateway transport. Exactly one call per admitted turn. */
   gatewayFetch(body: string, signal: AbortSignal): Promise<Response>;
