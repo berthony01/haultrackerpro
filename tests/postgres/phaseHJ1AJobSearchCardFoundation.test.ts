@@ -218,7 +218,7 @@ describe('HJ-2D private publication/discovery safety switch (default OFF)',()=>{
   expect(await control()).toEqual([{singleton:true,publication_enabled:true,discovery_enabled:false}]);
  });
  it('no client-callable function can flip the switch',async()=>{
-  const fns=(await db.query("SELECT p.oid::regprocedure::text AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','job_search_private') AND pg_get_functiondef(p.oid) ILIKE '%job_search_feature_control%' ORDER BY 1")).rows.map(r=>r.sig);
+  const fns=(await db.query("SELECT p.oid::regprocedure::text AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','job_search_private') AND p.prokind='f' AND pg_get_functiondef(p.oid) ILIKE '%job_search_feature_control%' ORDER BY 1")).rows.map(r=>r.sig);
   // Only the private manager reads it (FOR SHARE); none writes it.
   for(const sig of fns) expect((await db.query('SELECT pg_get_functiondef($1::regprocedure) AS d',[sig])).rows[0].d).not.toMatch(/UPDATE\s+job_search_private\.job_search_feature_control|INSERT\s+INTO\s+job_search_private\.job_search_feature_control|DELETE\s+FROM\s+job_search_private\.job_search_feature_control/i);
   expect(fns).toContain('job_search_private.manage_my_job_search_card(text,jsonb,integer,uuid,text)');
@@ -263,7 +263,7 @@ describe('HJ-2D switch OFF serialization with REAL concurrent sessions',()=>{
    expect(await pending).toMatchObject({error:{code:'42501'}});expect(await counts()).toEqual({cards:0,events:0});
   }finally{await holder.query('ROLLBACK');await pending;await holder.end();await publisher.end();}
  });
- it('operator OFF waits for an in-flight publish holding FOR SHARE; publish completes; fresh publish queued behind OFF is denied; no deadlock',async()=>{
+ it('operator OFF waits for in-flight FOR SHARE publishes; share-compatible publish during pending OFF linearizes before OFF; publish after OFF commit denied; no deadlock',async()=>{
   const [inflight,operator,fresh]=await clients(3);let off:Promise<unknown>|undefined,queued:Promise<unknown>|undefined;
   try{
    await inflight.query('BEGIN');await inflight.query('SET LOCAL ROLE authenticated');await inflight.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users.driver]);
@@ -272,14 +272,16 @@ describe('HJ-2D switch OFF serialization with REAL concurrent sessions',()=>{
    const opPid=await pidOf(operator);
    off=(async()=>{await operator.query('BEGIN');await operator.query('UPDATE job_search_private.job_search_feature_control SET publication_enabled=false,discovery_enabled=false');return 'updated';})();
    await waitFor(opPid); // real row-lock wait on the in-flight FOR SHARE holder
-   const freshPid=await pidOf(fresh);
+   // PostgreSQL grants a compatible FOR SHARE even while an UPDATE waits, so a
+   // publish started before OFF commits succeeds and OFF also waits for it.
    queued=publish(users.other,payload,0,randomUUID(),true,fresh).then(c=>({c}),error=>({error}));
-   await waitFor(freshPid); // fresh publish queues behind the pending OFF writer
+   expect(await queued).toMatchObject({c:{status:'published'}});
+   expect((await db.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[opPid])).rowCount).toBe(1);
    await inflight.query('COMMIT');
    expect(await off).toBe('updated');
    await operator.query('COMMIT');
-   expect(await queued).toMatchObject({error:{code:'42501'}});
-   expect(await counts()).toEqual({cards:1,events:1});
+   await expect(publish(users.dual,payload,0,randomUUID(),true,fresh)).rejects.toMatchObject({code:'42501'});
+   expect(await counts()).toEqual({cards:2,events:2});
    expect((await command(users.driver)).status).toBe('published'); // pre-OFF publication remains; not recalled
    await expect(publish(users.driver,payload,1)).rejects.toMatchObject({code:'42501'});
    expect((await command(users.driver,'withdraw',null,1,randomUUID())).status).toBe('withdrawn');
