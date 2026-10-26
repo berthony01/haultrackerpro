@@ -50,7 +50,13 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 import DriverWorkConversation from '@/components/home/DriverWorkConversation';
 import HomeConversationFlow from '@/components/home/HomeConversationFlow';
-import { WorkConversationDraftProvider } from '@/components/home/WorkConversationDraftProvider';
+import {
+  WorkConversationDraftProvider,
+  useWorkConversationDraftStore,
+  type WorkConversationDraftLease,
+  type WorkConversationDraftStore,
+} from '@/components/home/WorkConversationDraftProvider';
+import type { ConversationDraftSnapshot } from '@/components/home/HomeConversationFlow';
 
 function Nav() {
   const navigate = useNavigate();
@@ -263,17 +269,136 @@ describe('Phase 3 same-tab continuity (authenticated personal driver)', () => {
     expect(transcript()).not.toContain('Houston');
   });
 
-  it('public flow with no adapter never reads the authenticated draft', () => {
+  it('public no-adapter flow under the SAME live provider holding a private draft never reads it', () => {
+    const qc = new QueryClient();
+    const view = render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <Nav />
+          <WorkConversationDraftProvider>
+            <Routes>
+              <Route path="/" element={<DriverWorkConversation />} />
+              <Route
+                path="/loads"
+                element={<HomeConversationFlow onContinue={vi.fn()} amber="" surface="" border="" textMuted="" textDim="" />}
+              />
+            </Routes>
+          </WorkConversationDraftProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    buildProgress();
+    away(); // same provider stays mounted; public flow mounts with no adapter
+    expect(transcript()).not.toContain('Houston');
+    expect(screen.getByTestId('home-conversation-input')).toHaveValue('');
+    back(); // private draft is still retained for the valid owner
+    expect(transcript()).toContain('Houston');
+    expect(screen.getByTestId('home-conversation-input')).toHaveValue('unsent private draft');
+    view.unmount();
+  });
+
+  it('capability revoked while the chat is unmounted: remount shows no old draft and writes nothing', () => {
     const view = render(app());
     buildProgress();
-    view.unmount();
-    render(
-      <MemoryRouter>
-        <WorkConversationDraftProvider>
-          <HomeConversationFlow onContinue={vi.fn()} amber="" surface="" border="" textMuted="" textDim="" />
-        </WorkConversationDraftProvider>
-      </MemoryRouter>,
-    );
+    away();
+    state.driverAllowed = false;
+    view.rerender(app());
+    back();
+    expect(screen.queryByTestId('home-conversation-transcript')).toBeNull();
+    expect(screen.getByTestId('find-work-unavailable')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('Houston');
+    state.driverAllowed = true;
+    view.rerender(app());
+    expect(transcript()).not.toContain('Houston');
+    expect(screen.getByTestId('home-conversation-input')).toHaveValue('');
+  });
+});
+
+/** Captures real provider leases so stale callbacks can be invoked directly. */
+const captured: { lease: WorkConversationDraftLease | null; store: WorkConversationDraftStore | null } = {
+  lease: null,
+  store: null,
+};
+function Capture() {
+  const store = useWorkConversationDraftStore();
+  captured.store = store;
+  return null;
+}
+function harness() {
+  return (
+    <WorkConversationDraftProvider>
+      <Capture />
+    </WorkConversationDraftProvider>
+  );
+}
+const snap = (text: string) =>
+  ({
+    version: 1,
+    state: { answers: {}, bubbles: [{ id: 999, role: 'driver', text }], skipped: [], current: null, confirming: false, reviewing: false },
+    history: [],
+    draft: text,
+    seedIgnored: false,
+  }) as unknown as ConversationDraftSnapshot;
+
+describe('Phase 3 epoch boundary: captured stale callbacks are rejected', () => {
+  it.each([
+    ['signed out → same A', () => { state.user = null; }],
+    ['A → B → A', () => { state.user = { id: 'driver-b' }; }],
+    ['acting → same A', () => { state.acting = true; }],
+    ['managed loading → same A', () => { state.actingLoading = true; }],
+    ['session mismatch → same A', () => { state.sessionUser = 'driver-x'; }],
+  ])('%s', (_label, invalidate) => {
+    const view = render(harness());
+    const stale = captured.store!.lease('driver-a')!;
+    expect(stale.write('fp', snap('A private'))).toBe(true);
+    expect(stale.read('fp')?.draft).toBe('A private');
+
+    invalidate();
+    view.rerender(harness());
+    state.user = { id: 'driver-a' };
+    state.acting = false;
+    state.actingLoading = false;
+    state.sessionUser = undefined;
+    view.rerender(harness());
+
+    // Same owner valid again: the old lease is still dead.
+    expect(stale.write('fp', snap('stale resurrect'))).toBe(false);
+    expect(stale.read('fp')).toBeNull();
+    const fresh = captured.store!.lease('driver-a')!;
+    expect(fresh.read('fp')).toBeNull(); // no resurrection of A private / stale write
+    expect(fresh.write('fp', snap('fresh'))).toBe(true);
+    expect(fresh.read('fp')?.draft).toBe('fresh');
+    expect(stale.read('fp')).toBeNull();
+  });
+
+  it('driver-gate clear retires captured leases while a fresh lease can write', () => {
+    render(harness());
+    const stale = captured.store!.lease('driver-a')!;
+    stale.write('fp', snap('before revoke'));
+    captured.store!.clear(); // what the wrapper calls on a definitive invalid gate
+    expect(stale.write('fp', snap('after revoke'))).toBe(false);
+    const fresh = captured.store!.lease('driver-a')!;
+    expect(fresh.read('fp')).toBeNull();
+    expect(fresh.write('fp', snap('fresh'))).toBe(true);
+    expect(fresh.read('fp')?.draft).toBe('fresh');
+  });
+
+  it('ordinary re-lease in the same epoch still reads the retained draft (route navigation)', () => {
+    render(harness());
+    captured.store!.lease('driver-a')!.write('fp', snap('kept'));
+    expect(captured.store!.lease('driver-a')!.read('fp')?.draft).toBe('kept');
+    expect(captured.store!.lease('driver-b')).toBeNull();
+  });
+
+  it('a real mounted flow from an earlier epoch cannot write after A → signed out → A', () => {
+    const view = render(app());
+    buildProgress();
+    away();
+    state.user = null;
+    view.rerender(app());
+    state.user = { id: 'driver-a' };
+    view.rerender(app());
+    back();
     expect(transcript()).not.toContain('Houston');
     expect(screen.getByTestId('home-conversation-input')).toHaveValue('');
   });
