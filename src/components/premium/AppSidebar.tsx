@@ -1,4 +1,4 @@
-import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight, ReceiptText, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Truck, Receipt, Fuel, FileText, Settings as SettingsIcon, BriefcaseBusiness, Handshake, Users, ClipboardList, FileSignature, BarChart3, ArrowLeftRight, ReceiptText, MessageSquare, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { UserRole } from '@/hooks/useUserRole';
 import {
@@ -40,6 +40,7 @@ const driverItems: NavItem[] = [
   { id: 'nav:find-work', label: 'Talk to HaulTracker', icon: MessageSquare, href: '/find-work' },
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
   { id: 'nav:conversations', label: 'Conversations', icon: MessageSquare, href: '/conversations?workspace=driver' },
+  { id: 'nav:ai-assistant', label: 'AI assistant', icon: Sparkles, href: '/ai-assistant' },
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'fuel', label: 'Fuel', icon: Fuel },
@@ -57,6 +58,7 @@ const recruiterActiveItems: NavItem[] = [
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
   { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },
   { id: 'nav:conversations', label: 'Conversations', icon: MessageSquare, href: '/conversations?workspace=recruiter' },
+  { id: 'nav:ai-assistant', label: 'AI assistant', icon: Sparkles, href: '/ai-assistant' },
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
   { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },

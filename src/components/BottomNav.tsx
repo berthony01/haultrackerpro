@@ -20,6 +20,7 @@ import {
   ArrowLeftRight,
   ReceiptText,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sheet,
@@ -130,6 +131,7 @@ export function BottomNav(props: BottomNavProps) {
   const driverMoreItemsFull: MoreItem[] = [
     { label: 'Talk to HaulTracker', icon: MessageSquare, onClick: () => goHref('/find-work') },
     { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=driver') },
+    { label: 'AI assistant', icon: Sparkles, onClick: () => goHref('/ai-assistant'), description: 'Ask about your own workspace records.' },
     { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
     { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Review, approve, request changes, sign.' },
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
@@ -163,6 +165,7 @@ export function BottomNav(props: BottomNavProps) {
 
   const recruiterActiveMoreItems: MoreItem[] = [
     { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=recruiter') },
+    { label: 'AI assistant', icon: Sparkles, onClick: () => goHref('/ai-assistant'), description: 'Ask about your own workspace records.' },
     { label: 'Recruiter Command Center', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },

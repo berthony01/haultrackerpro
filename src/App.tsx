@@ -10,6 +10,7 @@ import { useAdmin } from "@/hooks/useAdmin";
 import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
 import { ActingContextProvider } from "@/hooks/useActingContext";
 import { WorkConversationDraftProvider } from "@/components/home/WorkConversationDraftProvider";
+import { AiAssistantProvider } from "@/hooks/useAiAssistant";
 import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
 import { PendingDelegationBanner } from "@/components/agency/PendingDelegationBanner";
 import { OwnerQaModeBanner } from "@/components/admin/OwnerQaModeBanner";
@@ -46,6 +47,7 @@ function lazyWithRetry<T extends React.ComponentType<any>>(
 
 // Everything else — lazy loaded
 const Conversations = lazyWithRetry(() => import("./pages/Conversations"), "Conversations");
+const AiAssistant = lazyWithRetry(() => import("./pages/AiAssistant"), "AiAssistant");
 const Index = lazyWithRetry(() => import("./pages/Index"), "Index");
 const Terms = lazy(() => import("./pages/Terms"));
 const Privacy = lazy(() => import("./pages/Privacy"));
@@ -213,6 +215,7 @@ const App = () => (
           <AuthProvider>
             <ActingContextProvider>
             <WorkConversationDraftProvider>
+            <AiAssistantProvider>
             <PageViewTracker />
             <RoleIntentReconcilerMount />
             <OwnerQaModeBanner />
@@ -316,6 +319,7 @@ const App = () => (
               <Route path="/recruiter/invite/:token" element={<RecruiterInviteAccept />} />
               <Route path="/professional-profile" element={<ProtectedRoute><ProfessionalProfile /></ProtectedRoute>} />
               <Route path="/assistant" element={<ProtectedRoute><AssistantDashboard /></ProtectedRoute>} />
+              <Route path="/ai-assistant" element={<ProtectedRoute><AiAssistant /></ProtectedRoute>} />
               <Route path="/assistant/invite/:token" element={<AssistantInviteAccept />} />
               <Route path="/assistant/settings" element={<ProtectedRoute><AssistantLimitedSettings /></ProtectedRoute>} />
               <Route path="/agency" element={<ProtectedRoute><AgencyDashboard /></ProtectedRoute>} />
@@ -329,6 +333,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+            </AiAssistantProvider>
             </WorkConversationDraftProvider>
             </ActingContextProvider>
           </AuthProvider>

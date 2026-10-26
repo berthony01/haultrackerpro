@@ -121,6 +121,9 @@ export default function AgencyDashboard() {
           <Button variant="outline" size="sm" onClick={() => navigate('/start')}>
             Switch Workspace
           </Button>
+          <Button variant="outline" size="sm" data-testid="agency-ai-assistant-link" onClick={() => navigate('/ai-assistant')}>
+            AI assistant
+          </Button>
         </div>
       </header>
 
