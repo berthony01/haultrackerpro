@@ -114,7 +114,7 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     const section = screen.getByTestId('my-trucking-section');
     expect(within(section).queryByRole('img')).not.toBeInTheDocument();
     expect(section).toHaveTextContent('Find your next opportunity. Keep your numbers in view.');
-    fireEvent.click(within(section).getByTestId('my-trucking-cta'));
+    fireEvent.click(within(within(section).getByTestId('my-trucking-cta')).getByRole('button'));
     expect(navigateSpy).toHaveBeenLastCalledWith('/auth?intent=driver');
   });
 
