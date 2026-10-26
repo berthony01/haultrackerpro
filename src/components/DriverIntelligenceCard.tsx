@@ -3,9 +3,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Trophy, Flame, TrendingUp, MapPin, Lock } from 'lucide-react';
-import { useDriverPoints, tierFor, mockPercentile, nextTierProgress } from '@/hooks/useDriverPoints';
+import { useDriverPoints, tierFor, nextTierProgress } from '@/hooks/useDriverPoints';
 import { useMyLeaderboardRank } from '@/hooks/useDriverLeaderboard';
-import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { ProUpgradeModal } from '@/components/ProUpgradeModal';
 
@@ -14,7 +13,6 @@ interface DriverIntelligenceCardProps {
 }
 
 export function DriverIntelligenceCard({ isPro }: DriverIntelligenceCardProps) {
-  const { user } = useAuth();
   const { data: points } = useDriverPoints();
   const { me, top, rows } = useMyLeaderboardRank(50);
   const navigate = useNavigate();
@@ -29,7 +27,6 @@ export function DriverIntelligenceCard({ isPro }: DriverIntelligenceCardProps) {
   const bestDate = points?.best_weekly_period_start ?? null;
   const tier = tierFor(total);
   const nextTier = nextTierProgress(total);
-  const percentile = mockPercentile(user?.id, total);
 
   // Rank chase line — competitive pull on every dashboard visit.
   let chaseLine: string | null = null;
@@ -74,10 +71,13 @@ export function DriverIntelligenceCard({ isPro }: DriverIntelligenceCardProps) {
               <div className="flex items-center gap-2">
                 <Trophy className={`h-4 w-4 ${tier.color}`} />
                 <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                  Driver Intelligence
+                  Activity &amp; Rewards
                 </p>
                 {!hasAccess && <Lock className="h-3 w-3 text-muted-foreground" />}
               </div>
+              <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                Points from app activity, logging and parking contributions. Separate from your operating score.
+              </p>
               <div className="mt-1 flex items-baseline gap-2 flex-wrap">
                 <span className="text-2xl font-black font-heading">{total}</span>
                 <Badge variant="outline" className={`${tier.color} border-current/30`}>
@@ -98,7 +98,6 @@ export function DriverIntelligenceCard({ isPro }: DriverIntelligenceCardProps) {
                 <span className="flex items-center gap-1 text-success">
                   <TrendingUp className="h-3 w-3" />+{weekly} this week
                 </span>
-                <span>Ahead of {percentile}% of drivers</span>
                 {me && <span>Your rank: <span className="font-bold text-foreground">#{me.rank}</span></span>}
                 {top && <span>Top: <span className="font-bold text-foreground">{top.weekly_points}p</span></span>}
               </div>
