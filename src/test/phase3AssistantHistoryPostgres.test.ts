@@ -8,7 +8,8 @@ import { PGlite } from '@electric-sql/pglite';
 const ROOT = process.cwd();
 const CANDIDATE = 'supabase/migration-candidates/20261026165204_phase3_assistant_history_foundation.sql';
 const MIG = 'supabase/migrations/';
-// Latest accepted definitions for each dependency. Exact body extraction, no edits.
+// Accepted definitions matched by the architect's independent live-body comparison.
+// Keep each helper at its matching source; exact body extraction, no body edits.
 const SOURCES: [string, string[]][] = [
  ['20260228060534_e148b76a-288a-4273-a42b-f9d95f9bfb0e.sql', ['is_admin','is_super_admin']],
  ['20260630002954_a8c350ea-94e2-4f9b-8107-58a921dbe35b.sql', ['_agency_plan_defaults']],
@@ -17,7 +18,8 @@ const SOURCES: [string, string[]][] = [
  ['20260821003749_bfa5a325-8fcb-4a8b-b4e5-e6109e459fcb.sql', ['_owner_qa_persona_for','effective_recruiter_tier']],
  ['20260821062449_7c014ba4-370b-4eb8-afe0-f71de5785e43.sql', ['is_qa_fixture_root']],
  ['20260821062812_14e13b55-7f8b-4dac-8b3b-a9a5b68f761b.sql', ['driver_has_active_pro','get_effective_agency_limits','_agency_member_paid_operational_authority']],
- ['20260816140000_phase_rc1j_b_recruiter_team_seat_entitlement.sql', ['recruiter_team_seat_limit','recruiter_team_occupied_seats','recruiter_team_workspace_within_limit','current_user_has_recruiter_permission']],
+ ['20260816140000_phase_rc1j_b_recruiter_team_seat_entitlement.sql', ['recruiter_team_occupied_seats','recruiter_team_workspace_within_limit','current_user_has_recruiter_permission']],
+ ['20260823033200_c81f5635-9733-4f6b-8f7d-33eff1a08390.sql', ['recruiter_team_seat_limit']],
  ['20260816220000_phase_am1a_agency_member_identity_seat_delegation_lifecycle_hardening.sql', ['agency_team_occupied_seats','agency_team_workspace_within_limit','_agency_delegation_operationally_active','assistant_has_permission']],
  ['20260817033000_phase_am1b_agency_workspace_permission_contract.sql', ['current_user_has_agency_permission']],
 ];
@@ -69,12 +71,31 @@ async function expired(thread:string, when="statement_timestamp()") {
  try { await db.query(`UPDATE public.assistant_threads SET created_at=(${when})-interval '720 hours', expires_at=(${when}) WHERE id=$1`,[thread]); }
  finally { await db.exec('ALTER TABLE public.assistant_threads ENABLE TRIGGER assistant_thread_guard'); }
 }
+async function registeredRecruiterQa() {
+ // A is the distinct canonical owner with real active starter billing and
+ // recruiter capability. ADMIN is an explicitly permissioned non-owner; with
+ // STAFF, occupied seats are 3: above actual starter 2, within QA growth 5.
+ await db.exec(`
+  INSERT INTO public.admin_users VALUES('${ADMIN}','super_admin');
+  INSERT INTO public.recruiter_members(recruiter_id,member_user_id,role,status,permissions)
+   VALUES('${RECRUITER}','${ADMIN}','recruiter_staff','active','{"opportunities_view":true}');
+  INSERT INTO public.qa_fixture_roots(root_kind,root_id,qa_owner_user_id,registered_by_user_id)
+   VALUES('recruiter_profile','${RECRUITER}','${ADMIN}','${ADMIN}');
+  INSERT INTO public.owner_qa_sessions(user_id,domain,persona,expires_at)
+   VALUES('${ADMIN}','recruiter','growth',now()+interval '1 hour');
+ `);
+}
 
 beforeAll(async()=>{
  db=new PGlite(); await db.exec(read('src/test/fixtures/phase3AssistantCanonical.sql'));
  for (const [path,names] of SOURCES) {
   const sql=read(MIG+path);
-  for (const name of names) await db.exec(exactFunction(sql,name));
+  for (const name of names) {
+   // Negative control substitutes only extracted input in memory, never files.
+   const source = name==='recruiter_team_seat_limit' && process.env.PHASE3_NEGATIVE_CONTROL==='seat'
+    ? read(MIG+'20260816140000_phase_rc1j_b_recruiter_team_seat_entitlement.sql') : sql;
+   await db.exec(exactFunction(source,name));
+  }
  }
  // Match canonical internal EXECUTE boundaries. Do not give authenticated the
  // internal driver/tier/seat/QA helpers merely to make the fixture pass.
@@ -218,6 +239,47 @@ describe('Phase3 source candidate: actual roles, canonical authorization and pri
   await db.exec(`INSERT INTO public.recruiter_members(recruiter_id,member_user_id,role,status) VALUES('${RECRUITER}','${OTHER}','recruiter_staff','active')`);
   await denied(STAFF,'recruiter',RECRUITER,['opportunities_view']); await create(A,'recruiter',RECRUITER,['opportunities_view']);
  });
+ it('registered Owner QA growth permits explicitly permissioned non-owner over actual starter seats with private history',async()=>{
+  await registeredRecruiterQa();
+  expect(await q('SELECT public.recruiter_team_occupied_seats($1) seats',[RECRUITER])).toEqual([{seats:3}]);
+  // Genuine authenticated candidate RPC and RLS, not bootstrap authorization.
+  const t=await create(ADMIN,'recruiter',RECRUITER,['opportunities_view']); await add(ADMIN,t.thread_id);
+  expect(await visible(ADMIN,t.thread_id)).toHaveLength(1);
+  expect(await visible(A,t.thread_id)).toHaveLength(0);
+  expect(await as(A,'SELECT id FROM public.assistant_messages WHERE thread_id=$1',[t.thread_id])).toHaveLength(0);
+  await expect(add(A,t.thread_id)).rejects.toMatchObject({code:'42501'});
+  const owner=await create(A,'recruiter',RECRUITER,['opportunities_view']); await add(A,owner.thread_id);
+  expect(await visible(ADMIN,owner.thread_id)).toHaveLength(0);
+  expect(await as(ADMIN,'SELECT id FROM public.assistant_messages WHERE thread_id=$1',[owner.thread_id])).toHaveLength(0);
+  await expect(add(ADMIN,owner.thread_id)).rejects.toMatchObject({code:'42501'});
+  // Same workspace, but STAFF has no matching registered QA ownership/persona.
+  await denied(STAFF,'recruiter',RECRUITER,['opportunities_view']);
+ });
+ it.each([
+  ['registration removed', 'DELETE FROM public.qa_fixture_roots'],
+  ['different QA root owner', `UPDATE public.qa_fixture_roots SET qa_owner_user_id='${OTHER}'`],
+  ['root inactive and revoked', 'UPDATE public.qa_fixture_roots SET active=false,revoked_at=now()'],
+  ['persona disabled', 'UPDATE public.owner_qa_sessions SET enabled=false'],
+  ['persona expired', "UPDATE public.owner_qa_sessions SET created_at=now()-interval '2 hours',expires_at=now()-interval '1 hour'"],
+  ['persona removed', 'DELETE FROM public.owner_qa_sessions'],
+  ['wrong persona domain', "UPDATE public.owner_qa_sessions SET domain='driver',persona='pro_monthly'"],
+  ['membership revoked', `UPDATE public.recruiter_members SET status='revoked' WHERE member_user_id='${ADMIN}'`],
+  ['permission removed', `UPDATE public.recruiter_members SET permissions='{}' WHERE member_user_id='${ADMIN}'`],
+  ['owner capability revoked', `UPDATE public.user_capabilities SET status='revoked' WHERE user_id='${A}' AND capability='recruiter'`],
+  ['real owner billing removed', `DELETE FROM public.recruiter_billing_profiles WHERE recruiter_id='${RECRUITER}'`],
+ ])('registered recruiter QA %s fails closed on create, RLS and append',async(_label,sql)=>{
+  await registeredRecruiterQa(); const t=await create(ADMIN,'recruiter',RECRUITER,['opportunities_view']); await add(ADMIN,t.thread_id);
+  await db.exec(sql);
+  await denied(ADMIN,'recruiter',RECRUITER,['opportunities_view']);
+  expect(await visible(ADMIN,t.thread_id)).toHaveLength(0);
+  expect(await as(ADMIN,'SELECT id FROM public.assistant_messages WHERE thread_id=$1',[t.thread_id])).toHaveLength(0);
+  await expect(add(ADMIN,t.thread_id,uid(902))).rejects.toMatchObject({code:'42501'});
+  expect(await q('SELECT id FROM public.assistant_messages')).toHaveLength(1);
+ });
+ it('non-superadmin registered recruiter persona never grants the seat overlay',async()=>{
+  await registeredRecruiterQa(); await db.exec('DELETE FROM public.admin_users');
+  await denied(ADMIN,'recruiter',RECRUITER,['opportunities_view']);
+ });
  it('recruiter pending unexpired seat counts but expired pending does not',async()=>{
   await db.exec(`INSERT INTO public.recruiter_members(recruiter_id,role,status,invite_token_hash,invite_expires_at) VALUES('${RECRUITER}','recruiter_staff','pending','synthetic-token',now()+interval '1 hour')`);
   await denied(STAFF,'recruiter',RECRUITER,['opportunities_view']);
@@ -305,6 +367,7 @@ describe('Phase3 source candidate: actual roles, canonical authorization and pri
  it('internal helper grants remain unavailable to authenticated',async()=>{
   await expect(as(A,'SELECT public.driver_has_active_pro($1)',[A])).rejects.toMatchObject({code:'42501'});
   await expect(as(A,'SELECT public.effective_recruiter_tier($1)',[RECRUITER])).rejects.toMatchObject({code:'42501'});
+  await expect(as(A,'SELECT public.recruiter_team_seat_limit($1)',[RECRUITER])).rejects.toMatchObject({code:'42501'});
   await expect(as(A,'SELECT public._assistant_permissions_valid($1,$2::text[])',['driver_self',['manage_loads']])).rejects.toMatchObject({code:'42501'});
  });
  it('fixed expiry exactly 720 hours and messages never extend it',async()=>{

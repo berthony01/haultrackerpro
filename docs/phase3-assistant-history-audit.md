@@ -31,7 +31,9 @@ The following live findings were supplied by ChatGPT's prior independent read-on
 - `profiles_user_id_key` is UNIQUE(user_id); `profiles_user_id_fkey` cascades from auth deletion. Users have own SELECT/INSERT/UPDATE policies, no DELETE policy. Existing `finalize_my_account_data_deletion()` deletes the own profile within its authenticated cleanup transaction (architect-inspected line 108), then the edge adapter deletes auth last. The candidate cascades history at profile deletion, with auth deletion independently cascading through the profile. Missing profile creation fails closed; replacement begins empty. This is a claim only about new history, not unrelated retained records. No deletion/auth code changed; the entire deletion adapter was not executed in this run.
 - Deployed Edge Function retrieval previously returned `INVALID_ARGUMENT`; do not infer source/deployed parity. Provider retention/training terms were not verified. Changelog retrieval had unsupported content type; no SDK change was required.
 
-Repository helper bodies used for local tests match the authoritative accepted source paths listed in the suite. No discrepancy with the supplied live findings was found, but byte-for-byte live helper parity was not independently fetched in this run.
+Historical checkpoint correction: the original suite incorrectly loaded `recruiter_team_seat_limit` from `20260816140000_phase_rc1j_b_recruiter_team_seat_entitlement.sql`. That older body lacks the registered-root Owner QA overlay; the original blanket provenance claim was therefore incorrect. The architect independently fetched live `pg_get_functiondef` bodies and normalized them against accepted migration bodies: this helper differed, while 18 other fetched canonical helper bodies matched their selected sources. `_agency_plan_defaults` was separately fetched and matched its simple CASE defaults (2/5/15 member seats). This implementation did not repeat hosted inspection.
+
+The corrected suite extracts `recruiter_team_seat_limit` exactly from `20260823033200_c81f5635-9733-4f6b-8f7d-33eff1a08390.sql`, matching the independently accepted live definition. The other Aug16 seat/accounting/permission helpers remain at their independently matching source; extraction does not rewrite any function body. Normalized body equality is not full hosted runtime proof: deployed grants, schemas, policies, callers, transaction behavior and network/Auth execution are not reproduced by that comparison.
 
 ## Approved decisions and schema
 
@@ -90,9 +92,27 @@ Final focused command:
 node_modules/.bin/vitest run src/test/phase3AssistantHistoryPostgres.test.ts src/test/workConversationContinuity.test.tsx src/test/authenticatedWorkChat.test.tsx
 ```
 
-Result: **210/210**, three suites: new SQL 120, unchanged continuity 22, unchanged authenticatedWorkChat 68. Coverage includes valid paid plans, missing/free/invalid plans, absent/anon identity, foreign actor/target, additive scope denial, all tested revoked/setup/suspended cases, exact delegation and staff domains, seats, owner inclusion/conflict, private cross-actor RLS, direct CRUD/forged assistant denial, internal ACL denial, exact expiry, idempotence/conflict, profile and auth cascade, user delete/clear after authority loss, service-only expired purge and no row leakage on rejected create/append.
+Historical pre-correction result: **210/210**, three suites: SQL 120, unchanged continuity 22, unchanged authenticatedWorkChat 68. This total predates the distinguishing registered-root seat coverage and does not prove current-helper parity. Coverage includes valid paid plans, missing/free/invalid plans, absent/anon identity, foreign actor/target, additive scope denial, all tested revoked/setup/suspended cases, exact delegation and staff domains, seats, owner inclusion/conflict, private cross-actor RLS, direct CRUD/forged assistant denial, internal ACL denial, exact expiry, idempotence/conflict, profile and auth cascade, user delete/clear after authority loss, service-only expired purge and no row leakage on rejected create/append.
 
 Existing Router future and Select controlled/uncontrolled warnings remain in the unchanged UI suites. No manual build/typecheck was run; automatic platform build reported build OK after the harness typing correction. Final diff check and exact checkpoint/path report are supplied in the completion report.
+
+## Independent-review correction checkpoint
+
+Starting HEAD: `c917a28974f9c028e5eb798d25793e79bea4fe94`, clean, with zero diff from underlying candidate checkpoint `1d225b97a008d915d417bd506a871bcecf9118da`. No prior agent/test process was observed. Only `src/test/phase3AssistantHistoryPostgres.test.ts` and this audit changed; the foundation doc needs no count correction. Candidate SQL, canonical fixture, runtime, grants in source migrations and all other files remain unchanged. No new files or hosted activity.
+
+Thirteen additional actual candidate/RLS cases cover a super_admin authenticated actor who is an explicitly permissioned NON-OWNER recruiter member. The distinct canonical owner has active recruiter capability and real active starter billing. Occupied seats are 3 (actual starter permits 2; registered growth persona permits 5). The QA root is registered to the actor, active and unrevoked; the actor has an active matching recruiter-domain growth persona. Candidate creation, append and own RLS succeed; canonical-owner and QA-actor histories remain mutually private, including message reads and rejected cross-actor append. Other staff cannot borrow the actor's overlay. Admin status is never data access.
+
+Separate cases remove registration, change root ownership, inactivate/revoke the root together (the fixture's real CHECK requires both), disable/expire/remove the persona, switch its domain, revoke membership, remove the exact permission, revoke canonical-owner capability or remove real owner billing. Each first creates authorized history, then proves new create denied with no new thread, RLS hides thread/messages, append denies with no new message. A non-superadmin with the same registration/persona/membership is denied. Authenticated EXECUTE on the internal seat helper remains denied; no helper grant was widened. No fixture column/constraint change was necessary.
+
+Old-helper negative control:
+
+```text
+PHASE3_NEGATIVE_CONTROL=seat node_modules/.bin/vitest run src/test/phase3AssistantHistoryPostgres.test.ts -t 'registered Owner QA growth permits'
+```
+
+Only the canonical extraction input is substituted in memory with the Aug16 body. Result: **1 failed / 132 skipped (133)**, `Not authorized` at the distinguishing valid candidate create. No file mutation/restoration was needed; the normal extraction still selects Aug23. Existing actor/scope negative-control branches and protections are retained.
+
+Final focused command (same three suites as above): **223/223**, SQL **133**, continuity **22**, authenticatedWorkChat **68**. Automatic build reported OK after the test edit; no manual build/typecheck. This is corrected local source-candidate evidence only, not Phase 3 PASS, activation or production acceptance. Source hashes, exact diff and final repository state are reported at completion.
 
 ## Release gates and limits
 
