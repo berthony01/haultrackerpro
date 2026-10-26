@@ -219,7 +219,7 @@ describe('HJ-2D private publication/discovery safety switch (default OFF)',()=>{
  });
  it('no client-callable function can flip the switch',async()=>{
   const fns=(await db.query("SELECT p.oid::regprocedure::text AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','job_search_private') AND p.prokind='f' AND pg_get_functiondef(p.oid) ILIKE '%job_search_feature_control%' ORDER BY 1")).rows.map(r=>r.sig);
-  // Only the private manager reads it (FOR SHARE); none writes it.
+  // Only the private manager reads it (FOR NO KEY UPDATE); none writes it.
   for(const sig of fns) expect((await db.query('SELECT pg_get_functiondef($1::regprocedure) AS d',[sig])).rows[0].d).not.toMatch(/UPDATE\s+job_search_private\.job_search_feature_control|INSERT\s+INTO\s+job_search_private\.job_search_feature_control|DELETE\s+FROM\s+job_search_private\.job_search_feature_control/i);
   expect(fns).toContain('job_search_private.manage_my_job_search_card(text,jsonb,integer,uuid,text)');
  });
@@ -266,7 +266,7 @@ describe('HJ-2D switch OFF serialization with REAL concurrent sessions',()=>{
  it('operator OFF waits for the in-flight FOR NO KEY UPDATE publish; later cross-owner publishes queue BEHIND the pending OFF and are denied; no deadlock',async()=>{
   const [inflight,operator,q1,q2]=await clients(4);let off:Promise<unknown>|undefined;const queued:Promise<unknown>[]=[];
   const waiting=async(pid:number)=>(await db.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[pid])).rowCount===1;
-  const snapshot=async()=>(await db.query('SELECT (SELECT jsonb_agg(c ORDER BY id) FROM public.user_capabilities c) caps,(SELECT jsonb_agg(p) FROM public.driver_opportunity_profiles p) profiles,(SELECT jsonb_agg(s) FROM public.existing_surface_sentinel s) sentinel')).rows[0];
+  const snapshot=async()=>(await db.query('SELECT (SELECT jsonb_agg(c ORDER BY user_id,capability) FROM public.user_capabilities c) caps,(SELECT jsonb_agg(p) FROM public.driver_opportunity_profiles p) profiles,(SELECT jsonb_agg(s) FROM public.existing_surface_sentinel s) sentinel')).rows[0];
   const untouched=await snapshot();
   try{
    await inflight.query('BEGIN');await inflight.query('SET LOCAL ROLE authenticated');await inflight.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users.driver]);
