@@ -290,7 +290,8 @@ describe('AI assistant review corrections', () => {
         : ok(boot([{ scope: 'driver_delegate', targetId: D, label: 'Dana', tools: ['loads'] }], { nextOffset: null }));
     });
     render(<App />);
-    await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Continue searching' })); });
+    const continueSearch = await screen.findByRole('button', { name: 'Continue searching' });
+    await act(async () => { fireEvent.click(continueSearch); });
     expect(await screen.findByText(/The search could not continue right now/)).toBeInTheDocument();
     expect(screen.queryByText('The AI assistant is not available for this driver.')).toBeNull();
     expect(sendBtn()).toBeDisabled();
@@ -307,7 +308,8 @@ describe('AI assistant review corrections', () => {
     const pending = deferred<any>();
     transport.bootstrap.mockImplementation((offset = 0) => offset === 1000 ? pending.p : ok(boot([driverCtx()], { nextOffset: offset + 50 })));
     const { rerender } = render(<App />);
-    await act(async () => { fireEvent.click(await screen.findByRole('button', { name: 'Continue searching' })); });
+    const continueSearch = await screen.findByRole('button', { name: 'Continue searching' });
+    await act(async () => { fireEvent.click(continueSearch); });
     expect(transport.bootstrap).toHaveBeenLastCalledWith(1000);
     signIn(B, S2);
     transport.bootstrap.mockImplementation(() => ok(boot([{ scope: 'driver_delegate', targetId: D, label: 'New identity workspace', tools: ['loads'] }], { nextOffset: null })));
