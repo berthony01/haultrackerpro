@@ -294,11 +294,8 @@ describe('actual Index settled dashboard integration', () => {
     state.loads = [{ id: 'existing' }]; render(tree(<Index />));
     expect(await screen.findByTestId('home-conversation-surface')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: 'Loads' })[0]);
-    console.log('DEBUG after Loads click:', {
-      dashboard: !!screen.queryByTestId('existing-dashboard'),
-      chat: !!screen.queryByTestId('home-conversation-surface'),
-      loadsButtons: screen.getAllByRole('button', { name: 'Loads' }).map((b) => (b as HTMLButtonElement).disabled + '|' + b.parentElement?.className?.slice(0, 60)),
-    });
+    // The lazy chat chunk resolving can delay the page-swap commit; wait for it.
+    await waitFor(() => expect(screen.queryByTestId('existing-dashboard')).toBeNull());
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
   });
 });
