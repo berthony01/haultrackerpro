@@ -28,6 +28,11 @@ export interface AiAssistantState {
   contextsLoading: boolean;
   /** Pages searched so far while looking for an explicit managed target. */
   contextsSearchPages: number;
+  /** Pinned-target search continuation: set only when the target is not found yet AND the
+   *  backend reported more pages. Not an ineligibility claim. */
+  pinSearchOffset: number | null;
+  pinSearchLoading: boolean;
+  pinSearchFailed: boolean;
   contextKey: string | null;
   threads: AssistantThread[];
   threadsCursor: Cursor | null;
@@ -45,13 +50,13 @@ export interface AiAssistantState {
 
 const initial = (): AiAssistantState => ({
   availability: 'idle', generationEnabled: false, retentionDays: null, maxChars: 2000, contexts: [],
-  contextsNextOffset: null, contextsLoading: false, contextsSearchPages: 0, contextKey: null,
+  contextsNextOffset: null, contextsLoading: false, contextsSearchPages: 0, pinSearchOffset: null, pinSearchLoading: false, pinSearchFailed: false, contextKey: null,
   threads: [], threadsCursor: null, threadsLoading: false, threadId: null, messages: [], messagesCursor: null,
   messagesLoading: false, lastChange: 'replace', draft: '', sending: false, notice: null,
 });
 
 export const contextKeyOf = (c: { scope: string; targetId: string }) => `${c.scope}:${c.targetId}`;
-/** Max sequential context pages searched for a pinned managed target (50 per page). */
+/** Max sequential context pages searched for a pinned managed target per operation (50 per page). */
 export const MAX_PIN_SEARCH_PAGES = 20;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -90,6 +95,7 @@ export interface AiAssistantApi {
   visibleThreads: AssistantThread[];
   ensureLoaded(): void;
   loadMoreContexts(): void;
+  continuePinnedSearch(): void;
   selectContext(key: string): void;
   newConversation(): void;
   openThread(id: string): void;
@@ -174,7 +180,37 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
       });
     };
 
+    /** Up to maxPages sequential pages from offset. Returns null if identity changed.
+     *  offset is the continuation when more pages remain (or the failed page offset). */
+    const searchPinned = async (t: Tok, p: string, offset: number | null, maxPages: number, startPages: number) => {
+      let off = offset; let pages = 0; let found: AssistantContext | null = null;
+      while (!found && off !== null && pages < maxPages) {
+        const r = await assistantApi.bootstrap(off);
+        if (!live(t)) return null;
+        if (!r.ok || !r.data || r.data.available !== true) return { found: null, offset: off, failed: true };
+        pages += 1; patch({ contextsSearchPages: startPages + pages });
+        found = (r.data.contexts ?? []).find((c) => c.scope === 'driver_delegate' && c.targetId === p) ?? null;
+        off = typeof r.data.nextOffset === 'number' ? r.data.nextOffset : null;
+      }
+      return { found, offset: found ? null : off, failed: false };
+    };
+
     return {
+      continuePinnedSearch() {
+        const t = token(); const p = pinned(); const off = s().pinSearchOffset;
+        if (!live(t) || !p || off === null || s().pinSearchLoading || s().availability !== 'ready') return;
+        patch({ pinSearchLoading: true, pinSearchFailed: false, notice: null });
+        void (async () => {
+          const res = await searchPinned(t, p, off, MAX_PIN_SEARCH_PAGES, s().contextsSearchPages);
+          if (!res || !live(t)) return;
+          if (res.found) {
+            patch({ pinSearchLoading: false, pinSearchOffset: null, contexts: [res.found], contextKey: contextKeyOf(res.found) });
+            void loadThreads(false);
+            return;
+          }
+          patch({ pinSearchLoading: false, pinSearchOffset: res.offset, pinSearchFailed: res.failed, notice: res.failed ? 'unavailable' : null });
+        })();
+      },
       ensureLoaded() {
         const t = token();
         if (!live(t) || s().availability !== 'idle') return;
@@ -187,21 +223,16 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
           const first = r.data;
           let contexts: AssistantContext[];
           let nextOffset: number | null = typeof first.nextOffset === 'number' ? first.nextOffset : null;
+          let pinOffset: number | null = null; let pinFailed = false;
           if (p) {
             // Bounded sequential discovery of the explicit managed target only. Personal and
             // other contexts are never shown while acting.
-            let found = (first.contexts ?? []).find((c) => c.scope === 'driver_delegate' && c.targetId === p) ?? null;
-            let pages = 1;
-            patch({ contextsSearchPages: pages });
-            while (!found && nextOffset !== null && pages < MAX_PIN_SEARCH_PAGES) {
-              r = await assistantApi.bootstrap(nextOffset);
-              if (!live(t)) return;
-              if (!r.ok || !r.data || r.data.available !== true) { patch({ availability: 'unavailable' }); return; }
-              pages += 1; patch({ contextsSearchPages: pages });
-              found = (r.data.contexts ?? []).find((c) => c.scope === 'driver_delegate' && c.targetId === p) ?? null;
-              nextOffset = typeof r.data.nextOffset === 'number' ? r.data.nextOffset : null;
-            }
-            contexts = found ? [found] : [];
+            const found0 = (first.contexts ?? []).find((c) => c.scope === 'driver_delegate' && c.targetId === p) ?? null;
+            patch({ contextsSearchPages: 1 });
+            const res = found0 ? { found: found0, offset: null, failed: false } : await searchPinned(t, p, nextOffset, MAX_PIN_SEARCH_PAGES - 1, 1);
+            if (!res) return;
+            contexts = res.found ? [res.found] : [];
+            pinOffset = res.found ? null : res.offset; pinFailed = res.failed;
             nextOffset = null;
           } else {
             contexts = first.contexts ?? [];
@@ -209,7 +240,8 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
           patch({
             availability: 'ready', generationEnabled: first.generationEnabled === true,
             retentionDays: first.retentionDays === 30 ? 30 : null, maxChars: first.limits?.maxChars ?? 2000,
-            contexts, contextsNextOffset: nextOffset,
+            contexts, contextsNextOffset: nextOffset, pinSearchOffset: pinOffset, pinSearchFailed: pinFailed,
+            notice: pinFailed ? 'unavailable' : null,
             contextKey: s().contextKey ?? (contexts[0] ? contextKeyOf(contexts[0]) : null),
           });
           void loadThreads(false);
