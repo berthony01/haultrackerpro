@@ -96,7 +96,7 @@ describe('AI assistant page', () => {
   it('send creates thread on first message, renders text safely with server source cards, auto-scrolls transcript only', async () => {
     transport.send.mockImplementation(() => ok({ threadId: 'th-1', reply: reply('m2', '<img src=x onerror=alert(1)> answer', [{ key: 'loads', label: 'Your loads (most recent)', href: '/dashboard?page=loads' }]) }));
     render(<App />);
-    await screen.findByText(/most recent loads/);
+    await screen.findByText(/I can read your/);
     const t = screen.getByTestId('ai-transcript');
     Object.defineProperty(t, 'scrollHeight', { configurable: true, get: () => 900 });
     fireEvent.change(input(), { target: { value: 'What loads?' } });
@@ -112,7 +112,7 @@ describe('AI assistant page', () => {
   it('errors and limits keep the typed message and show plain explanations', async () => {
     transport.send.mockImplementation(() => Promise.resolve({ ok: false, status: 429, code: 'limit_daily' }));
     render(<App />);
-    await screen.findByText(/most recent loads/);
+    await screen.findByText(/I can read your/);
     fireEvent.change(input(), { target: { value: 'Retry me' } });
     await act(async () => { fireEvent.click(sendBtn()); });
     expect(await screen.findByRole('alert')).toHaveTextContent('limit');
@@ -122,7 +122,7 @@ describe('AI assistant page', () => {
   it('unsent draft and current thread survive navigation in the same tab', async () => {
     transport.send.mockImplementation(() => ok({ threadId: 'th-1', reply: reply('m2', 'Kept reply') }));
     render(<App />);
-    await screen.findByText(/most recent loads/);
+    await screen.findByText(/I can read your/);
     fireEvent.change(input(), { target: { value: 'First' } });
     await act(async () => { fireEvent.click(sendBtn()); });
     await screen.findByText('Kept reply');
@@ -173,7 +173,7 @@ describe('AI assistant page', () => {
     const pending = deferred<any>();
     transport.send.mockImplementation(() => pending.p);
     const { rerender } = render(<App />);
-    await screen.findByText(/most recent loads/);
+    await screen.findByText(/I can read your/);
     fireEvent.change(input(), { target: { value: 'A private question' } });
     await act(async () => { fireEvent.click(sendBtn()); });
     signIn(B); transport.bootstrap.mockImplementation(() => ok(boot([driverCtx(B)])));
@@ -189,7 +189,7 @@ describe('AI assistant page', () => {
     const pending = deferred<any>();
     transport.send.mockImplementation(() => pending.p);
     render(<App />);
-    await screen.findByText(/most recent loads/);
+    await screen.findByText(/I can read your/);
     fireEvent.change(input(), { target: { value: 'Driver question' } });
     await act(async () => { fireEvent.click(sendBtn()); });
     fireEvent.change(screen.getByLabelText('AI assistant workspace'), { target: { value: `recruiter:${recruiterCtx.targetId}` } });
@@ -216,7 +216,7 @@ describe('AI assistant page', () => {
   it('sign-out resets synchronously', async () => {
     transport.send.mockImplementation(() => ok({ threadId: 'th-1', reply: reply('m2', 'Secret reply') }));
     const { rerender } = render(<App />);
-    await screen.findByText(/most recent loads/);
+    await screen.findByText(/I can read your/);
     fireEvent.change(input(), { target: { value: 'Q' } });
     await act(async () => { fireEvent.click(sendBtn()); });
     await screen.findByText('Secret reply');
