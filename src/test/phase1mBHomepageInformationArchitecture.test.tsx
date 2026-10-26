@@ -36,16 +36,17 @@ function renderLanding() {
  * their dedicated routes — they are simply no longer competing with the hero.
  */
 describe('Phase 1M-B — Homepage information architecture', () => {
-  it('renders the connected-platform hero headline and keeps the platform tagline', () => {
+  it('renders the asymmetric hero headline and keeps the platform tagline', () => {
     renderLanding();
     const hero = screen.getByTestId('landing-hero');
     expect(
       within(hero).getByRole('heading', {
         level: 1,
-        name: 'Trucking work and business, connected.',
+        name: 'Find work. Run your business. Support the people who move it.',
       }),
     ).toBeInTheDocument();
     expect(hero).toHaveTextContent('The business platform behind every truck.');
+    expect(hero).toHaveTextContent('One platform. Three connected workspaces.');
   });
 
   it('contains none of the forbidden phrases anywhere on the page', () => {
@@ -80,13 +81,13 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     expect(navigateSpy).toHaveBeenLastCalledWith('/assistants-agencies');
   });
 
-  it('renders exactly the locked six-part hierarchy in order', () => {
+  it('renders exactly the locked hierarchy in order', () => {
     renderLanding();
     const order = [
       'landing-header',
       'landing-hero',
+      'hero-audience-paths',
       'how-it-works-section',
-      'my-trucking-section',
       'secondary-tools-section',
       'trust-section',
     ].map((id) => screen.getByTestId(id));
