@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAdmin } from "@/hooks/useAdmin";
 import { useRoleIntentReconciler } from "@/hooks/useRoleIntentReconciler";
 import { ActingContextProvider } from "@/hooks/useActingContext";
+import { WorkConversationDraftProvider } from "@/components/home/WorkConversationDraftProvider";
 import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
 import { PendingDelegationBanner } from "@/components/agency/PendingDelegationBanner";
 import { OwnerQaModeBanner } from "@/components/admin/OwnerQaModeBanner";
@@ -211,6 +212,7 @@ const App = () => (
         <BrowserRouter>
           <AuthProvider>
             <ActingContextProvider>
+            <WorkConversationDraftProvider>
             <PageViewTracker />
             <RoleIntentReconcilerMount />
             <OwnerQaModeBanner />
@@ -327,6 +329,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+            </WorkConversationDraftProvider>
             </ActingContextProvider>
           </AuthProvider>
         </BrowserRouter>

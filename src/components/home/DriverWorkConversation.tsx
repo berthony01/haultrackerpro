@@ -10,17 +10,29 @@ import { describeProfileReuse, mapProfileToIntakeAnswers } from '@/lib/home/prof
 import { setPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
 import { clearJobSearchCardHandoff, setJobSearchCardHandoff, JOB_SEARCH_CARD_PATH } from '@/lib/jobSearch/jobSearchCardHandoff';
 import { useEffect, useRef } from 'react';
+import { useWorkConversationDraftStore } from '@/components/home/WorkConversationDraftProvider';
+import type { ConversationDraftAdapter } from '@/components/home/HomeConversationFlow';
 
 export const FIND_WORK_CONTINUE_LABEL = 'Review/update my work profile';
 export const FIND_WORK_PROFILE_ERROR_LINE =
   'We could not load your saved work profile right now, so we will just ask a few questions.';
 export const FIND_WORK_NOT_AVAILABLE = 'Find Work is available on driver accounts.';
+export const FIND_WORK_CONTINUITY_NOTE =
+  'Progress stays while you browse in this tab. Refreshing or signing out clears it.';
+export const FIND_WORK_START_OVER_NOTE =
+  'Start over clears this conversation only. Your saved work profile is not changed.';
 
 /** Personal, canonical Driver access only. Never mount profile reads before resolution. */
 export default function DriverWorkConversation() {
   const { user, loading: authLoading } = useAuth();
   const { driverWorkspaceAllowed, isLoading, error } = useViewMode();
   const { isActingAsAssistant, isLoadingManagedDrivers } = useActingContext();
+  const draftStore = useWorkConversationDraftStore();
+  // Definitive invalid outer gates clear the retained personal-driver draft.
+  if (draftStore && !authLoading && !isLoading && !isLoadingManagedDrivers &&
+      (!user || error || driverWorkspaceAllowed !== true || isActingAsAssistant)) {
+    draftStore.clear();
+  }
   useEffect(() => {
     if (authLoading || isLoading || error || isLoadingManagedDrivers || !user || driverWorkspaceAllowed !== true || isActingAsAssistant) clearJobSearchCardHandoff();
   }, [user?.id, authLoading, isLoading, error, isLoadingManagedDrivers, driverWorkspaceAllowed, isActingAsAssistant]);
@@ -43,6 +55,18 @@ function ProfileConversation() {
   const seed = useMemo(() => isError ? {} : mapProfileToIntakeAnswers(profile), [isError, profile]);
   const reuseLabels = useMemo(() => describeProfileReuse(seed), [seed]);
   const hasSeed = reuseLabels.length > 0;
+  const draftStore = useWorkConversationDraftStore();
+  const ownerId = user?.id ?? '';
+  // Canonical seed fingerprint: a changed saved profile invalidates a retained flow.
+  const fingerprint = useMemo(() => JSON.stringify({ e: isError, s: hasSeed ? seed : null }), [isError, hasSeed, seed]);
+  const draftAdapter = useMemo<ConversationDraftAdapter | undefined>(() => {
+    if (!draftStore || !ownerId) return undefined;
+    const ok = () => liveOwner.current === ownerId && session?.user.id === ownerId;
+    return {
+      read: () => (ok() ? draftStore.read(ownerId, fingerprint) : null),
+      write: (snap) => { if (ok()) draftStore.write(ownerId, fingerprint, snap); },
+    };
+  }, [draftStore, ownerId, fingerprint, session?.user.id]);
 
   if (profileLoading) {
     return <p data-testid="find-work-loading" className="text-sm text-muted-foreground">Loading…</p>;
@@ -55,8 +79,14 @@ function ProfileConversation() {
           {FIND_WORK_PROFILE_ERROR_LINE}
         </p>
       )}
+      {draftAdapter && (
+        <p data-testid="find-work-continuity-note" className="mb-3 text-xs text-muted-foreground">
+          {FIND_WORK_CONTINUITY_NOTE} {FIND_WORK_START_OVER_NOTE}
+        </p>
+      )}
       <HomeConversationFlow
-        key={hasSeed ? 'seeded' : 'unseeded'}
+        key={fingerprint}
+        draftAdapter={draftAdapter}
         amber="hsl(var(--primary))"
         surface="hsl(var(--card))"
         border="hsl(var(--border))"
