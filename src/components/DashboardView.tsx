@@ -459,7 +459,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <p className="text-[11px] text-muted-foreground pl-0.5">These totals follow the selected date range.</p>
       </div>
 
-      {/* === PREMIUM ANALYTICS HERO === */}
+      {/* === PRIMARY FINANCIALS (scoped to the selected period) === */}
       {!isLoading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -490,33 +490,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
               <p className="text-[11px] text-muted-foreground -mt-2">{footnote}</p>
             ) : null;
           })()}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
-              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
-              <ExpenseDonut expenses={filteredExpenses} />
-            </div>
-            <div className="space-y-4">
-              <DriverScoreGauge
-                score={scorecard.totalScore}
-                tier={scorecard.tier}
-                percentileLabel={scorecard.totalScore >= 80 ? 'Top 14% of drivers' : scorecard.totalScore >= 60 ? 'Top 35% of drivers' : 'Keep going!'}
-              />
-              <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
-            </div>
-          </div>
-
-          {showRecommendedOpportunity && onNavigate && (
-            <RecommendedOpportunityCard onNavigate={onNavigate} />
-          )}
-
-          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
-
-          {showPersonalWidgets && <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />}
         </>
       )}
 
-      {/* === ZONE 1 · ACTION ZONE === */}
+      {/* === QUICK ACTIONS === */}
       {!isLoading && showPersonalWidgets && onNavigate && (
         <div className="grid grid-cols-4 gap-2">
           <Button
@@ -554,21 +531,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       )}
 
-      {/* Driver Intelligence */}
-      {!isLoading && showPersonalWidgets && <DriverIntelligenceCard isPro={isPro} />}
-
-      {/* === ZONE 2 · COMPETITION === */}
-      {!isLoading && showPersonalWidgets && (
-        <DriverLeaderboardCard
-          limit={5}
-          onCustomize={onNavigate ? () => {
-            try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
-            onNavigate('settings');
-          } : undefined}
-        />
-      )}
-
-      {/* === ZONE 3 · ALERTS === */}
+      {/* === ALERTS === */}
       {!isLoading && showPersonalWidgets && <TaxReminderBanner settings={settings} isPro={isPro} />}
       {!isLoading && showPersonalWidgets && smartAlerts && (
         <SmartAlertsCard
@@ -579,6 +542,77 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           isPro={isPro}
         />
       )}
+
+      {/* Embedded guided Find Work conversation — collapsed by default. The
+          child stays mounted while closed so unsaved answers survive toggling. */}
+      {!isLoading && embeddedChat && (
+        <details className="rounded-2xl border border-border bg-card shadow-card">
+          <summary className="flex min-h-[44px] cursor-pointer select-none items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+            <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
+            Talk to HaulTracker
+            <span className="text-xs font-normal text-muted-foreground">Find Work: guided driver conversation</span>
+          </summary>
+          <div className="px-4 pb-4">
+            <p className="mb-3 text-xs text-muted-foreground">
+              Describe the work you want, then review your answers before saving. Nothing is saved automatically.
+            </p>
+            {embeddedChat}
+          </div>
+        </details>
+      )}
+
+      {/* === PERIOD DETAIL (charts, score, recent loads) === */}
+      {!isLoading && (
+        <>
+          {filteredLoads.length === 0 && (
+            <Card className="border-dashed border-muted-foreground/20 shadow-card">
+              <CardContent className="py-6 text-center">
+                <p className="font-bold text-sm">No loads in this period</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {loads.length > 0
+                    ? 'Choose another period to review your recorded loads.'
+                    : 'Log your first load to start seeing earnings, miles, and profit here.'}
+                </p>
+                {loads.length === 0 && showPersonalWidgets && onNavigate && (
+                  <Button className="mt-3 gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
+                    <Plus className="h-4 w-4" /> Log Your First Load
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {(filteredLoads.length > 0 || filteredExpenses.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2 space-y-4">
+                {filteredLoads.length > 0 && (
+                  <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
+                )}
+                {filteredExpenses.length > 0 && <ExpenseDonut expenses={filteredExpenses} />}
+              </div>
+              <div className="space-y-4">
+                <DriverScoreGauge
+                  score={scorecard.totalScore}
+                  tier={scorecard.tier}
+                  percentileLabel="Calculated from your own recorded loads, expenses, and logging consistency."
+                />
+                {filteredLoads.length > 0 && (
+                  <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {showRecommendedOpportunity && onNavigate && (
+            <RecommendedOpportunityCard onNavigate={onNavigate} />
+          )}
+
+          {filteredLoads.length > 0 && (
+            <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
+          )}
+        </>
+      )}
+
       {!isLoading && <WeeklyFocusCard loads={loads} />}
 
       {/* === ZONE 4 · QUICK SHORTCUTS === */}
