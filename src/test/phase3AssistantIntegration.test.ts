@@ -103,7 +103,7 @@ describe('Phase3B assistant-chat handler against actual candidate SQL', () => {
     const b = await call(tok(B), { action: 'bootstrap' });
     expect(b.body.contexts.map((c: any) => c.scope)).toEqual(['driver_self', 'agency']); // canonical dual-paid recruiter conflict excluded
     const ag = await call(tok(AGENCY_STAFF), { action: 'bootstrap' });
-    expect(ag.body.contexts.map((c: any) => [c.scope, c.targetId, c.tools])).toEqual([['driver_delegate', FREE, ['loads']], ['agency', AGENCY, ['packages']]]);
+    expect(ag.body.contexts.map((c: any) => [c.scope, c.targetId, c.tools])).toEqual([['driver_delegate', FREE, ['loads', 'expenses']], ['agency', AGENCY, ['packages']]]); // view_reports covers expenses
     expect((await call(tok(FREE), { action: 'bootstrap' })).body.contexts).toEqual([]);
   });
 
@@ -113,7 +113,7 @@ describe('Phase3B assistant-chat handler against actual candidate SQL', () => {
     const sent = JSON.parse(gatewayBodies[0]);
     expect(sent.model).toBe(MODEL_ID); expect(sent.max_tokens).toBe(768); expect(sent.stream).toBe(false);
     const ctx = gatewayBodies[0];
-    expect(ctx).not.toContain(SECRET); expect(ctx).not.toContain('7777'); expect(ctx).not.toContain('4242'); expect(ctx).toContain('"has_more":true');
+    expect(ctx).not.toContain(SECRET); expect(ctx).not.toContain('7777'); expect(ctx).not.toContain('4242'); expect(ctx).toMatch(/has_more\\\\?":true/);
     expect((ctx.match(/"load_date"/g) ?? []).length).toBe(20);
     expect(r.body.reply.sources).toEqual([{ key: 'expenses', label: 'Your expenses (most recent)', href: '/dashboard?page=expenses' }, { key: 'loads', label: 'Your loads (most recent)', href: '/dashboard?page=loads' }]);
     const m = await call(tok(A), { action: 'messages', threadId: r.body.threadId });
