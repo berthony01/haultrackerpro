@@ -203,7 +203,6 @@ describe('Phase 3 same-tab continuity (authenticated personal driver)', () => {
     ['auth loading', () => { state.authLoading = true; }],
     ['acting for another driver', () => { state.acting = true; }],
     ['managed context loading', () => { state.actingLoading = true; }],
-    ['revoked driver gate', () => { state.driverAllowed = false; }],
   ])('%s clears and refuses the retained draft', (_label, invalidate) => {
     const view = render(app());
     buildProgress();
@@ -218,6 +217,19 @@ describe('Phase 3 same-tab continuity (authenticated personal driver)', () => {
     state.driverAllowed = true;
     view.rerender(app());
     back();
+    expect(transcript()).not.toContain('Houston');
+    expect(screen.getByTestId('home-conversation-input')).toHaveValue('');
+  });
+
+  it('revoked driver gate while the chat is mounted refuses and clears the draft', () => {
+    const view = render(app());
+    buildProgress();
+    state.driverAllowed = false;
+    view.rerender(app());
+    expect(screen.queryByTestId('home-conversation-transcript')).toBeNull();
+    expect(screen.getByTestId('find-work-unavailable')).toBeTruthy();
+    state.driverAllowed = true;
+    view.rerender(app());
     expect(transcript()).not.toContain('Houston');
     expect(screen.getByTestId('home-conversation-input')).toHaveValue('');
   });
