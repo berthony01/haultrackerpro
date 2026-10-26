@@ -127,7 +127,7 @@ export async function readBounded(stream: ReadableStream<Uint8Array> | null, max
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (!(value instanceof Uint8Array)) { await reader.cancel().catch(() => undefined); return { ok: false, reason: 'invalid' }; }
+      if (!ArrayBuffer.isView(value)) { await reader.cancel().catch(() => undefined); return { ok: false, reason: 'invalid' }; }
       total += value.byteLength;
       if (total > maxBytes) { await reader.cancel().catch(() => undefined); return { ok: false, reason: 'too_large' }; }
       chunks.push(value);
@@ -355,9 +355,8 @@ async function handleInner(req: Request, deps: HandlerDeps): Promise<Response> {
     const reply = await callModel(deps, history, contextText, content);
     if (!reply) { await fail(); return err(503, 'failed'); }
 
-    finalized = true; // the success finalize below is the single terminal attempt
     const fin = await deps.serviceFinalize({ reservationId, leaseId, success: true, content: reply, sources: keys });
-    if (fin.error) return err(503, 'unavailable');
+    if (fin.error) { await fail(); return err(503, 'unavailable'); }
     const f = ((Array.isArray(fin.data) ? fin.data : []) as Array<{ status: string; reply_message_id: string | null }>)[0];
     if (!f || f.status !== 'completed') return err(403, 'forbidden');
     if (!(await stillSame())) return err(401, 'unauthenticated');

@@ -1,4 +1,4 @@
-// DEPLOYABLE SOURCE ADAPTER — CANDIDATE ONLY. Lives outside supabase/functions
+// DEPLOYABLE SOURCE ADAPTER, CANDIDATE ONLY. Lives outside supabase/functions
 // on purpose so it is never auto-deployed. Activation requires moving it under
 // supabase/functions/assistant-chat/ in a separately authorized release.
 import { createClient } from "npm:@supabase/supabase-js@2.57.2";
@@ -6,7 +6,9 @@ import { GATEWAY_URL, handleAssistantRequest } from "./handler.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
