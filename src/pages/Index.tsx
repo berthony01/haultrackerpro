@@ -249,7 +249,10 @@ const Index = () => {
   // Re-run URL hint handling on in-app navigation while Index stays mounted.
   // Params are still read from window.location: consumed hints are cleared
   // with history.replaceState, which Router state does not observe.
-  const routerSearch = useLocation().search;
+  const location = useLocation();
+  const routerSearch = location.search;
+  // A repeated identical query still represents a new navigation after consumption.
+  const routerNavigationKey = location.key;
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('checkout') === 'success') {
@@ -409,6 +412,7 @@ const Index = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     routerSearch,
+    routerNavigationKey,
     user?.id,
     subscription.isLoading,
     subscription.isPro,
