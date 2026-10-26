@@ -355,3 +355,73 @@ describe('HP-2 — scope and safety guards', () => {
     expect(PROFILE_SRC).toMatch(/We prefilled this from your homepage conversation\. Review before saving\./);
   });
 });
+
+describe('HP-2 — transcript auto-scroll reveals the newest message', () => {
+  it('scrolls only the overflowing transcript to the bottom after chip, text and clarification, without page scroll or focus hijack', () => {
+    const proto = HTMLElement.prototype;
+    const origSH = Object.getOwnPropertyDescriptor(proto, 'scrollHeight');
+    const origCH = Object.getOwnPropertyDescriptor(proto, 'clientHeight');
+    // Meaningful geometry: transcript is 220px tall, each bubble adds 80px.
+    Object.defineProperty(proto, 'scrollHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.dataset?.testid === 'home-conversation-transcript'
+          ? this.children.length * 80
+          : 0;
+      },
+    });
+    Object.defineProperty(proto, 'clientHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.dataset?.testid === 'home-conversation-transcript' ? 220 : 0;
+      },
+    });
+    const winScroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    const intoView = vi.fn();
+    const origIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = intoView;
+    try {
+      renderLanding();
+      const t = screen.getByTestId('home-conversation-transcript');
+      const atBottom = () => expect(t.scrollTop).toBe(t.scrollHeight);
+
+      fireEvent.click(screen.getByTestId('home-conversation-chip-regional'));
+      expect(t.scrollHeight).toBeGreaterThan(t.clientHeight);
+      atBottom();
+
+      reply('Houston, TX');
+      atBottom();
+
+      // Clarification path appends a re-ask bubble; still revealed.
+      fireEvent.click(screen.getByTestId('home-conversation-chip-a'));
+      const before = t.scrollHeight;
+      reply('zzzzz');
+      expect(t).toHaveTextContent('I did not catch that one.');
+      expect(t.scrollHeight).toBeGreaterThan(before);
+      atBottom();
+
+      // User scrolling history alone does not trigger a jump back down.
+      t.scrollTop = 40;
+      fireEvent.scroll(t);
+      expect(t.scrollTop).toBe(40);
+
+      const input = screen.getByTestId('home-conversation-input');
+      expect(document.activeElement).not.toBe(t);
+      expect(winScroll).not.toHaveBeenCalled();
+      expect(intoView).not.toHaveBeenCalled();
+      void input;
+    } finally {
+      winScroll.mockRestore();
+      Element.prototype.scrollIntoView = origIntoView;
+      if (origSH) Object.defineProperty(proto, 'scrollHeight', origSH);
+      else delete (proto as unknown as Record<string, unknown>).scrollHeight;
+      if (origCH) Object.defineProperty(proto, 'clientHeight', origCH);
+      else delete (proto as unknown as Record<string, unknown>).clientHeight;
+    }
+  });
+
+  it('source scrolls the transcript element itself, never scrollIntoView or window scroll', () => {
+    expect(FLOW_SRC).toMatch(/el\.scrollTop = el\.scrollHeight/);
+    expect(FLOW_SRC).not.toMatch(/scrollIntoView\(|window\.scroll/);
+  });
+});
