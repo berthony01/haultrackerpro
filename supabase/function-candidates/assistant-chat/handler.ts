@@ -203,7 +203,7 @@ async function callModel(deps: HandlerDeps, history: Array<{ role: string; conte
     const res = await deps.gatewayFetch(body, controller.signal);
     if (!res.ok) { deps.log?.('gateway_status', { status: res.status }); await res.body?.cancel().catch(() => undefined); return null; }
     const raw = await readBounded(res.body, MAX_PROVIDER_BYTES);
-    if (!raw.ok) { controller.abort(); deps.log?.('gateway_body', { reason: raw.reason }); return null; }
+    if ('reason' in raw) { controller.abort(); deps.log?.('gateway_body', { reason: raw.reason }); return null; }
     let parsed: unknown;
     try { parsed = JSON.parse(raw.text); } catch { return null; }
     const content = (parsed as { choices?: Array<{ message?: { content?: unknown } }> })?.choices?.[0]?.message?.content;
@@ -233,7 +233,7 @@ async function handleInner(req: Request, deps: HandlerDeps): Promise<Response> {
   const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   if (!token) return err(401, 'unauthenticated');
   const raw = await readBounded(req.body, LIMITS.maxBodyBytes);
-  if (!raw.ok) return raw.reason === 'too_large' ? err(413, 'too_large') : err(400, 'invalid');
+  if ('reason' in raw) return raw.reason === 'too_large' ? err(413, 'too_large') : err(400, 'invalid');
   let body: Record<string, unknown>;
   try { const p = JSON.parse(raw.text); if (!isPlainObject(p)) return err(400, 'invalid'); body = p; }
   catch { return err(400, 'invalid'); }
