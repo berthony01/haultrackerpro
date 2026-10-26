@@ -530,21 +530,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         </div>
       )}
 
-      {/* Driver Intelligence */}
-      {!isLoading && showPersonalWidgets && <DriverIntelligenceCard isPro={isPro} />}
-
-      {/* === ZONE 2 · COMPETITION === */}
-      {!isLoading && showPersonalWidgets && (
-        <DriverLeaderboardCard
-          limit={5}
-          onCustomize={onNavigate ? () => {
-            try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
-            onNavigate('settings');
-          } : undefined}
-        />
-      )}
-
-      {/* === ZONE 3 · ALERTS === */}
+      {/* === ALERTS === */}
       {!isLoading && showPersonalWidgets && <TaxReminderBanner settings={settings} isPro={isPro} />}
       {!isLoading && showPersonalWidgets && smartAlerts && (
         <SmartAlertsCard
@@ -555,6 +541,64 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           isPro={isPro}
         />
       )}
+
+      {/* Embedded guided Find Work conversation — Index supplies the collapsed
+          wrapper (native details, child stays mounted while closed) only for
+          the canonical self-driver dashboard. */}
+      {!isLoading && embeddedChat}
+
+      {/* === PERIOD DETAIL (charts, score, recent loads) === */}
+      {!isLoading && (
+        <>
+          {filteredLoads.length === 0 && (
+            <Card className="border-dashed border-muted-foreground/20 shadow-card">
+              <CardContent className="py-6 text-center">
+                <p className="font-bold text-sm">No loads in this period</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {loads.length > 0
+                    ? 'Choose another period to review your recorded loads.'
+                    : 'Log your first load to start seeing earnings, miles, and profit here.'}
+                </p>
+                {loads.length === 0 && showPersonalWidgets && onNavigate && (
+                  <Button className="mt-3 gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
+                    <Plus className="h-4 w-4" /> Log Your First Load
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {(filteredLoads.length > 0 || filteredExpenses.length > 0) && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2 space-y-4">
+                {filteredLoads.length > 0 && (
+                  <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
+                )}
+                {filteredExpenses.length > 0 && <ExpenseDonut expenses={filteredExpenses} />}
+              </div>
+              <div className="space-y-4">
+                <DriverScoreGauge
+                  score={scorecard.totalScore}
+                  tier={scorecard.tier}
+                  percentileLabel="Based on your full recorded history, not the selected period."
+                />
+                {filteredLoads.length > 0 && (
+                  <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {showRecommendedOpportunity && onNavigate && (
+            <RecommendedOpportunityCard onNavigate={onNavigate} />
+          )}
+
+          {filteredLoads.length > 0 && (
+            <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
+          )}
+        </>
+      )}
+
       {!isLoading && <WeeklyFocusCard loads={loads} />}
 
       {/* === ZONE 4 · QUICK SHORTCUTS === */}
