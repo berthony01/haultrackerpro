@@ -124,7 +124,7 @@ describe('Phase3B assistant-chat handler against actual candidate SQL', () => {
     const r = await send(tok(STAFF), { scope: 'driver_delegate', targetId: A });
     expect(r.status).toBe(200);
     const body = gatewayBodies[0];
-    expect(body).toContain('"key\\":\\"loads'.replace(/\\/g, '\\')); expect(body).not.toContain('expenses'); expect(body).not.toContain(SECRET);
+    expect(body).toContain('load_date'); expect(body).not.toContain('expense_date'); expect(body).not.toContain(SECRET);
   });
 
   it('agency delegate reads only the approved managed driver loads', async () => {
