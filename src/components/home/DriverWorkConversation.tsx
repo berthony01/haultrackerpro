@@ -9,7 +9,7 @@ import { HOME_INTAKE_NEXT_PATH, type IntakeAnswers } from '@/lib/home/conversati
 import { describeProfileReuse, mapProfileToIntakeAnswers } from '@/lib/home/profileConversationMerge';
 import { setPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
 import { clearJobSearchCardHandoff, setJobSearchCardHandoff, JOB_SEARCH_CARD_PATH } from '@/lib/jobSearch/jobSearchCardHandoff';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkConversationDraftStore } from '@/components/home/WorkConversationDraftProvider';
 import type { ConversationDraftAdapter } from '@/components/home/HomeConversationFlow';
 
