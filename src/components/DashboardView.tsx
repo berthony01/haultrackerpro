@@ -789,36 +789,55 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </Button>
           )}
 
-          {/* === ZONE 6 · INSIGHTS (AI + trends) === */}
-          {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
-          {showPersonalWidgets && <WeeklyPulseCard isPro={isPro} />}
+          {/* === HISTORICAL AND ROLLING INSIGHTS — these hooks use their own
+              history windows and intentionally do NOT follow the date selector. === */}
+          <section className="space-y-4" aria-label="Historical and rolling insights">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Historical and rolling insights</p>
+              <p className="text-[11px] text-muted-foreground">These insights use their own history windows and do not follow the date selector.</p>
+            </div>
 
-          {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
-          {showPersonalWidgets && <PersonalIntelligenceBlocks isPro={isPro} />}
+            {/* Weekly Pulse — promoted: Mon/Tue recap of last week + top recommendations */}
+            {showPersonalWidgets && <WeeklyPulseCard isPro={isPro} />}
 
-          {/* Smart Load Advisor — promoted */}
-          <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} />
+            {/* Personal Intelligence — promoted: best/weakest lanes, broker reliability, margin leaks */}
+            {showPersonalWidgets && <PersonalIntelligenceBlocks isPro={isPro} />}
 
-          {/* Personalized Pro Insight — free users only */}
+            {/* Smart Load Advisor — promoted */}
+            <SmartLoadAdvisor loads={loads} expenses={expenses} isPro={isPro} />
+
+            {/* Personalized Pro Insight — free users only */}
+            {showPersonalWidgets && (
+              <ProInsightCard
+                loads={loads}
+                expenses={expenses}
+                isPro={isPro}
+                onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
+              />
+            )}
+
+            {/* Pro Time Saved */}
+            {showPersonalWidgets && <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />}
+          </section>
+
+          {/* === ENGAGEMENT — activity rewards and community, below core operations === */}
           {showPersonalWidgets && (
-            <ProInsightCard
-              loads={loads}
-              expenses={expenses}
-              isPro={isPro}
-              onNavigate={onNavigate ? (p) => onNavigate(p) : undefined}
-            />
+            <section className="space-y-4" aria-label="Activity and community">
+              <DriverIntelligenceCard isPro={isPro} />
+              <DriverLeaderboardCard
+                limit={5}
+                onCustomize={onNavigate ? () => {
+                  try { sessionStorage.setItem('settings.focusSection', 'public-profile'); } catch {}
+                  onNavigate('settings');
+                } : undefined}
+              />
+            </section>
           )}
 
-          {/* Pro Time Saved */}
-          {showPersonalWidgets && <ProTimeSavedCard isPro={isPro} weekStartsOn={weekStartsOn} />}
-
-
-          {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
-
-          {/* Last Updated */}
+          {/* Latest load record update — reflects load records only, not a full app refresh */}
           {loads.length > 0 && (
             <p className="text-[10px] text-muted-foreground/50 text-center">
-              Last updated: {format(
+              Latest load record update: {format(
                 new Date(Math.max(...loads.map(l => new Date(l.updated_at).getTime()))),
                 'MMM d, h:mm a'
               )}
