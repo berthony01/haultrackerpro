@@ -109,10 +109,11 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     expect(steps.length).toBe(4);
   });
 
-  it('keeps one My Trucking proof section wired to the existing driver route', () => {
+  it('keeps the My Trucking driver region wired to the existing driver route without a mockup image', () => {
     renderLanding();
     const section = screen.getByTestId('my-trucking-section');
-    expect(within(section).getByRole('img')).toBeInTheDocument();
+    expect(within(section).queryByRole('img')).not.toBeInTheDocument();
+    expect(section).toHaveTextContent('Find your next opportunity. Keep your numbers in view.');
     fireEvent.click(within(section).getByTestId('my-trucking-cta'));
     expect(navigateSpy).toHaveBeenLastCalledWith('/auth?intent=driver');
   });
@@ -167,8 +168,12 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     expect(desktopNav.className).toMatch(/lg:flex/);
 
     const paths = screen.getByTestId('hero-audience-paths');
-    expect(paths.className).toMatch(/grid-cols-1/);
-    expect(paths.className).toMatch(/md:grid-cols-3/);
+    const articles = within(paths).getAllByRole('article');
+    expect(articles).toHaveLength(3);
+    articles.forEach((article) => {
+      expect(article.className).toMatch(/md:grid-cols-2/);
+      expect(article.className).not.toMatch(/grid-cols-2(?!-)/);
+    });
   });
 
   it('does not render the legacy six-card driver+recruiter pricing grid on the homepage', () => {
