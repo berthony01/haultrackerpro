@@ -72,7 +72,14 @@ beforeAll(async()=> {
  ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO anon,authenticated,service_role;
  `);
  before=await inventory(); await db.query(sql); expect(await inventory()).toEqual(before);
+ // Captured immediately after candidate DDL, before any local operator flip.
+ initialControl=(await db.query('SELECT * FROM job_search_private.job_search_feature_control')).rows;
 },30000);
+let initialControl:unknown[]=[];
+// Disposable local superuser SQL stands in for a future audited operator; never a client API.
+async function setFlags(publication:boolean,discovery:boolean,client:Client=db) {
+ await client.query('INSERT INTO job_search_private.job_search_feature_control(singleton,publication_enabled,discovery_enabled) VALUES(true,$1,$2) ON CONFLICT (singleton) DO UPDATE SET publication_enabled=EXCLUDED.publication_enabled,discovery_enabled=EXCLUDED.discovery_enabled',[publication,discovery]);
+}
 afterAll(async()=>{await db?.end();});
 beforeEach(async()=>{
  await db.query('TRUNCATE job_search_private.job_search_card_events,job_search_private.driver_job_search_cards,public.user_capabilities,public.marketplace_user_restrictions,public.admin_users,public.driver_opportunity_profiles,auth.users CASCADE');
@@ -81,14 +88,20 @@ beforeEach(async()=>{
  for (const u of [users.recruiter,users.dual]) await db.query("INSERT INTO public.user_capabilities(user_id,capability,status) VALUES($1,'recruiter','active')",[u]);
  await db.query("INSERT INTO public.admin_users VALUES($1,'super_admin');",[users.admin]);
  await db.query("INSERT INTO public.driver_opportunity_profiles VALUES($1,'never publish this contact')",[users.driver]);
+ // Happy-path suites run with publication locally ON; default-OFF is asserted separately.
+ await setFlags(true,false);
 });
 describe('HJ-1A actual candidate owner-only SQL/roles/lifecycle',()=> {
- it('schema has exactly two RLS tables, no policies or client DML/schema CREATE',async()=>{
+ it('schema has exactly three RLS tables (two card tables + private control singleton), no policies or client DML/schema CREATE',async()=>{
   const rows=(await db.query("SELECT c.relname,c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='job_search_private' AND c.relkind='r' ORDER BY c.relname")).rows;
-  expect(rows).toEqual([{relname:'driver_job_search_cards',relrowsecurity:true},{relname:'job_search_card_events',relrowsecurity:true}]);
+  expect(rows).toEqual([{relname:'driver_job_search_cards',relrowsecurity:true},{relname:'job_search_card_events',relrowsecurity:true},{relname:'job_search_feature_control',relrowsecurity:true}]);
   expect((await db.query("SELECT * FROM pg_policies WHERE schemaname='job_search_private'")).rows).toEqual([]);
-  for(const role of ['anon','authenticated','service_role']) {
-   for(const table of ['driver_job_search_cards','job_search_card_events']) for(const privilege of ['SELECT','INSERT','UPDATE','DELETE']) expect((await db.query('SELECT has_table_privilege($1,$2,$3) AS allowed',[role,`job_search_private.${table}`,privilege])).rows[0].allowed).toBe(false);
+  for(const role of ['anon','authenticated','service_role','PUBLIC']) {
+   for(const table of ['driver_job_search_cards','job_search_card_events','job_search_feature_control']) for(const privilege of ['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) {
+    if(role==='PUBLIC') { expect((await db.query("SELECT count(*)::int AS n FROM aclexplode(coalesce((SELECT relacl FROM pg_class WHERE oid=$1::regclass),'{}')) WHERE grantee=0",[`job_search_private.${table}`])).rows[0].n).toBe(0); continue; }
+    expect((await db.query('SELECT has_table_privilege($1,$2,$3) AS allowed',[role,`job_search_private.${table}`,privilege])).rows[0].allowed).toBe(false);
+   }
+   if(role==='PUBLIC') continue;
    expect((await db.query("SELECT has_schema_privilege($1,'job_search_private','CREATE') AS allowed",[role])).rows[0].allowed).toBe(false);
   }
   expect((await db.query("SELECT * FROM aclexplode((SELECT nspacl FROM pg_namespace WHERE nspname='job_search_private')) WHERE grantee=0")).rows).toEqual([]);
@@ -183,5 +196,101 @@ describe('HJ-1A REAL PostgreSQL concurrent sessions',()=>{
    let blocked=false;for(let i=0;i<100;i++){const r=await db.query("SELECT 1 FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT public.manage_my_job_search_card%' AND pid<>pg_backend_pid()");if(r.rowCount){blocked=true;break;}await new Promise(resolve=>setTimeout(resolve,5));}
    expect(blocked).toBe(true);await a.query('COMMIT');expect((await retry).status).toBe('withdrawn');expect(await counts()).toEqual({cards:1,events:2});
   }finally{await a.query('ROLLBACK');await a.end();await b.end();}
+ });
+});
+describe('HJ-2D private publication/discovery safety switch (default OFF)',()=>{
+ const control=async()=>(await db.query('SELECT singleton,publication_enabled,discovery_enabled FROM job_search_private.job_search_feature_control')).rows;
+ it('candidate DDL creates exactly one singleton row with BOTH flags OFF',()=>{
+  expect(initialControl).toHaveLength(1);
+  expect(initialControl[0]).toMatchObject({singleton:true,publication_enabled:false,discovery_enabled:false});
+ });
+ it('control columns are NOT NULL with OFF defaults and a fixed singleton key',async()=>{
+  const cols=(await db.query("SELECT column_name,is_nullable,column_default FROM information_schema.columns WHERE table_schema='job_search_private' AND table_name='job_search_feature_control' AND column_name IN ('singleton','publication_enabled','discovery_enabled') ORDER BY column_name")).rows;
+  expect(cols).toEqual([{column_name:'discovery_enabled',is_nullable:'NO',column_default:'false'},{column_name:'publication_enabled',is_nullable:'NO',column_default:'false'},{column_name:'singleton',is_nullable:'NO',column_default:'true'}]);
+  await expect(db.query('INSERT INTO job_search_private.job_search_feature_control(singleton) VALUES(false)')).rejects.toMatchObject({code:'23514'});
+  await expect(db.query('INSERT INTO job_search_private.job_search_feature_control(singleton) VALUES(true)')).rejects.toMatchObject({code:'23505'});
+  expect(await control()).toHaveLength(1);
+ });
+ for(const role of ['anon','authenticated','service_role']) it(`${role} cannot read, insert, flip or delete the control row`,async()=>{
+  for(const stmt of ['SELECT * FROM job_search_private.job_search_feature_control','UPDATE job_search_private.job_search_feature_control SET publication_enabled=true,discovery_enabled=true','DELETE FROM job_search_private.job_search_feature_control','INSERT INTO job_search_private.job_search_feature_control(singleton) VALUES(true)']) {
+   await db.query('BEGIN');try{await db.query(`SET LOCAL ROLE ${role}`);await db.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users.driver]);await expect(db.query(stmt)).rejects.toMatchObject({code:'42501'});}finally{await db.query('ROLLBACK');}
+  }
+  expect(await control()).toEqual([{singleton:true,publication_enabled:true,discovery_enabled:false}]);
+ });
+ it('no client-callable function can flip the switch',async()=>{
+  const fns=(await db.query("SELECT p.oid::regprocedure::text AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','job_search_private') AND p.prokind='f' AND pg_get_functiondef(p.oid) ILIKE '%job_search_feature_control%' ORDER BY 1")).rows.map(r=>r.sig);
+  // Only the private manager reads it (FOR SHARE); none writes it.
+  for(const sig of fns) expect((await db.query('SELECT pg_get_functiondef($1::regprocedure) AS d',[sig])).rows[0].d).not.toMatch(/UPDATE\s+job_search_private\.job_search_feature_control|INSERT\s+INTO\s+job_search_private\.job_search_feature_control|DELETE\s+FROM\s+job_search_private\.job_search_feature_control/i);
+  expect(fns).toContain('job_search_private.manage_my_job_search_card(text,jsonb,integer,uuid,text)');
+ });
+ for(const [pub,disc] of [[false,false],[false,true]] as const) for(const privateCall of [false,true]) it(`publication OFF (pub=${pub},disc=${disc}) denies ${privateCall?'private':'public'} first publish with 42501 and no receipt`,async()=>{
+  await setFlags(pub,disc);
+  await expect(publish(users.driver,payload,0,randomUUID(),privateCall)).rejects.toMatchObject({code:'42501'});
+  expect(await counts()).toEqual({cards:0,events:0});
+ });
+ it('publication ON/discovery OFF still permits only active drivers',async()=>{await setFlags(true,false);expect((await publish()).status).toBe('published');await expect(publish(users.recruiter)).rejects.toMatchObject({code:'42501'});await expect(publish(users.assistant)).rejects.toMatchObject({code:'42501'});expect((await publish(users.other,payload,0,randomUUID(),true)).status).toBe('published');expect(await counts()).toEqual({cards:2,events:2});});
+ it('missing control row fails CLOSED (never defaults ON)',async()=>{
+  await db.query('DELETE FROM job_search_private.job_search_feature_control');
+  try { for(const privateCall of [false,true]) await expect(publish(users.driver,payload,0,randomUUID(),privateCall)).rejects.toMatchObject({code:'42501'}); expect(await counts()).toEqual({cards:0,events:0}); expect(await command(users.driver)).toBeNull(); }
+  finally { await setFlags(true,false); }
+ });
+ it('after OFF a real published card survives: own get/pause/withdraw work, renewal and replay denied, receipts intact',async()=>{
+  const id=randomUUID();const c=await publish(users.driver,payload,0,id);
+  await setFlags(false,false);
+  const got=await command(users.driver);expect(got.id).toBe(c.id);expect(got.status).toBe('published'); // OFF is not instant recall
+  for(const privateCall of [false,true]) await expect(publish(users.driver,payload,0,id,privateCall)).rejects.toMatchObject({code:'42501'}); // identical replay denied
+  await expect(publish(users.driver,payload,1)).rejects.toMatchObject({code:'42501'}); // renewal denied
+  expect(await counts()).toEqual({cards:1,events:1});
+  expect((await command(users.driver,'pause',null,1,randomUUID())).status).toBe('paused');
+  expect((await command(users.driver,'withdraw',null,2,randomUUID(),null,'authenticated',true)).status).toBe('withdrawn');
+  expect(await counts()).toEqual({cards:1,events:3});
+  const ev=(await db.query('SELECT action,revision FROM job_search_private.job_search_card_events ORDER BY revision')).rows;
+  expect(ev).toEqual([{action:'publish',revision:1},{action:'pause',revision:2},{action:'withdraw',revision:3}]);
+  expect(await command(users.other)).toBeNull();
+  await setFlags(true,false);expect((await publish(users.driver,payload,3)).revision).toBe(4);
+ });
+ it('OFF does not alter existing public inventory or profile/sentinel rows',async()=>{await publish();await setFlags(false,false);await command(users.driver,'withdraw',null,1,randomUUID());expect(await inventory()).toEqual(before);expect((await db.query('SELECT private_contact FROM public.driver_opportunity_profiles')).rows).toEqual([{private_contact:'never publish this contact'}]);});
+});
+describe('HJ-2D switch OFF serialization with REAL concurrent sessions',()=>{
+ async function clients(n:number){const r:Client[]=[];for(let i=0;i<n;i++){const c=new Client(config);await c.connect();r.push(c);}return r;}
+ async function waitFor(pid:number,event?:string){for(let i=0;i<400;i++){const r=await db.query("SELECT wait_event FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[pid]);if(r.rowCount&&(!event||r.rows[0].wait_event===event))return r.rows[0].wait_event;await new Promise(res=>setTimeout(res,5));}throw new Error('Expected a real lock wait');}
+ const pidOf=async(c:Client)=>(await c.query('SELECT pg_backend_pid() AS pid')).rows[0].pid as number;
+ it('publish queued on owner advisory lock is denied once a concurrent OFF commits first',async()=>{
+  const [holder,publisher]=await clients(2);let pending:Promise<unknown>|undefined;
+  try{const pid=await pidOf(publisher);await holder.query('BEGIN');await holder.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[users.driver]);
+   pending=publish(users.driver,payload,0,randomUUID(),false,publisher).then(card=>({card}),error=>({error}));await waitFor(pid,'advisory');
+   await setFlags(false,false);await holder.query('COMMIT');
+   expect(await pending).toMatchObject({error:{code:'42501'}});expect(await counts()).toEqual({cards:0,events:0});
+  }finally{await holder.query('ROLLBACK');await pending;await holder.end();await publisher.end();}
+ });
+ it('operator OFF waits for in-flight FOR SHARE publishes; share-compatible publish during pending OFF linearizes before OFF; publish after OFF commit denied; no deadlock',async()=>{
+  const [inflight,operator,fresh]=await clients(3);let off:Promise<unknown>|undefined,queued:Promise<unknown>|undefined;
+  try{
+   await inflight.query('BEGIN');await inflight.query('SET LOCAL ROLE authenticated');await inflight.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users.driver]);
+   const card=(await inflight.query("SELECT public.manage_my_job_search_card('publish',$1::jsonb,0,$2::uuid,'job_search_card_v1') AS card",[JSON.stringify(payload),randomUUID()])).rows[0].card;
+   expect(card.status).toBe('published');
+   const opPid=await pidOf(operator);
+   off=(async()=>{await operator.query('BEGIN');await operator.query('UPDATE job_search_private.job_search_feature_control SET publication_enabled=false,discovery_enabled=false');return 'updated';})();
+   await waitFor(opPid); // real row-lock wait on the in-flight FOR SHARE holder
+   // PostgreSQL grants a compatible FOR SHARE even while an UPDATE waits, so a
+   // publish started before OFF commits succeeds and OFF also waits for it.
+   queued=publish(users.other,payload,0,randomUUID(),true,fresh).then(c=>({c}),error=>({error}));
+   expect(await queued).toMatchObject({c:{status:'published'}});
+   expect((await db.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[opPid])).rowCount).toBe(1);
+   await inflight.query('COMMIT');
+   expect(await off).toBe('updated');
+   await operator.query('COMMIT');
+   await expect(publish(users.dual,payload,0,randomUUID(),true,fresh)).rejects.toMatchObject({code:'42501'});
+   expect(await counts()).toEqual({cards:2,events:2});
+   expect((await command(users.driver)).status).toBe('published'); // pre-OFF publication remains; not recalled
+   await expect(publish(users.driver,payload,1)).rejects.toMatchObject({code:'42501'});
+   expect((await command(users.driver,'withdraw',null,1,randomUUID())).status).toBe('withdrawn');
+  }finally{await inflight.query('ROLLBACK');await operator.query('ROLLBACK');await off?.catch(()=>{});await queued;await inflight.end();await operator.end();await fresh.end();}
+ });
+ it('get/withdraw never wait on a pending operator OFF (no global lock on non-publish actions)',async()=>{
+  await publish();const [operator]=await clients(1);
+  try{await operator.query('BEGIN');await operator.query('UPDATE job_search_private.job_search_feature_control SET publication_enabled=false');
+   const t=Date.now();expect((await command(users.driver)).revision).toBe(1);expect((await command(users.driver,'withdraw',null,1,randomUUID())).status).toBe('withdrawn');expect(Date.now()-t).toBeLessThan(2000);
+  }finally{await operator.query('ROLLBACK');await operator.end();}
  });
 });

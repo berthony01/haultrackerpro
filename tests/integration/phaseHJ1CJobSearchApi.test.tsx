@@ -284,6 +284,10 @@ beforeAll(async () => {
   preCandidateInventory = await inventory();
   for (const file of sqlPaths) await db.query(source(file));
   await db.query('RESET ROLE');
+  // HJ-2D: candidates ship with both flags OFF; flip ON only via disposable local superuser SQL.
+  expect((await db.query('SELECT publication_enabled,discovery_enabled FROM job_search_private.job_search_feature_control')).rows)
+    .toEqual([{ publication_enabled: false, discovery_enabled: false }]);
+  await db.query('UPDATE job_search_private.job_search_feature_control SET publication_enabled=true,discovery_enabled=true');
   safeFile(HJ1C_ROOT + '/runtime/postgrest.conf', `db-uri = "postgresql://authenticator:${dbPassword}@/postgres?host=${SOCKET}&port=55441&sslmode=disable"
     db-schemas = "public"
     db-anon-role = "anon"
