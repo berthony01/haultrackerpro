@@ -98,6 +98,7 @@ export default function Landing() {
     { label: 'Features', href: '/features' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'For Recruiters', href: '/recruiters' },
+    { label: 'Assistants & Agencies', href: '/assistants-agencies' },
     { label: 'Resources', href: '/resources' },
   ];
 
@@ -113,19 +114,19 @@ export default function Landing() {
   return (
     <div className="min-h-screen overflow-x-hidden" style={{ background: NAVY_BG }}>
       <SEOHead
-        title="HaulTrackerPro — Talk About the Trucking Work You Want"
-        description="Tell HaulTracker Pro the trucking work you want in your own words. Build your driver work profile in a short conversation, then continue to real opportunities and the business tools behind every truck."
+        title="HaulTrackerPro | Trucking Work, Recruiting & Business Tools"
+        description="Find trucking opportunities, track loads and expenses, manage recruiter workflows, and support driver clients through approved assistant and agency access."
         path="/"
         jsonLd={[
           {
             '@context': 'https://schema.org',
             '@type': 'SoftwareApplication',
             name: 'HaulTrackerPro',
-            applicationCategory: 'FinanceApplication',
+            applicationCategory: 'BusinessApplication',
             applicationSubCategory: 'Trucking Software',
             operatingSystem: 'Web',
             description:
-              'Conversation-first trucking work platform, driver profit tracker, and verified recruiter opportunity workspace.',
+              'Find trucking opportunities, track loads and expenses, manage recruiter workflows, and support driver clients through approved assistant and agency access.',
             url: 'https://haultrackerpro.com',
             offers: [
               { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Driver Free' },
@@ -160,7 +161,7 @@ export default function Landing() {
                 key={item.href}
                 variant="ghost"
                 onClick={() => navigate(item.href)}
-                className="text-sm px-3"
+                className="min-h-[44px] text-sm px-2"
                 style={{ color: TEXT_MUTED }}
               >
                 {item.label}
@@ -169,7 +170,7 @@ export default function Landing() {
             <Button
               variant="ghost"
               onClick={() => navigate('/auth')}
-              className="text-sm px-3"
+              className="min-h-[44px] text-sm px-2"
               style={{ color: TEXT_MUTED }}
             >
               Log In
@@ -177,10 +178,10 @@ export default function Landing() {
             <Button
               data-testid="landing-header-start-talking"
               onClick={focusConversation}
-              className="text-sm font-bold rounded-xl px-5 ml-1"
+              className="min-h-[44px] text-sm font-bold rounded-lg px-4 ml-1"
               style={{ background: AMBER, color: 'white' }}
             >
-              Start Talking
+              Find Work
             </Button>
           </div>
 
@@ -188,19 +189,20 @@ export default function Landing() {
             <Button
               data-testid="landing-header-start-talking-mobile"
               onClick={focusConversation}
-              className="text-xs font-bold rounded-xl px-3"
+              className="min-h-[44px] text-xs font-bold rounded-lg px-3"
               style={{ background: AMBER, color: 'white' }}
             >
-              Start Talking
+              Find Work
             </Button>
-            <button
+            <Button
+              variant="ghost"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-lg"
+              className="h-11 w-11 p-2 rounded-lg"
               aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
               style={{ color: TEXT_MUTED }}
             >
               {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
+            </Button>
           </div>
         </div>
         {mobileMenuOpen && (
@@ -211,21 +213,22 @@ export default function Landing() {
           >
             <div className="flex flex-col px-4 py-3 space-y-1">
               {mobileNav.map((item) => (
-                <button
+                <Button
+                  variant="ghost"
                   key={item.label}
                   onClick={() => {
                     setMobileMenuOpen(false);
                     if (item.kind === 'scroll') {
                       focusConversation();
                     } else {
-                      navigate(item.href!);
+                      if (item.href) navigate(item.href);
                     }
                   }}
-                  className="w-full text-left px-3 py-3 rounded-lg text-sm font-medium hover:bg-white/5"
+                  className="w-full min-h-[44px] justify-start text-left px-3 py-3 rounded-lg text-sm font-medium"
                   style={{ color: TEXT_MUTED }}
                 >
                   {item.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -233,7 +236,7 @@ export default function Landing() {
       </nav>
 
       <main>
-        {/* 1 — HERO: the conversation IS the product */}
+        {/* Audience entry, followed by the driver-only guided conversation */}
         <section className="relative overflow-hidden" data-testid="landing-hero">
           <div
             className="absolute inset-0 pointer-events-none"
@@ -251,17 +254,71 @@ export default function Landing() {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-3"
               style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
             >
-              <Sparkles className="h-3.5 w-3.5" /> Conversation-first trucking platform
+              <Sparkles className="h-3.5 w-3.5" /> For the people behind every haul
             </div>
             <h1 className="text-[1.9rem] leading-[1.08] sm:text-5xl font-black tracking-tight text-white max-w-3xl mx-auto">
-              Talk about the work you want. <span style={{ color: AMBER_BRIGHT }}>Not paperwork.</span>
+              Trucking work and business, <span className="text-primary">connected.</span>
             </h1>
             <p
               className="mt-3 text-sm sm:text-lg leading-relaxed max-w-xl mx-auto"
               style={{ color: TEXT_MUTED }}
             >
-              Answer a few questions in your own words. No signup to start.
+              Find trucking opportunities, track your numbers, manage recruiting, or support approved driver clients. Choose where you want to start.
             </p>
+
+            <div
+              className="mt-7 grid grid-cols-1 md:grid-cols-3 gap-4 text-left"
+              data-testid="hero-audience-paths"
+            >
+              <article className="flex flex-col rounded-lg border border-sidebar-border bg-secondary p-5 text-secondary-foreground">
+                <Truck className="h-6 w-6 text-primary" aria-hidden="true" />
+                <h2 className="mt-4 text-lg font-bold">Drivers &amp; Owner-Operators</h2>
+                <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
+                  Find work that fits your preferences, or organize loads, expenses, fuel, and profit.
+                </p>
+                <div className="mt-auto pt-5 flex flex-col gap-2">
+                  <Button data-testid="hero-path-find-work" onClick={focusConversation} className="min-h-[44px] h-auto whitespace-normal font-bold">
+                    Find Work <ArrowRight aria-hidden="true" />
+                  </Button>
+                  <Button data-testid="hero-path-my-trucking" variant="secondary" onClick={goToDriver} className="min-h-[44px] h-auto whitespace-normal border border-sidebar-border">
+                    Track My Trucking
+                  </Button>
+                </div>
+              </article>
+              <article className="flex flex-col rounded-lg border border-sidebar-border bg-secondary p-5 text-secondary-foreground">
+                <Users className="h-6 w-6 text-primary" aria-hidden="true" />
+                <h2 className="mt-4 text-lg font-bold">Carriers &amp; Recruiters</h2>
+                <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
+                  Post opportunities and manage driver inquiries in your recruiter workspace.
+                </p>
+                <div className="mt-auto pt-5">
+                  <Button data-testid="hero-path-hire-drivers" onClick={() => navigate('/recruiters')} className="w-full min-h-[44px] h-auto whitespace-normal font-bold">
+                    Explore Recruiter Tools <ArrowRight aria-hidden="true" />
+                  </Button>
+                </div>
+              </article>
+              <article className="flex flex-col rounded-lg border border-sidebar-border bg-secondary p-5 text-secondary-foreground">
+                <Briefcase className="h-6 w-6 text-primary" aria-hidden="true" />
+                <h2 className="mt-4 text-lg font-bold">Assistants &amp; Agencies</h2>
+                <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
+                  Organize approved driver clients' records with the permissions they grant.
+                </p>
+                <div className="mt-auto pt-5">
+                  <Button data-testid="hero-path-assistants-agencies" onClick={() => navigate('/assistants-agencies')} className="w-full min-h-[44px] h-auto whitespace-normal font-bold">
+                    Explore Support Tools <ArrowRight aria-hidden="true" />
+                  </Button>
+                </div>
+              </article>
+            </div>
+
+            <div className="mt-10 text-left max-w-3xl mx-auto">
+              <h2 className="text-xl sm:text-2xl font-bold text-secondary-foreground">
+                Drivers: start with the work you want.
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-sidebar-foreground">
+                Use the free guided Find Work conversation to describe your preferences, then review them before saving.
+              </p>
+            </div>
 
             <div className="mt-5">
               {deepLink.jobRequested && (
@@ -286,52 +343,6 @@ export default function Landing() {
               />
             </div>
 
-
-            {/* 2 — Three compact paths */}
-            <div
-              className="mt-7 grid grid-cols-1 md:grid-cols-3 gap-3 max-w-4xl mx-auto"
-              data-testid="hero-audience-paths"
-            >
-              {[
-                {
-                  key: 'find-work',
-                  icon: MessageSquare,
-                  label: 'Find Work',
-                  outcome: 'Tell HaulTracker the freight and home time you want.',
-                  action: focusConversation,
-                },
-                {
-                  key: 'my-trucking',
-                  icon: Truck,
-                  label: 'My Trucking',
-                  outcome: 'Track loads, expenses, fuel and real profit on every mile.',
-                  action: goToDriver,
-                },
-                {
-                  key: 'hire-drivers',
-                  icon: Users,
-                  label: 'Hire Drivers',
-                  outcome: 'Verified recruiters post opportunities and reply to drivers.',
-                  action: () => navigate('/recruiters'),
-                },
-              ].map((p) => (
-                <button
-                  key={p.key}
-                  data-testid={`hero-path-${p.key}`}
-                  onClick={p.action}
-                  className="text-left rounded-2xl border p-4 min-h-[44px] hover:border-[hsl(25,95%,53%)] transition-colors"
-                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="p-1.5 rounded-md" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>
-                      <p.icon className="h-4 w-4" style={{ color: AMBER }} />
-                    </div>
-                    <span className="text-sm font-bold text-white">{p.label}</span>
-                  </div>
-                  <p className="mt-2 text-xs" style={{ color: TEXT_MUTED }}>{p.outcome}</p>
-                </button>
-              ))}
-            </div>
 
             <p className="mt-5 text-xs sm:text-sm" style={{ color: TEXT_DIM }}>
               The business platform behind every truck. Drivers start free — no credit card.
@@ -420,6 +431,21 @@ export default function Landing() {
           data-testid="secondary-tools-section"
         >
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
+            <h2 className="text-xl font-bold text-secondary-foreground">Connected work, practical tools.</h2>
+            <div className="mt-4 mb-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sidebar-foreground">
+              <div>
+                <Button variant="link" onClick={focusConversation} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start font-bold">Find work <ArrowRight aria-hidden="true" /></Button>
+                <p className="text-sm">Drivers describe their preferences; recruiters manage opportunities and inquiries.</p>
+              </div>
+              <div>
+                <Button variant="link" onClick={goToDriver} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start font-bold">Run your trucking business <ArrowRight aria-hidden="true" /></Button>
+                <p className="text-sm">Keep loads, expenses, fuel, and profit in your driver workspace.</p>
+              </div>
+              <div>
+                <Button variant="link" onClick={() => navigate('/assistants-agencies')} className="min-h-[44px] h-auto px-0 whitespace-normal justify-start font-bold">Support drivers <ArrowRight aria-hidden="true" /></Button>
+                <p className="text-sm">Assistants and agencies work within driver-approved permissions.</p>
+              </div>
+            </div>
             <p className="text-xs font-bold uppercase tracking-widest mb-4" style={{ color: TEXT_DIM }}>
               Also inside HaulTracker Pro
             </p>
@@ -460,13 +486,10 @@ export default function Landing() {
               <Lock className="h-3.5 w-3.5" /> Your information, your call
             </div>
             <h2 className="text-xl sm:text-2xl font-black text-white">
-              Nothing is shared until you say so.
+              You choose what to share.
             </h2>
             <p className="mt-3 text-sm sm:text-base leading-relaxed" style={{ color: TEXT_MUTED }}>
-              Your homepage answers stay on your device until you review and save them. Recruiter
-              access is verified, and recruiters can only see what you choose to share. Driver
-              Assistant and agency access begins only with explicit driver approval, is limited to
-              the permissions you grant, can be revoked instantly, and every action is audit-logged.
+              Review your Find Work answers before saving your preferences. Driver assistant and agency access requires driver approval and is limited to granted permissions.
             </p>
             <p className="mt-3 text-xs" style={{ color: TEXT_DIM }}>
               Service payments between drivers and assistants or agencies are arranged outside
