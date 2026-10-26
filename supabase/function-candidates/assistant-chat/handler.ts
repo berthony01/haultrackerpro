@@ -57,6 +57,18 @@ export const TOOLS_BY_SCOPE: Record<Scope, string[]> = {
   agency: ['packages', 'work_items', 'client_requests'],
 };
 
+/** Mirrors SQL _assistant_source_allowed: which registered projections a context's grants cover. */
+export function toolsFor(scope: Scope, perms: string[]): string[] {
+  const has = (...p: string[]) => p.some((x) => perms.includes(x));
+  const rules: Record<string, boolean> = {
+    loads: has('manage_loads', 'view_dashboard', 'view_reports'),
+    expenses: has('manage_expenses', 'view_dashboard', 'view_reports'),
+    opportunities: has('opportunities_view'), applications: has('applications_view'), conversations: has('conversations_view'),
+    packages: has('packages_view'), work_items: has('work_items_view_all'), client_requests: has('client_requests_view'),
+  };
+  return (TOOLS_BY_SCOPE[scope] ?? []).filter((k) => rules[k]);
+}
+
 function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
@@ -186,7 +198,7 @@ export async function handleAssistantRequest(req: Request, deps: HandlerDeps): P
       generationEnabled: deps.config.enabled,
       retentionDays: RETENTION_DAYS,
       limits: { daily: LIMITS.dailyAttempts, perMinute: LIMITS.perMinuteAttempts, maxChars: LIMITS.maxUserChars },
-      contexts: rows.map((c) => ({ scope: c.scope_kind, targetId: c.target_id, label: c.label, tools: TOOLS_BY_SCOPE[c.scope_kind]?.filter((k) => k === 'loads' || k === 'expenses' ? true : true) ?? [] })),
+      contexts: rows.map((c) => ({ scope: c.scope_kind, targetId: c.target_id, label: c.label, tools: toolsFor(c.scope_kind, c.permissions ?? []) })),
       contextsTruncated: rows.some((c) => c.has_more),
     });
   }
