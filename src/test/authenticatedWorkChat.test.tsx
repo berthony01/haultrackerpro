@@ -439,7 +439,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     if (cycle === 1) {
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
-      fireEvent.click(screen.getAllByRole('button', { name: 'Dashboard', exact: true })[0]);
+      fireEvent.click(screen.getAllByRole('button', { name: /^Dashboard$/ })[0]);
       expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
       expect(window.location.search).toBe('');
       expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
