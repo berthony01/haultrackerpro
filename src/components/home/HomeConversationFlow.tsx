@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, MessageSquare, RotateCcw, Undo2, Send, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import HomeOpportunityPreview from '@/components/home/HomeOpportunityPreview';
@@ -265,6 +265,15 @@ export default function HomeConversationFlow({
   const [draft, setDraft] = useState('');
 
   const { answers, bubbles, current, confirming } = state;
+  const transcriptRef = useRef<HTMLDivElement>(null);
+
+  // Reveal the newest bubble by scrolling only the transcript element itself.
+  // Runs once per bubble change (new question, clarification, back, restart);
+  // no window scroll, no scrollIntoView, no focus movement, no listeners.
+  useLayoutEffect(() => {
+    const el = transcriptRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [bubbles]);
   const summary = useMemo(() => summarizeIntake(answers), [answers]);
   const complete = current === null && !confirming;
   const seedActive = !seedIgnored && Boolean(profileDisclosure(initialAnswers ? profileReuseLabels : undefined));
@@ -550,6 +559,7 @@ export default function HomeConversationFlow({
         style={{ background: CANVAS_BG, borderColor: CANVAS_BORDER }}
       >
         <div
+          ref={transcriptRef}
           data-testid="home-conversation-transcript"
           className="h-[220px] sm:h-[240px] space-y-2 overflow-y-auto overscroll-contain pr-1"
           aria-live="polite"
