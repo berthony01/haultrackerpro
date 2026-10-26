@@ -1,6 +1,6 @@
 # Phase 3 Assistant Foundation: Architecture Contract
 
-Status: CONTRACT. Only section 1 is built. Everything in sections 2 to 6 is proposed future work and is not implemented, approved or active. Tracking: issue #44.
+Status: Section 1 is built. Phase 3A history is a SOURCE-ONLY SQL CANDIDATE with local role/RLS tests, not applied or active. Sections 2 to 6 remain future integration, except the approved retention and paid-plan decisions recorded below. Tracking: issue #44.
 
 ## 1. Built now: same-tab driver conversation continuity
 
@@ -27,7 +27,7 @@ Status: CONTRACT. Only section 1 is built. Everything in sections 2 to 6 is prop
 | Assistant / agency | Active driver-approved delegation for the target driver, the specific field/permission (`useActingContext` permissions, `src/lib/assistantPermissions.ts`, `src/lib/agencyWorkspacePermissions.ts`) and the managed driver's entitlement where applicable. |
 | Admin | Not blanket authorization. Admin view mode never grants data access by itself. |
 
-Pro entitlement (`src/hooks/useSubscription.ts`, server `check-subscription`) gates paid assistant use, checked server side.
+User-approved decision: a future general assistant is included in all existing paid plans (Driver Pro, paid Recruiter, paid Agency), always within the chosen role/target and existing data permissions. The source candidate uses canonical server capability, entitlement, membership, seat and delegation helpers, not client `isPro` or the existing specialized AI gateway. No general assistant is activated.
 
 ## 4. Future tool and safety rules (proposed)
 
@@ -43,7 +43,7 @@ Pro entitlement (`src/hooks/useSubscription.ts`, server `check-subscription`) ga
 
 ## 6. Proposed later build sequence
 
-1. Decide durable transcript policy: storage location, retention period, user deletion control, account deletion cascade, and whether drafts survive sign-out. (Open, not decided.)
+1. Approved history policy: expires 30 days (720 hours) after thread creation or user deletion sooner; messages never extend expiry. Source candidate tables are `assistant_threads` and `assistant_messages`, distinct from human Conversations and AI insights. Actor ownership references `public.profiles(user_id) ON DELETE CASCADE`, with identity exclusively from `auth.uid()`. Missing profiles fail closed without provisioning. Profile deletion and auth-to-profile deletion cascade history; a replacement profile starts empty. Physical expiry deletion requires a scheduler before release; none is configured. This does not change the built same-tab guided draft, its refresh/sign-out boundaries, or current UI.
 2. Server tool registry with per-tool authorization matrix and schema-faithful role/RLS tests.
 3. Read-only driver-self tools (own loads, expenses, profile summaries), Pro-gated, spend after authorization.
 4. Recruiter workspace read-only tools under membership grants.
@@ -52,4 +52,6 @@ Pro entitlement (`src/hooks/useSubscription.ts`, server `check-subscription`) ga
 
 Acceptance for each step: privilege matrix tests, denied-role evidence, no spend on denied calls, no writes, live post-change checks.
 
-Outstanding decisions: transcript retention and deletion, durable storage, Pro pricing of assistant usage, job search card activation, audit logging scope.
+Source candidate: `supabase/migration-candidates/20261026165204_phase3_assistant_history_foundation.sql`. Detailed scope matrix, provenance, local test evidence and release gates: [Phase 3 history audit](phase3-assistant-history-audit.md). No migration promotion, production SQL, model calls, tool registry or assistant-reply RPC occurred.
+
+Outstanding release work: retention scheduler, privacy/provider terms, budgets and rate caps, server-signed replies and pre-spend reauthorization, scoped read-only tools, stale-session/response guards, signed-in shell integration, live role QA, job search card activation decision and audit logging scope. Inclusion in paid plans does not waive permission, budget or retention checks.
