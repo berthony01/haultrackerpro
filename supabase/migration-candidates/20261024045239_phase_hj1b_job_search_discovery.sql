@@ -11,6 +11,12 @@ DECLARE
   _uid uuid := auth.uid();
   _rows jsonb;
 BEGIN
+  -- HJ-2D: plain read of the private switch at entry (STABLE: no row lock).
+  -- Missing row/NULL = OFF. Rechecked per statement; it cannot retract
+  -- results already delivered before OFF committed.
+  IF (SELECT f.discovery_enabled FROM job_search_private.job_search_feature_control f WHERE f.singleton) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Discovery unavailable' USING ERRCODE = '42501';
+  END IF;
   IF _recruiter_id IS NULL OR _limit IS NULL OR _limit NOT BETWEEN 1 AND 50
     OR ((_after_published_at IS NULL) <> (_after_card_id IS NULL))
     OR (_after_published_at IS NOT NULL AND NOT pg_catalog.isfinite(_after_published_at)) THEN

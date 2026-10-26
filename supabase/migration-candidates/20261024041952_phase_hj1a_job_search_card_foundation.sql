@@ -35,6 +35,20 @@ CREATE TABLE job_search_private.job_search_card_events (
 );
 REVOKE ALL ON job_search_private.job_search_card_events FROM PUBLIC, anon, authenticated, service_role;
 ALTER TABLE job_search_private.job_search_card_events ENABLE ROW LEVEL SECURITY;
+-- HJ-2D private safety switch. Singleton, both flags OFF at creation. No
+-- policies and no client grants: PUBLIC/anon/authenticated/service_role cannot
+-- read or write it. No client/admin RPC flips it; activation requires a
+-- separately authorized, audited privileged operator procedure. Missing row
+-- or NULL is treated as OFF (fail closed).
+CREATE TABLE job_search_private.job_search_feature_control (
+  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+  publication_enabled boolean NOT NULL DEFAULT false,
+  discovery_enabled boolean NOT NULL DEFAULT false
+);
+REVOKE ALL ON job_search_private.job_search_feature_control FROM PUBLIC, anon, authenticated, service_role;
+ALTER TABLE job_search_private.job_search_feature_control ENABLE ROW LEVEL SECURITY;
+INSERT INTO job_search_private.job_search_feature_control (singleton, publication_enabled, discovery_enabled)
+VALUES (true, false, false);
 
 CREATE FUNCTION job_search_private.manage_my_job_search_card(
   _action text, _payload jsonb DEFAULT NULL, _expected_revision integer DEFAULT NULL,
@@ -50,6 +64,7 @@ DECLARE
   _now timestamptz;
   _date date;
   _normalized jsonb;
+  _publication_enabled boolean;
 BEGIN
   IF _uid IS NULL THEN RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501'; END IF;
   IF _action IS NULL OR _action NOT IN ('get','publish','pause','withdraw') THEN
@@ -122,6 +137,19 @@ BEGIN
     END IF;
     _fingerprint := pg_catalog.md5(pg_catalog.jsonb_build_array(_action,_normalized,_expected_revision,_consent_version)::text);
     PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(_uid::text,0));
+    -- Lock order: owner advisory lock, THEN control row FOR SHARE. Every publish,
+    -- including command-id replay, requires publication_enabled under this share
+    -- lock held to commit, so an operator UPDATE to OFF waits for in-flight
+    -- publishes and any publish locking after that OFF commits is denied.
+    -- get/pause/withdraw never touch the control row. OFF does not recall
+    -- already-published cards.
+    IF _action = 'publish' THEN
+      SELECT f.publication_enabled INTO _publication_enabled
+        FROM job_search_private.job_search_feature_control f WHERE f.singleton FOR SHARE;
+      IF _publication_enabled IS NOT TRUE THEN
+        RAISE EXCEPTION 'Job search publication disabled' USING ERRCODE = '42501';
+      END IF;
+    END IF;
     SELECT * INTO _receipt FROM job_search_private.job_search_card_events e WHERE e.owner_user_id = _uid AND e.client_command_id = _client_command_id;
     IF FOUND AND _receipt.input_fingerprint <> _fingerprint THEN RAISE EXCEPTION 'Command input changed' USING ERRCODE='22023'; END IF;
   END IF;
