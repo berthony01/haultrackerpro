@@ -356,7 +356,7 @@ describe('Phase3B independent-review corrections', () => {
     expect((await call(t, { action: 'send', requestId, content: 'Purge me', scope: 'recruiter', targetId: RECRUITER })).status).toBe(409);
     // Another actor reusing the request id never sees A's reply.
     const other = await call(tok(B), { action: 'send', requestId, content: 'Purge me', threadId: one.body.threadId });
-    expect(other.status).toBe(409); expect(JSON.stringify(other.body)).not.toContain('grounded');
+    expect(other.status).toBe(403); expect(JSON.stringify(other.body)).not.toContain('grounded');
     expect(modelCalls).toBe(1);
   });
 
@@ -475,7 +475,8 @@ describe('Phase3B independent-review corrections', () => {
     expect(await count(`SELECT count(*)::int n FROM public.assistant_messages WHERE role='assistant'`)).toBe(0);
     gateway = async () => new Response('x', { status: 500 });
     const f = await call(tok(A), { action: 'send', requestId: rid(), content: 'hi', scope: 'driver_self', targetId: A }, undefined, d);
-    expect(f.status).toBe(503); expect(modelCalls).toBe(1);
+    // The unfinalized lease stays live (busy) until it expires; no second model call.
+    expect(f.status).toBe(429); expect(f.body.reason).toBe('busy'); expect(modelCalls).toBe(1);
   });
 
   it.each([
