@@ -30,19 +30,19 @@ function renderLanding() {
 }
 
 /**
- * HP-2 re-pin. The homepage information architecture is now the locked six-part
- * conversation-first hierarchy. Sections removed from `/` (workspace walkthrough,
+ * Homepage positioning re-pin: three audiences precede the guided driver chat.
+ * The existing ordered section anchors remain protected. Sections removed from `/` (workspace walkthrough,
  * role sales cards, pricing preview, FAQ, founder story, duplicate CTAs) keep
  * their dedicated routes — they are simply no longer competing with the hero.
  */
 describe('Phase 1M-B — Homepage information architecture', () => {
-  it('renders the conversation-first hero headline and keeps the platform tagline', () => {
+  it('renders the connected-platform hero headline and keeps the platform tagline', () => {
     renderLanding();
     const hero = screen.getByTestId('landing-hero');
     expect(
       within(hero).getByRole('heading', {
         level: 1,
-        name: /Talk about the work you want\./i,
+        name: 'Trucking work and business, connected.',
       }),
     ).toBeInTheDocument();
     expect(hero).toHaveTextContent('The business platform behind every truck.');
@@ -56,20 +56,28 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     expect(/side hustle/i.test(text)).toBe(false);
   });
 
-  it('renders the three primary hero paths in conversation-first order', () => {
+  it('keeps the driver, recruiter, and support primary actions wired to existing journeys', () => {
     renderLanding();
     const paths = screen.getByTestId('hero-audience-paths');
     const findWork = within(paths).getByTestId('hero-path-find-work');
     const myTrucking = within(paths).getByTestId('hero-path-my-trucking');
     const hire = within(paths).getByTestId('hero-path-hire-drivers');
+    const support = within(paths).getByTestId('hero-path-assistants-agencies');
     expect(findWork).toHaveTextContent(/Find Work/);
     expect(myTrucking).toHaveTextContent(/My Trucking/);
-    expect(hire).toHaveTextContent(/Hire Drivers/);
+    expect(hire).toHaveTextContent('Explore Recruiter Tools');
+    expect(support).toHaveTextContent('Explore Support Tools');
+
+    fireEvent.click(findWork);
+    expect(screen.getByTestId('home-conversation-input')).toHaveFocus();
+    expect(navigateSpy).not.toHaveBeenCalled();
 
     fireEvent.click(myTrucking);
     expect(navigateSpy).toHaveBeenLastCalledWith('/auth?intent=driver');
     fireEvent.click(hire);
     expect(navigateSpy).toHaveBeenLastCalledWith('/recruiters');
+    fireEvent.click(support);
+    expect(navigateSpy).toHaveBeenLastCalledWith('/assistants-agencies');
   });
 
   it('renders exactly the locked six-part hierarchy in order', () => {
@@ -131,14 +139,21 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     expect(navigateSpy).toHaveBeenLastCalledWith('/assistants-agencies');
   });
 
-  it('preserves truthful recruiter verification and back-office delegation/outside-payment disclosures', () => {
+  it('requires review, approved limited delegation, and outside-payment disclosures without unsupported claims', () => {
     const { container } = renderLanding();
     const text = container.textContent ?? '';
-    expect(/verified|verification/i.test(text)).toBe(true);
+    const trust = screen.getByTestId('trust-section');
+    expect(trust).toHaveTextContent(/review your Find Work answers before saving your preferences/i);
     expect(/driver approv/i.test(text)).toBe(true);
-    expect(/audit/i.test(text)).toBe(true);
-    expect(/revoke/i.test(text)).toBe(true);
+    expect(trust).toHaveTextContent(/access requires driver approval/i);
+    expect(trust).toHaveTextContent(/limited to granted permissions/i);
     expect(/does not process (service )?payments/i.test(text)).toBe(true);
+    expect(trust).toHaveTextContent(/service payments.*arranged outside HaulTracker Pro/i);
+    expect(/Verified recruiters post/i.test(text)).toBe(false);
+    expect(/every action is audit[-\s]logged/i.test(text)).toBe(false);
+    expect(/revoked instantly/i.test(text)).toBe(false);
+    expect(/\b(?:verified|qualified|automatically vetted)\s+drivers\b/i.test(text)).toBe(false);
+    expect(/\b(?:live\s+candidate[-\s]+(?:discovery|cards)|candidate[-\s]+discovery\s+is\s+live)\b/i.test(text)).toBe(false);
   });
 
   it('respects the responsive contract: desktop nav gated at lg, multi-card grids one-column by default, root overflow-x-hidden', () => {

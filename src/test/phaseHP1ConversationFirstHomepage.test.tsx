@@ -33,8 +33,8 @@ function renderLanding() {
   );
 }
 
-describe('Homepage — conversation-first front door (HP-1 re-pinned for HP-2)', () => {
-  it('renders the conversation surface inside the hero, above secondary sections', () => {
+describe('Homepage — audience-first front door with guided driver conversation', () => {
+  it('renders the driver conversation inside the hero, above secondary sections', () => {
     renderLanding();
     const hero = screen.getByTestId('landing-hero');
     const surface = within(hero).getByTestId('home-conversation-surface');
@@ -48,7 +48,7 @@ describe('Homepage — conversation-first front door (HP-1 re-pinned for HP-2)',
     ).toBeTruthy();
   });
 
-  it('the first thing the driver sees is the opening question, not a signup CTA', () => {
+  it('opens the driver conversation with a work question, not a signup CTA', () => {
     renderLanding();
     const transcript = screen.getByTestId('home-conversation-transcript');
     expect(transcript).toHaveTextContent('What kind of trucking work are you looking for?');
@@ -73,22 +73,46 @@ describe('Homepage — conversation-first front door (HP-1 re-pinned for HP-2)',
     expect(send).toBeEnabled();
   });
 
-  it('orders primary paths Find Work, My Trucking, Hire Drivers', () => {
+  it('orders four primary actions within exactly three audience articles before the chat', () => {
     renderLanding();
     const paths = screen.getByTestId('hero-audience-paths');
     const ids = Array.from(paths.querySelectorAll('[data-testid^="hero-path-"]')).map((el) =>
       el.getAttribute('data-testid'),
     );
-    expect(ids).toEqual(['hero-path-find-work', 'hero-path-my-trucking', 'hero-path-hire-drivers']);
+    expect(ids).toEqual([
+      'hero-path-find-work',
+      'hero-path-my-trucking',
+      'hero-path-hire-drivers',
+      'hero-path-assistants-agencies',
+    ]);
+    const articles = within(paths).getAllByRole('article');
+    expect(articles).toHaveLength(3);
+    const audienceHeadings = [
+      'Drivers & Owner-Operators',
+      'Carriers & Recruiters',
+      'Assistants & Agencies',
+    ];
+    expect(within(paths).getAllByRole('heading', { level: 2 })).toHaveLength(3);
+    const chat = screen.getByTestId('home-conversation-surface');
+    articles.forEach((article, index) => {
+      expect(within(article).getAllByRole('heading')).toHaveLength(1);
+      expect(within(article).getByRole('heading', {
+        level: 2,
+        name: audienceHeadings[index],
+      })).toBeInTheDocument();
+      expect(article.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING)
+        .toBeTruthy();
+    });
   });
 
   it('Find Work focuses the conversation instead of routing to signup', () => {
     renderLanding();
     fireEvent.click(screen.getByTestId('hero-path-find-work'));
+    expect(screen.getByTestId('home-conversation-input')).toHaveFocus();
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 
-  it('header primary action is conversation-first, not a generic signup', () => {
+  it('header primary action focuses the driver conversation, not a generic signup', () => {
     renderLanding();
     fireEvent.click(screen.getByTestId('landing-header-start-talking'));
     expect(navigateSpy).not.toHaveBeenCalled();
