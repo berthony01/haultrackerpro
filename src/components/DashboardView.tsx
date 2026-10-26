@@ -426,15 +426,16 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       {/* Phase DA-1 — self-only tier-up detection (signed-in user's own state) */}
       {showPersonalWidgets && <SelfTierUpDetector />}
 
-      {/* Date Range Filter — moved above premium hero so it scopes the new charts */}
+      {/* Selected period — the date controls scope every total in this region */}
       <div className="space-y-2">
+        <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Selected period</p>
         <div className="flex flex-wrap gap-1.5">
           {presets.map(p => (
             <Button
               key={p.key}
               variant={activePreset === p.key ? 'default' : 'outline'}
               size="sm"
-              className={`text-xs h-8 px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
+              className={`text-xs min-h-[44px] px-3 rounded-xl active:scale-95 transition-all duration-200 ${activePreset === p.key ? 'shadow-primary' : ''}`}
               onClick={() => setActivePreset(p.key)}
             >
               {p.label}
@@ -454,9 +455,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             <p className="text-[11px] text-muted-foreground font-medium pl-0.5">{label}</p>
           ) : null;
         })()}
+        <p className="text-[11px] text-muted-foreground pl-0.5">These totals follow the selected date range.</p>
       </div>
 
-      {/* === PREMIUM ANALYTICS HERO === */}
+      {/* === PRIMARY FINANCIALS (scoped to the selected period) === */}
       {!isLoading && (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
