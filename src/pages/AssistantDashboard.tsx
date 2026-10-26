@@ -84,6 +84,9 @@ export default function AssistantDashboard() {
           <ArrowLeftRight className="mr-1.5 h-3.5 w-3.5" />
           Switch Workspace
         </Button>
+        <Button variant="outline" size="sm" data-testid="assistant-ai-assistant-link" onClick={() => navigate('/ai-assistant')}>
+          AI assistant
+        </Button>
       </header>
 
       {/* Lightweight access summary — intentionally not dashboard-like. */}
