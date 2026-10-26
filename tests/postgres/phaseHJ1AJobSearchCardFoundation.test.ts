@@ -92,12 +92,16 @@ beforeEach(async()=>{
  await setFlags(true,false);
 });
 describe('HJ-1A actual candidate owner-only SQL/roles/lifecycle',()=> {
- it('schema has exactly two RLS tables, no policies or client DML/schema CREATE',async()=>{
+ it('schema has exactly three RLS tables (two card tables + private control singleton), no policies or client DML/schema CREATE',async()=>{
   const rows=(await db.query("SELECT c.relname,c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='job_search_private' AND c.relkind='r' ORDER BY c.relname")).rows;
-  expect(rows).toEqual([{relname:'driver_job_search_cards',relrowsecurity:true},{relname:'job_search_card_events',relrowsecurity:true}]);
+  expect(rows).toEqual([{relname:'driver_job_search_cards',relrowsecurity:true},{relname:'job_search_card_events',relrowsecurity:true},{relname:'job_search_feature_control',relrowsecurity:true}]);
   expect((await db.query("SELECT * FROM pg_policies WHERE schemaname='job_search_private'")).rows).toEqual([]);
-  for(const role of ['anon','authenticated','service_role']) {
-   for(const table of ['driver_job_search_cards','job_search_card_events']) for(const privilege of ['SELECT','INSERT','UPDATE','DELETE']) expect((await db.query('SELECT has_table_privilege($1,$2,$3) AS allowed',[role,`job_search_private.${table}`,privilege])).rows[0].allowed).toBe(false);
+  for(const role of ['anon','authenticated','service_role','PUBLIC']) {
+   for(const table of ['driver_job_search_cards','job_search_card_events','job_search_feature_control']) for(const privilege of ['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) {
+    if(role==='PUBLIC') { expect((await db.query("SELECT count(*)::int AS n FROM aclexplode(coalesce((SELECT relacl FROM pg_class WHERE oid=$1::regclass),'{}')) WHERE grantee=0",[`job_search_private.${table}`])).rows[0].n).toBe(0); continue; }
+    expect((await db.query('SELECT has_table_privilege($1,$2,$3) AS allowed',[role,`job_search_private.${table}`,privilege])).rows[0].allowed).toBe(false);
+   }
+   if(role==='PUBLIC') continue;
    expect((await db.query("SELECT has_schema_privilege($1,'job_search_private','CREATE') AS allowed",[role])).rows[0].allowed).toBe(false);
   }
   expect((await db.query("SELECT * FROM aclexplode((SELECT nspacl FROM pg_namespace WHERE nspname='job_search_private')) WHERE grantee=0")).rows).toEqual([]);
