@@ -489,33 +489,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
               <p className="text-[11px] text-muted-foreground -mt-2">{footnote}</p>
             ) : null;
           })()}
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 space-y-4">
-              <ProfitOverviewChart loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
-              <ExpenseDonut expenses={filteredExpenses} />
-            </div>
-            <div className="space-y-4">
-              <DriverScoreGauge
-                score={scorecard.totalScore}
-                tier={scorecard.tier}
-                percentileLabel={scorecard.totalScore >= 80 ? 'Top 14% of drivers' : scorecard.totalScore >= 60 ? 'Top 35% of drivers' : 'Keep going!'}
-              />
-              <RecentLoadsPanel loads={filteredLoads} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
-            </div>
-          </div>
-
-          {showRecommendedOpportunity && onNavigate && (
-            <RecommendedOpportunityCard onNavigate={onNavigate} />
-          )}
-
-          <ProfitByLoadTable loads={filteredLoads} expenses={filteredExpenses} onViewAll={showPersonalWidgets && onNavigate ? () => onNavigate('loads') : undefined} />
-
-          {showPersonalWidgets && <DashboardFooterCTA onClick={onNavigate ? () => onNavigate('add') : undefined} />}
         </>
       )}
 
-      {/* === ZONE 1 · ACTION ZONE === */}
+      {/* === QUICK ACTIONS === */}
       {!isLoading && showPersonalWidgets && onNavigate && (
         <div className="grid grid-cols-4 gap-2">
           <Button
