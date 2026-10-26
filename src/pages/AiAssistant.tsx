@@ -105,7 +105,9 @@ export default function AiAssistant() {
   const ctx = a.currentContext;
   const canSend = s.availability === 'ready' && s.generationEnabled && !!ctx && !s.sending && s.draft.trim().length > 0 && s.draft.trim().length <= s.maxChars;
   const prompts = ctx ? ctx.tools.flatMap((t) => PROMPTS[t] ?? []).slice(0, 4) : [];
-  const pinnedMissing = !!a.pinnedDriverId && s.availability === 'ready' && s.contexts.length === 0;
+  const pinnedIncomplete = !!a.pinnedDriverId && s.availability === 'ready' && s.contexts.length === 0 && s.pinSearchOffset !== null;
+  // Only an exhausted search (no continuation) may claim the driver is not available.
+  const pinnedMissing = !!a.pinnedDriverId && s.availability === 'ready' && s.contexts.length === 0 && s.pinSearchOffset === null;
 
   const onDelete = (t: AssistantThread) => setConfirm({ kind: 'delete', thread: t });
 
@@ -182,6 +184,16 @@ export default function AiAssistant() {
               <div ref={transcriptRef} data-testid="ai-transcript" className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3" aria-live="polite">
                 {s.availability !== 'ready' ? (
                   <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{a.pinnedDriverId && s.contextsSearchPages > 1 ? `Looking for this driver's workspace (page ${s.contextsSearchPages})...` : 'Loading…'}</p>
+                ) : pinnedIncomplete ? (
+                  <div className="m-auto max-w-md space-y-3 py-10 text-center" role="status">
+                    <p className="font-medium">Still looking for this driver's workspace.</p>
+                    <p className="text-sm text-muted-foreground">
+                      {s.pinSearchFailed ? 'The search could not continue right now.' : `Searched ${s.contextsSearchPages} pages of workspaces so far.`} You can keep searching.
+                    </p>
+                    <Button variant="outline" size="sm" onClick={() => a.continuePinnedSearch()} disabled={s.pinSearchLoading}>
+                      {s.pinSearchLoading ? 'Searching...' : 'Continue searching'}
+                    </Button>
+                  </div>
                 ) : s.contexts.length === 0 ? (
                   <div className="m-auto max-w-md space-y-2 py-10 text-center">
                     <p className="font-medium">{pinnedMissing ? 'The AI assistant is not available for this driver.' : 'The AI assistant is included with paid plans.'}</p>
