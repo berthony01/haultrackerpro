@@ -342,7 +342,7 @@ describe('AI assistant review corrections', () => {
     transport.threads.mockImplementation(() => ok({ threads: [thread('th-1', 'Recent chat')], nextCursor: null }));
     transport.messages.mockImplementation(() => pend.p);
     render(<App />);
-    await act(async () => { fireEvent.click(await within(await screen.findByLabelText('Conversation history')).findByText('Recent chat')); });
+    { const item = await within(await screen.findByLabelText('Conversation history')).findByText('Recent chat'); await act(async () => { fireEvent.click(item); }); }
     fireEvent.change(screen.getByLabelText('AI assistant workspace'), { target: { value: `recruiter:${recruiterCtx.targetId}` } });
     await act(async () => { pend.resolve({ ok: true, data: { messages: [reply('x', 'LATE')], nextCursor: null } }); });
     expect(screen.queryByText('LATE')).toBeNull();
@@ -412,7 +412,7 @@ describe('AI assistant review corrections', () => {
     render(<App />);
     const t = screen.getByTestId('ai-transcript');
     Object.defineProperty(t, 'scrollHeight', { configurable: true, get: () => height });
-    await act(async () => { fireEvent.click(await within(await screen.findByLabelText('Conversation history')).findByText('Recent chat')); });
+    { const item = await within(await screen.findByLabelText('Conversation history')).findByText('Recent chat'); await act(async () => { fireEvent.click(item); }); }
     await screen.findByText('Newest reply');
     expect(t.scrollTop).toBe(900);
     t.scrollTop = 0; // reader scrolled to top
