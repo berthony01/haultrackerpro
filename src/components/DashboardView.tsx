@@ -825,10 +825,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
           {/* PerformanceTrends + PerformanceCharts removed — superseded by premium ProfitOverviewChart above */}
 
-          {/* Last Updated */}
+          {/* Latest load record update — reflects load records only, not a full app refresh */}
           {loads.length > 0 && (
             <p className="text-[10px] text-muted-foreground/50 text-center">
-              Last updated: {format(
+              Latest load record update: {format(
                 new Date(Math.max(...loads.map(l => new Date(l.updated_at).getTime()))),
                 'MMM d, h:mm a'
               )}
@@ -846,26 +846,6 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             </div>
           </div>
 
-          {/* Empty State */}
-          {!isLoading && filteredLoads.length === 0 && (
-            <Card className="border-dashed border-2 border-muted-foreground/20 shadow-card">
-              <CardContent className="py-14 text-center">
-                <div className="inline-flex items-center justify-center rounded-2xl bg-muted p-5 mb-5">
-                  <Truck className="h-12 w-12 text-muted-foreground/30" />
-                </div>
-                <p className="font-bold text-lg">No loads for this period</p>
-                <p className="text-sm text-muted-foreground mt-1.5 mb-5 leading-relaxed">
-                  You haven't logged any loads for this date range.<br />
-                  Start tracking to see your earnings here.
-                </p>
-                {showPersonalWidgets && onNavigate && (
-                  <Button className="gap-2 rounded-xl shadow-primary active:scale-95 transition-all duration-200" onClick={() => onNavigate('add')}>
-                    <Plus className="h-4 w-4" /> Log Your First Load
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
         </>
       )}
     </div>
