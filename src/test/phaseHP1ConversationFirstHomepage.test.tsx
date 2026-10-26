@@ -34,17 +34,22 @@ function renderLanding() {
 }
 
 describe('Homepage — audience-first front door with guided driver conversation', () => {
-  it('renders the driver conversation inside the hero, above secondary sections', () => {
+  it('renders the driver conversation once, below the audience showcase and above secondary sections', () => {
     renderLanding();
     const hero = screen.getByTestId('landing-hero');
-    const surface = within(hero).getByTestId('home-conversation-surface');
-    expect(surface).toBeInTheDocument();
+    expect(within(hero).queryByTestId('home-conversation-surface')).not.toBeInTheDocument();
+
+    const surface = screen.getByTestId('home-conversation-surface');
     expect(within(surface).getByTestId('home-conversation-input')).toBeInTheDocument();
     expect(within(surface).getByTestId('home-conversation-transcript')).toBeInTheDocument();
 
+    const showcase = screen.getByTestId('hero-audience-paths');
+    expect(
+      showcase.compareDocumentPosition(surface) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
     const secondary = screen.getByTestId('secondary-tools-section');
     expect(
-      hero.compareDocumentPosition(secondary) & Node.DOCUMENT_POSITION_FOLLOWING,
+      surface.compareDocumentPosition(secondary) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
   });
 
@@ -73,7 +78,7 @@ describe('Homepage — audience-first front door with guided driver conversation
     expect(send).toBeEnabled();
   });
 
-  it('orders four primary actions within exactly three audience articles before the chat', () => {
+  it('orders four primary actions within exactly three substantial audience articles before the chat', () => {
     renderLanding();
     const paths = screen.getByTestId('hero-audience-paths');
     const ids = Array.from(paths.querySelectorAll('[data-testid^="hero-path-"]')).map((el) =>
@@ -87,19 +92,16 @@ describe('Homepage — audience-first front door with guided driver conversation
     ]);
     const articles = within(paths).getAllByRole('article');
     expect(articles).toHaveLength(3);
-    const audienceHeadings = [
+    const audienceEyebrows = [
       'Drivers & Owner-Operators',
       'Carriers & Recruiters',
       'Assistants & Agencies',
     ];
-    expect(within(paths).getAllByRole('heading', { level: 2 })).toHaveLength(3);
     const chat = screen.getByTestId('home-conversation-surface');
     articles.forEach((article, index) => {
       expect(within(article).getAllByRole('heading')).toHaveLength(1);
-      expect(within(article).getByRole('heading', {
-        level: 2,
-        name: audienceHeadings[index],
-      })).toBeInTheDocument();
+      expect(article).toHaveTextContent(audienceEyebrows[index]);
+      expect(within(article).getByText('Example workflow')).toBeInTheDocument();
       expect(article.compareDocumentPosition(chat) & Node.DOCUMENT_POSITION_FOLLOWING)
         .toBeTruthy();
     });
