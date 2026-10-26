@@ -9,7 +9,7 @@ import { HOME_INTAKE_NEXT_PATH, type IntakeAnswers } from '@/lib/home/conversati
 import { describeProfileReuse, mapProfileToIntakeAnswers } from '@/lib/home/profileConversationMerge';
 import { setPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
 import { clearJobSearchCardHandoff, setJobSearchCardHandoff, JOB_SEARCH_CARD_PATH } from '@/lib/jobSearch/jobSearchCardHandoff';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useWorkConversationDraftStore } from '@/components/home/WorkConversationDraftProvider';
 import type { ConversationDraftAdapter } from '@/components/home/HomeConversationFlow';
 
@@ -59,14 +59,17 @@ function ProfileConversation() {
   const ownerId = user?.id ?? '';
   // Canonical seed fingerprint: a changed saved profile invalidates a retained flow.
   const fingerprint = useMemo(() => JSON.stringify({ e: isError, s: hasSeed ? seed : null }), [isError, hasSeed, seed]);
+  // One epoch-bound lease per mount. An invalidation while mounted permanently
+  // retires it; only a fresh remount under valid identity obtains a new lease.
+  const [lease] = useState(() => (draftStore && ownerId ? draftStore.lease(ownerId) : null));
   const draftAdapter = useMemo<ConversationDraftAdapter | undefined>(() => {
-    if (!draftStore || !ownerId) return undefined;
+    if (!lease || !ownerId) return undefined;
     const ok = () => liveOwner.current === ownerId && session?.user.id === ownerId;
     return {
-      read: () => (ok() ? draftStore.read(ownerId, fingerprint) : null),
-      write: (snap) => { if (ok()) draftStore.write(ownerId, fingerprint, snap); },
+      read: () => (ok() ? lease.read(fingerprint) : null),
+      write: (snap) => { if (ok()) lease.write(fingerprint, snap); },
     };
-  }, [draftStore, ownerId, fingerprint, session?.user.id]);
+  }, [lease, ownerId, fingerprint, session?.user.id]);
 
   if (profileLoading) {
     return <p data-testid="find-work-loading" className="text-sm text-muted-foreground">Loading…</p>;
