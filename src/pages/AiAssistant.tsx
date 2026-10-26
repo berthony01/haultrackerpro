@@ -171,7 +171,7 @@ export default function AiAssistant() {
                     {s.contextsLoading ? 'Loading workspaces...' : 'Load more workspaces'}
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" className="ml-auto" disabled={s.availability !== 'ready' || a.visibleThreads.length === 0} onClick={() => setConfirm({ kind: 'clear' })}>
+                <Button variant="ghost" size="sm" className="ml-auto" disabled={!ready || s.availability !== 'ready'} onClick={() => setConfirm({ kind: 'clear' })}>
                   Clear history
                 </Button>
                 {s.threadId && (

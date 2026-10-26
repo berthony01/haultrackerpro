@@ -235,6 +235,94 @@ const thread = (id: string, preview: string, scope = 'driver_self', targetId = A
 const userMsg = (id: string, content: string) => ({ id, role: 'user', content, createdAt: '', sources: [] });
 
 describe('AI assistant review corrections', () => {
+  it('paid access loss still permits confirmed own clear with no contexts, histories or generation', async () => {
+    transport.bootstrap.mockImplementation(() => ok(boot([], { generationEnabled: false })));
+    transport.clear.mockImplementation(() => ok({ cleared: 0 }));
+    render(<App />);
+    await screen.findByText('The AI assistant is included with paid plans.');
+    const clear = screen.getByRole('button', { name: 'Clear history' });
+    expect(clear).toBeEnabled();
+    expect(sendBtn()).toBeDisabled();
+    fireEvent.click(clear);
+    const dialog = screen.getByRole('alertdialog');
+    expect(within(dialog).getByText(/every AI assistant conversation saved for your account, in every workspace/)).toBeInTheDocument();
+    expect(transport.clear).not.toHaveBeenCalled();
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'Clear history' })); });
+    expect(transport.clear).toHaveBeenCalledTimes(1);
+    expect(transport.clear).toHaveBeenCalledWith();
+    expect(transport.send).not.toHaveBeenCalled();
+    expect(transport.deleteThread).not.toHaveBeenCalled();
+    expect(transport.messages).not.toHaveBeenCalled();
+  });
+
+  it('page 21 managed target requires explicit continuation after the 20-page operation bound', async () => {
+    acting.value = { actingDriver: { driver_user_id: D }, isActingAsAssistant: true, isLoadingManagedDrivers: false };
+    transport.bootstrap.mockImplementation((offset = 0) => ok(boot(offset === 1000
+      ? [{ scope: 'driver_delegate', targetId: D, label: 'Dana', tools: ['loads'] }]
+      : [driverCtx(), { scope: 'driver_delegate', targetId: B, label: 'Other driver', tools: ['loads'] }],
+    { nextOffset: offset === 1000 ? null : offset + 50 })));
+    render(<App />);
+    const more = await screen.findByRole('button', { name: 'Continue searching' });
+    expect(transport.bootstrap).toHaveBeenCalledTimes(20);
+    expect(transport.bootstrap.mock.calls.map((c) => c[0])).toEqual([undefined, ...Array.from({ length: 19 }, (_, i) => (i + 1) * 50)]);
+    expect(screen.queryByText('The AI assistant is not available for this driver.')).toBeNull();
+    expect((screen.getByLabelText('AI assistant workspace') as HTMLSelectElement).value).toBe('');
+    expect(sendBtn()).toBeDisabled();
+    await act(async () => { fireEvent.click(more); });
+    const select = screen.getByLabelText('AI assistant workspace') as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe(`driver_delegate:${D}`));
+    expect(transport.bootstrap).toHaveBeenCalledTimes(21);
+    expect(transport.bootstrap).toHaveBeenLastCalledWith(1000);
+    expect(select.options).toHaveLength(1);
+    expect(select).toBeDisabled();
+    expect(within(select).queryByText(/My driver workspace|Other driver/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Continue searching' })).toBeNull();
+    expect(transport.send).not.toHaveBeenCalled();
+  });
+
+  it('failed pinned continuation retains its offset and incomplete state for explicit retry', async () => {
+    acting.value = { actingDriver: { driver_user_id: D }, isActingAsAssistant: true, isLoadingManagedDrivers: false };
+    let attempts = 0;
+    transport.bootstrap.mockImplementation((offset = 0) => {
+      if (offset !== 1000) return ok(boot([driverCtx()], { nextOffset: offset + 50 }));
+      attempts += 1;
+      return attempts === 1 ? Promise.resolve({ ok: false, status: 503, code: 'unavailable' })
+        : ok(boot([{ scope: 'driver_delegate', targetId: D, label: 'Dana', tools: ['loads'] }], { nextOffset: null }));
+    });
+    render(<App />);
+    const continueSearch = await screen.findByRole('button', { name: 'Continue searching' });
+    await act(async () => { fireEvent.click(continueSearch); });
+    expect(await screen.findByText(/The search could not continue right now/)).toBeInTheDocument();
+    expect(screen.queryByText('The AI assistant is not available for this driver.')).toBeNull();
+    expect(sendBtn()).toBeDisabled();
+    expect((screen.getByLabelText('AI assistant workspace') as HTMLSelectElement).value).toBe('');
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Continue searching' })); });
+    await waitFor(() => expect((screen.getByLabelText('AI assistant workspace') as HTMLSelectElement).value).toBe(`driver_delegate:${D}`));
+    expect(transport.bootstrap.mock.calls.slice(-2).map((c) => c[0])).toEqual([1000, 1000]);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(transport.send).not.toHaveBeenCalled();
+  });
+
+  it('identity change during pinned continuation discards the old target and delayed history', async () => {
+    acting.value = { actingDriver: { driver_user_id: D }, isActingAsAssistant: true, isLoadingManagedDrivers: false };
+    const pending = deferred<any>();
+    transport.bootstrap.mockImplementation((offset = 0) => offset === 1000 ? pending.p : ok(boot([driverCtx()], { nextOffset: offset + 50 })));
+    const { rerender } = render(<App />);
+    const continueSearch = await screen.findByRole('button', { name: 'Continue searching' });
+    await act(async () => { fireEvent.click(continueSearch); });
+    expect(transport.bootstrap).toHaveBeenLastCalledWith(1000);
+    signIn(B, S2);
+    transport.bootstrap.mockImplementation(() => ok(boot([{ scope: 'driver_delegate', targetId: D, label: 'New identity workspace', tools: ['loads'] }], { nextOffset: null })));
+    rerender(<App />);
+    await waitFor(() => expect((screen.getByLabelText('AI assistant workspace') as HTMLSelectElement).selectedOptions[0]?.textContent).toContain('New identity workspace'));
+    const historyCalls = transport.threads.mock.calls.length;
+    await act(async () => { pending.resolve({ ok: true, data: boot([{ scope: 'driver_delegate', targetId: D, label: 'OLD PRIVATE TARGET', tools: ['loads'] }], { nextOffset: null }) }); });
+    expect(screen.queryByText(/OLD PRIVATE TARGET/)).toBeNull();
+    expect((screen.getByLabelText('AI assistant workspace') as HTMLSelectElement).selectedOptions[0]?.textContent).toContain('New identity workspace');
+    expect(transport.threads).toHaveBeenCalledTimes(historyCalls);
+    expect(transport.send).not.toHaveBeenCalled();
+  });
+
   it('session hint: only a well-formed JWT session_id; missing or malformed fails closed', async () => {
     expect(sessionHintOf(jwt(A, S1))).toBe(S1);
     expect(sessionHintOf(jwt(A, 'not-a-uuid'))).toBeNull();
@@ -432,7 +520,7 @@ describe('AI assistant review corrections', () => {
 
   it('request ids: getRandomValues RFC 4122 v4 fallback; no secure source fails closed without sending', async () => {
     const real = globalThis.crypto;
-    const fake = { getRandomValues: (a: Uint8Array) => real.getRandomValues(a) };
+    const fake = { getRandomValues: real.getRandomValues.bind(real) };
     vi.stubGlobal('crypto', fake);
     const ids = new Set(Array.from({ length: 50 }, () => newRequestId()));
     expect(ids.size).toBe(50);
