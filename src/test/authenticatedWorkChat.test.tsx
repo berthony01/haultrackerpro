@@ -389,11 +389,12 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     expect(state.mutation).not.toHaveBeenCalled();
   });
 
-  it('dashboard-embedded chat Continue opens the unsaved review on the same mounted Index', async () => {
+  it('dashboard-embedded chat repeated identical Continue opens the unsaved review on the same mounted Index', async () => {
     // Use the browser-backed router directly: ReviewJourney's render-time
     // replaceState bridge is not part of the production dashboard journey.
     // All URL-effect auth/workspace/subscription dependencies remain settled;
-    // only Router's search changes when the real Continue action navigates.
+    // Consuming the first hint clears the document URL but not Router's search.
+    // The second identical Continue must work without remounting Index.
     capability('active'); state.realOpportunities = true; state.loads = [{ id: 'existing' }];
     state.profiles['driver-a'] = fullProfile;
     const settledUser = state.user;
@@ -407,6 +408,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
       <BrowserRouter><Location /><MountedDashboard /></BrowserRouter>
     </QueryClientProvider>);
     expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
+    for (const cycle of [1, 2]) {
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
     await waitFor(() => expect(state.rpc).toHaveBeenCalled());
     expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
@@ -421,7 +423,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
       expect(state.mutation).not.toHaveBeenCalled();
       expect(state.model).not.toHaveBeenCalled();
       expect(screen.queryByTestId('driver-profile-pending-review-note'),
-        'Continue navigated, but the unsaved profile review form is absent').not.toBeNull();
+        `Cycle ${cycle}: Continue navigated, but the unsaved profile review form is absent`).not.toBeNull();
     }, { timeout: 1500 });
     expect(screen.getByTestId('driver-profile-pending-review-note')).toHaveTextContent('not saved yet');
     expect(screen.getByDisplayValue('Houston')).toBeTruthy();
@@ -434,7 +436,18 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     expect(state.mutation).not.toHaveBeenCalled();
     expect(state.rpc.mock.calls.every(([name]) => name === 'list_public_opportunity_teasers')).toBe(true);
     expect(state.model).not.toHaveBeenCalled();
-  }, 10000);
+    if (cycle === 1) {
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
+      fireEvent.click(screen.getAllByRole('button', { name: /^Dashboard$/ })[0]);
+      expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
+      expect(window.location.search).toBe('');
+      expect(screen.getByTestId('location')).toHaveTextContent(HOME_INTAKE_NEXT_PATH);
+      expect(hasPendingProfileAnswers()).toBe(false);
+      expect(mounts).toHaveBeenCalledTimes(1);
+    }
+    }
+  }, 15000);
 });
 
 describe('pending profile handoff is isolated per account (same tab, no reload)', () => {
