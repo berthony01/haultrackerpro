@@ -297,8 +297,7 @@ describe('actual Index settled dashboard integration', () => {
     console.log('DEBUG after Loads click:', {
       dashboard: !!screen.queryByTestId('existing-dashboard'),
       chat: !!screen.queryByTestId('home-conversation-surface'),
-      detailsOpen: [...document.querySelectorAll('details')].map((d) => d.open),
-      chatParentChain: (() => { let el = screen.queryByTestId('home-conversation-surface'); const chain: string[] = []; while (el) { chain.push(el.tagName + (el.getAttribute('data-testid') ?? '')); el = el.parentElement as any; } return chain.join(' < '); })(),
+      loadsButtons: screen.getAllByRole('button', { name: 'Loads' }).map((b) => (b as HTMLButtonElement).disabled + '|' + b.parentElement?.className?.slice(0, 60)),
     });
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
   });
