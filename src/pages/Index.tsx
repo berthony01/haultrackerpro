@@ -958,6 +958,16 @@ const Index = () => {
     setPage('add_fuel');
   };
 
+  // Embedded guided Find Work conversation for the canonical self-driver
+  // dashboard only. Same gate as the previous above-dashboard section; passed
+  // to DashboardView as a simple slot prop and rendered collapsed there.
+  const dashboardChatSlot =
+    page === 'dashboard' && effectiveRole === 'driver' && driverWorkspaceAllowed && !isActingAsAssistant ? (
+      <Suspense fallback={<ViewFallback />}>
+        <DriverWorkConversation />
+      </Suspense>
+    ) : null;
+
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
       <SEOHead title="Dashboard | HaulTrackerPro" description="Your trucking dashboard." path="/dashboard" noindex />
@@ -1062,17 +1072,6 @@ const Index = () => {
           <ViewFallback />
         ) : (
           <>
-        {page === 'dashboard' && effectiveRole === 'driver' && driverWorkspaceAllowed && !isActingAsAssistant && (
-          <section className="mb-8" aria-labelledby="driver-work-chat-heading">
-            <h2 id="driver-work-chat-heading" className="mb-2 text-xl font-bold text-foreground">Talk to HaulTracker</h2>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Find work that fits you. Talk through your job preferences, see real openings, and review your work profile before saving changes.
-            </p>
-            <Suspense fallback={<ViewFallback />}>
-              <DriverWorkConversation />
-            </Suspense>
-          </section>
-        )}
         {/* Smart Reminders */}
         {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">
@@ -1162,6 +1161,7 @@ const Index = () => {
                   settingsOverride={isActingAsAssistant ? driverReportSettings ?? null : null}
                   isAssistantView={isActingAsAssistant}
                   showRecommendedOpportunity={!isActingAsAssistant && effectiveRole === 'driver' && driverWorkspaceAllowed}
+                  embeddedChat={dashboardChatSlot}
                 />
 
               </>

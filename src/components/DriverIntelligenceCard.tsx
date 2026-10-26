@@ -5,7 +5,6 @@ import { Badge } from '@/components/ui/badge';
 import { Trophy, Flame, TrendingUp, MapPin, Lock } from 'lucide-react';
 import { useDriverPoints, tierFor, nextTierProgress } from '@/hooks/useDriverPoints';
 import { useMyLeaderboardRank } from '@/hooks/useDriverLeaderboard';
-import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { ProUpgradeModal } from '@/components/ProUpgradeModal';
 
@@ -14,7 +13,6 @@ interface DriverIntelligenceCardProps {
 }
 
 export function DriverIntelligenceCard({ isPro }: DriverIntelligenceCardProps) {
-  const { user } = useAuth();
   const { data: points } = useDriverPoints();
   const { me, top, rows } = useMyLeaderboardRank(50);
   const navigate = useNavigate();
