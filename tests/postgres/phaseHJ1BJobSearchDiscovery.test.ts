@@ -119,6 +119,7 @@ beforeAll(async () => {
   baseline = await inventory();
   await db.query(source('supabase/migration-candidates/20261024045239_phase_hj1b_job_search_discovery.sql'));
   expect(await inventory()).toEqual(baseline);
+  initialControl = (await db.query('SELECT publication_enabled,discovery_enabled FROM job_search_private.job_search_feature_control')).rows;
 }, 30000);
 afterAll(async () => {
   await db.end();
@@ -156,7 +157,50 @@ beforeEach(async () => {
   await db.query("INSERT INTO public.driver_opportunity_profiles VALUES($1,'DO NOT LEAK')", [
     ids.driver
   ]);
+  // Happy-path suites run with both flags locally ON via disposable superuser SQL only.
+  await setFlags(true, true);
   await publish();
+});
+let initialControl: unknown[] = [];
+async function setFlags(publication: boolean, discovery: boolean) {
+  await db.query('INSERT INTO job_search_private.job_search_feature_control(singleton,publication_enabled,discovery_enabled) VALUES(true,$1,$2) ON CONFLICT (singleton) DO UPDATE SET publication_enabled=EXCLUDED.publication_enabled,discovery_enabled=EXCLUDED.discovery_enabled', [publication, discovery]);
+}
+it('candidate DDL leaves discovery and publication OFF', () => {
+  expect(initialControl).toEqual([{ publication_enabled: false, discovery_enabled: false }]);
+});
+for (const [pub, disc] of [[false, false], [true, false]] as const)
+  it(`discovery OFF (pub=${pub},disc=${disc}) denies public and private reader with 42501, side-effect free`, async () => {
+    await setFlags(pub, disc);
+    for (const privateCall of [false, true])
+      await expect(call(ids.owner, ids.workspace, 20, null, null, 'authenticated', privateCall)).rejects.toMatchObject({ code: '42501' });
+    expect((await db.query('SELECT count(*)::int AS n FROM job_search_private.job_search_card_events')).rows[0].n).toBe(1);
+  });
+it('discovery ON/publication OFF still serves already-published cards to the approved owner only', async () => {
+  await setFlags(false, true);
+  expect(await call()).toHaveLength(1);
+  expect(await call(ids.owner, ids.workspace, 20, null, null, 'authenticated', true)).toHaveLength(1);
+  for (const actor of [ids.driver, ids.staff, ids.admin, ids.other])
+    await expect(call(actor)).rejects.toMatchObject({ code: '42501' });
+  await expect(publish(ids.other)).rejects.toMatchObject({ code: '42501' });
+});
+it('missing control row fails CLOSED for discovery', async () => {
+  await db.query('DELETE FROM job_search_private.job_search_feature_control');
+  try {
+    for (const privateCall of [false, true])
+      await expect(call(ids.owner, ids.workspace, 20, null, null, 'authenticated', privateCall)).rejects.toMatchObject({ code: '42501' });
+  }
+  finally { await setFlags(true, true); }
+});
+it('reader stays STABLE and never row-locks the control singleton', async () => {
+  const fns = (await db.query("SELECT n.nspname,p.provolatile,pg_get_functiondef(p.oid) AS d FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE proname='list_recruiter_job_search_cards' ORDER BY n.nspname")).rows;
+  expect(fns.map(f => f.provolatile)).toEqual(['s', 's']);
+  expect(fns[0].d).toMatch(/job_search_feature_control/);
+  expect(fns[0].d).not.toMatch(/FOR\s+(SHARE|UPDATE)/i);
+});
+it('control singleton grants nothing to client roles', async () => {
+  for (const role of ['anon', 'authenticated', 'service_role'])
+    for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE'])
+      expect((await db.query('SELECT has_table_privilege($1,$2,$3) AS allowed', [role, 'job_search_private.job_search_feature_control', privilege])).rows[0].allowed).toBe(false);
 });
 it('approved eligible owner gets strict employment projection; direct checked private path matches', async () => {
   const rows = await call();
