@@ -114,7 +114,7 @@ describe('Phase3B assistant-chat handler against actual candidate SQL', () => {
     expect(sent.model).toBe(MODEL_ID); expect(sent.max_tokens).toBe(768); expect(sent.stream).toBe(false);
     const ctx = gatewayBodies[0];
     expect(ctx).not.toContain(SECRET); expect(ctx).not.toContain('7777'); expect(ctx).not.toContain('4242'); expect(ctx).toMatch(/has_more\\\\?":true/);
-    expect((ctx.match(/"load_date"/g) ?? []).length).toBe(20);
+    expect((ctx.match(/load_date/g) ?? []).length).toBe(20);
     expect(r.body.reply.sources).toEqual([{ key: 'expenses', label: 'Your expenses (most recent)', href: '/dashboard?page=expenses' }, { key: 'loads', label: 'Your loads (most recent)', href: '/dashboard?page=loads' }]);
     const m = await call(tok(A), { action: 'messages', threadId: r.body.threadId });
     expect(m.body.messages.map((x: any) => x.role)).toEqual(['assistant', 'user']);
