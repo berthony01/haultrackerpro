@@ -263,29 +263,44 @@ describe('HJ-2D switch OFF serialization with REAL concurrent sessions',()=>{
    expect(await pending).toMatchObject({error:{code:'42501'}});expect(await counts()).toEqual({cards:0,events:0});
   }finally{await holder.query('ROLLBACK');await pending;await holder.end();await publisher.end();}
  });
- it('operator OFF waits for in-flight FOR SHARE publishes; share-compatible publish during pending OFF linearizes before OFF; publish after OFF commit denied; no deadlock',async()=>{
-  const [inflight,operator,fresh]=await clients(3);let off:Promise<unknown>|undefined,queued:Promise<unknown>|undefined;
+ it('operator OFF waits for the in-flight FOR NO KEY UPDATE publish; later cross-owner publishes queue BEHIND the pending OFF and are denied; no deadlock',async()=>{
+  const [inflight,operator,q1,q2]=await clients(4);let off:Promise<unknown>|undefined;const queued:Promise<unknown>[]=[];
+  const waiting=async(pid:number)=>(await db.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[pid])).rowCount===1;
+  const snapshot=async()=>(await db.query('SELECT (SELECT jsonb_agg(c ORDER BY id) FROM public.user_capabilities c) caps,(SELECT jsonb_agg(p) FROM public.driver_opportunity_profiles p) profiles,(SELECT jsonb_agg(s) FROM public.existing_surface_sentinel s) sentinel')).rows[0];
+  const untouched=await snapshot();
   try{
    await inflight.query('BEGIN');await inflight.query('SET LOCAL ROLE authenticated');await inflight.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[users.driver]);
    const card=(await inflight.query("SELECT public.manage_my_job_search_card('publish',$1::jsonb,0,$2::uuid,'job_search_card_v1') AS card",[JSON.stringify(payload),randomUUID()])).rows[0].card;
    expect(card.status).toBe('published');
    const opPid=await pidOf(operator);
    off=(async()=>{await operator.query('BEGIN');await operator.query('UPDATE job_search_private.job_search_feature_control SET publication_enabled=false,discovery_enabled=false');return 'updated';})();
-   await waitFor(opPid); // real row-lock wait on the in-flight FOR SHARE holder
-   // PostgreSQL grants a compatible FOR SHARE even while an UPDATE waits, so a
-   // publish started before OFF commits succeeds and OFF also waits for it.
-   queued=publish(users.other,payload,0,randomUUID(),true,fresh).then(c=>({c}),error=>({error}));
-   expect(await queued).toMatchObject({c:{status:'published'}});
-   expect((await db.query("SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'",[opPid])).rowCount).toBe(1);
-   await inflight.query('COMMIT');
-   expect(await off).toBe('updated');
+   const opEvent=await waitFor(opPid); // observed real lock wait on the in-flight publisher
+   // Distinct owners, private and public paths, arriving while OFF is queued.
+   const p1=await pidOf(q1),p2=await pidOf(q2);
+   queued.push(publish(users.other,payload,0,randomUUID(),true,q1).then(c=>({c}),error=>({error})));
+   const e1=await waitFor(p1);
+   queued.push(publish(users.dual,payload,0,randomUUID(),false,q2).then(c=>({c}),error=>({error})));
+   const e2=await waitFor(p2);
+   console.log('HJ-2D observed lock waits:',{operator:opEvent,queued1:e1,queued2:e2});
+   expect(await waiting(opPid)).toBe(true);
+   const released=Date.now();await inflight.query('COMMIT');
+   expect(await off).toBe('updated'); // OFF acquires next, ahead of the later publishes
+   const offLatency=Date.now()-released;
+   // OFF holds the row uncommitted: both later publishes MUST still be blocked behind it.
+   expect(await waiting(p1)).toBe(true);expect(await waiting(p2)).toBe(true);
+   expect(await counts()).toEqual({cards:1,events:1});
    await operator.query('COMMIT');
-   await expect(publish(users.dual,payload,0,randomUUID(),true,fresh)).rejects.toMatchObject({code:'42501'});
-   expect(await counts()).toEqual({cards:2,events:2});
+   for(const r of await Promise.all(queued)) expect(r).toMatchObject({error:{code:'42501'}});
+   console.log('HJ-2D OFF acquire latency after in-flight commit (ms):',offLatency);
+   expect(offLatency).toBeLessThan(2000);
+   expect(await counts()).toEqual({cards:1,events:1}); // no receipt for denied publishes
    expect((await command(users.driver)).status).toBe('published'); // pre-OFF publication remains; not recalled
+   for(const privateCall of [false,true]) await expect(publish(users.other,payload,0,randomUUID(),privateCall)).rejects.toMatchObject({code:'42501'});
    await expect(publish(users.driver,payload,1)).rejects.toMatchObject({code:'42501'});
    expect((await command(users.driver,'withdraw',null,1,randomUUID())).status).toBe('withdrawn');
-  }finally{await inflight.query('ROLLBACK');await operator.query('ROLLBACK');await off?.catch(()=>{});await queued;await inflight.end();await operator.end();await fresh.end();}
+   expect(await counts()).toEqual({cards:1,events:2});
+   expect(await snapshot()).toEqual(untouched);expect(await inventory()).toEqual(before);
+  }finally{await inflight.query('ROLLBACK');await operator.query('ROLLBACK');await off?.catch(()=>{});await Promise.all(queued);for(const c of [inflight,operator,q1,q2]) await c.end();}
  });
  it('get/withdraw never wait on a pending operator OFF (no global lock on non-publish actions)',async()=>{
   await publish();const [operator]=await clients(1);
