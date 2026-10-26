@@ -12,8 +12,16 @@ CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$
  SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid
 $$;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon,authenticated,service_role;
+-- Phase3B: PostgREST-equivalent claims reader (same coalesce as hosted auth.jwt)
+-- and the live-verified auth.sessions projection (id,user_id,not_after). Clients
+-- receive no grant on auth.sessions; fixtures mint real local session rows.
+CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$
+ SELECT coalesce(nullif(current_setting('request.jwt.claim',true),''),nullif(current_setting('request.jwt.claims',true),''))::jsonb
+$$;
+GRANT EXECUTE ON FUNCTION auth.jwt() TO anon,authenticated,service_role;
+CREATE TABLE auth.sessions(id uuid PRIMARY KEY,user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,not_after timestamptz);
 -- Live catalog verified by architect: profiles_user_id_key + auth cascade.
-CREATE TABLE public.profiles(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE);
+CREATE TABLE public.profiles(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,display_name text);
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.profiles TO authenticated;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY profiles_select ON public.profiles FOR SELECT TO authenticated USING(user_id=auth.uid());
@@ -71,7 +79,7 @@ CREATE TYPE public.agency_member_status AS ENUM('pending','active','revoked');
 CREATE TYPE public.agency_workspace_permission AS ENUM(
  'packages_view','packages_manage','client_requests_view','client_requests_manage','clients_view','delegations_view',
  'delegations_manage','work_items_view_all','work_items_manage','audit_view','team_view');
-CREATE TABLE public.agency_profiles(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),owner_user_id uuid NOT NULL UNIQUE,status public.agency_status NOT NULL DEFAULT 'active');
+CREATE TABLE public.agency_profiles(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),owner_user_id uuid NOT NULL UNIQUE,status public.agency_status NOT NULL DEFAULT 'active',name text NOT NULL DEFAULT 'Local Agency');
 CREATE TABLE public.agency_members(
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),agency_id uuid NOT NULL REFERENCES public.agency_profiles(id) ON DELETE CASCADE,
  member_user_id uuid,role public.agency_member_role NOT NULL DEFAULT 'agency_member',status public.agency_member_status NOT NULL DEFAULT 'pending',
