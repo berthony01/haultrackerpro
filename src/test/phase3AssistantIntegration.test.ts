@@ -15,7 +15,7 @@ const SECRET = 'SENTINEL_FORBIDDEN';
 
 const ARG_TYPES: Record<string, string> = {
   _thread_id: 'uuid', _before: 'timestamptz', _before_id: 'uuid', _limit: 'integer', _offset: 'integer', _scope_kind: 'text',
-  _target_id: 'uuid', _request_id: 'uuid', _content: 'text', _reservation_id: 'uuid', _lease_id: 'uuid', _success: 'boolean', _sources: 'text[]',
+  _target_id: 'uuid', _request_id: 'uuid', _content: 'text', _reservation_id: 'uuid', _message_id: 'uuid', _lease_id: 'uuid', _success: 'boolean', _sources: 'text[]',
 };
 const SCALAR = new Set(['assistant_delete_thread', 'assistant_clear_my_history', 'assistant_thread_live', 'assistant_thread_context']);
 async function callRpc(actor: string | null, session: string | null, fn: string, args: Record<string, unknown>, role: 'authenticated' | 'service_role' = 'authenticated') {
