@@ -218,7 +218,7 @@ export function SelfTierUpDetector() {
   return null;
 }
 
-export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false }: DashboardViewProps) {
+export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, onNavigate, smartAlerts, isPro = false, settingsOverride = null, showRecommendedOpportunity = false, isAssistantView = false, embeddedChat = null }: DashboardViewProps) {
   const { settings: ownSettings } = useUserSettings();
   // Phase DA-1 — managed-driver safe settings win whenever provided.
   const settings: any = settingsOverride ?? ownSettings;
