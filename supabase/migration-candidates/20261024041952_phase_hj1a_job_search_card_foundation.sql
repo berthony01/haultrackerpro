@@ -137,15 +137,17 @@ BEGIN
     END IF;
     _fingerprint := pg_catalog.md5(pg_catalog.jsonb_build_array(_action,_normalized,_expected_revision,_consent_version)::text);
     PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(_uid::text,0));
-    -- Lock order: owner advisory lock, THEN control row FOR SHARE. Every publish,
-    -- including command-id replay, requires publication_enabled under this share
-    -- lock held to commit, so an operator UPDATE to OFF waits for in-flight
-    -- publishes and any publish locking after that OFF commits is denied.
+    -- Lock order: owner advisory lock, THEN control row FOR NO KEY UPDATE.
+    -- Every publish, including command-id replay, requires publication_enabled
+    -- under this lock held to commit. It conflicts with the operator's non-key
+    -- UPDATE and with other publishes, so a pending OFF queues ahead of later
+    -- publishes (no share-lock bypass); after OFF commits they are denied.
+    -- Tradeoff: publishes serialize globally across owners (low-rate path).
     -- get/pause/withdraw never touch the control row. OFF does not recall
     -- already-published cards.
     IF _action = 'publish' THEN
       SELECT f.publication_enabled INTO _publication_enabled
-        FROM job_search_private.job_search_feature_control f WHERE f.singleton FOR SHARE;
+        FROM job_search_private.job_search_feature_control f WHERE f.singleton FOR NO KEY UPDATE;
       IF _publication_enabled IS NOT TRUE THEN
         RAISE EXCEPTION 'Job search publication disabled' USING ERRCODE = '42501';
       END IF;
