@@ -172,7 +172,7 @@ describe('Phase 1M-B — Homepage information architecture', () => {
     expect(articles).toHaveLength(3);
     articles.forEach((article) => {
       expect(article.className).toMatch(/md:grid-cols-2/);
-      expect(article.className).not.toMatch(/grid-cols-2(?!-)/);
+      expect(article.className).not.toMatch(/(?:^|\s)grid-cols-[2-9]/);
     });
   });
 
