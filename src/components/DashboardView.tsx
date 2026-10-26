@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, type ReactNode } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { getEffectiveDate } from '@/lib/loadUtils';
 import {
@@ -29,7 +29,7 @@ import { SmartLoadAdvisor } from '@/components/SmartLoadAdvisor';
 import { ContributionMarginCard } from '@/components/ContributionMarginCard';
 import { PersonalIntelligenceBlocks } from '@/components/PersonalIntelligenceBlocks';
 import { WeeklyPulseCard } from '@/components/WeeklyPulseCard';
-import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel, ParkingCircle, Gauge } from 'lucide-react';
+import { DollarSign, Route, Truck, TrendingUp, TrendingDown, AlertTriangle, MapPin, Plus, ClipboardCheck, FileText, Receipt, Fuel, ParkingCircle, Gauge, MessageCircle } from 'lucide-react';
 import { HomeTimeDashboardCard } from '@/components/HomeTimeDashboardCard';
 import { DriverIntelligenceCard } from '@/components/DriverIntelligenceCard';
 import { useTierUpDetector } from '@/hooks/useTierUpDetector';
@@ -52,7 +52,6 @@ import { DriverScoreGauge } from '@/components/premium/DriverScoreGauge';
 import { RecentLoadsPanel } from '@/components/premium/RecentLoadsPanel';
 import { ExpenseDonut } from '@/components/premium/ExpenseDonut';
 import { ProfitByLoadTable } from '@/components/premium/ProfitByLoadTable';
-import { DashboardFooterCTA } from '@/components/premium/DashboardFooterCTA';
 import { useDriverScorecard } from '@/hooks/useDriverScorecard';
 import { RecommendedOpportunityCard } from '@/components/opportunities/RecommendedOpportunityCard';
 
@@ -83,7 +82,13 @@ interface DashboardViewProps {
    * tier-up, reminders, closeout, add/action controls).
    */
   isAssistantView?: boolean;
-
+  /**
+   * Optional embedded guided Find Work conversation. Index supplies this only
+   * for the canonical self-driver dashboard (same gate as before); it renders
+   * collapsed inside a native details element and stays mounted while closed
+   * so unsaved answers survive toggling.
+   */
+  embeddedChat?: ReactNode;
 }
 
 type PresetKey = 'this_week' | 'last_week' | 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom';
