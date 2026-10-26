@@ -38,13 +38,15 @@ const NOTICE: Record<string, string> = {
   disabled: 'AI replies are not turned on in this environment yet.',
   unavailable: 'The AI assistant is temporarily unavailable.',
   pending: 'This message is still being answered. Refresh history in a moment.',
+  delete_failed: 'That conversation could not be deleted. It may already be gone, or the AI assistant is unavailable right now.',
+  clear_failed: 'Your history could not be cleared right now. Nothing was deleted; please try again.',
 };
 
 function welcomeFor(ctx: AssistantContext | null) {
   if (!ctx) return '';
   const what = ctx.tools.map((t) => TOOL_TEXT[t]).filter(Boolean).join(', ');
   const who = ctx.scope === 'driver_delegate' ? `${ctx.label}'s` : ctx.scope === 'driver_self' ? 'your' : `${ctx.label}'s`;
-  return `I can read ${who} ${what} — read-only. I can't create, change or send anything.`;
+  return `I can read ${who} ${what}, read-only. I can't create, change or send anything.`;
 }
 
 function HistoryList({ a, onPick, onDelete }: { a: AiAssistantApi; onPick?: () => void; onDelete: (t: AssistantThread) => void }) {
@@ -87,10 +89,16 @@ export default function AiAssistant() {
   useEffect(() => { if (ready) a?.ensureLoaded(); }, [ready, a]);
   const messages = a?.state.messages;
   const sending = a?.state.sending;
+  const lastChange = a?.state.lastChange;
+  const prevHeight = useRef(0);
   useLayoutEffect(() => {
     const el = transcriptRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, sending]);
+    if (!el) return;
+    // Prepending older messages keeps the reader's place; new messages/replies/thinking go to the bottom.
+    if (lastChange === 'prepend') el.scrollTop = el.scrollTop + Math.max(0, el.scrollHeight - prevHeight.current);
+    else el.scrollTop = el.scrollHeight;
+    prevHeight.current = el.scrollHeight;
+  }, [messages, sending, lastChange]);
 
   if (!a) return null;
   const s = a.state;
@@ -152,10 +160,15 @@ export default function AiAssistant() {
                   >
                     {s.contexts.length === 0 && <option value="">No eligible workspace</option>}
                     {s.contexts.map((c) => (
-                      <option key={contextKeyOf(c)} value={contextKeyOf(c)}>{SCOPE_NAME[c.scope]} — {c.label}</option>
+                      <option key={contextKeyOf(c)} value={contextKeyOf(c)}>{SCOPE_NAME[c.scope]}: {c.label}</option>
                     ))}
                   </select>
                 </label>
+                {!a.pinnedDriverId && s.contextsNextOffset !== null && (
+                  <Button variant="outline" size="sm" onClick={() => a.loadMoreContexts()} disabled={s.contextsLoading}>
+                    {s.contextsLoading ? 'Loading workspaces...' : 'Load more workspaces'}
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" className="ml-auto" disabled={s.availability !== 'ready' || a.visibleThreads.length === 0} onClick={() => setConfirm({ kind: 'clear' })}>
                   Clear history
                 </Button>
@@ -168,7 +181,7 @@ export default function AiAssistant() {
 
               <div ref={transcriptRef} data-testid="ai-transcript" className="min-h-0 flex-1 space-y-3 overflow-y-auto p-3" aria-live="polite">
                 {s.availability !== 'ready' ? (
-                  <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading…</p>
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />{a.pinnedDriverId && s.contextsSearchPages > 1 ? `Looking for this driver's workspace (page ${s.contextsSearchPages})...` : 'Loading…'}</p>
                 ) : s.contexts.length === 0 ? (
                   <div className="m-auto max-w-md space-y-2 py-10 text-center">
                     <p className="font-medium">{pinnedMissing ? 'The AI assistant is not available for this driver.' : 'The AI assistant is included with paid plans.'}</p>
