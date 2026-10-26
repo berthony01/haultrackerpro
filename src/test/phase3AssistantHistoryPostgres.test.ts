@@ -143,8 +143,10 @@ describe('Phase3 source candidate: actual roles, canonical authorization and pri
  it.each(['setup','suspended','revoked'])('driver capability %s denied',async(status)=>{
   await db.query(`UPDATE public.user_capabilities SET status=$1 WHERE user_id=$2 AND capability='driver'`,[status,A]); await denied(A,'driver_self',A);
  });
- it.each([[],['manage_loads','manage_loads'],['manage_fuel'],['opportunities_view'],['manage_loads',null]])('invalid required permissions %j denied without row',async(perms)=>{
-  await denied(A,'driver_self',A,perms as string[]);
+ it.each([[],['manage_loads','manage_loads'],['manage_fuel'],['opportunities_view'],['manage_loads',null]].map(permissions=>({permissions})))('invalid required permissions $permissions denied without row',async({permissions})=>{
+  const before=await q('SELECT id FROM public.assistant_threads');
+  await expect(as(A,'SELECT * FROM public.assistant_create_thread($1,$2,$3::text[])',['driver_self',A,permissions])).rejects.toMatchObject({code:'42501'});
+  expect(await q('SELECT id FROM public.assistant_threads')).toEqual(before);
  });
  it('unknown scope and null target denied',async()=>{
   await denied(A,'general_ai',A); await expect(as(A,'SELECT * FROM public.assistant_create_thread($1,NULL,$2::text[])',['driver_self',['manage_loads']])).rejects.toMatchObject({code:'42501'});
@@ -370,6 +372,6 @@ describe('Phase3 source candidate: actual roles, canonical authorization and pri
  it('PUBLIC role has no inherited new RPC privileges',async()=>{
   await db.exec('CREATE ROLE phase3_unprivileged NOLOGIN; GRANT USAGE ON SCHEMA public,auth TO phase3_unprivileged; SET ROLE phase3_unprivileged');
   try {await expect(db.query('SELECT public.assistant_clear_my_history()')).rejects.toMatchObject({code:'42501'}); await expect(db.query('SELECT public.assistant_purge_expired()')).rejects.toMatchObject({code:'42501'});}
-  finally {await db.exec('RESET ROLE; DROP ROLE phase3_unprivileged');}
+  finally {await db.exec('RESET ROLE; REVOKE USAGE ON SCHEMA public,auth FROM phase3_unprivileged; DROP ROLE phase3_unprivileged');}
  });
 });
