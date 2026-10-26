@@ -72,7 +72,14 @@ beforeAll(async()=> {
  ALTER DEFAULT PRIVILEGES GRANT EXECUTE ON FUNCTIONS TO anon,authenticated,service_role;
  `);
  before=await inventory(); await db.query(sql); expect(await inventory()).toEqual(before);
+ // Captured immediately after candidate DDL, before any local operator flip.
+ initialControl=(await db.query('SELECT * FROM job_search_private.job_search_feature_control')).rows;
 },30000);
+let initialControl:unknown[]=[];
+// Disposable local superuser SQL stands in for a future audited operator; never a client API.
+async function setFlags(publication:boolean,discovery:boolean,client:Client=db) {
+ await client.query('INSERT INTO job_search_private.job_search_feature_control(singleton,publication_enabled,discovery_enabled) VALUES(true,$1,$2) ON CONFLICT (singleton) DO UPDATE SET publication_enabled=EXCLUDED.publication_enabled,discovery_enabled=EXCLUDED.discovery_enabled',[publication,discovery]);
+}
 afterAll(async()=>{await db?.end();});
 beforeEach(async()=>{
  await db.query('TRUNCATE job_search_private.job_search_card_events,job_search_private.driver_job_search_cards,public.user_capabilities,public.marketplace_user_restrictions,public.admin_users,public.driver_opportunity_profiles,auth.users CASCADE');
@@ -81,6 +88,8 @@ beforeEach(async()=>{
  for (const u of [users.recruiter,users.dual]) await db.query("INSERT INTO public.user_capabilities(user_id,capability,status) VALUES($1,'recruiter','active')",[u]);
  await db.query("INSERT INTO public.admin_users VALUES($1,'super_admin');",[users.admin]);
  await db.query("INSERT INTO public.driver_opportunity_profiles VALUES($1,'never publish this contact')",[users.driver]);
+ // Happy-path suites run with publication locally ON; default-OFF is asserted separately.
+ await setFlags(true,false);
 });
 describe('HJ-1A actual candidate owner-only SQL/roles/lifecycle',()=> {
  it('schema has exactly two RLS tables, no policies or client DML/schema CREATE',async()=>{
