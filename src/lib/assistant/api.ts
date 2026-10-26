@@ -12,14 +12,14 @@ export interface Cursor { before: string; beforeId: string }
 export interface BootstrapData {
   available: true; generationEnabled: boolean; retentionDays: number;
   limits: { daily: number; perMinute: number; maxChars: number };
-  contexts: AssistantContext[]; contextsTruncated: boolean;
+  contexts: AssistantContext[]; contextsTruncated: boolean; nextOffset: number | null;
 }
 
 /** Flat shape (project TS is non-strict, so discriminated narrowing is not relied on). */
 export interface ApiResult<T> { ok: boolean; data: T | null; status: number; code: string }
 
 export type AssistantRequest =
-  | { action: 'bootstrap' }
+  | { action: 'bootstrap'; offset?: number }
   | { action: 'threads'; cursor?: Cursor | null }
   | { action: 'messages'; threadId: string; cursor?: Cursor | null }
   | { action: 'send'; requestId: string; content: string; threadId?: string | null; scope?: AssistantScope; targetId?: string }
@@ -41,7 +41,7 @@ export async function invokeAssistant<T>(body: AssistantRequest): Promise<ApiRes
 }
 
 export const assistantApi = {
-  bootstrap: () => invokeAssistant<BootstrapData>({ action: 'bootstrap' }),
+  bootstrap: (offset?: number) => invokeAssistant<BootstrapData>(offset ? { action: 'bootstrap', offset } : { action: 'bootstrap' }),
   threads: (cursor?: Cursor | null) => invokeAssistant<{ threads: AssistantThread[]; nextCursor: Cursor | null }>({ action: 'threads', cursor: cursor ?? null }),
   messages: (threadId: string, cursor?: Cursor | null) => invokeAssistant<{ messages: AssistantMessage[]; nextCursor: Cursor | null }>({ action: 'messages', threadId, cursor: cursor ?? null }),
   send: (req: Omit<Extract<AssistantRequest, { action: 'send' }>, 'action'>) => invokeAssistant<{ threadId: string; reply?: AssistantMessage; pending?: boolean }>({ action: 'send', ...req }),

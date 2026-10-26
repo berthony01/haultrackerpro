@@ -345,17 +345,21 @@ BEGIN
  IF NOT FOUND OR _t.expires_at<=statement_timestamp() OR NOT public.assistant_scope_authorized(_t.scope_kind,_t.scope_target_id,_t.required_permissions) THEN
   RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
  _tgt:=_t.scope_target_id;
+ -- One ordering (date, created_at, id) ranks rows; only ranks 1..20 are kept and
+ -- created_at/rank are stripped from the final allowed projection.
  IF public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,'loads') THEN
-  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.load_date DESC,x.id DESC),'[]'),count(*) INTO _rows,_n FROM (
-   SELECT l.id,l.load_date,l.status,l.payment_status,l.estimated_pay,l.actual_pay_received FROM public.loads l
+  SELECT coalesce(jsonb_agg(to_jsonb(x)-'created_at'-'rn' ORDER BY x.rn) FILTER (WHERE x.rn<=20),'[]'),count(*) INTO _rows,_n FROM (
+   SELECT l.id,l.load_date,l.status,l.payment_status,l.estimated_pay,l.actual_pay_received,l.created_at,
+    row_number() OVER (ORDER BY l.load_date DESC,l.created_at DESC,l.id DESC) rn FROM public.loads l
    WHERE l.user_id=_tgt ORDER BY l.load_date DESC,l.created_at DESC,l.id DESC LIMIT 21) x;
-  _out:=_out||jsonb_build_object('key','loads','kind','recent','limit',20,'has_more',_n>20,'rows',CASE WHEN _n>20 THEN _rows-20 ELSE _rows END);
+  _out:=_out||jsonb_build_object('key','loads','kind','recent','limit',20,'has_more',_n>20,'rows',_rows);
  END IF;
  IF public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,'expenses') THEN
-  SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.expense_date DESC,x.id DESC),'[]'),count(*) INTO _rows,_n FROM (
-   SELECT e.id,e.expense_date,e.category,e.amount,e.expense_type FROM public.expenses e
+  SELECT coalesce(jsonb_agg(to_jsonb(x)-'created_at'-'rn' ORDER BY x.rn) FILTER (WHERE x.rn<=20),'[]'),count(*) INTO _rows,_n FROM (
+   SELECT e.id,e.expense_date,e.category,e.amount,e.expense_type,e.created_at,
+    row_number() OVER (ORDER BY e.expense_date DESC,e.created_at DESC,e.id DESC) rn FROM public.expenses e
    WHERE e.user_id=_tgt ORDER BY e.expense_date DESC,e.created_at DESC,e.id DESC LIMIT 21) x;
-  _out:=_out||jsonb_build_object('key','expenses','kind','recent','limit',20,'has_more',_n>20,'rows',CASE WHEN _n>20 THEN _rows-20 ELSE _rows END);
+  _out:=_out||jsonb_build_object('key','expenses','kind','recent','limit',20,'has_more',_n>20,'rows',_rows);
  END IF;
  IF public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,'opportunities') THEN
   SELECT coalesce(jsonb_agg(to_jsonb(x) ORDER BY x.updated_at DESC,x.id DESC),'[]'),count(*) INTO _rows,_n FROM (
@@ -436,33 +440,64 @@ CREATE TRIGGER assistant_usage_guard BEFORE INSERT OR UPDATE ON public.assistant
 
 -- Atomic append + reservation under per-actor advisory lock. Candidate safety
 -- defaults: 20 admitted per rolling 24h, 5 per rolling minute, 1 live lease.
+-- LOCK ORDER (reserve, finalize, delete, purge): thread row BEFORE usage row and
+-- before message inserts, matching DELETE thread -> cascade messages -> SET NULL
+-- usage. Immutable thread pointers are read unlocked, then the thread is locked,
+-- then the ledger row is locked and the pointer revalidated.
+-- Dedup survives the 24h bodyless-ledger purge: the retained 30-day transcript
+-- holds request_id, so a retained request is never re-admitted or re-spent.
 CREATE FUNCTION public.assistant_reserve_turn(_thread_id uuid,_scope_kind text,_target_id uuid,_request_id uuid,_content text)
 RETURNS TABLE(status text,reservation_id uuid,lease_id uuid,thread_id uuid,user_message_id uuid,reply_message_id uuid)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, auth AS $$
 #variable_conflict use_column
 DECLARE _actor uuid:=auth.uid(); _u public.assistant_usage; _thread uuid:=_thread_id; _msg uuid; _body text:=btrim(_content);
+ _prior_n integer; _prior_thread uuid; _usage_thread uuid; _usage_found boolean; _ptr uuid; _t public.assistant_threads; _reply uuid;
 BEGIN
  IF _actor IS NULL OR NOT public._assistant_session_valid() THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
  IF _request_id IS NULL OR _body IS NULL OR char_length(_body) NOT BETWEEN 1 AND 2000 THEN RAISE EXCEPTION 'Invalid message' USING ERRCODE='22023'; END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended('assistant_usage:'||_actor::text,0));
- SELECT u.* INTO _u FROM public.assistant_usage u WHERE u.actor_user_id=_actor AND u.request_id=_request_id FOR UPDATE;
- IF FOUND THEN
-  IF _u.thread_id IS NULL OR (_thread IS NOT NULL AND _thread<>_u.thread_id)
-   OR (_thread IS NULL AND NOT EXISTS (SELECT 1 FROM public.assistant_threads t WHERE t.id=_u.thread_id AND t.scope_kind=_scope_kind AND t.scope_target_id=_target_id)) THEN
+ -- Unlocked discovery: retained actor-owned user message (any thread) and ledger row.
+ SELECT count(*),min(m.thread_id::text)::uuid INTO _prior_n,_prior_thread FROM public.assistant_messages m
+  JOIN public.assistant_threads t ON t.id=m.thread_id WHERE t.actor_user_id=_actor AND m.role='user' AND m.request_id=_request_id;
+ SELECT u.thread_id INTO _usage_thread FROM public.assistant_usage u WHERE u.actor_user_id=_actor AND u.request_id=_request_id;
+ _usage_found:=FOUND;
+ IF _prior_n>1 THEN RAISE EXCEPTION 'Conflicting retry' USING ERRCODE='22023'; END IF;
+ IF _usage_found OR _prior_n=1 THEN
+  _ptr:=coalesce(_usage_thread,_prior_thread);
+  IF _ptr IS NULL OR (_usage_found AND _usage_thread IS NULL)
+   OR (_usage_thread IS NOT NULL AND _prior_thread IS NOT NULL AND _usage_thread<>_prior_thread)
+   OR (_thread IS NOT NULL AND _thread<>_ptr) THEN
    RAISE EXCEPTION 'Conflicting retry' USING ERRCODE='22023'; END IF;
-  IF NOT public.assistant_thread_live(_u.thread_id) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
-  IF NOT EXISTS (SELECT 1 FROM public.assistant_messages m WHERE m.thread_id=_u.thread_id AND m.role='user' AND m.request_id=_request_id AND m.content=_body) THEN
+  SELECT t.* INTO _t FROM public.assistant_threads t WHERE t.id=_ptr AND t.actor_user_id=_actor FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Conflicting retry' USING ERRCODE='22023'; END IF; -- deleted: never resurrect
+  IF _thread IS NULL AND (_t.scope_kind IS DISTINCT FROM _scope_kind OR _t.scope_target_id IS DISTINCT FROM _target_id) THEN
    RAISE EXCEPTION 'Conflicting retry' USING ERRCODE='22023'; END IF;
-  RETURN QUERY SELECT CASE _u.state WHEN 'pending' THEN 'duplicate_pending' ELSE _u.state END,_u.id,NULL::uuid,_u.thread_id,NULL::uuid,_u.reply_message_id;
+  IF NOT EXISTS (SELECT 1 FROM public.assistant_messages m WHERE m.thread_id=_ptr AND m.role='user' AND m.request_id=_request_id AND m.content=_body) THEN
+   RAISE EXCEPTION 'Conflicting retry' USING ERRCODE='22023'; END IF;
+  IF NOT public.assistant_thread_live(_ptr) THEN RAISE EXCEPTION 'Not authorized' USING ERRCODE='42501'; END IF;
+  IF _usage_found THEN
+   SELECT u.* INTO _u FROM public.assistant_usage u WHERE u.actor_user_id=_actor AND u.request_id=_request_id FOR UPDATE;
+   IF NOT FOUND OR _u.thread_id IS DISTINCT FROM _ptr THEN RAISE EXCEPTION 'Conflicting retry' USING ERRCODE='22023'; END IF;
+   -- Expired lease is terminal: failed, no new model call; a new request id is required.
+   IF _u.state='pending' AND _u.lease_expires_at<=clock_timestamp() THEN
+    UPDATE public.assistant_usage u SET state='failed',finished_at=clock_timestamp() WHERE u.id=_u.id; _u.state:='failed';
+   END IF;
+   RETURN QUERY SELECT CASE _u.state WHEN 'pending' THEN 'duplicate_pending' ELSE _u.state END,_u.id,NULL::uuid,_ptr,NULL::uuid,_u.reply_message_id;
+   RETURN;
+  END IF;
+  -- Ledger purged after 24h: the retained transcript decides. Never re-admitted.
+  SELECT m.id INTO _reply FROM public.assistant_messages m WHERE m.thread_id=_ptr AND m.role='assistant' AND m.request_id=_request_id;
+  RETURN QUERY SELECT CASE WHEN _reply IS NULL THEN 'failed' ELSE 'completed' END::text,NULL::uuid,NULL::uuid,_ptr,NULL::uuid,_reply;
   RETURN;
  END IF;
  IF (SELECT count(*) FROM public.assistant_usage u WHERE u.actor_user_id=_actor AND u.created_at>statement_timestamp()-interval '24 hours')>=20 THEN
   RETURN QUERY SELECT 'limit_daily'::text,NULL::uuid,NULL::uuid,_thread,NULL::uuid,NULL::uuid; RETURN; END IF;
  IF (SELECT count(*) FROM public.assistant_usage u WHERE u.actor_user_id=_actor AND u.created_at>statement_timestamp()-interval '1 minute')>=5 THEN
   RETURN QUERY SELECT 'limit_minute'::text,NULL::uuid,NULL::uuid,_thread,NULL::uuid,NULL::uuid; RETURN; END IF;
- IF EXISTS (SELECT 1 FROM public.assistant_usage u WHERE u.actor_user_id=_actor AND u.state='pending' AND u.lease_expires_at>statement_timestamp()) THEN
+ IF EXISTS (SELECT 1 FROM public.assistant_usage u WHERE u.actor_user_id=_actor AND u.state='pending' AND u.lease_expires_at>clock_timestamp()) THEN
   RETURN QUERY SELECT 'busy'::text,NULL::uuid,NULL::uuid,_thread,NULL::uuid,NULL::uuid; RETURN; END IF;
  IF _thread IS NULL THEN SELECT s.thread_id INTO _thread FROM public.assistant_start_thread(_scope_kind,_target_id) s; END IF;
+ -- assistant_add_user_message locks the thread row FOR UPDATE before inserting; usage follows.
  _msg:=public.assistant_add_user_message(_thread,_request_id,_body);
  INSERT INTO public.assistant_usage(actor_user_id,thread_id,request_id,session_id)
  VALUES (_actor,_thread,_request_id,(auth.jwt()->>'session_id')::uuid) RETURNING * INTO _u;
@@ -472,6 +507,18 @@ $$;
 REVOKE ALL ON FUNCTION public.assistant_reserve_turn(uuid,text,uuid,uuid,text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.assistant_reserve_turn(uuid,text,uuid,uuid,text) TO authenticated, service_role;
 
+-- Exact authorized reply lookup (no page scan). SECURITY INVOKER: RLS on
+-- threads/messages applies, plus explicit actor, thread, id and role predicates.
+CREATE FUNCTION public.assistant_get_reply(_thread_id uuid,_message_id uuid)
+RETURNS TABLE(id uuid,role text,content text,sources text[],created_at timestamptz)
+LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog, public, auth AS $$
+ SELECT m.id,m.role,m.content,m.sources,m.created_at FROM public.assistant_messages m
+ WHERE m.id=_message_id AND m.thread_id=_thread_id AND m.role='assistant'
+  AND EXISTS (SELECT 1 FROM public.assistant_threads t WHERE t.id=_thread_id AND t.actor_user_id=auth.uid())
+$$;
+REVOKE ALL ON FUNCTION public.assistant_get_reply(uuid,uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.assistant_get_reply(uuid,uuid) TO authenticated, service_role;
+
 -- SERVICE-ONLY finalization. Actor/session/thread derived from the ledger; the
 -- JWT claims are set transaction-locally for canonical auth.uid helpers and
 -- restored on success and exception. Failure keeps admitted budget.
@@ -479,15 +526,31 @@ CREATE FUNCTION public.assistant_finalize_turn(_reservation_id uuid,_lease_id uu
 RETURNS TABLE(status text,reply_message_id uuid) LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public, auth AS $$
 #variable_conflict use_column
-DECLARE _u public.assistant_usage; _t public.assistant_threads; _ok boolean; _msg uuid; _body text:=btrim(_content); _k text;
+DECLARE _u public.assistant_usage; _t public.assistant_threads; _ok boolean; _msg uuid; _body text:=btrim(_content); _k text; _ptr uuid;
  _old_sub text:=coalesce(current_setting('request.jwt.claim.sub',true),''); _old_claims text:=coalesce(current_setting('request.jwt.claims',true),'');
 BEGIN
+ -- Lock order: unlocked immutable pointer -> thread row -> ledger row (revalidated).
+ SELECT u.thread_id INTO _ptr FROM public.assistant_usage u WHERE u.id=_reservation_id;
+ IF _ptr IS NOT NULL THEN SELECT t.* INTO _t FROM public.assistant_threads t WHERE t.id=_ptr FOR UPDATE; END IF;
  SELECT u.* INTO _u FROM public.assistant_usage u WHERE u.id=_reservation_id FOR UPDATE;
  IF NOT FOUND OR _lease_id IS NULL OR _u.lease_id<>_lease_id THEN RAISE EXCEPTION 'Invalid reservation' USING ERRCODE='42501'; END IF;
  IF _u.state<>'pending' THEN RETURN QUERY SELECT ('already_'||_u.state)::text,_u.reply_message_id; RETURN; END IF;
- IF _u.lease_expires_at<=statement_timestamp() OR _u.thread_id IS NULL THEN
-  UPDATE public.assistant_usage u SET state='failed',finished_at=statement_timestamp() WHERE u.id=_u.id;
+ -- Actual current clock after waiting for locks.
+ IF _u.lease_expires_at<=clock_timestamp() OR _u.thread_id IS NULL OR _u.thread_id IS DISTINCT FROM _ptr OR _t.id IS NULL THEN
+  UPDATE public.assistant_usage u SET state='failed',finished_at=clock_timestamp() WHERE u.id=_u.id;
   RETURN QUERY SELECT 'rejected'::text,NULL::uuid; RETURN; END IF;
+ IF NOT coalesce(_success,false) OR _body IS NULL OR char_length(_body) NOT BETWEEN 1 AND 8000
+  OR _sources IS NULL OR array_position(_sources,NULL) IS NOT NULL THEN
+  UPDATE public.assistant_usage u SET state='failed',finished_at=clock_timestamp() WHERE u.id=_u.id;
+  RETURN QUERY SELECT CASE WHEN NOT coalesce(_success,false) THEN 'failed' ELSE 'invalid' END::text,NULL::uuid; RETURN;
+ END IF;
+ FOREACH _k IN ARRAY _sources LOOP
+  IF NOT public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,_k) THEN
+   UPDATE public.assistant_usage u SET state='failed',finished_at=clock_timestamp() WHERE u.id=_u.id;
+   RETURN QUERY SELECT 'invalid'::text,NULL::uuid; RETURN;
+  END IF;
+ END LOOP;
+ -- Session/scope/entitlement recheck immediately before INSERT.
  BEGIN
   PERFORM set_config('request.jwt.claim.sub',_u.actor_user_id::text,true);
   PERFORM set_config('request.jwt.claims',jsonb_build_object('sub',_u.actor_user_id,'session_id',_u.session_id,'role','authenticated')::text,true);
@@ -497,21 +560,13 @@ BEGIN
   PERFORM set_config('request.jwt.claim.sub',_old_sub,true); PERFORM set_config('request.jwt.claims',_old_claims,true);
   RAISE;
  END;
- SELECT t.* INTO _t FROM public.assistant_threads t WHERE t.id=_u.thread_id;
- IF NOT coalesce(_ok,false) OR NOT coalesce(_success,false) OR _body IS NULL OR char_length(_body) NOT BETWEEN 1 AND 8000
-  OR _sources IS NULL OR array_position(_sources,NULL) IS NOT NULL THEN
-  UPDATE public.assistant_usage u SET state='failed',finished_at=statement_timestamp() WHERE u.id=_u.id;
-  RETURN QUERY SELECT CASE WHEN NOT coalesce(_ok,false) THEN 'rejected' WHEN NOT coalesce(_success,false) THEN 'failed' ELSE 'invalid' END::text,NULL::uuid; RETURN;
+ IF NOT coalesce(_ok,false) THEN
+  UPDATE public.assistant_usage u SET state='failed',finished_at=clock_timestamp() WHERE u.id=_u.id;
+  RETURN QUERY SELECT 'rejected'::text,NULL::uuid; RETURN;
  END IF;
- FOREACH _k IN ARRAY _sources LOOP
-  IF NOT public._assistant_source_allowed(_t.scope_kind,_t.required_permissions,_k) THEN
-   UPDATE public.assistant_usage u SET state='failed',finished_at=statement_timestamp() WHERE u.id=_u.id;
-   RETURN QUERY SELECT 'invalid'::text,NULL::uuid; RETURN;
-  END IF;
- END LOOP;
  INSERT INTO public.assistant_messages(thread_id,role,content,request_id,sources)
  VALUES (_u.thread_id,'assistant',_body,_u.request_id,(SELECT coalesce(array_agg(DISTINCT s),'{}') FROM unnest(_sources) s)) RETURNING id INTO _msg;
- UPDATE public.assistant_usage u SET state='completed',finished_at=statement_timestamp(),reply_message_id=_msg WHERE u.id=_u.id;
+ UPDATE public.assistant_usage u SET state='completed',finished_at=clock_timestamp(),reply_message_id=_msg WHERE u.id=_u.id;
  RETURN QUERY SELECT 'completed'::text,_msg;
 END;
 $$;
