@@ -19,11 +19,10 @@ export function DriverScoreGauge({ score, tier, percentileLabel }: Props) {
       transition={{ duration: 0.4, ease: 'easeOut' }}
       className="premium-card p-5"
     >
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Operating &amp; Logging Score</p>
-      <p className="text-[10px] text-muted-foreground/70 mb-3">App-calculated score from operating metrics and logging consistency. Not a safety or hiring rating.</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground mb-3">Driver Score</p>
       <div className="relative w-full aspect-[2/1] max-w-[220px] mx-auto">
-        <svg viewBox="0 0 200 110" className="w-full h-full" role="img" aria-label={`Operating and logging score ${Math.round(clamped)} out of 100${tier ? `, tier ${tier}` : ''}`}>
-          <title>{`Operating and logging score: ${Math.round(clamped)} / 100`}</title>
+        <svg viewBox="0 0 200 110" className="w-full h-full" role="img" aria-label={`Driver score ${Math.round(clamped)} out of 100${tier ? `, tier ${tier}` : ''}`}>
+          <title>{`Driver score: ${Math.round(clamped)} / 100`}</title>
           {/* track */}
           <path d="M 15 100 A 85 85 0 0 1 185 100" fill="none" stroke="hsl(220 30% 18%)" strokeWidth="14" strokeLinecap="round" />
           {/* progress */}
