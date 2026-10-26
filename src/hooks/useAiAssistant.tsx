@@ -93,7 +93,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     stateRef.current = initial();
   }
 
-  const api = useMemo<AiAssistantApi>(() => {
+  const api = useMemo<Omit<AiAssistantApi, 'state' | 'pinnedDriverId' | 'identityReady' | 'currentContext' | 'visibleThreads'>>(() => {
     const token = () => ({ epoch: epochRef.current, view: viewRef.current });
     const live = (t: { epoch: number }) => t.epoch === epochRef.current && identityRef.current !== null;
     const liveView = (t: { epoch: number; view: number }) => live(t) && t.view === viewRef.current;
@@ -102,7 +102,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     const pinned = () => { const id = identityRef.current; const part = id?.split('|')[2]; return part && part !== 'self' ? part : null; };
     const allowedContexts = (list: AssistantContext[]) => {
       const p = pinned();
-      return p ? list.filter((c) => c.scope === 'driver_delegate' && c.targetId === p) : list.filter((c) => c.scope !== 'driver_delegate' || true);
+      return p ? list.filter((c) => c.scope === 'driver_delegate' && c.targetId === p) : list;
     };
     const threadAllowed = (t: AssistantThread) => {
       const p = pinned();
@@ -128,11 +128,6 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
     };
 
     return {
-      get state() { return stateRef.current; },
-      pinnedDriverId: null,
-      identityReady: false,
-      currentContext: null,
-      visibleThreads: [],
       ensureLoaded() {
         const t = token();
         if (!live(t) || s().availability !== 'idle') return;
@@ -216,9 +211,7 @@ export function AiAssistantProvider({ children }: { children: ReactNode }) {
   const visibleThreads = state.threads.filter((t) =>
     (pinnedDriverId ? t.scope === 'driver_delegate' && t.targetId === pinnedDriverId : true)
     && state.contexts.some((c) => contextKeyOf(c) === contextKeyOf(t)));
-  const value: AiAssistantApi = Object.assign(Object.create(api), {
-    state, pinnedDriverId, identityReady: valid, currentContext, visibleThreads,
-  });
+  const value: AiAssistantApi = { ...api, state, pinnedDriverId, identityReady: valid, currentContext, visibleThreads };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
