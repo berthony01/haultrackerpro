@@ -265,18 +265,12 @@ describe('persistent navigation remains separate from human Conversations', () =
 });
 
 describe('actual Index settled dashboard integration', () => {
-  it.each([0, 4])('eligible self-driver dashboard keeps the guided chat available with %s loads', async (count) => {
+  it.each([0, 4])('self-driver dashboard no longer embeds a chat panel with %s loads (launcher owns it)', async (count) => {
     state.loads = Array.from({ length: count }, (_, i) => ({ id: String(i) }));
     render(tree(<Index />));
-    const content = await screen.findByTestId(count === 0 ? 'existing-onboarding' : 'existing-dashboard');
-    const chat = await screen.findByTestId('home-conversation-surface');
-    if (count === 0) {
-      // Zero-load onboarding still offers the same collapsed chat after it.
-      expect(chat.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
-    } else {
-      // The chat lives inside the financial dashboard slot, not above it.
-      expect(content.contains(chat)).toBe(true);
-    }
+    await screen.findByTestId(count === 0 ? 'existing-onboarding' : 'existing-dashboard');
+    expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
+    expect(screen.queryByTestId('dashboard-chat-toggle')).toBeNull();
   });
   it.each(['recruiter', 'loading', 'error', 'null', 'assistant', 'no-driver', 'acting-pending'])('never mounts chat for %s', (condition) => {
     state.loads = [{ id: 'existing' }];
@@ -288,14 +282,6 @@ describe('actual Index settled dashboard integration', () => {
     if (condition === 'no-driver') state.access.driverWorkspaceAllowed = false;
     if (condition === 'acting-pending') state.actingLoading = true;
     render(tree(<Index />));
-    expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
-  });
-  it('switching to another dashboard page removes the chat and preserves navigation', async () => {
-    state.loads = [{ id: 'existing' }]; render(tree(<Index />));
-    expect(await screen.findByTestId('home-conversation-surface')).toBeTruthy();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Loads' })[0]);
-    // The lazy chat chunk resolving can delay the page-swap commit; wait for it.
-    await waitFor(() => expect(screen.queryByTestId('existing-dashboard')).toBeNull());
     expect(screen.queryByTestId('home-conversation-surface')).toBeNull();
   });
 });
