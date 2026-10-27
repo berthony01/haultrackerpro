@@ -36,7 +36,6 @@ import { useDriverOpportunityProfile } from '@/hooks/opportunities/useDriverOppo
 import { useReleaseNotesSeen } from '@/hooks/useReleaseNotesSeen';
 
 // Heavy / route-rare views and modals — lazy so they don't bloat the dashboard chunk.
-const DriverWorkConversation = lazy(() => import('@/components/home/DriverWorkConversation'));
 const LoadForm = lazy(() => import('@/components/LoadForm').then(m => ({ default: m.LoadForm })));
 const ExpenseForm = lazy(() => import('@/components/ExpenseForm').then(m => ({ default: m.ExpenseForm })));
 const FuelLogForm = lazy(() => import('@/components/FuelLogForm').then(m => ({ default: m.FuelLogForm })));
@@ -63,7 +62,7 @@ import { ContractActionsCard } from '@/components/contracts/ContractActionsCard'
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import AssistantBlockedNotice from '@/components/assistants/AssistantBlockedNotice';
 
-import { Truck, LogOut, X, Route, Users, TrendingUp, Shield, MessageCircle } from 'lucide-react';
+import { Truck, LogOut, X, Route, Users, TrendingUp, Shield } from 'lucide-react';
 import { useAdmin } from '@/hooks/useAdmin';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -958,33 +957,8 @@ const Index = () => {
     setPage('add_fuel');
   };
 
-  // Embedded guided Find Work conversation for the canonical self-driver
-  // dashboard only. Same gate as the previous above-dashboard section. The
-  // native details wrapper starts closed; the child stays mounted while
-  // closed so unsaved answers survive toggling. Rendered after Onboarding
-  // for first-load drivers and inside DashboardView's slot otherwise, so
-  // exactly one chat runtime exists at a time.
-  const dashboardChatSlot =
-    page === 'dashboard' && effectiveRole === 'driver' && driverWorkspaceAllowed && !isActingAsAssistant ? (
-      <details className="rounded-2xl border border-border bg-card shadow-card">
-        <summary
-          data-testid="dashboard-chat-toggle"
-          className="flex min-h-[44px] cursor-pointer select-none items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-details-marker]:hidden"
-        >
-          <MessageCircle className="h-4 w-4 shrink-0 text-primary" />
-          Talk to HaulTracker
-          <span className="text-xs font-normal text-muted-foreground">Find Work: guided driver conversation</span>
-        </summary>
-        <div className="px-4 pb-4">
-          <p className="mb-3 text-xs text-muted-foreground">
-            Describe the work you want, then review your answers before saving. Nothing is saved automatically.
-          </p>
-          <Suspense fallback={<ViewFallback />}>
-            <DriverWorkConversation />
-          </Suspense>
-        </div>
-      </details>
-    ) : null;
+  // The dashboard no longer embeds its own chat: the single HaulTracker
+  // Assistant launcher (mounted at the App shell) owns guided Find Work access.
 
   return (
     <div className="app-shell min-h-screen pb-24 lg:pb-0 lg:flex">
@@ -1103,10 +1077,7 @@ const Index = () => {
         )}
 
         {showOnboarding ? (
-          <>
-            <Onboarding onGetStarted={() => { setEditingLoad(null); setPage('add'); }} />
-            {dashboardChatSlot}
-          </>
+          <Onboarding onGetStarted={() => { setEditingLoad(null); setPage('add'); }} />
         ) : isActingAsAssistant && !isAssistantPageAllowed(page, actingPermissions) ? (
           <AssistantBlockedNotice
             driverName={actingDriver?.driver_name || actingDriver?.driver_email || 'this driver'}
@@ -1182,7 +1153,6 @@ const Index = () => {
                   settingsOverride={isActingAsAssistant ? driverReportSettings ?? null : null}
                   isAssistantView={isActingAsAssistant}
                   showRecommendedOpportunity={!isActingAsAssistant && effectiveRole === 'driver' && driverWorkspaceAllowed}
-                  embeddedChat={dashboardChatSlot}
                 />
 
               </>
