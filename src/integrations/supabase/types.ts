@@ -632,6 +632,146 @@ export type Database = {
           },
         ]
       }
+      assistant_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          request_id: string
+          role: string
+          sources: string[]
+          thread_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          request_id: string
+          role: string
+          sources?: string[]
+          thread_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          request_id?: string
+          role?: string
+          sources?: string[]
+          thread_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assistant_threads: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          required_permissions: string[]
+          scope_kind: string
+          scope_target_id: string
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          required_permissions: string[]
+          scope_kind: string
+          scope_target_id: string
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          required_permissions?: string[]
+          scope_kind?: string
+          scope_target_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_threads_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      assistant_usage: {
+        Row: {
+          actor_user_id: string
+          created_at: string
+          finished_at: string | null
+          id: string
+          lease_expires_at: string
+          lease_id: string
+          reply_message_id: string | null
+          request_id: string
+          session_id: string
+          state: string
+          thread_id: string | null
+        }
+        Insert: {
+          actor_user_id: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          lease_expires_at?: string
+          lease_id?: string
+          reply_message_id?: string | null
+          request_id: string
+          session_id: string
+          state?: string
+          thread_id?: string | null
+        }
+        Update: {
+          actor_user_id?: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          lease_expires_at?: string
+          lease_id?: string
+          reply_message_id?: string | null
+          request_id?: string
+          session_id?: string
+          state?: string
+          thread_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_usage_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "assistant_usage_reply_message_id_fkey"
+            columns: ["reply_message_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_messages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assistant_usage_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "assistant_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       broker_stats: {
         Row: {
           avg_actual_pay: number
@@ -5273,6 +5413,19 @@ export type Database = {
         }[]
       }
       _agency_plan_label: { Args: { _plan_key: string }; Returns: string }
+      _assistant_context_permissions: {
+        Args: { _scope: string; _target: string }
+        Returns: string[]
+      }
+      _assistant_permissions_valid: {
+        Args: { _permissions: string[]; _scope: string }
+        Returns: boolean
+      }
+      _assistant_session_valid: { Args: never; Returns: boolean }
+      _assistant_source_allowed: {
+        Args: { _key: string; _perms: string[]; _scope: string }
+        Returns: boolean
+      }
       _build_recruiter_staff_report_payload: {
         Args: { _from: string; _recruiter_id: string; _to: string }
         Returns: Json
@@ -5408,14 +5561,124 @@ export type Database = {
         Args: { _action: string; _agency_id: string }
         Returns: undefined
       }
+      assistant_add_user_message: {
+        Args: { _content: string; _request_id: string; _thread_id: string }
+        Returns: string
+      }
+      assistant_clear_my_history: { Args: never; Returns: number }
+      assistant_create_thread: {
+        Args: {
+          _required_permissions: string[]
+          _scope_kind: string
+          _target_id: string
+        }
+        Returns: {
+          expires_at: string
+          thread_id: string
+        }[]
+      }
       assistant_delete_load_stops: {
         Args: { _driver: string; _load_id: string }
         Returns: number
+      }
+      assistant_delete_thread: {
+        Args: { _thread_id: string }
+        Returns: boolean
+      }
+      assistant_finalize_turn: {
+        Args: {
+          _content: string
+          _lease_id: string
+          _reservation_id: string
+          _sources: string[]
+          _success: boolean
+        }
+        Returns: {
+          reply_message_id: string
+          status: string
+        }[]
+      }
+      assistant_get_reply: {
+        Args: { _message_id: string; _thread_id: string }
+        Returns: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          sources: string[]
+        }[]
       }
       assistant_has_permission: {
         Args: { _assistant: string; _driver: string; _perm: string }
         Returns: boolean
       }
+      assistant_list_contexts: {
+        Args: { _limit?: number; _offset?: number }
+        Returns: {
+          has_more: boolean
+          label: string
+          permissions: string[]
+          scope_kind: string
+          target_id: string
+        }[]
+      }
+      assistant_list_messages: {
+        Args: {
+          _before?: string
+          _before_id?: string
+          _limit?: number
+          _thread_id: string
+        }
+        Returns: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          sources: string[]
+        }[]
+      }
+      assistant_list_threads: {
+        Args: { _before?: string; _before_id?: string; _limit?: number }
+        Returns: {
+          created_at: string
+          expires_at: string
+          id: string
+          preview: string
+          scope_kind: string
+          scope_target_id: string
+        }[]
+      }
+      assistant_purge_expired: { Args: never; Returns: number }
+      assistant_reserve_turn: {
+        Args: {
+          _content: string
+          _request_id: string
+          _scope_kind: string
+          _target_id: string
+          _thread_id: string
+        }
+        Returns: {
+          lease_id: string
+          reply_message_id: string
+          reservation_id: string
+          status: string
+          thread_id: string
+          user_message_id: string
+        }[]
+      }
+      assistant_scope_authorized: {
+        Args: { _permissions: string[]; _scope: string; _target: string }
+        Returns: boolean
+      }
+      assistant_start_thread: {
+        Args: { _scope_kind: string; _target_id: string }
+        Returns: {
+          expires_at: string
+          thread_id: string
+        }[]
+      }
+      assistant_thread_context: { Args: { _thread_id: string }; Returns: Json }
+      assistant_thread_live: { Args: { _thread_id: string }; Returns: boolean }
       award_load_points: {
         Args: { _load_id: string }
         Returns: {
