@@ -421,6 +421,8 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     for (const cycle of [1, 2]) {
     // The app-level launcher starts closed; open it each cycle, as a user would.
     fireEvent.click(await screen.findByTestId('assistant-launcher'));
+    // Guided help starts on a menu; the chosen Find work topic is kept for the second cycle.
+    if (cycle === 1) fireEvent.click(await screen.findByRole('button', { name: /Find work/ }));
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
     await waitFor(() => expect(state.rpc).toHaveBeenCalled());
     expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
