@@ -14,7 +14,7 @@ vi.mock('@/hooks/useActingContext', () => ({ useActingContext: () => ({ isActing
 vi.mock('@/hooks/useAiAssistant', () => ({ useAiAssistant: () => st.ai }));
 vi.mock('@/components/home/DriverWorkConversation', () => ({ default: () => <div data-testid="guided-find-work" /> }));
 
-import { HaulTrackerAssistantLauncher, isAssistantRoute, GUIDED_LABEL, AI_LABEL } from '@/components/assistant/HaulTrackerAssistantLauncher';
+import { HaulTrackerAssistantLauncher, openHaulTrackerAssistant, isAssistantRoute, GUIDED_LABEL, AI_LABEL } from '@/components/assistant/HaulTrackerAssistantLauncher';
 
 function aiStub(generationEnabled: boolean) {
   const send = vi.fn(); const ensureLoaded = vi.fn();
@@ -83,5 +83,17 @@ describe('HaulTracker Assistant launcher', () => {
     expect(screen.queryByRole('dialog')).toBeNull();
     fireEvent.click(screen.getByTestId('assistant-launcher'));
     expect(screen.getByRole('tab', { name: GUIDED_LABEL }).getAttribute('aria-selected')).toBe('true');
+  });
+  it('menu bridge opens the same bubble on the current page; unhandled where no bubble is mounted', () => {
+    mount('/dashboard');
+    let handled = false;
+    act(() => { handled = openHaulTrackerAssistant(); });
+    expect(handled).toBe(true);
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: GUIDED_LABEL })).toBeTruthy();
+    cleanup();
+    mount('/ai-assistant');
+    expect(openHaulTrackerAssistant()).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 });
