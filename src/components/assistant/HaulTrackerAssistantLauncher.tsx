@@ -58,19 +58,19 @@ type Mode = 'guided' | 'ai';
 /** Single app-wide assistant bubble. Identity-keyed so sign-out, session or managed-target switches reset it. */
 export function HaulTrackerAssistantLauncher() {
   const { user, session, loading } = useAuth();
-  const { pathname, search } = useLocation();
+  const { pathname, key: navKey } = useLocation();
   const { actingDriver, isActingAsAssistant, isLoadingManagedDrivers } = useActingContext();
   if (loading || isLoadingManagedDrivers || !user?.id || session?.user?.id !== user.id) return null;
   if (!isAssistantRoute(pathname)) return null;
   const key = `${user.id}|${isActingAsAssistant ? actingDriver?.driver_user_id ?? 'pending' : 'self'}`;
-  return <LauncherInner key={key} pathname={pathname} search={search} />;
+  return <LauncherInner key={key} pathname={pathname} navKey={navKey} />;
 }
 
-function LauncherInner({ pathname, search }: { pathname: string; search: string }) {
+function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('guided');
   // Following a link or guided Continue closes the panel; mode and drafts are kept for reopening.
-  useEffect(() => { setOpen(false); }, [pathname, search]);
+  useEffect(() => { setOpen(false); }, [navKey]);
   const { effectiveRole, driverWorkspaceAllowed, isLoading, error } = useViewMode();
   const { isActingAsAssistant } = useActingContext();
   if (isLoading) return null;
