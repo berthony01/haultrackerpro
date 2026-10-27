@@ -537,3 +537,23 @@ describe('AI assistant review corrections', () => {
     vi.unstubAllGlobals();
   });
 });
+
+describe('AI assistant transparency notice', () => {
+  it('shows the privacy notice with a /privacy link exactly once when generation is enabled, without gating send', async () => {
+    render(<App />);
+    await screen.findByText(/I can read your/);
+    expect(screen.getAllByText(/external AI processing service/)).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Privacy Policy/ })).toHaveAttribute('href', '/privacy');
+    expect(screen.getByText(/Please avoid including sensitive details/)).toBeInTheDocument();
+    fireEvent.change(input(), { target: { value: 'Hello' } });
+    expect(sendBtn()).toBeEnabled();
+  });
+
+  it('shows the same privacy notice when generation is disabled', async () => {
+    transport.bootstrap.mockImplementation(() => ok(boot([driverCtx()], { generationEnabled: false })));
+    render(<App />);
+    await screen.findByText(/AI replies are not turned on/);
+    expect(screen.getAllByText(/external AI processing service/)).toHaveLength(1);
+    expect(screen.getByRole('link', { name: /Privacy Policy/ })).toHaveAttribute('href', '/privacy');
+  });
+});
