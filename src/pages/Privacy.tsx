@@ -221,6 +221,13 @@ export default function Privacy() {
           <p className="text-muted-foreground">Optional AI, OCR, and automated extraction features — voice expense capture, receipt and screenshot scanning, rate confirmations, pasted load text, pasted opportunity text, clause and contract text, AI summaries, and other inputs you submit when extraction is invoked — send the content you submit to third-party AI or OCR processing services through HaulTrackerPro's processing layer so the requested output can be returned. Output may be incomplete or inaccurate and should be compared against the original document before you rely on it. The opportunity paste extractor does not save the pasted text as an opportunity until you submit the form.</p>
         </section>
 
+        <section className="space-y-2">
+          <h3 className="text-base font-bold">AI Assistant Conversation Data</h3>
+          <p className="text-muted-foreground">The AI Assistant's reply generation is currently disabled, so no conversation content is sent to an AI provider at this time. If generation is enabled, the messages you send to the AI Assistant, together with limited workspace data you have authorized it to use, will be transmitted through HaulTrackerPro's processing layer to an external AI processing provider so it can generate a reply.</p>
+          <p className="text-muted-foreground">AI Assistant conversation history stored in HaulTrackerPro expires automatically after 30 days, and you can delete your conversation history earlier at any time from the AI Assistant page. An automated cleanup job runs every hour to remove expired conversation records.</p>
+          <p className="text-muted-foreground">HaulTrackerPro cannot guarantee the external AI provider's own logging, retention, or training practices. Those practices are governed by the provider and should be verified with the provider directly.</p>
+        </section>
+
 
         <section className="space-y-2">
           <h3 className="text-base font-bold">21. Contact Information</h3>
