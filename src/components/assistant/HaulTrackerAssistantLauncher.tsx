@@ -21,8 +21,7 @@ const APP_PREFIXES = ['/dashboard', '/conversations', '/assistant', '/agency', '
 const EXCLUDED = [/^\/ai-assistant/, /^\/find-work/, /\/invite\//, /^\/agency\/request\//, /^\/recruiter\/(faq|features|guide|updates)/];
 export function isAssistantRoute(pathname: string): boolean {
   if (EXCLUDED.some((r) => r.test(pathname))) return false;
-  if (pathname === '/recruiter' || pathname.startsWith('/recruiter/')) return true;
-  return APP_PREFIXES.some((p) => pathname === p || pathname.startsWith(p.endsWith('/') ? p : `${p}/`) || pathname === p.replace(/\/$/, ''));
+  return ['/recruiter', ...APP_PREFIXES].some((p) => p.endsWith('/') ? pathname.startsWith(p) : pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export type GuideAudience = 'self_driver' | 'acting_assistant' | 'recruiter' | 'agency' | 'general';
