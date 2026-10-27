@@ -537,6 +537,13 @@ export default function Landing() {
                   onResolved={setTargetedJob}
                 />
               )}
+              <p
+                data-testid="free-find-work-guide-label"
+                className="mb-2 text-xs font-bold uppercase tracking-[0.16em]"
+                style={{ color: AMBER_BRIGHT }}
+              >
+                Free Find Work Guide
+              </p>
               <HomeConversationHero
                 onContinue={continueToOpportunities}
                 amber={AMBER}

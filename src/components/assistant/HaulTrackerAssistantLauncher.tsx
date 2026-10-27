@@ -55,6 +55,16 @@ export const GUIDE_LINKS: Record<GuideAudience, GuideLink[]> = {
 
 type Mode = 'guided' | 'ai';
 
+/** Typed window event bridge so app navigation can open the one floating assistant. */
+export const OPEN_ASSISTANT_EVENT = 'haultracker:open-assistant';
+/** Returns true when a mounted launcher handled the request (it calls preventDefault). */
+export function openHaulTrackerAssistant(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ev = new CustomEvent(OPEN_ASSISTANT_EVENT, { cancelable: true });
+  window.dispatchEvent(ev);
+  return ev.defaultPrevented;
+}
+
 /** Single app-wide assistant bubble. Identity-keyed so sign-out, session or managed-target switches reset it. */
 export function HaulTrackerAssistantLauncher() {
   const { user, session, loading } = useAuth();
@@ -71,6 +81,11 @@ function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string 
   const [mode, setMode] = useState<Mode>('guided');
   // Following a link or guided Continue closes the panel; mode and drafts are kept for reopening.
   useEffect(() => { setOpen(false); }, [navKey]);
+  useEffect(() => {
+    const onOpen = (e: Event) => { e.preventDefault(); setOpen(true); };
+    window.addEventListener(OPEN_ASSISTANT_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_ASSISTANT_EVENT, onOpen);
+  }, []);
   const { effectiveRole, driverWorkspaceAllowed, isLoading, error } = useViewMode();
   const { isActingAsAssistant } = useActingContext();
   if (isLoading) return null;

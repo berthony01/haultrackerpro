@@ -241,8 +241,14 @@ describe('persistent navigation remains separate from human Conversations', () =
     render(tree(<AppSidebar active="dashboard" role="driver" onNavigate={vi.fn()} />));
     expect(screen.getByRole('button', { name: 'Opportunities' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Conversations' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Talk to HaulTracker' }));
-    expect(screen.getByTestId('location')).toHaveTextContent('/find-work');
+    const opened = vi.fn((e: Event) => e.preventDefault());
+    window.addEventListener('haultracker:open-assistant', opened);
+    fireEvent.click(screen.getByRole('button', { name: 'HaulTracker Assistant' }));
+    window.removeEventListener('haultracker:open-assistant', opened);
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('location')).toHaveTextContent('/dashboard');
+    expect(screen.queryByText('Talk to HaulTracker')).toBeNull();
+    expect(screen.queryByText('AI assistant')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
     expect(screen.getByTestId('location')).toHaveTextContent('/conversations?workspace=driver');
   });
@@ -251,8 +257,13 @@ describe('persistent navigation remains separate from human Conversations', () =
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
     expect(screen.getByText('Conversations')).toBeTruthy();
     expect(screen.getByText('Opportunity Preferences')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Talk to HaulTracker' }));
-    expect(screen.getByTestId('location')).toHaveTextContent('/find-work');
+    const opened = vi.fn((e: Event) => e.preventDefault());
+    window.addEventListener('haultracker:open-assistant', opened);
+    fireEvent.click(screen.getByRole('button', { name: /HaulTracker Assistant/ }));
+    window.removeEventListener('haultracker:open-assistant', opened);
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Talk to HaulTracker')).toBeNull();
+    expect(screen.getAllByText('HaulTracker Assistant')).toHaveLength(1);
   });
   it.each(['assistant', 'loading', 'recruiter-active', 'recruiter-no-ops', 'recruiter-null'])('adds no guided navigation for %s', (condition) => {
     const props = { active: 'dashboard', onNavigate: vi.fn(), role: condition.startsWith('recruiter') ? 'recruiter' as const : 'driver' as const,
