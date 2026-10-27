@@ -14,6 +14,7 @@ import { AiAssistantProvider } from "@/hooks/useAiAssistant";
 import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
 import { PendingDelegationBanner } from "@/components/agency/PendingDelegationBanner";
 import { OwnerQaModeBanner } from "@/components/admin/OwnerQaModeBanner";
+import { HaulTrackerAssistantLauncher } from "@/components/assistant/HaulTrackerAssistantLauncher";
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -333,6 +334,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
+            <HaulTrackerAssistantLauncher />
             </AiAssistantProvider>
             </WorkConversationDraftProvider>
             </ActingContextProvider>
