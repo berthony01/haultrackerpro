@@ -167,3 +167,12 @@ describe('Homepage — audience-first front door with guided driver conversation
     expect(LANDING_SRC).not.toMatch(/htp_home_conversation_draft|HOME_CONVERSATION_DRAFT_KEY/);
   });
 });
+
+describe('public Find Work guide labeling', () => {
+  it('labels the embedded conversation as the Free Find Work Guide, not a second assistant', () => {
+    renderLanding();
+    expect(screen.getByTestId('free-find-work-guide-label').textContent).toBe('Free Find Work Guide');
+    expect(screen.queryByText(/Talk to HaulTracker/)).toBeNull();
+    expect(screen.queryByTestId('assistant-launcher')).toBeNull();
+  });
+});
