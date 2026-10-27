@@ -71,6 +71,8 @@ describe('HaulTracker Assistant launcher', () => {
     const r = mount(); fireEvent.click(screen.getByTestId('assistant-launcher'));
     fireEvent.click(screen.getByRole('tab', { name: AI_LABEL }));
     act(() => nav('/conversations'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByTestId('assistant-launcher'));
     expect(screen.getByRole('tab', { name: AI_LABEL }).getAttribute('aria-selected')).toBe('true');
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
     expect(screen.queryByRole('dialog')).toBeNull();

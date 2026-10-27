@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { computeWorkspaceAccess } from '@/lib/workspaceAccess';
 import { deriveUserCapabilitiesView, type UserCapabilityStatus } from '@/lib/userCapabilities';
 import { HOME_INTAKE_NEXT_PATH, INTAKE_OPENING_PROMPT } from '@/lib/home/conversationIntake';
+import { HaulTrackerAssistantLauncher } from '@/components/assistant/HaulTrackerAssistantLauncher';
 import { consumePendingProfileAnswers, clearPendingProfileAnswers } from '@/lib/home/pendingProfileHandoff';
 
 const state = vi.hoisted(() => ({
@@ -386,7 +387,7 @@ describe('canonical workspace handoff reaches the actual review destination', ()
     expect(state.mutation).not.toHaveBeenCalled();
   });
 
-  it('dashboard-embedded chat repeated identical Continue opens the unsaved review on the same mounted Index', async () => {
+  it('launcher guided chat repeated identical Continue opens the unsaved review on the same mounted Index', async () => {
     // Use the browser-backed router directly: ReviewJourney's render-time
     // replaceState bridge is not part of the production dashboard journey.
     // All URL-effect auth/workspace/subscription dependencies remain settled;
@@ -402,13 +403,12 @@ describe('canonical workspace handoff reaches the actual review destination', ()
       return <Index />;
     }
     render(<QueryClientProvider client={new QueryClient()}>
-      <BrowserRouter><Location /><MountedDashboard /></BrowserRouter>
+      <BrowserRouter><Location /><MountedDashboard /><HaulTrackerAssistantLauncher /></BrowserRouter>
     </QueryClientProvider>);
     expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
     for (const cycle of [1, 2]) {
-    // The production dashboard wraps the slot in a native details element that
-    // starts closed; open it explicitly each cycle, as a user would.
-    fireEvent.click(await screen.findByTestId('dashboard-chat-toggle'));
+    // The app-level launcher starts closed; open it each cycle, as a user would.
+    fireEvent.click(await screen.findByTestId('assistant-launcher'));
     fireEvent.click(await screen.findByTestId('home-conversation-confirm-yes'));
     await waitFor(() => expect(state.rpc).toHaveBeenCalled());
     expect(screen.queryByTestId('driver-profile-pending-review-note')).toBeNull();
