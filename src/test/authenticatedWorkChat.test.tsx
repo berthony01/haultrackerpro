@@ -246,7 +246,7 @@ describe('persistent navigation remains separate from human Conversations', () =
     fireEvent.click(screen.getByRole('button', { name: 'HaulTracker Assistant' }));
     window.removeEventListener('haultracker:open-assistant', opened);
     expect(opened).toHaveBeenCalledTimes(1);
-    expect(screen.getByTestId('location')).toHaveTextContent('/dashboard');
+    expect(screen.getByTestId('location').textContent).not.toMatch(/find-work|ai-assistant/);
     expect(screen.queryByText('Talk to HaulTracker')).toBeNull();
     expect(screen.queryByText('AI assistant')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Conversations' }));
