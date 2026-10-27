@@ -257,13 +257,14 @@ describe('persistent navigation remains separate from human Conversations', () =
     fireEvent.click(screen.getByRole('button', { name: 'More' }));
     expect(screen.getByText('Conversations')).toBeTruthy();
     expect(screen.getByText('Opportunity Preferences')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /HaulTracker Assistant/ })).toHaveLength(1);
+    expect(screen.queryByText('AI assistant')).toBeNull();
     const opened = vi.fn((e: Event) => e.preventDefault());
     window.addEventListener('haultracker:open-assistant', opened);
     fireEvent.click(screen.getByRole('button', { name: /HaulTracker Assistant/ }));
     window.removeEventListener('haultracker:open-assistant', opened);
     expect(opened).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Talk to HaulTracker')).toBeNull();
-    expect(screen.getAllByText('HaulTracker Assistant')).toHaveLength(1);
   });
   it.each(['assistant', 'loading', 'recruiter-active', 'recruiter-no-ops', 'recruiter-null'])('adds no guided navigation for %s', (condition) => {
     const props = { active: 'dashboard', onNavigate: vi.fn(), role: condition.startsWith('recruiter') ? 'recruiter' as const : 'driver' as const,
