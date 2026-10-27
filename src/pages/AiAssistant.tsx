@@ -252,6 +252,10 @@ export default function AiAssistant() {
                   />
                   <Button type="submit" disabled={!canSend}><Send className="mr-1.5 h-4 w-4" />Send</Button>
                 </form>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  When AI replies are enabled, your question and the authorized workspace records you can already access are sent to an external AI processing service to generate the reply. Conversation history expires after 30 days or can be deleted sooner; the AI provider's own logging and retention may differ and are governed by its policies. Please avoid including sensitive details beyond what is needed.{' '}
+                  <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground">See our Privacy Policy</Link>.
+                </p>
                 <p className="mt-1 text-[11px] text-muted-foreground">
                   Read-only. Uses only records you can already access.{s.retentionDays === 30 ? ' Conversations are kept for 30 days unless you delete them sooner.' : ''}
                 </p>
