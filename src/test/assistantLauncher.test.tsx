@@ -6,15 +6,16 @@ import { MemoryRouter, useNavigate } from 'react-router-dom';
 const st = vi.hoisted(() => ({
   user: { id: 'u1' } as { id: string } | null, loading: false,
   role: 'driver' as 'driver' | 'recruiter' | null, driverAllowed: true, acting: false, actingId: null as string | null,
-  ai: null as any,
+  ai: null as any, agency: null as null | { status: string }, managed: [] as { driver_user_id: string }[],
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: st.user, session: st.user ? { user: { id: st.user.id } } : null, loading: st.loading }) }));
 vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => ({ effectiveRole: st.role, driverWorkspaceAllowed: st.driverAllowed, isLoading: false, error: null }) }));
-vi.mock('@/hooks/useActingContext', () => ({ useActingContext: () => ({ isActingAsAssistant: st.acting, isLoadingManagedDrivers: false, actingDriver: st.actingId ? { driver_user_id: st.actingId } : null }) }));
+vi.mock('@/hooks/useActingContext', () => ({ useActingContext: () => ({ isActingAsAssistant: st.acting, isLoadingManagedDrivers: false, managedDrivers: st.managed, actingDriver: st.actingId ? { driver_user_id: st.actingId } : null }) }));
+vi.mock('@/hooks/useAgency', () => ({ useMyAgency: () => ({ data: st.agency, isLoading: false, error: null }) }));
 vi.mock('@/hooks/useAiAssistant', () => ({ useAiAssistant: () => st.ai }));
-vi.mock('@/components/home/DriverWorkConversation', () => ({ default: () => <div data-testid="guided-find-work" /> }));
+vi.mock('@/components/home/DriverWorkConversation', () => ({ default: (p: { theme?: string }) => <div data-testid="guided-find-work" data-theme={p.theme} /> }));
 
-import { HaulTrackerAssistantLauncher, openHaulTrackerAssistant, isAssistantRoute, GUIDED_LABEL, AI_LABEL } from '@/components/assistant/HaulTrackerAssistantLauncher';
+import { HaulTrackerAssistantLauncher, openHaulTrackerAssistant, isAssistantRoute, resolveAudience, GUIDED_LABEL, AI_LABEL } from '@/components/assistant/HaulTrackerAssistantLauncher';
 
 function aiStub(generationEnabled: boolean) {
   const send = vi.fn(); const ensureLoaded = vi.fn();
@@ -26,7 +27,9 @@ let nav: (p: string) => void = () => {};
 function Nav() { nav = useNavigate(); return null; }
 const mount = (path = '/dashboard') => render(<MemoryRouter initialEntries={[path]}><Nav /><HaulTrackerAssistantLauncher /></MemoryRouter>);
 
-beforeEach(() => { Object.assign(st, { user: { id: 'u1' }, loading: false, role: 'driver', driverAllowed: true, acting: false, actingId: null, ai: aiStub(false) }); });
+beforeEach(() => { Object.assign(st, { user: { id: 'u1' }, loading: false, role: 'driver', driverAllowed: true, acting: false, actingId: null, ai: aiStub(false), agency: null, managed: [] }); });
+const openBubble = (path?: string) => { const r = mount(path); fireEvent.click(screen.getByTestId('assistant-launcher')); return r; };
+const choose = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }));
 afterEach(cleanup);
 
 describe('HaulTracker Assistant launcher', () => {
@@ -38,19 +41,64 @@ describe('HaulTracker Assistant launcher', () => {
     st.user = null; mount(); expect(screen.queryByTestId('assistant-launcher')).toBeNull(); cleanup();
     st.user = { id: 'u1' }; mount('/ai-assistant'); expect(screen.queryByTestId('assistant-launcher')).toBeNull();
   });
-  it('self-driver guided mode shows the canonical Find Work flow and labels', async () => {
-    mount(); fireEvent.click(screen.getByTestId('assistant-launcher'));
-    expect(screen.getByRole('dialog')).toBeTruthy();
+  it('self-driver starts on an interactive menu; Find Work mounts only after choosing it, in dark theme', async () => {
+    openBubble();
+    expect(screen.getByRole('dialog').className).toContain('ht-assistant-dark');
     expect(screen.getByRole('tab', { name: GUIDED_LABEL })).toBeTruthy();
     expect(screen.getByRole('tab', { name: AI_LABEL })).toBeTruthy();
-    expect(await screen.findByTestId('guided-find-work')).toBeTruthy();
+    expect(screen.getByText('What do you need help with?')).toBeTruthy();
+    expect(screen.queryByTestId('guided-find-work')).toBeNull();
+    choose(/Find work/);
+    const fw = await screen.findByTestId('guided-find-work');
+    expect(fw.getAttribute('data-theme')).toBe('dark');
+    choose(/Start over/);
+    expect(screen.queryByTestId('guided-find-work')).toBeNull();
     expect(screen.getByRole('link', { name: 'Conversations' }).getAttribute('href')).toBe('/conversations');
   });
-  it.each([['recruiter', 'Recruiter hub'], ['acting', 'Assistant dashboard']])('%s gets role-safe links and no driver Find Work', (who, link) => {
-    if (who === 'recruiter') st.role = 'recruiter'; else { st.acting = true; st.actingId = 'd9'; }
-    mount(); fireEvent.click(screen.getByTestId('assistant-launcher'));
-    expect(screen.getByRole('link', { name: new RegExp(link) })).toBeTruthy();
+  it('follow-up choices, Back and route actions work', () => {
+    openBubble(); choose(/Loads and expenses/); choose(/Add a load/);
+    expect(screen.getByRole('link', { name: /Add a load/ }).getAttribute('href')).toBe('/dashboard?page=add');
+    choose(/Back/); expect(screen.getByRole('button', { name: /Log an expense/ })).toBeTruthy();
+    choose(/Back/); expect(screen.getByText('What do you need help with?')).toBeTruthy();
+  });
+  it.each([
+    ['recruiter', '/recruiter', /Applications/, '/recruiter/applications'],
+    ['agency', '/agency', /Delegation and access/, '/assistants-agencies'],
+    ['acting', '/dashboard', /Tasks I can do/, '/assistant'],
+  ])('%s gets its own interactive menu and never the driver intake', (who, path, topic, href) => {
+    if (who === 'recruiter') st.role = 'recruiter';
+    if (who === 'agency') { st.role = 'recruiter'; st.agency = { status: 'active' }; }
+    if (who === 'acting') { st.acting = true; st.actingId = 'd9'; }
+    openBubble(path);
+    expect(screen.queryByRole('button', { name: /Find work/ })).toBeNull();
+    choose(topic);
+    expect(screen.getAllByRole('link').some((l) => l.getAttribute('href') === href)).toBe(true);
     expect(screen.queryByTestId('guided-find-work')).toBeNull();
+  });
+  it('visiting /agency without an active agency fails closed to general help', () => {
+    st.role = null; st.agency = null; openBubble('/agency');
+    expect(screen.getByTestId('assistant-guided').getAttribute('data-audience')).toBe('general');
+    cleanup(); st.agency = { status: 'disabled' }; openBubble('/agency');
+    expect(screen.getByTestId('assistant-guided').getAttribute('data-audience')).toBe('general');
+  });
+  it('audience resolution is fail closed', () => {
+    const base = { isActing: false, onAssistantRoute: false, managesDrivers: false, isAgency: false, role: null, driverAllowed: null, error: null };
+    expect(resolveAudience(base)).toBe('general');
+    expect(resolveAudience({ ...base, role: 'driver', driverAllowed: false })).toBe('general');
+    expect(resolveAudience({ ...base, role: 'driver', driverAllowed: true, error: new Error('x') })).toBe('general');
+    expect(resolveAudience({ ...base, onAssistantRoute: true })).toBe('general');
+    expect(resolveAudience({ ...base, onAssistantRoute: true, managesDrivers: true })).toBe('acting_assistant');
+    expect(resolveAudience({ ...base, isActing: true, role: 'driver', driverAllowed: true })).toBe('acting_assistant');
+  });
+  it('keeps the chosen topic across close/reopen and navigation, resets on identity change', () => {
+    const r = openBubble(); choose(/Reports and profit/);
+    act(() => nav('/conversations'));
+    fireEvent.click(screen.getByTestId('assistant-launcher'));
+    expect(screen.getByRole('heading', { name: 'Reports and profit' })).toBeTruthy();
+    st.user = { id: 'u2' };
+    r.rerender(<MemoryRouter initialEntries={['/dashboard']}><Nav /><HaulTrackerAssistantLauncher /></MemoryRouter>);
+    fireEvent.click(screen.getByTestId('assistant-launcher'));
+    expect(screen.getByText('What do you need help with?')).toBeTruthy();
   });
   it('AI mode uses the shared store; send stays disabled while generation is off', () => {
     mount(); fireEvent.click(screen.getByTestId('assistant-launcher'));

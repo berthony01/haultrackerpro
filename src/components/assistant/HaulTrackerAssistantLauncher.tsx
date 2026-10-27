@@ -1,13 +1,15 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { MessageCircle, X, Send, Loader2, Sparkles, Compass, ExternalLink } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Sparkles, ExternalLink, ChevronLeft, RotateCcw, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { useViewMode } from '@/hooks/useViewMode';
 import { useActingContext } from '@/hooks/useActingContext';
 import { useAiAssistant } from '@/hooks/useAiAssistant';
+import { useMyAgency } from '@/hooks/useAgency';
+import { GUIDE_TOPICS, findTopicPath, type GuideTopic } from '@/components/assistant/guidedTopics';
 
 const DriverWorkConversation = lazy(() => import('@/components/home/DriverWorkConversation'));
 
@@ -25,33 +27,7 @@ export function isAssistantRoute(pathname: string): boolean {
 }
 
 export type GuideAudience = 'self_driver' | 'acting_assistant' | 'recruiter' | 'agency' | 'general';
-type GuideLink = { label: string; to: string; hint: string };
-export const GUIDE_LINKS: Record<GuideAudience, GuideLink[]> = {
-  self_driver: [
-    { label: 'Add a load', to: '/dashboard?page=add', hint: 'Log pay, miles and stops.' },
-    { label: 'Reports', to: '/dashboard?page=reports', hint: 'Weekly and monthly profit.' },
-    { label: 'Work items', to: '/driver/work-items', hint: 'Tasks shared with your assistant.' },
-    { label: 'How-to guide', to: '/how-to-use-haultrackerpro', hint: 'Step-by-step help.' },
-  ],
-  acting_assistant: [
-    { label: 'Assistant dashboard', to: '/assistant', hint: 'Drivers you help and your access.' },
-    { label: 'Help docs', to: '/docs', hint: 'How assistant access works.' },
-  ],
-  recruiter: [
-    { label: 'Recruiter hub', to: '/recruiter', hint: 'Your recruiting workspace.' },
-    { label: 'Applications', to: '/recruiter/applications', hint: 'Review driver applications.' },
-    { label: 'Recruiter guide', to: '/recruiter/guide', hint: 'Set up and post opportunities.' },
-    { label: 'Recruiter FAQ', to: '/recruiter/faq', hint: 'Common questions.' },
-  ],
-  agency: [
-    { label: 'Agency dashboard', to: '/agency', hint: 'Clients, packages and requests.' },
-    { label: 'Help docs', to: '/docs', hint: 'How agency access works.' },
-  ],
-  general: [
-    { label: 'Help docs', to: '/docs', hint: 'Guides and answers.' },
-    { label: 'FAQ', to: '/faq', hint: 'Common questions.' },
-  ],
-};
+export type { GuideLink } from '@/components/assistant/guidedTopics';
 
 type Mode = 'guided' | 'ai';
 
@@ -77,8 +53,35 @@ export function HaulTrackerAssistantLauncher() {
 }
 
 function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string }) {
+  // /agency is only treated as agency once the existing authorized get_my_agency check confirms an active agency.
+  if (pathname === '/agency' || pathname.startsWith('/agency/')) {
+    return <AgencyResolver>{(isAgency) => <LauncherBody pathname={pathname} navKey={navKey} isAgency={isAgency} />}</AgencyResolver>;
+  }
+  return <LauncherBody pathname={pathname} navKey={navKey} isAgency={false} />;
+}
+
+function AgencyResolver({ children }: { children: (isAgency: boolean) => ReactNode }) {
+  const { data, isLoading, error } = useMyAgency();
+  if (isLoading) return null;
+  return <>{children(!error && !!data && data.status === 'active')}</>;
+}
+
+/** Fail-closed audience resolution from authorized context only; URL alone never grants a role. */
+export function resolveAudience(i: { isActing: boolean; onAssistantRoute: boolean; managesDrivers: boolean; isAgency: boolean; role: string | null | undefined; driverAllowed: boolean | null | undefined; error: unknown }): GuideAudience {
+  if (i.isActing) return 'acting_assistant';
+  if (i.isAgency) return 'agency';
+  if (i.onAssistantRoute && i.managesDrivers) return 'acting_assistant';
+  if (i.error) return 'general';
+  if (i.role === 'recruiter') return 'recruiter';
+  if (i.role === 'driver' && i.driverAllowed === true) return 'self_driver';
+  return 'general';
+}
+
+function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey: string; isAgency: boolean }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('guided');
+  // Topic path is in memory only, keyed by audience; identity changes remount the launcher and clear it.
+  const [guide, setGuide] = useState<{ audience: GuideAudience | null; path: string[] }>({ audience: null, path: [] });
   // Following a link or guided Continue closes the panel; mode and drafts are kept for reopening.
   useEffect(() => { setOpen(false); }, [navKey]);
   useEffect(() => {
@@ -87,14 +90,16 @@ function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string 
     return () => window.removeEventListener(OPEN_ASSISTANT_EVENT, onOpen);
   }, []);
   const { effectiveRole, driverWorkspaceAllowed, isLoading, error } = useViewMode();
-  const { isActingAsAssistant } = useActingContext();
+  const { isActingAsAssistant, managedDrivers } = useActingContext();
   if (isLoading) return null;
-  const audience: GuideAudience = isActingAsAssistant ? 'acting_assistant'
-    : pathname.startsWith('/agency') ? 'agency'
-    : pathname.startsWith('/assistant') ? 'acting_assistant'
-    : effectiveRole === 'recruiter' ? 'recruiter'
-    : effectiveRole === 'driver' && driverWorkspaceAllowed === true && !error ? 'self_driver'
-    : 'general';
+  const audience = resolveAudience({
+    isActing: isActingAsAssistant, isAgency,
+    onAssistantRoute: pathname === '/assistant' || pathname.startsWith('/assistant/'),
+    managesDrivers: (managedDrivers?.length ?? 0) > 0,
+    role: effectiveRole, driverAllowed: driverWorkspaceAllowed, error,
+  });
+  const path = guide.audience === audience ? guide.path : [];
+  const setPath = (p: string[]) => setGuide({ audience, path: p });
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -114,7 +119,7 @@ function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string 
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-background/60 sm:bg-transparent" />
         <DialogPrimitive.Content
           data-testid="assistant-panel"
-          className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-card text-card-foreground shadow-2xl focus:outline-none sm:inset-x-auto sm:bottom-6 sm:right-4 sm:max-h-[min(640px,80dvh)] sm:w-[400px] sm:rounded-2xl"
+          className="ht-assistant-dark fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-card text-card-foreground shadow-2xl focus:outline-none sm:inset-x-auto sm:bottom-6 sm:right-4 sm:max-h-[min(640px,80dvh)] sm:w-[400px] sm:rounded-2xl"
         >
           <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
             <MessageCircle className="h-5 w-5 text-primary" aria-hidden />
@@ -135,7 +140,7 @@ function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string 
             ))}
           </div>
           <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
-            {mode === 'guided' ? <GuidedPanel audience={audience} /> : <AiPanel />}
+            {mode === 'guided' ? <GuidedPanel audience={audience} path={path} setPath={setPath} /> : <AiPanel />}
           </div>
           <div className="border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
             Messages with real recruiters and drivers live in{' '}
@@ -147,27 +152,53 @@ function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string 
   );
 }
 
-function GuidedPanel({ audience }: { audience: GuideAudience }) {
+function GuidedPanel({ audience, path, setPath }: { audience: GuideAudience; path: string[]; setPath: (p: string[]) => void }) {
+  const trail = findTopicPath(GUIDE_TOPICS[audience], path);
+  const current: GuideTopic | undefined = trail[trail.length - 1];
+  const choices = current ? current.children ?? [] : GUIDE_TOPICS[audience];
+  const ids = trail.map((t) => t.id);
   return (
-    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" data-testid="assistant-guided">
+    <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4" data-testid="assistant-guided" data-audience={audience}>
       <p className="text-xs text-muted-foreground">Step-by-step guidance and links. Not AI-generated.</p>
-      {audience === 'self_driver' && (
-        <section aria-label="Find Work guide" className="space-y-2">
-          <p className="flex items-center gap-1.5 text-sm font-semibold"><Compass className="h-4 w-4 text-primary" aria-hidden />Find Work</p>
-          <p className="text-xs text-muted-foreground">Describe the work you want, then review your answers before saving. Nothing is saved automatically.</p>
-          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
-            <DriverWorkConversation />
-          </Suspense>
+      {current ? (
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="sm" className="h-9 px-2" onClick={() => setPath(ids.slice(0, -1))}><ChevronLeft className="mr-1 h-4 w-4" aria-hidden />Back</Button>
+          <Button variant="ghost" size="sm" className="ml-auto h-9 px-2" onClick={() => setPath([])}><RotateCcw className="mr-1 h-4 w-4" aria-hidden />Start over</Button>
+        </div>
+      ) : (
+        <p className="text-sm font-semibold">What do you need help with?</p>
+      )}
+      {current && (
+        <section aria-label={current.label} className="space-y-2">
+          <h3 className="text-sm font-semibold">{current.label}</h3>
+          {current.body && <p className="text-sm text-muted-foreground">{current.body}</p>}
+          {current.findWork && audience === 'self_driver' && (
+            <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+              <DriverWorkConversation theme="dark" />
+            </Suspense>
+          )}
         </section>
       )}
-      <nav aria-label="Helpful links" className="space-y-1.5">
-        {GUIDE_LINKS[audience].map((l) => (
-          <Link key={l.to} to={l.to} className="block rounded-md border border-border/60 px-3 py-2 hover:border-primary">
-            <span className="block text-sm font-medium">{l.label}</span>
-            <span className="block text-xs text-muted-foreground">{l.hint}</span>
-          </Link>
-        ))}
-      </nav>
+      {choices.length > 0 && (
+        <div role="group" aria-label="Choices" className="flex flex-col gap-1.5">
+          {choices.map((c) => (
+            <button key={c.id} type="button" onClick={() => setPath([...ids, c.id])}
+              className="flex min-h-[44px] items-center justify-between rounded-md border border-border/60 px-3 py-2 text-left text-sm font-medium hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              {c.label}<ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden />
+            </button>
+          ))}
+        </div>
+      )}
+      {current?.links && current.links.length > 0 && (
+        <nav aria-label="Helpful links" className="space-y-1.5">
+          {current.links.map((l) => (
+            <Link key={l.to} to={l.to} className="block rounded-md border border-border/60 px-3 py-2 hover:border-primary">
+              <span className="block text-sm font-medium">{l.label}</span>
+              <span className="block text-xs text-muted-foreground">{l.hint}</span>
+            </Link>
+          ))}
+        </nav>
+      )}
     </div>
   );
 }

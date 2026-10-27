@@ -23,7 +23,7 @@ export const FIND_WORK_START_OVER_NOTE =
   'Start over clears this conversation only. Your saved work profile is not changed.';
 
 /** Personal, canonical Driver access only. Never mount profile reads before resolution. */
-export default function DriverWorkConversation() {
+export default function DriverWorkConversation({ theme }: { theme?: 'light' | 'dark' } = {}) {
   const { user, loading: authLoading } = useAuth();
   const { driverWorkspaceAllowed, isLoading, error } = useViewMode();
   const { isActingAsAssistant, isLoadingManagedDrivers } = useActingContext();
@@ -43,10 +43,10 @@ export default function DriverWorkConversation() {
   if (!user || error || driverWorkspaceAllowed !== true || isActingAsAssistant) {
     return <p data-testid="find-work-unavailable" className="text-sm text-muted-foreground">{FIND_WORK_NOT_AVAILABLE}</p>;
   }
-  return <ProfileConversation key={user.id} />;
+  return <ProfileConversation key={user.id} theme={theme} />;
 }
 
-function ProfileConversation() {
+function ProfileConversation({ theme }: { theme?: 'light' | 'dark' }) {
   const navigate = useNavigate();
   const { user, session } = useAuth();
   const liveOwner = useRef(user?.id);
@@ -89,6 +89,7 @@ function ProfileConversation() {
       )}
       <HomeConversationFlow
         key={fingerprint}
+        theme={theme}
         draftAdapter={draftAdapter}
         amber="hsl(var(--primary))"
         surface="hsl(var(--card))"

@@ -429,3 +429,8 @@ body.app-shell-active .btn-orange-glow:active { transform: translateY(1px); }
   border-color: hsl(0 0% 100% / 0.18);
   color: hsl(0 0% 92%);
 }
+
+/* Floating HaulTracker Assistant only: keep embedded light-hover chips dark. */
+.ht-assistant-dark .hover\:bg-white:hover {
+  background-color: hsl(var(--muted));
+}

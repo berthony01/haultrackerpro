@@ -206,23 +206,45 @@ function makeInitialState(
 
 
 // HP-2R1 — warm off-white conversation canvas + premium chat palette.
-const CANVAS_BG = 'hsl(36, 45%, 97%)';
-const CANVAS_BORDER = 'hsl(220, 16%, 86%)';
-const INK = 'hsl(220, 22%, 14%)';
-const INK_SOFT = 'hsl(220, 12%, 32%)';
-const INK_MUTED = 'hsl(220, 10%, 44%)';
-const ASSISTANT_BG = 'hsl(0, 0%, 100%)';
-const ASSISTANT_BORDER = 'hsl(220, 16%, 88%)';
-const DRIVER_BG = 'hsl(25, 80%, 46%)';
-const CHIP_BORDER = 'hsl(220, 16%, 78%)';
-const CHIP_HOVER_BORDER = 'hsl(25, 95%, 53%)';
-const CHIP_HOVER_INK = 'hsl(25, 70%, 38%)';
-const FIELD_BG = 'hsl(36, 50%, 99%)';
-const FIELD_BORDER = 'hsl(220, 16%, 76%)';
-const FIELD_FOCUS = 'hsl(25, 95%, 53%)';
-const PLACEHOLDER_INK = 'hsl(220, 10%, 42%)';
-const SUMMARY_BG = 'hsl(0, 0%, 100%)';
-const SUMMARY_BORDER = 'hsl(25, 80%, 70%)';
+const LIGHT_PALETTE = {
+  CANVAS_BG: 'hsl(36, 45%, 97%)',
+  CANVAS_BORDER: 'hsl(220, 16%, 86%)',
+  INK: 'hsl(220, 22%, 14%)',
+  INK_SOFT: 'hsl(220, 12%, 32%)',
+  INK_MUTED: 'hsl(220, 10%, 44%)',
+  ASSISTANT_BG: 'hsl(0, 0%, 100%)',
+  ASSISTANT_BORDER: 'hsl(220, 16%, 88%)',
+  DRIVER_BG: 'hsl(25, 80%, 46%)',
+  CHIP_BORDER: 'hsl(220, 16%, 78%)',
+  CHIP_HOVER_BORDER: 'hsl(25, 95%, 53%)',
+  CHIP_HOVER_INK: 'hsl(25, 70%, 38%)',
+  FIELD_BG: 'hsl(36, 50%, 99%)',
+  FIELD_BORDER: 'hsl(220, 16%, 76%)',
+  FIELD_FOCUS: 'hsl(25, 95%, 53%)',
+  PLACEHOLDER_INK: 'hsl(220, 10%, 42%)',
+  SUMMARY_BG: 'hsl(0, 0%, 100%)',
+  SUMMARY_BORDER: 'hsl(25, 80%, 70%)',
+} as const;
+/** Optional dark palette for contained dark surfaces (floating assistant). Default stays LIGHT. */
+const DARK_PALETTE: Record<keyof typeof LIGHT_PALETTE, string> = {
+  CANVAS_BG: 'hsl(var(--muted) / 0.35)',
+  CANVAS_BORDER: 'hsl(var(--border))',
+  INK: 'hsl(var(--foreground))',
+  INK_SOFT: 'hsl(var(--foreground) / 0.85)',
+  INK_MUTED: 'hsl(var(--muted-foreground))',
+  ASSISTANT_BG: 'hsl(var(--card))',
+  ASSISTANT_BORDER: 'hsl(var(--border))',
+  DRIVER_BG: 'hsl(25, 80%, 46%)',
+  CHIP_BORDER: 'hsl(var(--border))',
+  CHIP_HOVER_BORDER: 'hsl(var(--primary))',
+  CHIP_HOVER_INK: 'hsl(var(--primary))',
+  FIELD_BG: 'hsl(var(--background))',
+  FIELD_BORDER: 'hsl(var(--border))',
+  FIELD_FOCUS: 'hsl(var(--primary))',
+  PLACEHOLDER_INK: 'hsl(var(--muted-foreground))',
+  SUMMARY_BG: 'hsl(var(--card))',
+  SUMMARY_BORDER: 'hsl(var(--primary) / 0.6)',
+};
 
 export interface HomeConversationFlowProps {
   /** Navigation stays owned by the page so the homepage keeps a single router surface. */
@@ -243,6 +265,8 @@ export interface HomeConversationFlowProps {
   onReviewJobSearchCard?: (answers: IntakeAnswers) => void;
   /** Phase 3 — optional same-tab memory adapter. Absent => ephemeral (public homepage). */
   draftAdapter?: ConversationDraftAdapter;
+  /** Optional palette; omitted => original light canvas. */
+  theme?: 'light' | 'dark';
 }
 
 /** Immutable same-tab runtime snapshot. No identity, contact or consent fields. */
@@ -272,7 +296,9 @@ export default function HomeConversationFlow({
   continueLabel,
   onReviewJobSearchCard,
   draftAdapter,
+  theme,
 }: HomeConversationFlowProps) {
+  const { CANVAS_BG, CANVAS_BORDER, INK, INK_SOFT, INK_MUTED, ASSISTANT_BG, ASSISTANT_BORDER, DRIVER_BG, CHIP_BORDER, CHIP_HOVER_BORDER, CHIP_HOVER_INK, FIELD_BG, FIELD_BORDER, FIELD_FOCUS, PLACEHOLDER_INK, SUMMARY_BG, SUMMARY_BORDER } = theme === 'dark' ? DARK_PALETTE : LIGHT_PALETTE;
   // Phase 3 — read a retained same-tab snapshot exactly once, only from a valid adapter.
   const [restored] = useState<ConversationDraftSnapshot | null>(() => {
     const snap = draftAdapter?.read() ?? null;
