@@ -7,6 +7,7 @@ import {
 } from '@/lib/assistantPermissions';
 import type { UserCapabilityStatus } from '@/lib/userCapabilities';
 import { resolveRecruiterNavTier } from '@/lib/dashboardWorkspacePolicy';
+import { openHaulTrackerAssistant } from '@/components/assistant/HaulTrackerAssistantLauncher';
 
 interface AppSidebarProps {
   active: string;
@@ -32,15 +33,18 @@ type NavItem = {
    *  of onNavigate(id). Used for cross-shell destinations like /start and
    *  /driver/assistant-control that live outside the page-state router. */
   href?: string;
+  /** Opens the floating HaulTracker Assistant on the current page instead of navigating. */
+  opensAssistant?: boolean;
 };
+
+const ASSISTANT_ITEM: NavItem = { id: 'nav:haultracker-assistant', label: 'HaulTracker Assistant', icon: Sparkles, opensAssistant: true };
 
 const driverItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
-  { id: 'nav:find-work', label: 'Talk to HaulTracker', icon: MessageSquare, href: '/find-work' },
+  ASSISTANT_ITEM,
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
   { id: 'nav:conversations', label: 'Conversations', icon: MessageSquare, href: '/conversations?workspace=driver' },
-  { id: 'nav:ai-assistant', label: 'AI assistant', icon: Sparkles, href: '/ai-assistant' },
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'expenses', label: 'Expenses', icon: Receipt },
   { id: 'fuel', label: 'Fuel', icon: Fuel },
@@ -58,7 +62,7 @@ const recruiterActiveItems: NavItem[] = [
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
   { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },
   { id: 'nav:conversations', label: 'Conversations', icon: MessageSquare, href: '/conversations?workspace=recruiter' },
-  { id: 'nav:ai-assistant', label: 'AI assistant', icon: Sparkles, href: '/ai-assistant' },
+  ASSISTANT_ITEM,
   { id: 'contracts', label: 'Contracts', icon: FileSignature },
   { id: 'settings', label: 'Settings', icon: SettingsIcon },
   { id: 'nav:switch-workspace', label: 'Switch Workspace', icon: ArrowLeftRight, href: '/start' },
@@ -115,7 +119,7 @@ export function AppSidebar(props: AppSidebarProps) {
   // Acting-assistant mode must never expose cross-shell nav (workspace
   // switch or the driver's own assistant/agency control center).
   const filteredForAssistant = isAssistant
-    ? baseItems.filter((i) => !i.href && isAssistantPageAllowed(i.id, assistantPermissions))
+    ? baseItems.filter((i) => !i.href && !i.opensAssistant && isAssistantPageAllowed(i.id, assistantPermissions))
     : baseItems;
   const items = filteredForAssistant;
 
@@ -153,13 +157,13 @@ export function AppSidebar(props: AppSidebarProps) {
           </div>
         ) : (
           items.map(item => {
-            const isActive = !item.href && active === item.id;
+            const isActive = !item.href && !item.opensAssistant && active === item.id;
             const Icon = item.icon;
             return (
               <button
                 key={item.id}
                 data-nav-id={item.id}
-                onClick={() => (item.href ? navigate(item.href) : onNavigate(item.id))}
+                onClick={() => (item.opensAssistant ? openHaulTrackerAssistant() : item.href ? navigate(item.href) : onNavigate(item.id))}
                 aria-current={isActive ? 'page' : undefined}
                 className={`sidebar-link w-full text-left ${isActive ? 'active' : ''}`}
               >

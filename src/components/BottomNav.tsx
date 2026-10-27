@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { openHaulTrackerAssistant } from '@/components/assistant/HaulTrackerAssistantLauncher';
 import {
   LayoutDashboard,
   Plus,
@@ -126,12 +127,16 @@ export function BottomNav(props: BottomNavProps) {
     navigate(href);
   };
 
+  const openAssistant = () => {
+    setMoreOpen(false);
+    openHaulTrackerAssistant();
+  };
+
   type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
 
   const driverMoreItemsFull: MoreItem[] = [
-    { label: 'Talk to HaulTracker', icon: MessageSquare, onClick: () => goHref('/find-work') },
+    { label: 'HaulTracker Assistant', icon: Sparkles, onClick: openAssistant, description: 'Guided help (Free) or AI answers (Pro).' },
     { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=driver') },
-    { label: 'AI assistant', icon: Sparkles, onClick: () => goHref('/ai-assistant'), description: 'Ask about your own workspace records.' },
     { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
     { label: 'Contracts', icon: FileSignature, onClick: () => go('contracts'), description: 'Review, approve, request changes, sign.' },
     { label: 'Reports', icon: FileText, onClick: () => go('reports') },
@@ -165,7 +170,7 @@ export function BottomNav(props: BottomNavProps) {
 
   const recruiterActiveMoreItems: MoreItem[] = [
     { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=recruiter') },
-    { label: 'AI assistant', icon: Sparkles, onClick: () => goHref('/ai-assistant'), description: 'Ask about your own workspace records.' },
+    { label: 'HaulTracker Assistant', icon: Sparkles, onClick: openAssistant, description: 'Guided help (Free) or AI answers (Pro).' },
     { label: 'Recruiter Command Center', icon: Handshake, onClick: () => go('recruiter-access') },
     { label: 'Manage Opportunities', icon: ClipboardList, onClick: () => go('recruiter-access:manager') },
     { label: 'Applications', icon: Users, onClick: () => go('recruiter-access:applications') },
