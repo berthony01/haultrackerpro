@@ -57,11 +57,24 @@ export function HaulTrackerAssistantLauncher() {
 
 function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string }) {
   // One stable LauncherBody across routes so mode/topic/draft survive /dashboard <-> /agency.
-  // /agency is only treated as agency once the existing cached get_my_agency check confirms an active agency.
-  const { data, isLoading, error } = useMyAgency();
+  // The existing cached get_my_agency check runs only on /agency, in a sibling probe (no remount);
+  // agency is granted only for an active agency with no error. URL alone never grants it.
+  const [agency, setAgency] = useState<'pending' | 'active' | 'none'>('pending');
   const onAgency = pathname === '/agency' || pathname.startsWith('/agency/');
-  const isAgency = onAgency && !isLoading && !error && !!data && data.status === 'active';
-  return <LauncherBody pathname={pathname} navKey={navKey} isAgency={isAgency} hidden={onAgency && isLoading} />;
+  return (
+    <>
+      {onAgency ? <AgencyProbe onResult={setAgency} /> : null}
+      <LauncherBody pathname={pathname} navKey={navKey} isAgency={onAgency && agency === 'active'} hidden={onAgency && agency === 'pending'} />
+    </>
+  );
+}
+
+function AgencyProbe({ onResult }: { onResult: (r: 'pending' | 'active' | 'none') => void }) {
+  const { data, isLoading, error } = useMyAgency();
+  const result = isLoading ? 'pending' : !error && !!data && data.status === 'active' ? 'active' : 'none';
+  useLayoutEffect(() => { onResult(result); }, [result, onResult]);
+  useLayoutEffect(() => () => onResult('pending'), [onResult]);
+  return null;
 }
 
 /** Fail-closed audience resolution from authorized context only; URL alone never grants a role. */
