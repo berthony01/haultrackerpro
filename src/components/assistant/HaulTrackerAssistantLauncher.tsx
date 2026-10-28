@@ -134,7 +134,7 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
           className={`ht-assistant-dark fixed inset-x-0 bottom-0 z-50 flex flex-col border border-border bg-card pb-[env(safe-area-inset-bottom)] text-card-foreground shadow-2xl focus:outline-none sm:inset-x-auto sm:bottom-6 sm:right-4 sm:rounded-2xl ${expanded ? 'top-0 max-h-[100dvh] rounded-none sm:top-6 sm:max-h-[calc(100dvh-3rem)] sm:w-[min(720px,calc(100vw-2rem))]' : 'max-h-[85dvh] rounded-t-2xl sm:max-h-[min(640px,80dvh)] sm:w-[400px]'}`}
         >
           <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
-            <MessageCircle className="h-5 w-5 shrink-0 text-primary-glow" aria-hidden />
+            <MessageCircle className="h-5 w-5 shrink-0 text-accent" aria-hidden />
             <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">{ASSISTANT_NAME}</DialogPrimitive.Title>
             <Button variant="ghost" size="icon" className="h-11 w-11 text-foreground" aria-label={expanded ? 'Shrink assistant' : 'Expand assistant'} aria-pressed={expanded} onClick={() => setExpanded((v) => !v)}>
               {expanded ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
@@ -149,7 +149,7 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
               <button
                 key={m} ref={(el) => { tabRefs.current[m] = el; }} type="button" role="tab" id={TAB_ID(m)} aria-controls={PANEL_ID}
                 aria-selected={mode === m} tabIndex={mode === m ? 0 : -1} data-state={mode === m ? 'active' : 'inactive'} onClick={() => selectMode(m)}
-                className={`flex min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-md border px-2 py-2 text-center text-sm font-semibold leading-tight whitespace-normal break-words transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${mode === m ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-secondary text-foreground hover:border-primary-glow'}`}
+                className={`flex min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-md border px-2 py-2 text-center text-sm font-semibold leading-tight whitespace-normal break-words transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${mode === m ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-secondary text-foreground hover:border-accent'}`}
               >
                 {m === 'guided' ? GUIDED_LABEL : AI_LABEL}
               </button>
@@ -265,7 +265,7 @@ function AiPanel({ onUseGuided }: { onUseGuided: () => void }) {
       <div className="shrink-0 border-t border-border p-3">
         {disabled ? (
           <div role="status" data-testid="assistant-ai-disabled" className="flex items-start gap-3 rounded-lg border border-border bg-secondary p-3">
-            <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-glow" aria-hidden />
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-accent" aria-hidden />
             <div className="min-w-0 space-y-2">
               <p className="text-sm font-medium text-foreground">{AI_DISABLED_COPY}</p>
               <Button type="button" size="sm" variant="outline" className="min-h-[44px] border-border text-foreground" onClick={onUseGuided}>Switch to Free help</Button>
@@ -285,7 +285,7 @@ function AiPanel({ onUseGuided }: { onUseGuided: () => void }) {
           When AI replies are enabled, your question and authorized workspace records are sent to an external AI processing service. History expires after 30 days or can be deleted sooner; provider logging may differ.{' '}
           <Link to="/privacy" className="font-medium text-foreground underline underline-offset-2">Privacy Policy</Link>
         </p>
-        <Link to="/ai-assistant" className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-medium text-primary-glow hover:underline">
+        <Link to="/ai-assistant" className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-medium text-accent hover:underline">
           <Sparkles className="h-3.5 w-3.5" aria-hidden />Open full workspace<ExternalLink className="h-3 w-3" aria-hidden />
         </Link>
       </div>

@@ -104,8 +104,10 @@ describe('HaulTracker Assistant launcher', () => {
     mount(); fireEvent.click(screen.getByTestId('assistant-launcher'));
     fireEvent.click(screen.getByRole('tab', { name: AI_LABEL }));
     expect(st.ai.ensureLoaded).toHaveBeenCalled();
-    expect(screen.getByTestId('assistant-ai-disabled')).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('assistant-ai-disabled').textContent).toContain('Guided help remains available');
+    expect(screen.queryByRole('button', { name: 'Send' })).toBeNull();
+    expect(screen.queryByRole('textbox', { name: /Message the AI assistant/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Privacy Policy' }).getAttribute('href')).toBe('/privacy');
     expect(screen.getByRole('link', { name: /Open full workspace/ }).getAttribute('href')).toBe('/ai-assistant');
     expect(st.ai.send).not.toHaveBeenCalled();
   });
@@ -143,5 +145,40 @@ describe('HaulTracker Assistant launcher', () => {
     mount('/ai-assistant');
     expect(openHaulTrackerAssistant()).toBe(false);
     expect(screen.queryByRole('dialog')).toBeNull();
+  });
+  it('tabs: high-contrast selected style, ARIA wiring and Left/Right/Home/End keyboard', () => {
+    openBubble();
+    const g = screen.getByRole('tab', { name: GUIDED_LABEL }); const a = screen.getByRole('tab', { name: AI_LABEL });
+    expect(g.className).toContain('bg-primary'); expect(g.className).toContain('text-primary-foreground');
+    expect(a.className).toContain('bg-secondary'); expect(a.className).toContain('text-foreground'); expect(a.className).toContain('border-border');
+    expect(g.className).toContain('min-h-[44px]'); expect(g.className).toContain('whitespace-normal');
+    expect(g.tabIndex).toBe(0); expect(a.tabIndex).toBe(-1);
+    const panel = screen.getByRole('tabpanel');
+    expect(g.getAttribute('aria-controls')).toBe(panel.id); expect(panel.getAttribute('aria-labelledby')).toBe(g.id);
+    fireEvent.keyDown(g, { key: 'ArrowRight' });
+    expect(a.getAttribute('aria-selected')).toBe('true'); expect(document.activeElement).toBe(a); expect(a.tabIndex).toBe(0);
+    fireEvent.keyDown(a, { key: 'ArrowRight' }); expect(g.getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(g, { key: 'End' }); expect(a.getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(a, { key: 'Home' }); expect(g.getAttribute('aria-selected')).toBe('true');
+    fireEvent.keyDown(g, { key: 'ArrowLeft' }); expect(a.getAttribute('aria-selected')).toBe('true');
+  });
+  it('Pro disabled state offers Switch to Free help which switches mode', () => {
+    openBubble(); fireEvent.click(screen.getByRole('tab', { name: AI_LABEL }));
+    choose('Switch to Free help');
+    expect(screen.getByRole('tab', { name: GUIDED_LABEL }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByTestId('assistant-guided')).toBeTruthy();
+  });
+  it('expand keeps mode and draft; footer readable; Escape still closes', () => {
+    st.ai = aiStub(true); openBubble(); fireEvent.click(screen.getByRole('tab', { name: AI_LABEL }));
+    const d = screen.getByRole('dialog'); expect(d.getAttribute('data-expanded')).toBe('false');
+    choose('Expand assistant');
+    expect(d.getAttribute('data-expanded')).toBe('true'); expect(d.className).toContain('max-h-[100dvh]');
+    expect(screen.getByRole('tab', { name: AI_LABEL }).getAttribute('aria-selected')).toBe('true');
+    expect((screen.getByRole('textbox', { name: /Message the AI assistant/ }) as HTMLTextAreaElement).value).toBe('hello');
+    expect(screen.getByTestId('assistant-footer').className).toContain('text-[13px]');
+    expect(screen.getByTestId('assistant-ai-disclosure').className).toContain('text-xs');
+    choose('Shrink assistant'); expect(d.getAttribute('data-expanded')).toBe('false');
+    fireEvent.keyDown(d, { key: 'Escape' }); expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('assistant-launcher')).toBeTruthy();
   });
 });
