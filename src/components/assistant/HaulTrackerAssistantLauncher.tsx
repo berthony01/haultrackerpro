@@ -75,7 +75,7 @@ export function resolveAudience(i: { isActing: boolean; onAssistantRoute: boolea
   return 'general';
 }
 
-function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey: string; isAgency: boolean }) {
+function LauncherBody({ pathname, navKey, isAgency, hidden }: { pathname: string; navKey: string; isAgency: boolean; hidden: boolean }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('guided');
   const [expanded, setExpanded] = useState(false);
@@ -87,7 +87,8 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
     if (next) { e.preventDefault(); selectMode(next, true); }
   };
   // Topic path is in memory only, keyed by audience; identity changes remount the launcher and clear it.
-  const [guide, setGuide] = useState<{ audience: GuideAudience | null; path: string[] }>({ audience: null, path: [] });
+  // Kept separately per audience so agency-only topics never show for another audience.
+  const [guidePaths, setGuidePaths] = useState<Partial<Record<GuideAudience, string[]>>>({});
   // Following a link or guided Continue closes the panel; mode and drafts are kept for reopening.
   useEffect(() => { setOpen(false); }, [navKey]);
   useEffect(() => {
@@ -97,15 +98,15 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
   }, []);
   const { effectiveRole, driverWorkspaceAllowed, isLoading, error } = useViewMode();
   const { isActingAsAssistant, managedDrivers } = useActingContext();
-  if (isLoading) return null;
+  if (isLoading || hidden) return null;
   const audience = resolveAudience({
     isActing: isActingAsAssistant, isAgency,
     onAssistantRoute: pathname === '/assistant' || pathname.startsWith('/assistant/'),
     managesDrivers: (managedDrivers?.length ?? 0) > 0,
     role: effectiveRole, driverAllowed: driverWorkspaceAllowed, error,
   });
-  const path = guide.audience === audience ? guide.path : [];
-  const setPath = (p: string[]) => setGuide({ audience, path: p });
+  const path = guidePaths[audience] ?? [];
+  const setPath = (p: string[]) => setGuidePaths((prev) => ({ ...prev, [audience]: p }));
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
