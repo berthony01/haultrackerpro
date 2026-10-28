@@ -389,14 +389,14 @@ describe('AppSidebar — capability tier gating', () => {
   });
   it('recruiter workspace + setup: hub only, no ops/contracts/settings', () => {
     renderSidebar({ role: 'recruiter', recruiterCapabilityStatus: 'setup' });
-    expect(screen.getByText('Recruiter Command Center')).toBeTruthy();
+    expect(screen.getAllByText('Recruiter Command Center')).toHaveLength(2); // workspace header + hub nav item
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
     expect(screen.queryByText('Contracts')).toBeNull();
     expect(screen.queryByText('Settings')).toBeNull();
   });
   it('recruiter workspace + suspended: hub only', () => {
     renderSidebar({ role: 'recruiter', recruiterCapabilityStatus: 'suspended' });
-    expect(screen.getByText('Recruiter Command Center')).toBeTruthy();
+    expect(screen.getAllByText('Recruiter Command Center')).toHaveLength(2); // workspace header + hub nav item
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
   });
   it('recruiter workspace + revoked: no recruiter workspace links even with role=recruiter', () => {
