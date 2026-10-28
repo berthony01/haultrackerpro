@@ -146,12 +146,25 @@ describe('HaulTracker Assistant launcher', () => {
     expect(openHaulTrackerAssistant()).toBe(false);
     expect(screen.queryByRole('dialog')).toBeNull();
   });
-  it('tabs: high-contrast selected style, ARIA wiring and Left/Right/Home/End keyboard', () => {
+  it('tabs: selected tab uses AA-contrast burnt orange (#B45309 on white, 5.02:1), unselected unchanged, ARIA wiring and Left/Right/Home/End keyboard', () => {
     openBubble();
     const g = screen.getByRole('tab', { name: GUIDED_LABEL }); const a = screen.getByRole('tab', { name: AI_LABEL });
-    expect(g.className).toContain('bg-primary'); expect(g.className).toContain('text-primary-foreground');
+    // Selected tab must use the darker burnt orange with white text (not the bright --primary orange, which is only ~2.78:1 on white).
+    expect(g.className).toContain('bg-[#B45309]'); expect(g.className).toContain('text-white');
+    expect(g.className).not.toContain('bg-primary'); expect(g.className).not.toContain('text-primary-foreground');
     expect(a.className).toContain('bg-secondary'); expect(a.className).toContain('text-foreground'); expect(a.className).toContain('border-border');
     expect(g.className).toContain('min-h-[44px]'); expect(g.className).toContain('whitespace-normal');
+    // Deterministic WCAG contrast from explicit constants (sRGB linearization, WCAG 2.x relative luminance).
+    const srgbToLinear = (c: number) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    const luminance = (hex: string) => {
+      const [r, g2, b] = [0, 2, 4].map((i) => parseInt(hex.slice(1 + i, 3 + i), 16) / 255);
+      return 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g2) + 0.0722 * srgbToLinear(b);
+    };
+    const ratio = (fg: string, bg: string) => {
+      const [l1, l2] = [luminance(fg), luminance(bg)].sort((x, y) => y - x);
+      return (l1 + 0.05) / (l2 + 0.05);
+    };
+    expect(ratio('#FFFFFF', '#B45309')).toBeGreaterThanOrEqual(4.5); // ~5.02:1, WCAG AA normal text
     expect(g.tabIndex).toBe(0); expect(a.tabIndex).toBe(-1);
     const panel = screen.getByRole('tabpanel');
     expect(g.getAttribute('aria-controls')).toBe(panel.id); expect(panel.getAttribute('aria-labelledby')).toBe(g.id);

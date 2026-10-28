@@ -149,7 +149,7 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
               <button
                 key={m} ref={(el) => { tabRefs.current[m] = el; }} type="button" role="tab" id={TAB_ID(m)} aria-controls={PANEL_ID}
                 aria-selected={mode === m} tabIndex={mode === m ? 0 : -1} data-state={mode === m ? 'active' : 'inactive'} onClick={() => selectMode(m)}
-                className={`flex min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-md border px-2 py-2 text-center text-sm font-semibold leading-tight whitespace-normal break-words transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${mode === m ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-secondary text-foreground hover:border-accent'}`}
+                className={`flex min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-md border px-2 py-2 text-center text-sm font-semibold leading-tight whitespace-normal break-words transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${mode === m ? 'border-[#B45309] bg-[#B45309] text-white shadow-sm' : 'border-border bg-secondary text-foreground hover:border-accent'}`}
               >
                 {m === 'guided' ? GUIDED_LABEL : AI_LABEL}
               </button>
