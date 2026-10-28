@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { MessageCircle, X, Send, Loader2, Sparkles, ExternalLink, ChevronLeft, RotateCcw, ChevronRight } from 'lucide-react';
+import { MessageCircle, X, Send, Loader2, Sparkles, ExternalLink, ChevronLeft, RotateCcw, ChevronRight, Maximize2, Minimize2, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,7 +16,10 @@ const DriverWorkConversation = lazy(() => import('@/components/home/DriverWorkCo
 export const ASSISTANT_NAME = 'HaulTracker Assistant';
 export const GUIDED_LABEL = 'Guided help · Free';
 export const AI_LABEL = 'AI answers · Pro';
-export const AI_DISABLED_COPY = 'AI replies are not turned on in this environment yet. Guided help stays available.';
+export const AI_DISABLED_COPY = 'AI answers are being prepared and are not available yet. Guided help remains available.';
+const MODES: Mode[] = ['guided', 'ai'];
+const TAB_ID = (m: Mode) => `ht-assistant-tab-${m}`;
+const PANEL_ID = 'ht-assistant-tabpanel';
 
 /** Authenticated app areas only. /ai-assistant and /find-work host their own full chat, so no bubble there. */
 const APP_PREFIXES = ['/dashboard', '/conversations', '/assistant', '/agency', '/driver/', '/start', '/professional-profile', '/parking', '/updates'];
@@ -80,6 +83,14 @@ export function resolveAudience(i: { isActing: boolean; onAssistantRoute: boolea
 function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey: string; isAgency: boolean }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('guided');
+  const [expanded, setExpanded] = useState(false);
+  const tabRefs = useRef<Record<Mode, HTMLButtonElement | null>>({ guided: null, ai: null });
+  const selectMode = (m: Mode, focus = false) => { setMode(m); if (focus) tabRefs.current[m]?.focus(); };
+  const onTabKey = (e: React.KeyboardEvent) => {
+    const i = MODES.indexOf(mode);
+    const next = e.key === 'ArrowRight' ? MODES[(i + 1) % MODES.length] : e.key === 'ArrowLeft' ? MODES[(i - 1 + MODES.length) % MODES.length] : e.key === 'Home' ? MODES[0] : e.key === 'End' ? MODES[MODES.length - 1] : null;
+    if (next) { e.preventDefault(); selectMode(next, true); }
+  };
   // Topic path is in memory only, keyed by audience; identity changes remount the launcher and clear it.
   const [guide, setGuide] = useState<{ audience: GuideAudience | null; path: string[] }>({ audience: null, path: [] });
   // Following a link or guided Continue closes the panel; mode and drafts are kept for reopening.
@@ -119,32 +130,37 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
         <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-background/60 sm:bg-transparent" />
         <DialogPrimitive.Content
           data-testid="assistant-panel"
-          className="ht-assistant-dark fixed inset-x-0 bottom-0 z-50 flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-card text-card-foreground shadow-2xl focus:outline-none sm:inset-x-auto sm:bottom-6 sm:right-4 sm:max-h-[min(640px,80dvh)] sm:w-[400px] sm:rounded-2xl"
+          data-expanded={expanded}
+          className={`ht-assistant-dark fixed inset-x-0 bottom-0 z-50 flex flex-col border border-border bg-card pb-[env(safe-area-inset-bottom)] text-card-foreground shadow-2xl focus:outline-none sm:inset-x-auto sm:bottom-6 sm:right-4 sm:rounded-2xl ${expanded ? 'top-0 max-h-[100dvh] rounded-none sm:top-6 sm:max-h-[calc(100dvh-3rem)] sm:w-[min(720px,calc(100vw-2rem))]' : 'max-h-[85dvh] rounded-t-2xl sm:max-h-[min(640px,80dvh)] sm:w-[400px]'}`}
         >
-          <div className="flex items-center gap-2 border-b border-border/60 px-4 py-3">
-            <MessageCircle className="h-5 w-5 text-primary" aria-hidden />
-            <DialogPrimitive.Title className="text-base font-semibold">{ASSISTANT_NAME}</DialogPrimitive.Title>
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
+            <MessageCircle className="h-5 w-5 shrink-0 text-primary-glow" aria-hidden />
+            <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-base font-semibold">{ASSISTANT_NAME}</DialogPrimitive.Title>
+            <Button variant="ghost" size="icon" className="h-11 w-11 text-foreground" aria-label={expanded ? 'Shrink assistant' : 'Expand assistant'} aria-pressed={expanded} onClick={() => setExpanded((v) => !v)}>
+              {expanded ? <Minimize2 className="h-4 w-4" aria-hidden /> : <Maximize2 className="h-4 w-4" aria-hidden />}
+            </Button>
             <DialogPrimitive.Close asChild>
-              <Button variant="ghost" size="icon" className="ml-auto h-8 w-8" aria-label="Close assistant"><X className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-11 w-11 text-foreground" aria-label="Close assistant"><X className="h-4 w-4" /></Button>
             </DialogPrimitive.Close>
           </div>
           <DialogPrimitive.Description className="sr-only">Guided help and AI answers for your workspace.</DialogPrimitive.Description>
-          <div role="tablist" aria-label="Assistant mode" className="flex gap-1 border-b border-border/60 p-2">
-            {(['guided', 'ai'] as Mode[]).map((m) => (
+          <div role="tablist" aria-label="Assistant mode" aria-orientation="horizontal" onKeyDown={onTabKey} className="flex shrink-0 gap-2 border-b border-border p-2">
+            {MODES.map((m) => (
               <button
-                key={m} type="button" role="tab" aria-selected={mode === m} onClick={() => setMode(m)}
-                className={`flex-1 rounded-md px-3 py-2 text-sm font-medium ${mode === m ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-muted/40'}`}
+                key={m} ref={(el) => { tabRefs.current[m] = el; }} type="button" role="tab" id={TAB_ID(m)} aria-controls={PANEL_ID}
+                aria-selected={mode === m} tabIndex={mode === m ? 0 : -1} data-state={mode === m ? 'active' : 'inactive'} onClick={() => selectMode(m)}
+                className={`flex min-h-[44px] min-w-0 flex-1 items-center justify-center rounded-md border px-2 py-2 text-center text-sm font-semibold leading-tight whitespace-normal break-words transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card ${mode === m ? 'border-primary bg-primary text-primary-foreground shadow-sm' : 'border-border bg-secondary text-foreground hover:border-primary-glow'}`}
               >
                 {m === 'guided' ? GUIDED_LABEL : AI_LABEL}
               </button>
             ))}
           </div>
-          <div role="tabpanel" className="flex min-h-0 flex-1 flex-col">
-            {mode === 'guided' ? <GuidedPanel audience={audience} path={path} setPath={setPath} /> : <AiPanel />}
+          <div role="tabpanel" id={PANEL_ID} aria-labelledby={TAB_ID(mode)} className="flex min-h-0 flex-1 flex-col">
+            {mode === 'guided' ? <GuidedPanel audience={audience} path={path} setPath={setPath} /> : <AiPanel onUseGuided={() => selectMode('guided', true)} />}
           </div>
-          <div className="border-t border-border/60 px-4 py-2 text-[11px] text-muted-foreground">
+          <div data-testid="assistant-footer" className="shrink-0 border-t border-border px-4 py-2.5 text-[13px] leading-snug text-secondary-foreground">
             Messages with real recruiters and drivers live in{' '}
-            <Link to="/conversations" className="underline underline-offset-2 hover:text-foreground">Conversations</Link>.
+            <Link to="/conversations" className="font-medium text-foreground underline underline-offset-2">Conversations</Link>.
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
@@ -159,7 +175,7 @@ function GuidedPanel({ audience, path, setPath }: { audience: GuideAudience; pat
   const ids = trail.map((t) => t.id);
   return (
     <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4" data-testid="assistant-guided" data-audience={audience}>
-      <p className="text-xs text-muted-foreground">Step-by-step guidance and links. Not AI-generated.</p>
+      <p className="text-[13px] text-secondary-foreground">Step-by-step guidance and links. Not AI-generated.</p>
       {current ? (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" className="h-9 px-2" onClick={() => setPath(ids.slice(0, -1))}><ChevronLeft className="mr-1 h-4 w-4" aria-hidden />Back</Button>
@@ -194,7 +210,7 @@ function GuidedPanel({ audience, path, setPath }: { audience: GuideAudience; pat
           {current.links.map((l) => (
             <Link key={l.to} to={l.to} className="block rounded-md border border-border/60 px-3 py-2 hover:border-primary">
               <span className="block text-sm font-medium">{l.label}</span>
-              <span className="block text-xs text-muted-foreground">{l.hint}</span>
+              <span className="block text-[13px] text-secondary-foreground">{l.hint}</span>
             </Link>
           ))}
         </nav>
@@ -204,7 +220,7 @@ function GuidedPanel({ audience, path, setPath }: { audience: GuideAudience; pat
 }
 
 /** Compact view over the existing AiAssistantProvider store; no separate state or API. */
-function AiPanel() {
+function AiPanel({ onUseGuided }: { onUseGuided: () => void }) {
   const a = useAiAssistant();
   const ready = a?.identityReady === true;
   const ref = useRef<HTMLDivElement>(null);
@@ -246,8 +262,16 @@ function AiPanel() {
         )}
         {s.sending && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Thinking…</p>}
       </div>
-      <div className="border-t border-border/60 p-3">
-        {disabled && <p role="status" data-testid="assistant-ai-disabled" className="mb-2 text-xs text-muted-foreground">{AI_DISABLED_COPY}</p>}
+      <div className="shrink-0 border-t border-border p-3">
+        {disabled ? (
+          <div role="status" data-testid="assistant-ai-disabled" className="flex items-start gap-3 rounded-lg border border-border bg-secondary p-3">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary-glow" aria-hidden />
+            <div className="min-w-0 space-y-2">
+              <p className="text-sm font-medium text-foreground">{AI_DISABLED_COPY}</p>
+              <Button type="button" size="sm" variant="outline" className="min-h-[44px] border-border text-foreground" onClick={onUseGuided}>Switch to Free help</Button>
+            </div>
+          </div>
+        ) : (
         <form className="flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); if (canSend) { nearBottom.current = true; void a.send(); } }}>
           <Textarea
             aria-label="Message the AI assistant" rows={2} className="min-h-[44px] flex-1 resize-none"
@@ -256,11 +280,12 @@ function AiPanel() {
           />
           <Button type="submit" size="icon" aria-label="Send" disabled={!canSend}><Send className="h-4 w-4" /></Button>
         </form>
-        <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+        )}
+        <p data-testid="assistant-ai-disclosure" className="mt-2 text-xs leading-relaxed text-secondary-foreground">
           When AI replies are enabled, your question and authorized workspace records are sent to an external AI processing service. History expires after 30 days or can be deleted sooner; provider logging may differ.{' '}
-          <Link to="/privacy" className="underline underline-offset-2">Privacy Policy</Link>
+          <Link to="/privacy" className="font-medium text-foreground underline underline-offset-2">Privacy Policy</Link>
         </p>
-        <Link to="/ai-assistant" className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+        <Link to="/ai-assistant" className="mt-2 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-medium text-primary-glow hover:underline">
           <Sparkles className="h-3.5 w-3.5" aria-hidden />Open full workspace<ExternalLink className="h-3 w-3" aria-hidden />
         </Link>
       </div>
