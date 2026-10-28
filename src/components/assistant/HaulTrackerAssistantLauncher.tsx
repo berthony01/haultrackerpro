@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { MessageCircle, X, Send, Loader2, Sparkles, ExternalLink, ChevronLeft, RotateCcw, ChevronRight, Maximize2, Minimize2, Info } from 'lucide-react';
@@ -56,17 +56,25 @@ export function HaulTrackerAssistantLauncher() {
 }
 
 function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string }) {
-  // /agency is only treated as agency once the existing authorized get_my_agency check confirms an active agency.
-  if (pathname === '/agency' || pathname.startsWith('/agency/')) {
-    return <AgencyResolver>{(isAgency) => <LauncherBody pathname={pathname} navKey={navKey} isAgency={isAgency} />}</AgencyResolver>;
-  }
-  return <LauncherBody pathname={pathname} navKey={navKey} isAgency={false} />;
+  // One stable LauncherBody across routes so mode/topic/draft survive /dashboard <-> /agency.
+  // The existing cached get_my_agency check runs only on /agency, in a sibling probe (no remount);
+  // agency is granted only for an active agency with no error. URL alone never grants it.
+  const [agency, setAgency] = useState<'pending' | 'active' | 'none'>('pending');
+  const onAgency = pathname === '/agency' || pathname.startsWith('/agency/');
+  return (
+    <>
+      {onAgency ? <AgencyProbe onResult={setAgency} /> : null}
+      <LauncherBody pathname={pathname} navKey={navKey} isAgency={onAgency && agency === 'active'} hidden={onAgency && agency === 'pending'} />
+    </>
+  );
 }
 
-function AgencyResolver({ children }: { children: (isAgency: boolean) => ReactNode }) {
+function AgencyProbe({ onResult }: { onResult: (r: 'pending' | 'active' | 'none') => void }) {
   const { data, isLoading, error } = useMyAgency();
-  if (isLoading) return null;
-  return <>{children(!error && !!data && data.status === 'active')}</>;
+  const result = isLoading ? 'pending' : !error && !!data && data.status === 'active' ? 'active' : 'none';
+  useLayoutEffect(() => { onResult(result); }, [result, onResult]);
+  useLayoutEffect(() => () => onResult('pending'), [onResult]);
+  return null;
 }
 
 /** Fail-closed audience resolution from authorized context only; URL alone never grants a role. */
@@ -80,7 +88,7 @@ export function resolveAudience(i: { isActing: boolean; onAssistantRoute: boolea
   return 'general';
 }
 
-function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey: string; isAgency: boolean }) {
+function LauncherBody({ pathname, navKey, isAgency, hidden }: { pathname: string; navKey: string; isAgency: boolean; hidden: boolean }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>('guided');
   const [expanded, setExpanded] = useState(false);
@@ -92,7 +100,8 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
     if (next) { e.preventDefault(); selectMode(next, true); }
   };
   // Topic path is in memory only, keyed by audience; identity changes remount the launcher and clear it.
-  const [guide, setGuide] = useState<{ audience: GuideAudience | null; path: string[] }>({ audience: null, path: [] });
+  // Kept separately per audience so agency-only topics never show for another audience.
+  const [guidePaths, setGuidePaths] = useState<Partial<Record<GuideAudience, string[]>>>({});
   // Following a link or guided Continue closes the panel; mode and drafts are kept for reopening.
   useEffect(() => { setOpen(false); }, [navKey]);
   useEffect(() => {
@@ -102,15 +111,15 @@ function LauncherBody({ pathname, navKey, isAgency }: { pathname: string; navKey
   }, []);
   const { effectiveRole, driverWorkspaceAllowed, isLoading, error } = useViewMode();
   const { isActingAsAssistant, managedDrivers } = useActingContext();
-  if (isLoading) return null;
+  if (isLoading || hidden) return null;
   const audience = resolveAudience({
     isActing: isActingAsAssistant, isAgency,
     onAssistantRoute: pathname === '/assistant' || pathname.startsWith('/assistant/'),
     managesDrivers: (managedDrivers?.length ?? 0) > 0,
     role: effectiveRole, driverAllowed: driverWorkspaceAllowed, error,
   });
-  const path = guide.audience === audience ? guide.path : [];
-  const setPath = (p: string[]) => setGuide({ audience, path: p });
+  const path = guidePaths[audience] ?? [];
+  const setPath = (p: string[]) => setGuidePaths((prev) => ({ ...prev, [audience]: p }));
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
