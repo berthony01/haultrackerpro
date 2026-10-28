@@ -84,6 +84,12 @@ const ViewFallback = () => (
   <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
 );
 
+/** `?page=reports` hint: honored only for an authorized self-driver; anyone else stays on the default page. */
+export function resolveReportsDeepLink(i: { driverWorkspaceAllowed: boolean | null | undefined; effectiveRole: string | null | undefined; isActingAsAssistant: boolean; workspaceError?: unknown }): 'reports' | null {
+  if (i.workspaceError || i.isActingAsAssistant) return null;
+  return i.driverWorkspaceAllowed === true && i.effectiveRole === 'driver' ? 'reports' : null;
+}
+
 const Index = () => {
   const { signOut, user } = useAuth();
   const queryClient = useQueryClient();

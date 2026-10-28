@@ -56,17 +56,12 @@ export function HaulTrackerAssistantLauncher() {
 }
 
 function LauncherInner({ pathname, navKey }: { pathname: string; navKey: string }) {
-  // /agency is only treated as agency once the existing authorized get_my_agency check confirms an active agency.
-  if (pathname === '/agency' || pathname.startsWith('/agency/')) {
-    return <AgencyResolver>{(isAgency) => <LauncherBody pathname={pathname} navKey={navKey} isAgency={isAgency} />}</AgencyResolver>;
-  }
-  return <LauncherBody pathname={pathname} navKey={navKey} isAgency={false} />;
-}
-
-function AgencyResolver({ children }: { children: (isAgency: boolean) => ReactNode }) {
+  // One stable LauncherBody across routes so mode/topic/draft survive /dashboard <-> /agency.
+  // /agency is only treated as agency once the existing cached get_my_agency check confirms an active agency.
   const { data, isLoading, error } = useMyAgency();
-  if (isLoading) return null;
-  return <>{children(!error && !!data && data.status === 'active')}</>;
+  const onAgency = pathname === '/agency' || pathname.startsWith('/agency/');
+  const isAgency = onAgency && !isLoading && !error && !!data && data.status === 'active';
+  return <LauncherBody pathname={pathname} navKey={navKey} isAgency={isAgency} hidden={onAgency && isLoading} />;
 }
 
 /** Fail-closed audience resolution from authorized context only; URL alone never grants a role. */
