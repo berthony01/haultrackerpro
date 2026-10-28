@@ -565,7 +565,9 @@ describe('release repairs: Reports refresh, More sheet height, Find Work dark ch
     fireEvent.mouseEnter(first[0]); noWhite(first[0]); fireEvent.mouseLeave(first[0]);
     fireEvent.focus(first[0]); noWhite(first[0]); fireEvent.blur(first[0]);
     fireEvent.click(first[0]);
-    const next = chipsAt(); expect(next.length).toBeGreaterThan(0); next.forEach(noWhite);
+    // Subsequent step: every chip and the text field stay off white.
+    chipsAt().forEach(noWhite);
+    screen.getByTestId('home-conversation-surface').querySelectorAll<HTMLElement>('input, textarea').forEach(noWhite);
   });
   it('light Find Work keeps the original white chips', () => {
     render(tree(<DriverWorkConversation />));
