@@ -75,7 +75,7 @@ vi.mock('@/components/FuelLogForm', () => ({ FuelLogForm: () => null }));
 vi.mock('@/components/FuelLogsListView', () => ({ FuelLogsListView: () => null }));
 vi.mock('@/components/ExpensesListView', () => ({ ExpensesListView: () => null }));
 vi.mock('@/components/LoadsListView', () => ({ LoadsListView: () => null }));
-vi.mock('@/components/ReportsView', () => ({ ReportsView: () => null }));
+vi.mock('@/components/ReportsView', () => ({ ReportsView: () => <div data-testid="reports-view" /> }));
 vi.mock('@/components/SettingsView', () => ({ SettingsView: () => null }));
 vi.mock('@/components/WeeklyCloseout', () => ({ WeeklyCloseout: () => null }));
 vi.mock('@/components/MonthlySummary', () => ({ MonthlySummary: () => null }));
@@ -519,5 +519,60 @@ describe('pending profile handoff is isolated per account (same tab, no reload)'
     expect(hasPendingProfileAnswers()).toBe(false);
     expect(state.authListeners.size).toBe(0);
     expect(state.mutation).not.toHaveBeenCalled();
+  });
+});
+
+describe('release repairs: Reports refresh, More sheet height, Find Work dark chips', () => {
+  it('self-driver ?page=reports mounts Reports and survives a refresh', async () => {
+    window.history.replaceState({}, '', '/dashboard?page=reports');
+    const first = render(tree(<Index />));
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    expect(window.location.search).toBe('?page=reports');
+    first.unmount();
+    render(tree(<Index />));
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    expect(window.location.search).toBe('?page=reports');
+  });
+  it.each(['recruiter', 'acting'] as const)('forged ?page=reports for %s is stripped and never mounts Reports', async (who) => {
+    if (who === 'recruiter') capability(null, 'active'); else state.acting = true;
+    window.history.replaceState({}, '', '/dashboard?page=reports');
+    render(tree(<Index />));
+    await waitFor(() => expect(window.location.search).toBe(''));
+    expect(screen.queryByTestId('reports-view')).toBeNull();
+  });
+  it('More sheet is height-capped with only the list scrolling', () => {
+    render(tree(<BottomNav active="dashboard" role="driver" onNavigate={vi.fn()} />));
+    fireEvent.click(screen.getByRole('button', { name: 'More' }));
+    const sheet = screen.getByTestId('more-sheet');
+    expect(sheet.className).toContain('max-h-[calc(100dvh-1rem)]');
+    expect(sheet.className).toContain('flex-col');
+    const list = screen.getByTestId('more-sheet-list');
+    expect(list.className).toContain('overflow-y-auto');
+    expect(list.className).toContain('overflow-x-hidden');
+    expect(list.className).toContain('min-h-0');
+    expect(screen.getByRole('heading', { name: 'More' }).closest('[data-testid="more-sheet-list"]')).toBeNull();
+  });
+  it('dark Find Work chips never use a white fill, across steps, hover and focus', () => {
+    render(tree(<DriverWorkConversation theme="dark" />));
+    const chipsAt = () => Array.from(screen.getByTestId('home-conversation-surface').querySelectorAll<HTMLButtonElement>('button[data-testid^="home-conversation-chip-"]'));
+    const check = () => {
+      const chips = chipsAt();
+      expect(chips.length).toBeGreaterThan(0);
+      for (const c of chips) {
+        expect(c.style.background).not.toMatch(/100%\)|white|#fff/i);
+        expect(c.style.color).toBe('hsl(var(--foreground))');
+      }
+      return chips;
+    };
+    const first = check();
+    fireEvent.mouseEnter(first[0]); expect(first[0].style.color).toBe('hsl(var(--foreground))');
+    fireEvent.mouseLeave(first[0]); fireEvent.focus(first[0]); expect(first[0].style.color).toBe('hsl(var(--foreground))');
+    fireEvent.click(first[0]);
+    check();
+  });
+  it('light Find Work keeps the original white chips', () => {
+    render(tree(<DriverWorkConversation />));
+    const chip = screen.getByTestId('home-conversation-surface').querySelector<HTMLButtonElement>('button[data-testid^="home-conversation-chip-"]')!;
+    expect(chip.style.background).toMatch(/255|100%|white/);
   });
 });

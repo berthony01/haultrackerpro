@@ -671,3 +671,31 @@ describe('resolveRecruiterSubviewForStatus ↔ resolveRecruiterSubview equivalen
 });
 
 
+
+describe('same-tab workspace sync across useViewMode instances', () => {
+  beforeEach(() => {
+    localStorage.clear(); sessionStorage.clear();
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    roleMock = () => ({ role: 'driver', isLoading: false });
+  });
+  it('a switch in one instance updates another immediately, both ways', () => {
+    const a = renderHook(() => useViewMode());
+    const b = renderHook(() => useViewMode());
+    expect(b.result.current.effectiveRole).toBe('driver');
+    act(() => a.result.current.setViewMode('recruiter'));
+    expect(b.result.current.effectiveRole).toBe('recruiter');
+    act(() => a.result.current.setViewMode('driver'));
+    expect(b.result.current.effectiveRole).toBe('driver');
+  });
+  it('a broadcast never grants a workspace the listener is not allowed', () => {
+    const a = renderHook(() => useViewMode());
+    capMock = () => ({ rows: rowsFor('active', null), isLoading: false, error: null });
+    const b = renderHook(() => useViewMode());
+    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
+    a.rerender();
+    act(() => a.result.current.setViewMode('recruiter'));
+    expect(a.result.current.effectiveRole).toBe('recruiter');
+    expect(b.result.current.effectiveRole).toBe('driver');
+  });
+});
