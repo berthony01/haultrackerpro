@@ -270,11 +270,11 @@ export function BottomNav(props: BottomNavProps) {
                     </span>
                   </button>
                 </SheetTrigger>
-                <SheetContent side="bottom" className="rounded-t-2xl pb-8">
-                  <SheetHeader className="text-left mb-4">
+                <SheetContent side="bottom" data-testid="more-sheet" className="rounded-t-2xl flex flex-col max-h-[calc(100dvh-1rem)] pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                  <SheetHeader className="text-left mb-4 shrink-0 pr-8">
                     <SheetTitle>More</SheetTitle>
                   </SheetHeader>
-                  <div className="grid grid-cols-1 gap-2">
+                  <div data-testid="more-sheet-list" className="grid grid-cols-1 gap-2 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
                     {moreItems.map(mi => (
                       <button
                         key={mi.label}

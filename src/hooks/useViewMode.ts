@@ -19,6 +19,13 @@ function scopedKey(userId: string): string {
   return `${STORAGE_PREFIX}${userId}`;
 }
 
+/** Same-tab selection signal: every mounted useViewMode instance hears an
+ *  explicit switch. Carries a PREFERENCE only — each instance still validates
+ *  it against its own trusted capability view before exposing it. */
+type SelectionListener = (userId: string, next: WorkspaceRole) => void;
+const selectionListeners = new Set<SelectionListener>();
+export function __viewModeListenerCount(): number { return selectionListeners.size; }
+
 function readStored(key: string): WorkspaceRole | null {
   try {
     const v = localStorage.getItem(key);
@@ -136,6 +143,17 @@ export function useViewMode() {
   // synchronously on every render before being exposed as `effectiveRole`.
   const [selection, setSelection] = useState<WorkspaceRole | null>(null);
 
+  // Same-tab sync: adopt another instance's explicit switch for the SAME user.
+  // setSelection with an equal value is a no-op, so this cannot loop.
+  useEffect(() => {
+    if (!userId) return;
+    const listener: SelectionListener = (uid, next) => {
+      if (uid === userId) setSelection(next);
+    };
+    selectionListeners.add(listener);
+    return () => { selectionListeners.delete(listener); };
+  }, [userId]);
+
   // Legacy unscoped key must never be trusted; clear it once on mount.
   useEffect(() => {
     try { localStorage.removeItem(LEGACY_UNSCOPED_KEY); } catch {}
@@ -239,6 +257,7 @@ export function useViewMode() {
       if (!workspaceAllowed(next)) return;
       setSelection(next);
       writeStored(scopedKey(userId), next);
+      selectionListeners.forEach((l) => l(userId, next));
     },
     [userId, trustedView, workspaceAllowed],
   );

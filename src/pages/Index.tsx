@@ -415,10 +415,15 @@ const Index = () => {
       window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'reports') {
       // Hint only: the workspace policy effect still re-resolves the page.
-      if (resolveReportsDeepLink({ driverWorkspaceAllowed, effectiveRole, isActingAsAssistant, workspaceError }) === 'reports') {
-        setPage('reports');
+      // Wait for workspace resolution so a refresh does not drop the hint.
+      if (!workspaceLoading) {
+        if (resolveReportsDeepLink({ driverWorkspaceAllowed, effectiveRole, isActingAsAssistant, workspaceError }) === 'reports') {
+          // Authorized: keep ?page=reports so a refresh stays on Reports.
+          setPage('reports');
+        } else {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
       }
-      window.history.replaceState({}, '', window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -759,6 +764,27 @@ const Index = () => {
     page,
     recruiterView,
   ]);
+
+  // Mirror Reports into the address so refresh keeps it; clear it on leaving.
+  // Writing requires the same authorization as the deep link.
+  const prevPageRef = useRef(page);
+  useEffect(() => {
+    const prev = prevPageRef.current;
+    prevPageRef.current = page;
+    const sp = new URLSearchParams(window.location.search);
+    const has = sp.get('page') === 'reports';
+    if (page === 'reports') {
+      if (!has && resolveReportsDeepLink({ driverWorkspaceAllowed, effectiveRole, isActingAsAssistant, workspaceError }) === 'reports') {
+        sp.set('page', 'reports');
+        window.history.replaceState(window.history.state, '', `${window.location.pathname}?${sp.toString()}`);
+      }
+    } else if (prev === 'reports' && has) {
+      sp.delete('page');
+      const q = sp.toString();
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${q ? `?${q}` : ''}`);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const openOpportunitiesView = (view: 'recruiter' | 'driver-profile' | 'list') => {
     try { sessionStorage.setItem('htp_opportunities_initial_view', view); } catch {}
