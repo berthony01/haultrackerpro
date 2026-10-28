@@ -407,6 +407,12 @@ const Index = () => {
         setPage('recruiter-access');
       }
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (pageParam === 'reports') {
+      // Hint only: the workspace policy effect still re-resolves the page.
+      if (resolveReportsDeepLink({ driverWorkspaceAllowed, effectiveRole, isActingAsAssistant, workspaceError }) === 'reports') {
+        setPage('reports');
+      }
+      window.history.replaceState({}, '', window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
