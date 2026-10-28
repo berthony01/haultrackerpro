@@ -7,11 +7,12 @@ const st = vi.hoisted(() => ({
   user: { id: 'u1' } as { id: string } | null, loading: false,
   role: 'driver' as 'driver' | 'recruiter' | null, driverAllowed: true, acting: false, actingId: null as string | null,
   ai: null as any, agency: null as null | { status: string }, managed: [] as { driver_user_id: string }[],
+  agencyLoading: false, agencyError: null as unknown, agencyCalls: 0,
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: st.user, session: st.user ? { user: { id: st.user.id } } : null, loading: st.loading }) }));
 vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => ({ effectiveRole: st.role, driverWorkspaceAllowed: st.driverAllowed, isLoading: false, error: null }) }));
 vi.mock('@/hooks/useActingContext', () => ({ useActingContext: () => ({ isActingAsAssistant: st.acting, isLoadingManagedDrivers: false, managedDrivers: st.managed, actingDriver: st.actingId ? { driver_user_id: st.actingId } : null }) }));
-vi.mock('@/hooks/useAgency', () => ({ useMyAgency: () => ({ data: st.agency, isLoading: false, error: null }) }));
+vi.mock('@/hooks/useAgency', () => ({ useMyAgency: () => { st.agencyCalls++; return { data: st.agency, isLoading: st.agencyLoading, error: st.agencyError }; } }));
 vi.mock('@/hooks/useAiAssistant', () => ({ useAiAssistant: () => st.ai }));
 vi.mock('@/components/home/DriverWorkConversation', () => ({ default: (p: { theme?: string }) => <div data-testid="guided-find-work" data-theme={p.theme} /> }));
 
@@ -27,7 +28,7 @@ let nav: (p: string) => void = () => {};
 function Nav() { nav = useNavigate(); return null; }
 const mount = (path = '/dashboard') => render(<MemoryRouter initialEntries={[path]}><Nav /><HaulTrackerAssistantLauncher /></MemoryRouter>);
 
-beforeEach(() => { Object.assign(st, { user: { id: 'u1' }, loading: false, role: 'driver', driverAllowed: true, acting: false, actingId: null, ai: aiStub(false), agency: null, managed: [] }); });
+beforeEach(() => { Object.assign(st, { user: { id: 'u1' }, loading: false, role: 'driver', driverAllowed: true, acting: false, actingId: null, ai: aiStub(false), agency: null, managed: [], agencyLoading: false, agencyError: null, agencyCalls: 0 }); });
 const openBubble = (path?: string) => { const r = mount(path); fireEvent.click(screen.getByTestId('assistant-launcher')); return r; };
 const choose = (name: string | RegExp) => fireEvent.click(screen.getByRole('button', { name }));
 afterEach(cleanup);
@@ -193,5 +194,66 @@ describe('HaulTracker Assistant launcher', () => {
     choose('Shrink assistant'); expect(d.getAttribute('data-expanded')).toBe('false');
     fireEvent.keyDown(d, { key: 'Escape' }); expect(screen.queryByRole('dialog')).toBeNull();
     expect(screen.getByTestId('assistant-launcher')).toBeTruthy();
+  });
+  describe('stable launcher across /dashboard <-> /agency', () => {
+    it('keeps mode, open state reset, AI draft and per-audience topics; one bubble; agency only when active', () => {
+      st.agency = { status: 'active' }; st.ai = aiStub(true);
+      openBubble('/dashboard');
+      choose(/Reports/);
+      const driverTopic = screen.getByRole('button', { name: /Back/ });
+      expect(driverTopic).toBeTruthy();
+      act(() => nav('/agency'));
+      expect(screen.getAllByTestId('assistant-launcher')).toHaveLength(1);
+      fireEvent.click(screen.getByTestId('assistant-launcher'));
+      expect(screen.getByText(/Delegation and access/)).toBeTruthy();
+      expect(screen.queryByRole('button', { name: /Find work/ })).toBeNull();
+      fireEvent.click(screen.getByRole('tab', { name: AI_LABEL }));
+      act(() => nav('/dashboard'));
+      fireEvent.click(screen.getByTestId('assistant-launcher'));
+      expect(screen.getByRole('tab', { name: AI_LABEL }).getAttribute('aria-selected')).toBe('true');
+      fireEvent.click(screen.getByRole('tab', { name: GUIDED_LABEL }));
+      expect(screen.getByRole('button', { name: /Back/ })).toBeTruthy();
+      expect(screen.queryByText(/Delegation and access/)).toBeNull();
+      expect(st.agencyCalls).toBeLessThan(40);
+    });
+    it('inactive, errored or loading agency never shows agency help', () => {
+      for (const set of [() => { st.agency = { status: 'disabled' }; }, () => { st.agency = { status: 'active' }; st.agencyError = new Error('x'); }]) {
+        Object.assign(st, { agency: null, agencyError: null, role: null }); set();
+        openBubble('/agency');
+        expect(screen.queryByText(/Delegation and access/)).toBeNull();
+        cleanup();
+      }
+      st.agency = { status: 'active' }; st.agencyLoading = true; mount('/agency');
+      expect(screen.queryByTestId('assistant-launcher')).toBeNull();
+    });
+    it('recruiter and acting assistant keep their own audience on /agency without active agency', () => {
+      st.role = 'recruiter'; openBubble('/agency');
+      expect(screen.queryByText(/Delegation and access/)).toBeNull();
+      expect(screen.queryByRole('button', { name: /Find work/ })).toBeNull();
+      cleanup(); st.role = 'driver'; st.acting = true; st.actingId = 'd9'; st.agency = { status: 'active' }; openBubble('/agency');
+      expect(screen.queryByRole('button', { name: /Find work/ })).toBeNull();
+      expect(screen.queryByText(/Delegation and access/)).toBeNull();
+    });
+    it('identity change resets mode and topic', () => {
+      const r = openBubble('/dashboard');
+      choose(/Reports/);
+      st.user = { id: 'u2' };
+      r.rerender(<MemoryRouter initialEntries={['/dashboard']}><Nav /><HaulTrackerAssistantLauncher /></MemoryRouter>);
+      fireEvent.click(screen.getByTestId('assistant-launcher'));
+      expect(screen.queryByRole('button', { name: /Back/ })).toBeNull();
+      expect(screen.getByRole('tab', { name: GUIDED_LABEL }).getAttribute('aria-selected')).toBe('true');
+    });
+  });
+});
+
+import { resolveReportsDeepLink } from '@/pages/Index';
+describe('/dashboard?page=reports deep link', () => {
+  it('opens reports only for an authorized self-driver', () => {
+    expect(resolveReportsDeepLink({ driverWorkspaceAllowed: true, effectiveRole: 'driver', isActingAsAssistant: false })).toBe('reports');
+    expect(resolveReportsDeepLink({ driverWorkspaceAllowed: true, effectiveRole: 'recruiter', isActingAsAssistant: false })).toBeNull();
+    expect(resolveReportsDeepLink({ driverWorkspaceAllowed: false, effectiveRole: 'driver', isActingAsAssistant: false })).toBeNull();
+    expect(resolveReportsDeepLink({ driverWorkspaceAllowed: true, effectiveRole: 'driver', isActingAsAssistant: true })).toBeNull();
+    expect(resolveReportsDeepLink({ driverWorkspaceAllowed: true, effectiveRole: 'driver', isActingAsAssistant: false, workspaceError: new Error('x') })).toBeNull();
+    expect(resolveReportsDeepLink({ driverWorkspaceAllowed: null, effectiveRole: null, isActingAsAssistant: false })).toBeNull();
   });
 });

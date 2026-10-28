@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { MessageCircle, X, Send, Loader2, Sparkles, ExternalLink, ChevronLeft, RotateCcw, ChevronRight, Maximize2, Minimize2, Info } from 'lucide-react';
