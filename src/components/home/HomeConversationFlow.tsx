@@ -249,6 +249,16 @@ const DARK_PALETTE: Record<keyof typeof LIGHT_PALETTE, string> = {
   CHIP_BG: 'hsl(var(--secondary))',
 };
 
+/** Chip colors per theme (exported for focused contrast tests). */
+export function conversationChipColors(theme: 'light' | 'dark') {
+  const p = theme === 'dark' ? DARK_PALETTE : LIGHT_PALETTE;
+  return {
+    background: p.CHIP_BG,
+    ink: theme === 'dark' ? p.INK : p.INK_SOFT,
+    hoverInk: theme === 'dark' ? p.INK : p.CHIP_HOVER_INK,
+  };
+}
+
 export interface HomeConversationFlowProps {
   /** Navigation stays owned by the page so the homepage keeps a single router surface. */
   onContinue: (answers: IntakeAnswers) => void;
@@ -543,8 +553,7 @@ export default function HomeConversationFlow({
       : { background: DRIVER_BG, color: 'white', borderColor: 'transparent' };
 
   // Dark mode uses full-strength foreground / bright hover ink for contrast.
-  const chipInk = theme === 'dark' ? INK : INK_SOFT;
-  const chipHoverInk = theme === 'dark' ? INK : CHIP_HOVER_INK;
+  const { ink: chipInk, hoverInk: chipHoverInk } = conversationChipColors(theme);
   const chipStyle = {
     borderColor: CHIP_BORDER,
     color: chipInk,

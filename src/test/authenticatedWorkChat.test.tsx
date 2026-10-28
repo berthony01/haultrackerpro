@@ -111,6 +111,7 @@ vi.mock('@/components/contracts/ContractActionsCard', () => ({ ContractActionsCa
 configure({ asyncUtilTimeout: 5000 });
 
 import DriverWorkConversation from '@/components/home/DriverWorkConversation';
+import { conversationChipColors } from '@/components/home/HomeConversationFlow';
 import FindWork from '@/pages/FindWork';
 import Index from '@/pages/Index';
 import { DriverOpportunityProfile } from '@/components/opportunities/DriverOpportunityProfile';
@@ -552,26 +553,19 @@ describe('release repairs: Reports refresh, More sheet height, Find Work dark ch
     expect(list.className).toContain('min-h-0');
     expect(screen.getByRole('heading', { name: 'More' }).closest('[data-testid="more-sheet-list"]')).toBeNull();
   });
-  it('dark Find Work chips never use a white fill, across steps, hover and focus', () => {
+  it('dark Find Work chips use the dark surface + full foreground ink, never white, across steps/hover/focus', () => {
+    const dark = conversationChipColors('dark');
+    expect(dark).toEqual({ background: 'hsl(var(--secondary))', ink: 'hsl(var(--foreground))', hoverInk: 'hsl(var(--foreground))' });
+    expect(conversationChipColors('light').background).toBe('hsl(0, 0%, 100%)');
     render(tree(<DriverWorkConversation theme="dark" />));
     const chipsAt = () => Array.from(screen.getByTestId('home-conversation-surface').querySelectorAll<HTMLButtonElement>('button[data-testid^="home-conversation-chip-"]'));
-    const check = () => {
-      const chips = chipsAt();
-      expect(chips.length).toBeGreaterThan(0);
-      for (const c of chips) {
-        const css = c.getAttribute('style') ?? '';
-        expect(css).toContain('background: hsl(var(--secondary))');
-        expect(css).toMatch(/(^|;\s*)color: hsl\(var\(--foreground\)\)/);
-        expect(css).not.toMatch(/0, 0%, 100%|white|#fff/i);
-      }
-      return chips;
-    };
-    const first = check();
-    const ink = (el: HTMLElement) => el.getAttribute('style') ?? '';
-    fireEvent.mouseEnter(first[0]); expect(ink(first[0])).toMatch(/(^|;\s*)color: hsl\(var\(--foreground\)\)/);
-    fireEvent.mouseLeave(first[0]); fireEvent.focus(first[0]); expect(ink(first[0])).toMatch(/(^|;\s*)color: hsl\(var\(--foreground\)\)/);
+    // jsdom drops var() values, so a white fill would be the only surviving background.
+    const noWhite = (c: HTMLElement) => expect(c.style.background).not.toMatch(/255|100%|white/i);
+    const first = chipsAt(); expect(first.length).toBeGreaterThan(0); first.forEach(noWhite);
+    fireEvent.mouseEnter(first[0]); noWhite(first[0]); fireEvent.mouseLeave(first[0]);
+    fireEvent.focus(first[0]); noWhite(first[0]); fireEvent.blur(first[0]);
     fireEvent.click(first[0]);
-    check();
+    const next = chipsAt(); expect(next.length).toBeGreaterThan(0); next.forEach(noWhite);
   });
   it('light Find Work keeps the original white chips', () => {
     render(tree(<DriverWorkConversation />));
