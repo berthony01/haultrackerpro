@@ -224,6 +224,7 @@ const LIGHT_PALETTE = {
   PLACEHOLDER_INK: 'hsl(220, 10%, 42%)',
   SUMMARY_BG: 'hsl(0, 0%, 100%)',
   SUMMARY_BORDER: 'hsl(25, 80%, 70%)',
+  CHIP_BG: 'hsl(0, 0%, 100%)',
 } as const;
 /** Optional dark palette for contained dark surfaces (floating assistant). Default stays LIGHT. */
 const DARK_PALETTE: Record<keyof typeof LIGHT_PALETTE, string> = {
@@ -244,7 +245,19 @@ const DARK_PALETTE: Record<keyof typeof LIGHT_PALETTE, string> = {
   PLACEHOLDER_INK: 'hsl(var(--muted-foreground))',
   SUMMARY_BG: 'hsl(var(--card))',
   SUMMARY_BORDER: 'hsl(var(--primary) / 0.6)',
+  // Dark chips: solid secondary surface with full foreground text (no white fill).
+  CHIP_BG: 'hsl(var(--secondary))',
 };
+
+/** Chip colors per theme (exported for focused contrast tests). */
+export function conversationChipColors(theme: 'light' | 'dark') {
+  const p = theme === 'dark' ? DARK_PALETTE : LIGHT_PALETTE;
+  return {
+    background: p.CHIP_BG,
+    ink: theme === 'dark' ? p.INK : p.INK_SOFT,
+    hoverInk: theme === 'dark' ? p.INK : p.CHIP_HOVER_INK,
+  };
+}
 
 export interface HomeConversationFlowProps {
   /** Navigation stays owned by the page so the homepage keeps a single router surface. */
@@ -298,7 +311,7 @@ export default function HomeConversationFlow({
   draftAdapter,
   theme,
 }: HomeConversationFlowProps) {
-  const { CANVAS_BG, CANVAS_BORDER, INK, INK_SOFT, INK_MUTED, ASSISTANT_BG, ASSISTANT_BORDER, DRIVER_BG, CHIP_BORDER, CHIP_HOVER_BORDER, CHIP_HOVER_INK, FIELD_BG, FIELD_BORDER, FIELD_FOCUS, PLACEHOLDER_INK, SUMMARY_BG, SUMMARY_BORDER } = theme === 'dark' ? DARK_PALETTE : LIGHT_PALETTE;
+  const { CANVAS_BG, CANVAS_BORDER, INK, INK_SOFT, INK_MUTED, ASSISTANT_BG, ASSISTANT_BORDER, DRIVER_BG, CHIP_BORDER, CHIP_HOVER_BORDER, CHIP_HOVER_INK, FIELD_BG, FIELD_BORDER, FIELD_FOCUS, PLACEHOLDER_INK, SUMMARY_BG, SUMMARY_BORDER, CHIP_BG } = theme === 'dark' ? DARK_PALETTE : LIGHT_PALETTE;
   // Phase 3 — read a retained same-tab snapshot exactly once, only from a valid adapter.
   const [restored] = useState<ConversationDraftSnapshot | null>(() => {
     const snap = draftAdapter?.read() ?? null;
@@ -539,19 +552,21 @@ export default function HomeConversationFlow({
         }
       : { background: DRIVER_BG, color: 'white', borderColor: 'transparent' };
 
+  // Dark mode uses full-strength foreground / bright hover ink for contrast.
+  const { ink: chipInk, hoverInk: chipHoverInk } = conversationChipColors(theme);
   const chipStyle = {
     borderColor: CHIP_BORDER,
-    color: INK_SOFT,
-    background: 'hsl(0, 0%, 100%)',
+    color: chipInk,
+    background: CHIP_BG,
   };
 
   const chipHover = (e: React.SyntheticEvent<HTMLButtonElement>) => {
     e.currentTarget.style.borderColor = CHIP_HOVER_BORDER;
-    e.currentTarget.style.color = CHIP_HOVER_INK;
+    e.currentTarget.style.color = chipHoverInk;
   };
   const chipReset = (e: React.SyntheticEvent<HTMLButtonElement>) => {
     e.currentTarget.style.borderColor = CHIP_BORDER;
-    e.currentTarget.style.color = INK_SOFT;
+    e.currentTarget.style.color = chipInk;
   };
 
   return (
@@ -681,27 +696,11 @@ export default function HomeConversationFlow({
                     data-testid={`home-conversation-chip-${chip.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
                     onClick={() => submitChip(chip)}
                     className="rounded-full border px-3 py-2 text-xs font-semibold min-h-[44px] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    style={{
-                      borderColor: CHIP_BORDER,
-                      color: INK_SOFT,
-                      background: 'hsl(0, 0%, 100%)',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = CHIP_HOVER_BORDER;
-                      e.currentTarget.style.color = CHIP_HOVER_INK;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = CHIP_BORDER;
-                      e.currentTarget.style.color = INK_SOFT;
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = CHIP_HOVER_BORDER;
-                      e.currentTarget.style.color = CHIP_HOVER_INK;
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = CHIP_BORDER;
-                      e.currentTarget.style.color = INK_SOFT;
-                    }}
+                    style={chipStyle}
+                    onMouseEnter={chipHover}
+                    onMouseLeave={chipReset}
+                    onFocus={chipHover}
+                    onBlur={chipReset}
                   >
                     {chip}
                   </button>
