@@ -377,7 +377,7 @@ describe('AppSidebar — capability tier gating', () => {
     });
     expect(screen.getByText('Dashboard')).toBeTruthy();
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
-    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Recruiter Command Center')).toBeNull();
   });
   it('recruiter workspace + active+ops: full recruiter items', () => {
     renderSidebar({
@@ -389,24 +389,24 @@ describe('AppSidebar — capability tier gating', () => {
   });
   it('recruiter workspace + setup: hub only, no ops/contracts/settings', () => {
     renderSidebar({ role: 'recruiter', recruiterCapabilityStatus: 'setup' });
-    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getAllByText('Recruiter Command Center')).toHaveLength(2); // workspace header + hub nav item
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
     expect(screen.queryByText('Contracts')).toBeNull();
     expect(screen.queryByText('Settings')).toBeNull();
   });
   it('recruiter workspace + suspended: hub only', () => {
     renderSidebar({ role: 'recruiter', recruiterCapabilityStatus: 'suspended' });
-    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getAllByText('Recruiter Command Center')).toHaveLength(2); // workspace header + hub nav item
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
   });
   it('recruiter workspace + revoked: no recruiter workspace links even with role=recruiter', () => {
     renderSidebar({ role: 'recruiter', recruiterCapabilityStatus: 'revoked' });
-    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Recruiter Command Center')).toBeNull();
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
   });
   it('recruiter workspace + explicit null status: no recruiter workspace links', () => {
     renderSidebar({ role: 'recruiter', recruiterCapabilityStatus: null });
-    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Recruiter Command Center')).toBeNull();
   });
   it('legacy (prop omitted) + role=recruiter: preserves legacy full nav', () => {
     renderSidebar({ role: 'recruiter' });
@@ -415,7 +415,7 @@ describe('AppSidebar — capability tier gating', () => {
   it('loading: skeleton only, no actionable workspace links', () => {
     renderSidebar({ role: 'driver', recruiterCapabilityStatus: null, workspaceLoading: true });
     expect(screen.queryByText('Dashboard')).toBeNull();
-    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Recruiter Command Center')).toBeNull();
   });
 });
 
@@ -494,7 +494,7 @@ describe('BottomNav — More sheet interaction contents', () => {
       role: 'recruiter', recruiterCapabilityStatus: 'active', recruiterOperationsAllowed: true,
     });
     openMore();
-    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Recruiter Command Center')).toBeTruthy();
     expect(screen.getByText('Manage Opportunities')).toBeTruthy();
     expect(screen.getByText('Applications')).toBeTruthy();
     expect(screen.getByText('Reports')).toBeTruthy();
@@ -503,10 +503,10 @@ describe('BottomNav — More sheet interaction contents', () => {
     expect(screen.getByText('Sign Out')).toBeTruthy();
   });
 
-  it('recruiter setup: More sheet has ONLY Recruiter Dashboard + Sign Out', () => {
+  it('recruiter setup: More sheet has ONLY Recruiter Command Center + Sign Out', () => {
     renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'setup' });
     openMore();
-    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Recruiter Command Center')).toBeTruthy();
     expect(screen.getByText('Sign Out')).toBeTruthy();
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
     expect(screen.queryByText('Applications')).toBeNull();
@@ -515,20 +515,20 @@ describe('BottomNav — More sheet interaction contents', () => {
     expect(screen.queryByText('Settings')).toBeNull();
   });
 
-  it('recruiter suspended: More sheet has ONLY Recruiter Dashboard + Sign Out', () => {
+  it('recruiter suspended: More sheet has ONLY Recruiter Command Center + Sign Out', () => {
     renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'suspended' });
     openMore();
-    expect(screen.getByText('Recruiter Dashboard')).toBeTruthy();
+    expect(screen.getByText('Recruiter Command Center')).toBeTruthy();
     expect(screen.getByText('Sign Out')).toBeTruthy();
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
     expect(screen.queryByText('Applications')).toBeNull();
   });
 
-  it('recruiter explicit null: More sheet has ONLY Sign Out — no Recruiter Dashboard', () => {
+  it('recruiter explicit null: More sheet has ONLY Sign Out — no Recruiter Command Center', () => {
     renderBottom({ role: 'recruiter', recruiterCapabilityStatus: null });
     openMore();
     expect(screen.getByText('Sign Out')).toBeTruthy();
-    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Recruiter Command Center')).toBeNull();
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
     expect(screen.queryByText('Applications')).toBeNull();
     expect(screen.queryByText('Reports')).toBeNull();
@@ -538,7 +538,7 @@ describe('BottomNav — More sheet interaction contents', () => {
     renderBottom({ role: 'recruiter', recruiterCapabilityStatus: 'revoked' });
     openMore();
     expect(screen.getByText('Sign Out')).toBeTruthy();
-    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Recruiter Command Center')).toBeNull();
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
   });
 
@@ -554,7 +554,7 @@ describe('BottomNav — More sheet interaction contents', () => {
     expect(screen.getByText('Sign Out')).toBeTruthy();
     expect(screen.queryByText('Manage Opportunities')).toBeNull();
     expect(screen.queryByText('Applications')).toBeNull();
-    expect(screen.queryByText('Recruiter Dashboard')).toBeNull();
+    expect(screen.queryByText('Recruiter Command Center')).toBeNull();
   });
 });
 
