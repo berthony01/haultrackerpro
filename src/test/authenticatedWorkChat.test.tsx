@@ -559,14 +559,17 @@ describe('release repairs: Reports refresh, More sheet height, Find Work dark ch
       const chips = chipsAt();
       expect(chips.length).toBeGreaterThan(0);
       for (const c of chips) {
-        expect(c.style.background).not.toMatch(/100%\)|white|#fff/i);
-        expect(c.style.color).toBe('hsl(var(--foreground))');
+        const css = c.getAttribute('style') ?? '';
+        expect(css).toContain('background: hsl(var(--secondary))');
+        expect(css).toMatch(/(^|;\s*)color: hsl\(var\(--foreground\)\)/);
+        expect(css).not.toMatch(/0, 0%, 100%|white|#fff/i);
       }
       return chips;
     };
     const first = check();
-    fireEvent.mouseEnter(first[0]); expect(first[0].style.color).toBe('hsl(var(--foreground))');
-    fireEvent.mouseLeave(first[0]); fireEvent.focus(first[0]); expect(first[0].style.color).toBe('hsl(var(--foreground))');
+    const ink = (el: HTMLElement) => el.getAttribute('style') ?? '';
+    fireEvent.mouseEnter(first[0]); expect(ink(first[0])).toMatch(/(^|;\s*)color: hsl\(var\(--foreground\)\)/);
+    fireEvent.mouseLeave(first[0]); fireEvent.focus(first[0]); expect(ink(first[0])).toMatch(/(^|;\s*)color: hsl\(var\(--foreground\)\)/);
     fireEvent.click(first[0]);
     check();
   });

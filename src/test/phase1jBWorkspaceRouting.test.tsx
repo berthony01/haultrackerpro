@@ -44,7 +44,7 @@ let capMock: () => {
 };
 let roleMock: () => { role: WorkspaceRole | null; isLoading: boolean };
 
-import { useViewMode } from '@/hooks/useViewMode';
+import { useViewMode, __viewModeListenerCount } from '@/hooks/useViewMode';
 
 // --------------------------------------------------------------------------
 // Helpers
@@ -688,14 +688,16 @@ describe('same-tab workspace sync across useViewMode instances', () => {
     act(() => a.result.current.setViewMode('driver'));
     expect(b.result.current.effectiveRole).toBe('driver');
   });
-  it('a broadcast never grants a workspace the listener is not allowed', () => {
-    const a = renderHook(() => useViewMode());
-    capMock = () => ({ rows: rowsFor('active', null), isLoading: false, error: null });
+  it('a broadcast for another user is ignored and listeners are released on unmount', () => {
     const b = renderHook(() => useViewMode());
-    capMock = () => ({ rows: rowsFor('active', 'active'), isLoading: false, error: null });
-    a.rerender();
-    act(() => a.result.current.setViewMode('recruiter'));
-    expect(a.result.current.effectiveRole).toBe('recruiter');
-    expect(b.result.current.effectiveRole).toBe('driver');
+    act(() => b.result.current.setViewMode('recruiter'));
+    authMock = () => ({ user: { id: 'u2' }, loading: false });
+    const a = renderHook(() => useViewMode());
+    act(() => a.result.current.setViewMode('driver'));
+    authMock = () => ({ user: { id: 'u1' }, loading: false });
+    b.rerender();
+    expect(b.result.current.effectiveRole).toBe('recruiter');
+    a.unmount(); b.unmount();
+    expect(__viewModeListenerCount()).toBe(0);
   });
 });
