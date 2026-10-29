@@ -75,7 +75,7 @@ CREATE TABLE public.telegram_dispatch_review_proposals (
   CONSTRAINT telegram_dispatch_review_proposals_update_check CHECK (source_update_id > 0),
   CONSTRAINT telegram_dispatch_review_proposals_hash_check CHECK (source_payload_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT telegram_dispatch_review_proposals_reference_check
-    CHECK (load_reference ~ '^[A-Z0-9][A-Z0-9-]{2,39}$'),
+    CHECK (load_reference ~ '^(?=[A-Z0-9-]*[0-9])[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$'),
   CONSTRAINT telegram_dispatch_review_proposals_prev_check
     CHECK (expected_previous_status IN ('pending','en_route')),
   CONSTRAINT telegram_dispatch_review_proposals_target_check
@@ -215,7 +215,7 @@ BEGIN
      OR _chat_type IS NULL
      OR _chat_type NOT IN ('group', 'supergroup')
      OR ((_reference IS NULL) <> (_proposed_status IS NULL))
-     OR (_reference IS NOT NULL AND _reference !~ '^[A-Z0-9][A-Z0-9-]{2,39}$')
+     OR (_reference IS NOT NULL AND _reference !~ '^(?=[A-Z0-9-]*[0-9])[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$')
      OR (_proposed_status IS NOT NULL AND _proposed_status NOT IN ('completed','cancelled')) THEN
     RAISE EXCEPTION 'telegram_update_invalid';
   END IF;
@@ -533,7 +533,7 @@ BEGIN
                'telegram_chat_not_bound',
                'telegram_driver_relationship_not_available',
                'dispatch_load_not_found',
-               'dispatch_invalid_transition',
+               'dispatch_invalid_status_transition',
                'dispatch_idempotency_conflict'
              ]) THEN
             _outcome := 'dispatch_review_denied';
