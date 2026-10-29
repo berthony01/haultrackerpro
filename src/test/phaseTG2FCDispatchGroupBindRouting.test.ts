@@ -220,10 +220,13 @@ describe("TG-2F-C B — pre-existing TG-2D classification is unchanged", () => {
     });
   });
 
-  it("keeps ordinary private text as non_start_message", () => {
+  // Superseded by RB-3A: ordinary private non-reply text is offered as a
+  // Quick Post source candidate (the database decides whether a live draft
+  // exists; otherwise it records the unchanged non_start_message outcome).
+  it("routes ordinary private text as an RB-3A Quick Post source candidate", () => {
     expect(classifyUpdate(identity({ chatType: "private", text: "hello" }))).toEqual({
-      kind: "ignored",
-      resultCode: "non_start_message",
+      kind: "quick_post_source",
+      text: "hello",
     });
   });
 
