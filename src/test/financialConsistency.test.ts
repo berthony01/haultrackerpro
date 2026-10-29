@@ -5,7 +5,7 @@ import {
   sumOperatingMiles,
   fleetEffectiveRPM,
 } from '@/lib/loadMetrics';
-import { getWeekSummaries } from '@/lib/loadUtils';
+import { getWeekSummaries, buildLoadCsvRow } from '@/lib/loadUtils';
 import { computeAlerts } from '@/hooks/useSmartAlerts';
 import type { Load } from '@/hooks/useLoads';
 
@@ -88,5 +88,49 @@ describe('Phase 23A.5 — Smart Alerts exclude cancelled loads', () => {
     // No expenses → no negative-profit alert should fire.
     const alerts = computeAlerts(loads, [], 1);
     expect(alerts.find(a => a.type === 'negative_profit')).toBeUndefined();
+  });
+});
+
+describe('Oversized mileage — summary, weekly and export parity', () => {
+  it('uses 202.45 miles and $0.82 RPM everywhere while retaining saved pay and total', () => {
+    const load = mk({ loaded_miles: 195.45, deadhead_miles: 7, total_miles: 20245, estimated_pay: 166.01 });
+    const summary = summarizeLoads([load], []);
+    const [week] = getWeekSummaries([load], 1);
+    const row = buildLoadCsvRow(load, []);
+    expect(summary.totalMiles).toBeCloseTo(202.45, 8);
+    expect(summary.effectiveRPM.toFixed(2)).toBe('0.82');
+    expect(week.avgRatePerMile).toBeCloseTo(summary.effectiveRPM, 8);
+    expect(week.totalEstimatedPay).toBe(166.01);
+    expect(row[7]).toBeCloseTo(202.45, 8);
+    expect(row[11]).toBe('0.82');
+    expect(row[15]).toBe('166.01');
+    expect(load.total_miles).toBe(20245);
+  });
+
+  it('keeps actual payments and expenses unchanged and excludes pending/cancelled from completed summary', () => {
+    const load = mk({ loaded_miles: 195.45, deadhead_miles: 7, total_miles: 20245, estimated_pay: 166.01, actual_pay_received: 150 });
+    const expenses = [{ amount: 30 }] as Parameters<typeof summarizeLoads>[1];
+    const summary = summarizeLoads([
+      load,
+      mk({ status: 'pending', total_miles: 20245, estimated_pay: 9999 }),
+      mk({ status: 'cancelled', total_miles: 20245, estimated_pay: 9999 }),
+    ], expenses);
+    expect(summary.loadCount).toBe(1);
+    expect(summary.cancelledCount).toBe(1);
+    expect(summary.totalMiles).toBeCloseTo(202.45, 8);
+    expect(summary.estimatedPay).toBe(166.01);
+    expect(summary.actualPay).toBe(150);
+    expect(summary.grossRevenue).toBe(150);
+    expect(summary.expensesTotal).toBe(30);
+    expect(summary.netProfit).toBe(120);
+    expect(summary.effectiveRPM).toBeCloseTo(150 / 202.45, 8);
+    expect(load.actual_pay_received).toBe(150);
+    expect(expenses[0].amount).toBe(30);
+  });
+
+  it('zero/null mileage produces finite zero summary and weekly RPM', () => {
+    const load = mk({ loaded_miles: 0, deadhead_miles: 0, total_miles: null, estimated_pay: 166.01 });
+    expect(summarizeLoads([load], []).effectiveRPM).toBe(0);
+    expect(getWeekSummaries([load], 1)[0].avgRatePerMile).toBe(0);
   });
 });

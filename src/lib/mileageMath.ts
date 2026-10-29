@@ -22,9 +22,19 @@ export interface ResolveOperatingMilesInput {
   totalMiles?: number | null;
 }
 
+/** A nonzero itemized sum and an explicit total must agree within 2 miles. */
+export function hasMileageContradiction(input: ResolveOperatingMilesInput): boolean {
+  const componentTotal = num(input.loadedMiles) + num(input.deadheadMiles);
+  return input.totalMiles != null && componentTotal > 0 &&
+    Math.abs(num(input.totalMiles) - componentTotal) > TOLERANCE_MI;
+}
+
 /**
  * Returns the trustworthy total operating miles for a load.
- * See Phase 6C.3 / 6C.4 sanity rules.
+ * A nonzero component sum is the itemized distance, even if only one component
+ * is supplied. Missing components contribute zero; never infer extra mileage
+ * from a contradictory summary. Total-only loads remain trusted when neither
+ * component contributes mileage. This is read-time math, never a row repair.
  */
 export function resolveOperatingMiles(input: ResolveOperatingMilesInput): number {
   const loaded = num(input.loadedMiles);
@@ -34,8 +44,7 @@ export function resolveOperatingMiles(input: ResolveOperatingMilesInput): number
 
   if (componentTotal > 0) {
     if (stored <= 0) return componentTotal;
-    if (loaded > 0 && stored < loaded) return componentTotal;
-    if (stored < componentTotal - TOLERANCE_MI) return componentTotal;
+    if (hasMileageContradiction(input)) return componentTotal;
     return stored;
   }
   if (stored > 0) return stored;

@@ -43,6 +43,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { MapPin, DollarSign, Route, Clock, X, FileText, AlertCircle, Info, Camera, Crown, Receipt, ChevronDown } from 'lucide-react';
 import { PayModel, PAY_MODEL_LABELS, PAY_MODEL_DESCRIPTIONS, PAY_MODEL_VALUES, isPayModel, resolvePayModel } from '@/lib/payModels';
 import { computeLoadPay } from '@/lib/computeLoadPay';
+import { hasMileageContradiction } from '@/lib/mileageMath';
 import { useCostProfile, computeCostProfileCPM } from '@/hooks/useCostProfile';
 import { toast } from 'sonner';
 import { SmartChips } from '@/components/SmartChips';
@@ -298,6 +299,13 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     if (isNaN(loadedMiles) || loadedMiles < 0) errs.loaded_miles = 'Must be 0 or positive';
     const deadheadMiles = parseFloat(form.deadhead_miles);
     if (form.deadhead_miles && (isNaN(deadheadMiles) || deadheadMiles < 0)) errs.deadhead_miles = 'Must be 0 or positive';
+    if (form.total_miles !== '' && hasMileageContradiction({
+      loadedMiles,
+      deadheadMiles,
+      totalMiles: parseFloat(form.total_miles),
+    })) {
+      errs.total_miles = 'Total Miles must match loaded + deadhead miles within 2 miles. Correct Loaded Miles, Deadhead Miles, or Total Miles before saving.';
+    }
     // Rate per mile is conditionally required based on pay model
     const rpmRaw = form.rate_per_mile;
     const rpm = parseFloat(rpmRaw);
@@ -977,6 +985,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               Total Miles {form.pay_model === 'total_miles' ? '(paid)' : '(optional)'}
             </Label>
             <Input id="total_miles" type="number" step="any" {...numericProps} placeholder="0" value={form.total_miles} onChange={e => update('total_miles', e.target.value)} />
+            <FieldError field="total_miles" />
             <p className="text-[10px] text-muted-foreground mt-0.5">
               Trip miles usually means loaded miles. Total miles usually means trip + deadhead.
             </p>
@@ -1214,7 +1223,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           {(() => {
             const loaded = parseFloat(form.loaded_miles) || 0;
             const dh = parseFloat(form.deadhead_miles) || 0;
-            const totalMi = loaded + dh;
+            const totalMi = payCalc.totalOperatingMiles;
             const contractRate = parseFloat(form.rate_per_mile) || 0;
             const gross = isCancelled ? 0 : estimated;
             const effRPM = totalMi > 0 ? gross / totalMi : 0;
