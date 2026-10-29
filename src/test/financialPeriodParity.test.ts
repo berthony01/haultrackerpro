@@ -161,7 +161,7 @@ describe('F1 production page KPIs and generated exports', () => {
     const expenses = [expense(900, 'Fuel'), expense(25)];
     state.fuel = [fuel(50), fuel(70, '2026-04-30')];
     const dash = render(createElement(DashboardView, { loads, expenses, fuelLogs: state.fuel, isAssistantView: true }));
-    fireEvent.click(dash.getByRole('button', { name: 'All Time', exact: true }));
+    fireEvent.click(dash.getByRole('button', { name: /^All Time$/ }));
     const metric = (root: HTMLElement, id: string) => Number(root.querySelector(`[data-testid="${id}"]`)?.getAttribute('data-value'));
     const report = render(createElement(ReportsView, { loads, expenses, isPro: false, canExport: false }));
     for (const [d, r, expected] of [
@@ -171,14 +171,22 @@ describe('F1 production page KPIs and generated exports', () => {
       expect(metric(dash.container, `dashboard-${d}`)).toBe(expected);
       expect(metric(report.container, `reports-${r}`)).toBe(expected);
     }
-    fireEvent.click(dash.getByRole('button', { name: 'Custom', exact: true }));
+    fireEvent.click(dash.getByRole('button', { name: /^Custom$/ }));
     const dates = dash.container.querySelectorAll('input[type="date"]');
     fireEvent.change(dates[0], { target: { value: range.from } });
     fireEvent.change(dates[1], { target: { value: range.to } });
     const agg = aggregate(loads, expenses, state.fuel);
+    fireEvent.click(report.getByRole('button', { name: /^Custom Range$/ }));
+    const reportDates = report.container.querySelectorAll('input[type="date"]');
+    fireEvent.change(reportDates[0], { target: { value: range.from } });
+    fireEvent.change(reportDates[1], { target: { value: range.to } });
+    fireEvent.click(report.getByRole('button', { name: /^Apply$/ }));
     expect(metric(dash.container, 'dashboard-total-expenses')).toBe(agg.summary.expensesTotal);
     expect(metric(dash.container, 'dashboard-net-profit-v')).toBe(agg.summary.netProfit);
     expect(metric(dash.container, 'dashboard-effective-rpm')).toBe(agg.summary.effectiveRPM);
+    expect(metric(report.container, 'reports-total-expenses')).toBe(agg.summary.expensesTotal);
+    expect(metric(report.container, 'reports-net-profit')).toBe(agg.summary.netProfit);
+    expect(metric(report.container, 'reports-effective-rpm')).toBe(agg.summary.effectiveRPM);
   });
 
   it('CSV and real PDF consume the same numerical aggregate, keeping pending operational status', async () => {
