@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import SEOHead from '@/components/SEOHead';
 import RelatedGuidesSection from '@/components/RelatedGuidesSection';
+import { estimateFinancialScenario, type FinancialEstimateResult } from '@/lib/financialEstimates';
 
 export default function TruckingLoadProfitCalculator() {
   const navigate = useNavigate();
@@ -15,30 +16,16 @@ export default function TruckingLoadProfitCalculator() {
   const [costPerMile, setCostPerMile] = useState('');
   const [fuelCost, setFuelCost] = useState('');
   const [otherExpenses, setOtherExpenses] = useState('');
-  const [result, setResult] = useState<{
-    ratePerMile: number;
-    totalCost: number;
-    profit: number;
-    profitPerMile: number;
-  } | null>(null);
-
+  const [calculation, setCalculation] = useState<FinancialEstimateResult | null>(null);
+  const result = calculation?.ok ? calculation.estimate : null;
   const handleCalculate = () => {
-    const pay = parseFloat(loadPay) || 0;
-    const miles = parseFloat(totalMiles) || 0;
-    const cpm = parseFloat(costPerMile) || 0;
-    const fuel = parseFloat(fuelCost) || 0;
-    const other = parseFloat(otherExpenses) || 0;
-
-    if (miles > 0 && pay > 0) {
-      const totalCost = cpm * miles + fuel + other;
-      const profit = pay - totalCost;
-      setResult({
-        ratePerMile: pay / miles,
-        totalCost,
-        profit,
-        profitPerMile: profit / miles,
-      });
-    }
+    setCalculation(estimateFinancialScenario({
+      miles: totalMiles,
+      revenue: { kind: 'gross', grossPay: loadPay },
+      nonFuelCostPerMile: costPerMile,
+      fuel: { kind: 'total', totalCost: fuelCost },
+      otherExpenses,
+    }));
   };
 
   return (
@@ -67,7 +54,7 @@ export default function TruckingLoadProfitCalculator() {
             <h1 className="text-3xl font-black font-heading">Is This Trucking Load Profitable?</h1>
           </div>
           <p className="text-muted-foreground leading-relaxed">
-            Calculate your real profit before accepting a load.
+            Estimate operating profit before accepting a load.
           </p>
         </header>
 
@@ -81,7 +68,7 @@ export default function TruckingLoadProfitCalculator() {
               {[
                 { label: 'Load Pay ($)', value: loadPay, set: setLoadPay, placeholder: 'e.g. 3200' },
                 { label: 'Total Miles', value: totalMiles, set: setTotalMiles, placeholder: 'e.g. 1200' },
-                { label: 'Estimated Cost Per Mile ($)', value: costPerMile, set: setCostPerMile, placeholder: 'e.g. 1.50' },
+                { label: 'Estimated Nonfuel Cost Per Mile ($)', value: costPerMile, set: setCostPerMile, placeholder: 'e.g. 1.50' },
                 { label: 'Fuel Cost (optional) ($)', value: fuelCost, set: setFuelCost, placeholder: 'e.g. 400' },
                 { label: 'Other Expenses (optional) ($)', value: otherExpenses, set: setOtherExpenses, placeholder: 'e.g. 100' },
               ].map((field) => (
@@ -92,12 +79,14 @@ export default function TruckingLoadProfitCalculator() {
                     inputMode="decimal"
                     placeholder={field.placeholder}
                     value={field.value}
-                    onChange={(e) => field.set(e.target.value)}
+                    onChange={(e) => { field.set(e.target.value); setCalculation(null); }}
                   />
                 </div>
               ))}
             </div>
 
+            <p className="text-xs text-muted-foreground">Nonfuel cost per mile excludes fuel. Enter fuel only in Fuel Cost; if your CPM includes fuel, subtract its fuel portion first.</p>
+            {calculation && !calculation.ok && <div role="alert" className="text-sm text-destructive">{calculation.errors.join(' ')}</div>}
             <Button className="w-full gap-2" size="lg" onClick={handleCalculate}>
               <Calculator className="h-4 w-4" /> Calculate
             </Button>
@@ -110,26 +99,26 @@ export default function TruckingLoadProfitCalculator() {
                     <p className="text-2xl font-black text-foreground">${result.ratePerMile.toFixed(2)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Cost</p>
-                    <p className="text-2xl font-black text-foreground">${result.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    <p className="text-sm text-muted-foreground">Estimated Total Cost</p>
+                    <p className="text-2xl font-black text-foreground">${result.totalExpenses.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 </div>
                 <div className="h-px bg-border" />
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Estimated Profit</p>
-                    <p className={`text-2xl font-black ${result.profit >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      ${result.profit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <p className={`text-2xl font-black ${result.operatingProfit >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                      ${result.operatingProfit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Profit Per Mile</p>
                     <p className={`text-2xl font-black ${result.profitPerMile >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      ${result.profitPerMile.toFixed(4)}
+                      ${result.profitPerMile.toFixed(2)}
                     </p>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground">Profit = Load Pay − (Cost Per Mile × Miles + Fuel + Other)</p>
+                <p className="text-xs text-muted-foreground">Estimated operating profit = Load Pay − (Nonfuel Cost Per Mile × Miles + Fuel + Other). Not a recorded financial report.</p>
               </div>
             )}
           </CardContent>
@@ -141,7 +130,7 @@ export default function TruckingLoadProfitCalculator() {
           <Card>
             <CardContent className="p-5 space-y-3">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                A driver is offered a load paying <strong className="text-foreground">$3,200</strong> for <strong className="text-foreground">1,200 miles</strong>. Their estimated cost per mile is <strong className="text-foreground">$1.50</strong>, with <strong className="text-foreground">$400</strong> in fuel and <strong className="text-foreground">$100</strong> in tolls.
+                A driver is offered a load paying <strong className="text-foreground">$3,200</strong> for <strong className="text-foreground">1,200 miles</strong>. Their estimated nonfuel cost per mile (excluding fuel) is <strong className="text-foreground">$1.50</strong>, with <strong className="text-foreground">$400</strong> in fuel and <strong className="text-foreground">$100</strong> in tolls.
               </p>
               <div className="rounded-lg bg-muted/50 p-4 space-y-1 text-sm">
                 <p className="font-semibold text-foreground">Rate Per Mile: $3,200 ÷ 1,200 = $2.67/mile</p>
