@@ -155,8 +155,8 @@ export default function LoadProfitCalculator() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-t border-border/50">
-                  <span className="text-sm text-muted-foreground">Profit Per Mile</span>
-                  <span className="text-sm font-bold font-mono">{formatCurrency(results.profitPerMile)}/mi</span>
+                  <span className="text-sm text-muted-foreground">{Number(taxRate) > 0 ? 'After-tax estimate per mile' : 'Estimated operating profit per mile'}</span>
+                  <span className="text-sm font-bold font-mono">${(Number(taxRate) > 0 ? results.profitPerMile : results.operatingProfitPerMile).toFixed(4)}/mi</span>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">Tax reserve uses your entered percentage of gross revenue; it is not actual tax owed or a recorded financial report.</p>

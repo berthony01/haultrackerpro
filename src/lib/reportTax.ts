@@ -4,6 +4,7 @@ import type { Load } from '@/hooks/useLoads';
 import type { Expense } from '@/hooks/useExpenses';
 import type { UserSettings } from '@/hooks/useUserSettings';
 import { getLoadExpectedPay } from '@/lib/loadMetrics';
+import { toCents, centsToDollars, sumCents } from '@/lib/financialMoney';
 
 export interface TaxEstimateResult {
   enabled: boolean;
@@ -51,13 +52,14 @@ export function computeTaxEstimate(
 
   const totalRate = federalRate + stateRate + seRate + bufferRate;
 
-  const paidLoads = loads.filter(l => l.actual_pay_received != null);
-  const grossRevenue =
-    paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-    loads.filter(l => l.actual_pay_received == null).reduce((s, l) => s + (getLoadExpectedPay(l) || 0), 0);
-
-  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const netProfit = grossRevenue - totalExpenses;
+  // Input aggregation only (F3-P1): each recorded amount is recognized in
+  // integer cents, then summed. The tax formula below is unchanged.
+  const grossCents = sumCents(loads.map(l =>
+    l.actual_pay_received != null ? toCents(l.actual_pay_received) : toCents(getLoadExpectedPay(l) || 0)));
+  const expenseCents = sumCents(expenses.map(e => toCents(e.amount)));
+  const grossRevenue = centsToDollars(grossCents);
+  const totalExpenses = centsToDollars(expenseCents);
+  const netProfit = centsToDollars(grossCents - expenseCents);
   const baseLabel: 'gross' | 'net' = settings.tax_base_type === 'gross' ? 'gross' : 'net';
   const taxBase = baseLabel === 'gross' ? grossRevenue : netProfit;
 

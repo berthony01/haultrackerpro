@@ -19,7 +19,7 @@ describe('F2 shared what-if estimates', () => {
     expect(estimate(base)).toEqual({
       grossRevenue: 3200, nonFuelCost: 1800, fuelCost: 400, otherExpenses: 100,
       totalExpenses: 2300, taxReserve: 0, operatingProfit: 900, afterTaxEstimate: 900,
-      ratePerMile: 2.67, profitPerMile: 0.75,
+      ratePerMile: 2.6667, operatingProfitPerMile: 0.75, profitPerMile: 0.75,
     });
   });
   it('matches both calculator input scenarios for the same revenue, fuel and nonfuel costs', () => {

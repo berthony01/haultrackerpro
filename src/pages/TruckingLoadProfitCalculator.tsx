@@ -96,7 +96,7 @@ export default function TruckingLoadProfitCalculator() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">Rate Per Mile</p>
-                    <p className="text-2xl font-black text-foreground">${result.ratePerMile.toFixed(2)}</p>
+                    <p className="text-2xl font-black text-foreground">${result.ratePerMile.toFixed(4)}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Estimated Total Cost</p>
@@ -112,9 +112,9 @@ export default function TruckingLoadProfitCalculator() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Profit Per Mile</p>
-                    <p className={`text-2xl font-black ${result.profitPerMile >= 0 ? 'text-primary' : 'text-destructive'}`}>
-                      ${result.profitPerMile.toFixed(2)}
+                    <p className="text-sm text-muted-foreground">Estimated operating profit per mile</p>
+                    <p className={`text-2xl font-black ${result.operatingProfitPerMile >= 0 ? 'text-primary' : 'text-destructive'}`}>
+                      ${result.operatingProfitPerMile.toFixed(4)}
                     </p>
                   </div>
                 </div>
