@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
 import SEOHead from '@/components/SEOHead';
@@ -255,6 +255,7 @@ const Index = () => {
   // Params are still read from window.location: consumed hints are cleared
   // with history.replaceState, which Router state does not observe.
   const location = useLocation();
+  const navigationType = useNavigationType();
   const routerSearch = location.search;
   // A repeated identical query still represents a new navigation after consumption.
   const routerNavigationKey = location.key;
@@ -424,11 +425,16 @@ const Index = () => {
           window.history.replaceState({}, '', window.location.pathname);
         }
       }
+    } else if (!pageParam && location.pathname === '/dashboard' && navigationType === 'POP' && page === 'reports') {
+      // Back to the unqualified dashboard is navigation intent, not a local
+      // Reports selection. Settle the view before the page mirror can run.
+      setPage('dashboard');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     routerSearch,
     routerNavigationKey,
+    navigationType,
     user?.id,
     subscription.isLoading,
     subscription.isPro,
@@ -776,12 +782,12 @@ const Index = () => {
     if (page === 'reports') {
       if (!has && resolveReportsDeepLink({ driverWorkspaceAllowed, effectiveRole, isActingAsAssistant, workspaceError }) === 'reports') {
         sp.set('page', 'reports');
-        window.history.replaceState(window.history.state, '', `${window.location.pathname}?${sp.toString()}`);
+        navigate({ pathname: location.pathname, search: `?${sp.toString()}`, hash: location.hash }, { replace: true, state: location.state });
       }
     } else if (prev === 'reports' && has) {
       sp.delete('page');
       const q = sp.toString();
-      window.history.replaceState(window.history.state, '', `${window.location.pathname}${q ? `?${q}` : ''}`);
+      navigate({ pathname: location.pathname, search: q ? `?${q}` : '', hash: location.hash }, { replace: true, state: location.state });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
