@@ -58,10 +58,3 @@ export function sumRecognizedCents<T>(items: T[], pick: (item: T) => unknown): n
   return sumCents(items.map(i => toCents(pick(i))));
 }
 
-/** Round a ratio to `places` decimals, half away from zero (display ratios). */
-export function roundRatio(value: number, places = 4): number {
-  if (!Number.isFinite(value)) return 0;
-  const f = 10 ** places;
-  const r = Math.sign(value) * Math.round(Math.abs(value) * f + Number.EPSILON * f) / f;
-  return Object.is(r, -0) ? 0 : r;
-}
