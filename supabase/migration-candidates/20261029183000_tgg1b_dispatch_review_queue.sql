@@ -112,6 +112,75 @@ ALTER TABLE public.telegram_dispatch_review_proposals ENABLE ROW LEVEL SECURITY;
 -- Intentionally NO policies: fail-closed for every non-service role.
 
 -- ---------------------------------------------------------------------------
+-- A2. Durable review-delivery outbox (one row per proposal)
+-- ---------------------------------------------------------------------------
+-- Enqueued in the SAME transaction as the proposal, so a proposal can never
+-- exist without a pending delivery, and a crashed poller cannot lose it.
+--
+-- DELIVERY SEMANTICS: AT-LEAST-ONCE. Telegram sendMessage has no idempotency
+-- key. If sendMessage succeeds but the worker crashes (or the ack RPC fails)
+-- before ack, the lease expires and the row is reclaimed and re-sent, so a
+-- DUPLICATE review message can become visible in the group. This is a known,
+-- accepted limitation; it is harmless for authority because every button
+-- resolves to the SAME proposal, and the review RPC decides it at most once.
+-- Exactly-once visible delivery is NOT claimed.
+--
+-- Stores no message text, no Telegram payload, no names, no provider error
+-- strings — only a bounded failure category. Chat id / reference / target
+-- are derived by JOIN from the proposal at claim time.
+CREATE TABLE public.telegram_dispatch_review_outbox (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposal_id uuid NOT NULL REFERENCES public.telegram_dispatch_review_proposals(id) ON DELETE CASCADE,
+  delivery_state text NOT NULL DEFAULT 'pending',
+  attempt_count integer NOT NULL DEFAULT 0,
+  max_attempts integer NOT NULL DEFAULT 5,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(),
+  claim_token uuid,
+  lease_expires_at timestamptz,
+  telegram_message_id bigint,
+  last_failure_code text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz,
+  CONSTRAINT telegram_dispatch_review_outbox_proposal_unique UNIQUE (proposal_id),
+  CONSTRAINT telegram_dispatch_review_outbox_state_check
+    CHECK (delivery_state IN ('pending','sending','sent','failed','cancelled')),
+  CONSTRAINT telegram_dispatch_review_outbox_attempts_check
+    CHECK (max_attempts BETWEEN 1 AND 10 AND attempt_count BETWEEN 0 AND max_attempts),
+  CONSTRAINT telegram_dispatch_review_outbox_failure_code_check
+    CHECK (last_failure_code IS NULL OR last_failure_code IN (
+      'network','timeout','rate_limited','telegram_server','telegram_rejected',
+      'chat_unavailable','lease_lost','attempts_exhausted','proposal_closed','unknown')),
+  CONSTRAINT telegram_dispatch_review_outbox_message_check
+    CHECK (telegram_message_id IS NULL OR telegram_message_id > 0),
+  CONSTRAINT telegram_dispatch_review_outbox_shape_check CHECK (
+    (delivery_state = 'pending' AND claim_token IS NULL AND lease_expires_at IS NULL
+       AND telegram_message_id IS NULL AND completed_at IS NULL)
+    OR (delivery_state = 'sending' AND claim_token IS NOT NULL AND lease_expires_at IS NOT NULL
+       AND telegram_message_id IS NULL AND completed_at IS NULL AND attempt_count >= 1)
+    OR (delivery_state = 'sent' AND claim_token IS NULL AND lease_expires_at IS NULL
+       AND telegram_message_id IS NOT NULL AND completed_at IS NOT NULL)
+    OR (delivery_state IN ('failed','cancelled') AND claim_token IS NULL AND lease_expires_at IS NULL
+       AND telegram_message_id IS NULL AND completed_at IS NOT NULL)
+  )
+);
+
+CREATE INDEX telegram_dispatch_review_outbox_due_idx
+  ON public.telegram_dispatch_review_outbox (next_attempt_at)
+  WHERE delivery_state = 'pending';
+CREATE INDEX telegram_dispatch_review_outbox_lease_idx
+  ON public.telegram_dispatch_review_outbox (lease_expires_at)
+  WHERE delivery_state = 'sending';
+
+REVOKE ALL ON public.telegram_dispatch_review_outbox FROM PUBLIC;
+REVOKE ALL ON public.telegram_dispatch_review_outbox FROM anon;
+REVOKE ALL ON public.telegram_dispatch_review_outbox FROM authenticated;
+GRANT ALL ON public.telegram_dispatch_review_outbox TO service_role;
+
+ALTER TABLE public.telegram_dispatch_review_outbox ENABLE ROW LEVEL SECURITY;
+-- Intentionally NO policies.
+
+-- ---------------------------------------------------------------------------
 -- B. Additive result-code vocabulary
 -- ---------------------------------------------------------------------------
 -- All 39 live values are preserved EXACTLY; nine dispatch_review_* codes added.
