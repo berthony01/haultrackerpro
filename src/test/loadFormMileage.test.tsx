@@ -3,6 +3,10 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import type { Load } from '@/hooks/useLoads';
 
+// Match existing LoadForm tests: Radix Switch needs a browser-only observer.
+class ResizeObserverStub { observe() {} unobserve() {} disconnect() {} }
+vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), warning: vi.fn() } }));
 vi.mock('@/hooks/useUserSettings', () => ({ useUserSettings: () => ({ settings: null }) }));
 vi.mock('@/hooks/useCostProfile', () => ({
