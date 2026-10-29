@@ -38,7 +38,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 // Explicit labelled reference: "Load #ABC123", "Ref ABC123", "Ref: ABC123",
 // "load reference ABC123", "load ref ABC123". 4–24 chars, A–Z/0–9/hyphen,
 // must contain a digit, must start and end alphanumeric.
-const REFERENCE_LABEL = /\b(?:load\s*#|load\s+ref(?:erence)?\s*[:#]?|ref\s*[:#]?)\s*([A-Za-z0-9][A-Za-z0-9-]{2,22}[A-Za-z0-9])(?![A-Za-z0-9-])/gi;
+// The label captures the whole following token; shape is validated afterwards
+// so a labelled-but-malformed reference is reported, never silently skipped.
+const REFERENCE_LABEL = /\b(?:load\s*#|load\s+ref(?:erence)?\s*[:#]?|ref\s*[:#]?)\s*([A-Za-z0-9-]*)/gi;
 const REFERENCE_SHAPE = /^(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/;
 const COMPLETION = /\b(?:completed|delivered)\b/i;
 const CANCELLATION = /\b(?:cancelled|canceled)\b/i;
@@ -49,6 +51,7 @@ const DISQUALIFIERS: RegExp[] = [
   /\b(?:not|no|never|nor|without|isn|wasn|hasn|haven|didn|won|cannot)\b/i,
   /\b(?:will|shall|going|gonna|about|soon|tomorrow|later|tonight|eta|expected|expect|scheduled|schedule|plan|planned|planning)\b/i,
   /\b(?:please|pls|plz|can|could|should|would|may|might|must|need|needs|want|wants|let|lets|request|requested|asking|ask)\b/i,
+  /\b(?:was|were|did|does|do|is|are|has|have|had|who|what|why|how|which|where)\b/i, // question forms without "?"
   /\b(?:if|when|whether|unless|maybe|perhaps|possibly|probably)\b/i,
   /\b(?:ignore|test|testing|example|sample|demo|undo|revert|reverse|reversed|mistake|wrong|oops|disregard|correction)\b/i,
   /\b(?:cancel|deliver|complete|delivering|completing|cancelling|canceling)\b/i, // present/progressive forms
