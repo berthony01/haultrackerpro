@@ -86,7 +86,7 @@ export default function TruckingLoadProfitCalculator() {
             </div>
 
             <p className="text-xs text-muted-foreground">Nonfuel cost per mile excludes fuel. Enter fuel only in Fuel Cost; if your CPM includes fuel, subtract its fuel portion first.</p>
-            {calculation && !calculation.ok && <div role="alert" className="text-sm text-destructive">{calculation.errors.join(' ')}</div>}
+            {calculation && calculation.ok === false && <div role="alert" className="text-sm text-destructive">{calculation.errors.join(' ')}</div>}
             <Button className="w-full gap-2" size="lg" onClick={handleCalculate}>
               <Calculator className="h-4 w-4" /> Calculate
             </Button>

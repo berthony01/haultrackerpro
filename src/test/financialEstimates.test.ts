@@ -10,7 +10,7 @@ const base: FinancialEstimateInput = {
 };
 function estimate(input: FinancialEstimateInput) {
   const result = estimateFinancialScenario(input);
-  if (!result.ok) throw new Error(result.errors.join(' '));
+  if (result.ok === false) throw new Error(result.errors.join(' '));
   return result.estimate;
 }
 

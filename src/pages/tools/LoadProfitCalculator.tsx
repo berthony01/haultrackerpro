@@ -112,7 +112,7 @@ export default function LoadProfitCalculator() {
           </CardContent>
         </Card>
 
-        {hasAnyInput && !calculation.ok && (
+        {hasAnyInput && calculation.ok === false && (
           <div role="alert" className="text-sm text-destructive">{calculation.errors.join(' ')}</div>
         )}
         {/* Results */}

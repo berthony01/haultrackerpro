@@ -27,7 +27,8 @@ const expense = (amount: number, category: string, expense_type?: 'fixed' | 'var
 } as Expense);
 const cash = (value: number) => value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 function rowValue(label: string) {
-  return screen.getByText(label).closest('div.flex')?.textContent;
+  const nearest = screen.getByText(label).closest('div.flex');
+  return (label === 'Contribution Margin' ? nearest?.parentElement : nearest)?.textContent;
 }
 afterEach(() => { cleanup(); vi.useRealTimers(); localStorage.clear(); });
 beforeEach(() => { state.loads = []; state.cpm = undefined; state.loading = false; });
