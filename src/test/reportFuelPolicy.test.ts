@@ -73,8 +73,9 @@ describe('reportAggregator — fuel double-count policy', () => {
   it('counts $500 Fuel expense when no Fuel Logs exist', () => {
     const agg = run([fuelExpense], []);
     // No logs → Fuel category is the canonical source.
-    expect(agg.profit.fuelCost).toBe(0);            // fuel.totalCost comes from logs
-    expect(agg.profit.expensesTotal).toBe(500);     // Fuel expense flows through expensesTotal
+    expect(agg.profit.fuelCost).toBe(500);          // canonical source falls back to Fuel expenses
+    expect(agg.profit.expensesTotal).toBe(0);       // non-fuel breakdown
+    expect(agg.summary.expensesTotal).toBe(500);   // inclusive operating expenses
     expect(agg.expenseStats.fuel).toBe(500);
     expect(agg.profit.netAfterExpenses).toBe(2000 - 500);
     expect(agg.expenseStats.deductibleEstimate).toBe(500);

@@ -323,7 +323,7 @@ function buildSummaryCards(type: ReportType, agg: ReportAggregation): Card[] {
     case 'full_profit':
     case 'weekly_performance':
       return [
-        { label: 'Total Loads', value: String(s.loadCount + ls.cancelled) },
+        { label: 'Total Loads', value: String(agg.loads.length) },
         { label: 'Completed Loads', value: String(s.loadCount), tone: 'success' },
         { label: 'Cancelled Loads', value: String(ls.cancelled), tone: ls.cancelled > 0 ? 'danger' : 'default' },
         { label: 'Gross Pay', value: fmtMoney(p.grossRevenue) },
@@ -338,7 +338,7 @@ function buildSummaryCards(type: ReportType, agg: ReportAggregation): Card[] {
       ];
     case 'load_summary':
       return [
-        { label: 'Total Loads', value: String(s.loadCount + ls.cancelled) },
+        { label: 'Total Loads', value: String(agg.loads.length) },
         { label: 'Completed Loads', value: String(s.loadCount), tone: 'success' },
         { label: 'Cancelled Loads', value: String(ls.cancelled), tone: ls.cancelled > 0 ? 'danger' : 'default' },
         { label: 'Gross Pay', value: fmtMoney(p.grossRevenue) },
@@ -353,7 +353,7 @@ function buildSummaryCards(type: ReportType, agg: ReportAggregation): Card[] {
       ];
     case 'expense':
       return [
-        { label: 'Total Expenses', value: fmtMoney(p.expensesTotal + f.totalCost), tone: 'danger' },
+        { label: 'Total Expenses', value: fmtMoney(s.expensesTotal), tone: 'danger' },
         { label: 'Fuel Expenses', value: fmtMoney(es.fuel) },
         { label: 'Maintenance', value: fmtMoney(es.maintenance) },
         { label: 'Toll Expenses', value: fmtMoney(es.tolls) },
@@ -391,7 +391,7 @@ function buildSummaryCards(type: ReportType, agg: ReportAggregation): Card[] {
     case 'tax_estimate':
       return [
         { label: 'Gross Pay', value: fmtMoney(p.grossRevenue) },
-        { label: 'Total Expenses', value: fmtMoney(p.expensesTotal + f.totalCost) },
+        { label: 'Total Expenses', value: fmtMoney(s.expensesTotal) },
         { label: 'Estimated Taxable Income', value: fmtMoney(t.netProfit) },
         { label: 'Estimated Tax Reserve', value: fmtMoney(t.totalTax), tone: 'orange' },
         { label: 'Net Before Tax', value: fmtMoney(p.netAfterExpenses) },
@@ -401,7 +401,7 @@ function buildSummaryCards(type: ReportType, agg: ReportAggregation): Card[] {
       ];
     case 'settlement_dispute':
       return [
-        { label: 'Expected Pay', value: fmtMoney(p.grossRevenue) },
+        { label: 'Expected Pay', value: fmtMoney(s.estimatedPay) },
         { label: 'Actual Pay', value: fmtMoney(p.actualPay) },
         { label: 'Difference / Unpaid', value: fmtMoney(p.differenceUnpaid), tone: p.differenceUnpaid > 0 ? 'danger' : 'default' },
         { label: 'Missing Actual Pay', value: String(s.pendingPaymentCount) },
@@ -423,7 +423,7 @@ function buildSummaryCards(type: ReportType, agg: ReportAggregation): Card[] {
         { label: 'Loaded Miles', value: fmtNum(s.loadedMiles, 0) },
         { label: 'Deadhead Miles', value: fmtNum(s.deadheadMiles, 0) },
         { label: 'Avg Monthly Gross', value: fmtMoney(p.grossRevenue / months) },
-        { label: 'Avg Monthly Expenses', value: fmtMoney((p.expensesTotal + f.totalCost) / months) },
+        { label: 'Avg Monthly Expenses', value: fmtMoney(s.expensesTotal / months) },
         { label: 'Avg Monthly Net', value: fmtMoney(p.netAfterTax / months) },
       ];
     }
@@ -463,7 +463,7 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
     y = sectionTitle(doc, y, 'Performance Snapshot');
     y = drawSnapshot(doc, y, [
       { label: 'Gross Pay', value: fmtMoney(agg.profit.grossRevenue), op: '−' },
-      { label: 'Fuel + Expenses', value: fmtMoney(agg.profit.fuelCost + agg.profit.expensesTotal), op: '−' },
+      { label: 'Fuel + Expenses', value: fmtMoney(agg.summary.expensesTotal), op: '−' },
       { label: 'Tax Reserve (Est.)', value: fmtMoney(agg.profit.estimatedTaxReserve), op: '=' },
       { label: 'Net Profit (Est.)', value: fmtMoney(agg.profit.netAfterTax), tone: agg.profit.netAfterTax >= 0 ? 'success' : 'danger' },
     ]);
@@ -475,7 +475,7 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
     y = sectionTitle(doc, y, 'Load Breakdown');
     const head = [['Date', 'Pickup', 'Dropoff', 'Pay Model', 'Loaded Mi', 'DH Mi', 'Est. Pay', 'Actual Pay', 'Status']];
     const body = agg.activeLoads.map(l => {
-      const status = (l.status ?? 'completed') === 'cancelled' ? 'Cancelled' : 'Completed';
+      const status = l.status == null ? 'Completed' : l.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
       return [
         fmtDate(getEffectiveDate(l)),
         l.pickup_location,
@@ -609,7 +609,7 @@ export function buildReportPdf(type: ReportType, agg: ReportAggregation): Blob {
   if (type === 'settlement_dispute') {
     // Cancelled loads must NEVER appear as disputed/unpaid — they have no
     // expected pay in the dispute sense.
-    const issues = agg.activeLoads.filter(l => {
+    const issues = agg.completedLoads.filter(l => {
       const expected = getLoadExpectedPay(l);
       const actual = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
       return actual == null || Math.abs((actual ?? 0) - expected) > 0.01;

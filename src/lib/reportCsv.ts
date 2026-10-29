@@ -64,7 +64,7 @@ export function buildReportCSV(type: ReportType, agg: ReportAggregation): string
   // SECTION 2 — Executive Summary
   lines.push(row('EXECUTIVE SUMMARY'));
   lines.push(row('Metric', 'Value'));
-  lines.push(row('Total Loads', intStr(agg.summary.loadCount + agg.loadStats.cancelled)));
+  lines.push(row('Total Loads', intStr(agg.loads.length)));
   lines.push(row('Completed Loads', intStr(agg.loadStats.completed)));
   lines.push(row('Cancelled Loads', intStr(agg.loadStats.cancelled)));
   lines.push(row('Total Gross Pay', money(agg.profit.grossRevenue)));
@@ -78,7 +78,7 @@ export function buildReportCSV(type: ReportType, agg: ReportAggregation): string
   lines.push(row('Average Pay Per Load', money(agg.profit.avgPayPerLoad)));
   lines.push(row('Fuel Cost', money(agg.profit.fuelCost)));
   lines.push(row('Other Expenses', money(agg.profit.expensesTotal)));
-  lines.push(row('Total Expenses', money(agg.profit.fuelCost + agg.profit.expensesTotal)));
+  lines.push(row('Total Expenses', money(agg.summary.expensesTotal)));
   lines.push(row('Estimated Tax Reserve', money(agg.profit.estimatedTaxReserve)));
   lines.push(row('Net After Expenses', money(agg.profit.netAfterExpenses)));
   lines.push(row('Net After Estimated Tax', money(agg.profit.netAfterTax)));
@@ -91,7 +91,7 @@ export function buildReportCSV(type: ReportType, agg: ReportAggregation): string
     lines.push(row('PERFORMANCE SNAPSHOT'));
     lines.push(row('Metric', 'Value'));
     lines.push(row('Gross Pay', money(agg.profit.grossRevenue)));
-    lines.push(row('Minus Fuel + Expenses', money(-(agg.profit.fuelCost + agg.profit.expensesTotal))));
+    lines.push(row('Minus Fuel + Expenses', money(-agg.summary.expensesTotal)));
     lines.push(row('Minus Estimated Tax Reserve', money(-agg.profit.estimatedTaxReserve)));
     lines.push(row('Estimated Net Profit', money(agg.profit.netAfterTax)));
     lines.push(blank());
@@ -141,7 +141,7 @@ export function buildReportCSV(type: ReportType, agg: ReportAggregation): string
         (e as any).notes ?? '',
       ));
     }
-    lines.push(row('', '', 'Total', money(agg.profit.expensesTotal), ''));
+    lines.push(row('', '', 'Operating Expenses (canonical, including fuel)', money(agg.summary.expensesTotal), ''));
     lines.push(blank());
   }
 
