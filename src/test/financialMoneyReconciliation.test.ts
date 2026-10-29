@@ -115,7 +115,7 @@ describe('F3-P1 report / tax / CSV reconciliation', () => {
     expect(agg.profit.fuelCost).toBe(32.69);
     expect(agg.profit.expensesTotal).toBe(11.01); // 10.01 + 1.01 − 0.01
     expect(agg.profit.netAfterExpenses).toBe(256.31);
-    expect(agg.profit.differenceUnpaid).toBe(agg.summary.estimatedPay - agg.summary.actualPay > 0 ? 100.02 : 100.02);
+    expect(agg.profit.differenceUnpaid).toBe(100.02);
   });
   it('category and monthly buckets reconcile to the period totals', () => {
     const cat = agg.expenseStats.byCategory;
