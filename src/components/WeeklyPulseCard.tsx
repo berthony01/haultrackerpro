@@ -8,7 +8,7 @@ import { Sparkles, TrendingUp, TrendingDown, Building2, X, Lock, Crown } from 'l
 import { useNavigate } from 'react-router-dom';
 import { buildWeeklyRecommendations } from '@/lib/profitDefenseAlerts';
 import { formatCurrency, getEffectiveDate } from '@/lib/loadUtils';
-import { sumExpectedPay, sumOperatingMiles } from '@/lib/loadMetrics';
+import { onlyFinanciallyCompleted, getLoadRealizedRevenue, sumOperatingMiles } from '@/lib/financialCalculations';
 
 interface WeeklyPulseCardProps {
   isPro: boolean;
@@ -36,18 +36,18 @@ export function WeeklyPulseCard({ isPro }: WeeklyPulseCardProps) {
     const end = endOfWeek(subWeeks(now, 1), { weekStartsOn: 1 });
     const startKey = format(start, 'yyyy-MM-dd');
     const endKey = format(end, 'yyyy-MM-dd');
-    const inRange = loads.filter(l => {
+    const inRange = onlyFinanciallyCompleted(loads).filter(l => {
       const d = getEffectiveDate(l);
       return d >= startKey && d <= endKey;
     });
-    const revenue = inRange.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
-      + sumExpectedPay(inRange.filter(l => l.actual_pay_received == null));
+    const revenue = inRange.reduce((s, l) => s + getLoadRealizedRevenue(l), 0);
     const loadedMiles = inRange.reduce((s, l) => s + Number(l.loaded_miles ?? 0), 0);
     const totalOpMiles = sumOperatingMiles(inRange);
-    const cpm = Number(operatingMetrics?.rolling_cost_per_mile ?? 0);
-    const variableCost = totalOpMiles * cpm;
-    const net = revenue - variableCost;
-    const margin = revenue > 0 ? (net / revenue) * 100 : 0;
+    const cpm = Number(operatingMetrics?.rolling_cost_per_mile);
+    const estimatedCost = totalOpMiles * cpm;
+    const usableCost = Number.isFinite(cpm) && cpm > 0 && Number.isFinite(estimatedCost);
+    const net = usableCost ? revenue - estimatedCost : null;
+    const margin = net != null && revenue > 0 ? (net / revenue) * 100 : null;
     return { start, end, loads: inRange, revenue, loadedMiles, net, margin };
   }, [loads, operatingMetrics]);
 
@@ -126,18 +126,24 @@ export function WeeklyPulseCard({ isPro }: WeeklyPulseCardProps) {
               <div className="text-sm font-bold">{formatCurrency(lastWeek.revenue)}</div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Net</div>
-              <div className={`text-sm font-bold ${lastWeek.net >= 0 ? 'text-success' : 'text-destructive'}`}>
-                {formatCurrency(lastWeek.net)}
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Estimated Net</div>
+              <div className={`text-sm font-bold ${lastWeek.net == null ? 'text-muted-foreground' : lastWeek.net >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {lastWeek.net == null ? '—' : formatCurrency(lastWeek.net)}
               </div>
             </div>
             <div>
-              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Margin</div>
-              <div className={`text-sm font-bold ${lastWeek.margin >= 15 ? 'text-success' : lastWeek.margin >= 0 ? 'text-foreground' : 'text-destructive'}`}>
-                {lastWeek.margin.toFixed(1)}%
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Estimated Margin</div>
+              <div className={`text-sm font-bold ${lastWeek.margin == null ? 'text-muted-foreground' : lastWeek.margin >= 15 ? 'text-success' : lastWeek.margin >= 0 ? 'text-foreground' : 'text-destructive'}`}>
+                {lastWeek.margin == null ? '—' : `${lastWeek.margin.toFixed(1)}%`}
               </div>
             </div>
           </div>
+        )}
+
+        {lastWeek.loads.length > 0 && (
+          <p className="px-4 pt-2 text-xs text-muted-foreground">
+            {lastWeek.net == null ? 'Cost estimate unavailable.' : 'Net and margin estimated using historical cost per mile, not recorded expenses.'}
+          </p>
         )}
 
         <div className="p-4 space-y-3">
