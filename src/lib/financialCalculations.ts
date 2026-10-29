@@ -39,6 +39,7 @@ import {
   fleetEffectiveRPM,
   fleetDeadheadPct,
 } from '@/lib/loadMetrics';
+import { toCents, centsToDollars, sumCents } from '@/lib/financialMoney';
 
 // ── Filters ────────────────────────────────────────────────────────────────
 
@@ -72,18 +73,13 @@ export function applyFuelLogPolicy<E extends { category?: string | null; amount?
   const expensesForMath = fuelLogsExist
     ? expenses.filter(e => e.category !== 'Fuel')
     : expenses;
-  const fuelTotal = fuelLogs.reduce((s, f) => {
-    const n = Number(f.total_cost);
-    return s + (Number.isFinite(n) && n > 0 ? n : 0);
-  }, 0);
-  const nonFuelExpensesTotal = expensesForMath.reduce((s, e) => {
-    const n = Number(e.amount);
-    return s + (Number.isFinite(n) ? n : 0);
-  }, 0);
+  // Each record is recognized in integer cents, then summed (F3-P1).
+  const fuelCents = sumCents(fuelLogs.map(f => Math.max(0, toCents(f.total_cost))));
+  const nonFuelCents = sumCents(expensesForMath.map(e => toCents(e.amount)));
   return {
     expensesForMath,
-    fuelTotal,
-    combinedExpensesTotal: nonFuelExpensesTotal + fuelTotal,
+    fuelTotal: centsToDollars(fuelCents),
+    combinedExpensesTotal: centsToDollars(nonFuelCents + fuelCents),
   };
 }
 
@@ -142,16 +138,26 @@ export function onlyFinanciallyCompleted<T extends { status?: string | null }>(l
  * return $0.
  */
 export function getLoadRealizedRevenue(load: Load): number {
+  return centsToDollars(getLoadRealizedRevenueCents(load));
+}
+
+/** Recognized expected pay for one load, in integer cents (half away from zero). */
+export function getLoadExpectedPayCents(load: Load): number {
+  return toCents(getLoadExpectedPay(load));
+}
+
+/** Recognized realized revenue for one load, in integer cents. */
+export function getLoadRealizedRevenueCents(load: Load): number {
   if (!isCompletedLoadForFinancials(load)) return 0;
   const actual = load.actual_pay_received;
-  if (actual != null && Number.isFinite(Number(actual))) return Number(actual);
-  return getLoadExpectedPay(load);
+  if (actual != null && Number.isFinite(Number(actual))) return toCents(actual);
+  return getLoadExpectedPayCents(load);
 }
 
 /** Net Profit for a single load given its allocated expenses (already filtered). */
 export function getLoadNetProfit(load: Load, loadExpenses: Expense[] = []): number {
-  const exp = loadExpenses.reduce((s, e) => s + num(e.amount), 0);
-  return getLoadRealizedRevenue(load) - exp;
+  const exp = sumCents(loadExpenses.map(e => toCents(e.amount)));
+  return centsToDollars(getLoadRealizedRevenueCents(load) - exp);
 }
 
 /** Net RPM for a single load. */
@@ -178,10 +184,10 @@ export function derivePaymentDisplayStatus(load: Load): PaymentDisplayStatus {
   if ((load.status ?? 'completed') === 'cancelled') return 'cancelled';
   const actual = load.actual_pay_received;
   if (actual == null) return 'pending';
-  const a = Number(actual);
-  const expected = getLoadExpectedPay(load);
-  // Penny-tolerant comparison
-  if (Math.abs(a - expected) < 0.005) return 'paid';
+  // Compare recognized cents: a one-cent difference is a real difference.
+  const a = toCents(actual);
+  const expected = getLoadExpectedPayCents(load);
+  if (a === expected) return 'paid';
   return a > expected ? 'overpaid' : 'underpaid';
 }
 
@@ -191,7 +197,7 @@ export function derivePaymentDisplayStatus(load: Load): PaymentDisplayStatus {
  */
 export function getPaymentDifference(load: Load): number | null {
   if (load.actual_pay_received == null) return null;
-  return Number(load.actual_pay_received) - getLoadExpectedPay(load);
+  return centsToDollars(toCents(load.actual_pay_received) - getLoadExpectedPayCents(load));
 }
 
 // ── Aggregate / fleet helpers ──────────────────────────────────────────────
@@ -253,16 +259,22 @@ export function summarizeLoads(allLoads: Load[], expenses: Expense[] = []): Load
   const completed = onlyFinanciallyCompleted(allLoads);
   const cancelled = onlyCancelled(allLoads);
 
-  const estimatedPay = sumExpectedPay(completed);
-  const actualPay = sumActualPay(completed);
-  const grossRevenue = completed.reduce((s, l) => s + getLoadRealizedRevenue(l), 0);
+  // F3-P1: every recorded amount is recognized per row in integer cents, then
+  // summed and netted in cents. Raw stored values are never altered.
+  const estimatedPayCents = sumCents(completed.map(getLoadExpectedPayCents));
+  const actualPayCents = sumCents(completed.map(l => toCents(l.actual_pay_received)));
+  const grossCents = sumCents(completed.map(getLoadRealizedRevenueCents));
+  const expensesCents = sumCents(expenses.map(e => toCents(e.amount)));
+  const estimatedPay = centsToDollars(estimatedPayCents);
+  const actualPay = centsToDollars(actualPayCents);
+  const grossRevenue = centsToDollars(grossCents);
 
   const loadedMiles = sumLoadedMiles(completed);
   const deadheadMiles = sumDeadheadMiles(completed);
   const totalMiles = sumOperatingMiles(completed);
 
-  const expensesTotal = expenses.reduce((s, e) => s + num(e.amount), 0);
-  const netProfit = grossRevenue - expensesTotal;
+  const expensesTotal = centsToDollars(expensesCents);
+  const netProfit = centsToDollars(grossCents - expensesCents);
 
   // Weighted avg contract rate = Σ(loaded * rate) / Σ(loaded)
   let weightedRate = 0;
@@ -278,23 +290,22 @@ export function summarizeLoads(allLoads: Load[], expenses: Expense[] = []): Load
   const marginPct = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
 
   let pendingPaymentCount = 0;
-  let pendingPaymentEstimated = 0;
-  let paymentDifferenceTotal = 0;
+  let pendingCents = 0;
+  let differenceCents = 0;
   let underpaidCount = 0;
   let overpaidCount = 0;
   for (const l of completed) {
     const status = derivePaymentDisplayStatus(l);
     if (status === 'pending') {
       pendingPaymentCount += 1;
-      pendingPaymentEstimated += getLoadExpectedPay(l);
-    } else if (status === 'underpaid') {
-      underpaidCount += 1;
-      paymentDifferenceTotal += getPaymentDifference(l) ?? 0;
-    } else if (status === 'overpaid') {
-      overpaidCount += 1;
-      paymentDifferenceTotal += getPaymentDifference(l) ?? 0;
+      pendingCents += getLoadExpectedPayCents(l);
+    } else if (status === 'underpaid' || status === 'overpaid') {
+      if (status === 'underpaid') underpaidCount += 1; else overpaidCount += 1;
+      differenceCents += toCents(l.actual_pay_received) - getLoadExpectedPayCents(l);
     }
   }
+  const pendingPaymentEstimated = centsToDollars(pendingCents);
+  const paymentDifferenceTotal = centsToDollars(differenceCents);
 
   return {
     loadCount: completed.length,
@@ -335,12 +346,12 @@ export function summarizeFinancialPeriod(
   const policy = applyFuelLogPolicy(expenses, fuelLogs);
   const base = summarizeLoads(loads, policy.expensesForMath);
   const expensesTotal = policy.combinedExpensesTotal;
-  const netProfit = base.grossRevenue - expensesTotal;
+  const netProfit = centsToDollars(toCents(base.grossRevenue) - toCents(expensesTotal));
   const fuelLogsExist = fuelLogs.length > 0;
   const fuelExpenses = expenses.filter(e => e.category === 'Fuel');
   const canonicalFuelTotal = fuelLogsExist
     ? policy.fuelTotal
-    : fuelExpenses.reduce((s, e) => s + num(e.amount), 0);
+    : centsToDollars(sumCents(fuelExpenses.map(e => toCents(e.amount))));
 
   return {
     ...base,
@@ -354,7 +365,7 @@ export function summarizeFinancialPeriod(
       fuelLogsExist,
       source: fuelLogsExist ? 'fuel_logs' as const : 'expenses' as const,
       canonicalFuelTotal,
-      otherExpensesTotal: expensesTotal - canonicalFuelTotal,
+      otherExpensesTotal: centsToDollars(toCents(expensesTotal) - toCents(canonicalFuelTotal)),
       expenseEntryCount: policy.expensesForMath.length,
       fuelLogCount: fuelLogs.length,
       totalEntryCount: policy.expensesForMath.length + fuelLogs.length,
