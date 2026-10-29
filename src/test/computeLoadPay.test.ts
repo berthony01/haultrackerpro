@@ -191,7 +191,7 @@ describe('computeLoadPay — Phase 6C.4 operating-mile sanity', () => {
     expect(r.effectiveRpm).toBeCloseTo(2, 5);
   });
 
-  it('totalMiles greater than loaded+deadhead remains trusted', () => {
+  it('totalMiles greater than loaded+deadhead by >2 uses components', () => {
     const r = computeLoadPay({
       payModel: 'total_miles',
       loadedMiles: 500,
@@ -199,8 +199,8 @@ describe('computeLoadPay — Phase 6C.4 operating-mile sanity', () => {
       totalMiles: 600,
       loadedRpm: 1,
     });
-    expect(r.totalOperatingMiles).toBe(600);
-    expect(r.expectedGrossPay).toBe(600);
+    expect(r.totalOperatingMiles).toBe(550);
+    expect(r.expectedGrossPay).toBe(550);
   });
 
   it('totalMiles within 2mi tolerance remains trusted', () => {
@@ -222,5 +222,12 @@ describe('computeLoadPay — Phase 6C.4 operating-mile sanity', () => {
     });
     expect(r.totalOperatingMiles).toBe(300);
     expect(r.expectedGrossPay).toBe(300);
+  });
+
+  it('manual preview preserves $166.01 pay but fixes oversized mileage and RPM', () => {
+    const r = computeLoadPay({ payModel: 'manual', loadedMiles: 195.45, deadheadMiles: 7, totalMiles: 20245, manualGross: 166.01 });
+    expect(r.totalOperatingMiles).toBeCloseTo(202.45, 8);
+    expect(r.expectedGrossPay).toBe(166.01);
+    expect(r.effectiveRpm.toFixed(2)).toBe('0.82');
   });
 });

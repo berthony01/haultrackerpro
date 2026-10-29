@@ -5,6 +5,7 @@ import {
   getLoadPaidMiles,
 } from '@/lib/loadMetrics';
 import { summarizeLoads } from '@/lib/financialCalculations';
+import { resolveOperatingMiles } from '@/lib/mileageMath';
 
 const mk = (overrides: any = {}): any => ({
   id: 'l1',
@@ -46,8 +47,8 @@ describe('Phase 6C.3 — getLoadOperatingMiles sanity guard', () => {
     expect(getLoadOperatingMiles(mk({ loaded_miles: 500, deadhead_miles: 50, total_miles: 549 }))).toBe(549);
   });
 
-  it('7. total_miles greater than components → returns stored', () => {
-    expect(getLoadOperatingMiles(mk({ loaded_miles: 500, deadhead_miles: 50, total_miles: 600 }))).toBe(600);
+  it('7. total_miles greater than components by >2 → returns components', () => {
+    expect(getLoadOperatingMiles(mk({ loaded_miles: 500, deadhead_miles: 50, total_miles: 600 }))).toBe(550);
   });
 
   it('8. only total_miles exists → returns stored', () => {
@@ -78,5 +79,34 @@ describe('Phase 6C.3 — getLoadOperatingMiles sanity guard', () => {
   it('12. getLoadPaidMiles for loaded_miles_only unchanged when no deadhead pay', () => {
     const l = mk({ pay_model: 'loaded_miles_only', loaded_miles: 500, deadhead_miles: 50, total_miles: 1 });
     expect(getLoadPaidMiles(l)).toBe(500);
+  });
+
+  it('oversized 20245 total resolves to 202.45 miles and $0.82 RPM without mutation', () => {
+    const load = Object.freeze(mk({ loaded_miles: 195.45, deadhead_miles: 7, total_miles: 20245, estimated_pay: 166.01 }));
+    expect(getLoadOperatingMiles(load)).toBeCloseTo(202.45, 8);
+    expect(getLoadEffectiveRPM(load).toFixed(2)).toBe('0.82');
+    expect(load.total_miles).toBe(20245);
+    expect(load.estimated_pay).toBe(166.01);
+  });
+
+  it.each([201.7, 203.2, 200.45, 204.45])('preserves historical total %s within inclusive 2-mile tolerance', total => {
+    expect(resolveOperatingMiles({ loadedMiles: 195.45, deadheadMiles: 7, totalMiles: total })).toBe(total);
+  });
+
+  it('preserves a 0.75-mile difference even below loaded miles', () => {
+    expect(resolveOperatingMiles({ loadedMiles: 195.45, deadheadMiles: 0, totalMiles: 194.7 })).toBe(194.7);
+  });
+
+  it.each([
+    [{ loadedMiles: null, deadheadMiles: null, totalMiles: 700 }, 700],
+    [{ loadedMiles: 0, deadheadMiles: 0, totalMiles: 700 }, 700],
+    [{ loadedMiles: null, deadheadMiles: null, totalMiles: null }, 0],
+    [{ loadedMiles: 0, deadheadMiles: 0, totalMiles: 0 }, 0],
+    [{ loadedMiles: 195.45, deadheadMiles: 7, totalMiles: null }, 202.45],
+    [{ loadedMiles: 195.45, deadheadMiles: 7, totalMiles: 0 }, 202.45],
+    [{ loadedMiles: 195.45, deadheadMiles: null, totalMiles: 20245 }, 195.45],
+    [{ loadedMiles: null, deadheadMiles: 7, totalMiles: 20245 }, 7],
+  ])('handles missing, zero and partially itemized mileage: %j', (input, expected) => {
+    expect(resolveOperatingMiles(input)).toBeCloseTo(expected, 8);
   });
 });
