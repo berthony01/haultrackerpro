@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, cleanup, configure } from '@testing-library/react';
-import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
+import { render, screen, fireEvent, waitFor, cleanup, configure, act } from '@testing-library/react';
+import { BrowserRouter, MemoryRouter, useLocation, Link, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { computeWorkspaceAccess } from '@/lib/workspaceAccess';
 import { deriveUserCapabilitiesView, type UserCapabilityStatus } from '@/lib/userCapabilities';
@@ -524,6 +524,67 @@ describe('pending profile handoff is isolated per account (same tab, no reload)'
 });
 
 describe('release repairs: Reports refresh, More sheet height, Find Work dark chips', () => {
+  const reportsNavigationTree = () => (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <BrowserRouter>
+        <Location />
+        <Link to="/dashboard?page=reports">Open Reports route</Link>
+        <Link to="/docs">Leave dashboard route</Link>
+        <Routes>
+          <Route path="/dashboard" element={<Index />} />
+          <Route path="/docs" element={<div data-testid="away-from-dashboard" />} />
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
+  it('browser Back dismisses Reports and Forward restores it without rewriting either history entry', async () => {
+    render(reportsNavigationTree());
+    expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
+    fireEvent.click(screen.getByRole('link', { name: 'Open Reports route' }));
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    expect(screen.getByTestId('location')).toHaveTextContent('/dashboard?page=reports');
+    const reportsKey = window.history.state.key;
+    await act(async () => { window.history.back(); });
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/dashboard');
+      expect(screen.queryByTestId('reports-view')).toBeNull();
+      expect(screen.getByTestId('existing-dashboard')).toBeTruthy();
+      expect(window.location.search).toBe('');
+    });
+    await act(async () => { window.history.forward(); });
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    expect(screen.getByTestId('location').textContent).toBe('/dashboard?page=reports');
+    expect(window.history.state.key).toBe(reportsKey);
+    expect(state.model).not.toHaveBeenCalled();
+  });
+  it('Reports survives leaving the route and browser Back; local Dashboard navigation clears the Reports hint through Router', async () => {
+    window.history.replaceState({}, '', '/dashboard?page=reports');
+    render(reportsNavigationTree());
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    fireEvent.click(screen.getByRole('link', { name: 'Leave dashboard route' }));
+    expect(await screen.findByTestId('away-from-dashboard')).toBeTruthy();
+    expect(screen.queryByTestId('reports-view')).toBeNull();
+    await act(async () => { window.history.back(); });
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: /^Dashboard$/ })[0]);
+    expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/dashboard'));
+    expect(window.location.search).toBe('');
+  });
+  it('refresh retains the Reports query while the trusted workspace resolves, then mounts Reports', async () => {
+    window.history.replaceState({}, '', '/dashboard?page=reports');
+    state.access.isLoading = true;
+    const view = render(reportsNavigationTree());
+    expect(screen.queryByTestId('reports-view')).toBeNull();
+    expect(window.location.search).toBe('?page=reports');
+    state.access.isLoading = false;
+    view.rerender(reportsNavigationTree());
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    view.unmount();
+    render(reportsNavigationTree());
+    expect(await screen.findByTestId('reports-view')).toBeTruthy();
+    expect(screen.getByTestId('location').textContent).toBe('/dashboard?page=reports');
+  });
   it('self-driver ?page=reports mounts Reports and survives a refresh', async () => {
     window.history.replaceState({}, '', '/dashboard?page=reports');
     const first = render(tree(<Index />));
