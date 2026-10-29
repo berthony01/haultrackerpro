@@ -57,4 +57,3 @@ export function sumCents(values: Iterable<number>): number {
 export function sumRecognizedCents<T>(items: T[], pick: (item: T) => unknown): number {
   return sumCents(items.map(i => toCents(pick(i))));
 }
-
