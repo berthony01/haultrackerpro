@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Load } from '@/hooks/useLoads';
 import { Expense } from '@/hooks/useExpenses';
 import { formatCurrency } from '@/lib/loadUtils';
-import { sumExpectedPay, sumOperatingMiles } from '@/lib/loadMetrics';
+import { summarizeFinancialPeriod } from '@/lib/financialCalculations';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { TrendingUp, TrendingDown, Info, Layers } from 'lucide-react';
@@ -10,30 +10,24 @@ import { TrendingUp, TrendingDown, Info, Layers } from 'lucide-react';
 interface ContributionMarginCardProps {
   loads: Load[];
   expenses: Expense[];
+  fuelLogs?: { total_cost?: number | string | null }[];
 }
 
-export function ContributionMarginCard({ loads, expenses }: ContributionMarginCardProps) {
+export function ContributionMarginCard({ loads, expenses, fuelLogs = [] }: ContributionMarginCardProps) {
   const data = useMemo(() => {
-    if (loads.length === 0) return null;
-
-    const paidLoads = loads.filter(l => l.actual_pay_received != null);
-    const grossRevenue = paidLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0) +
-      sumExpectedPay(loads.filter(l => l.actual_pay_received == null));
-
-    const variableExpenses = expenses
-      .filter(e => (e as any).expense_type === 'variable' || !(e as any).expense_type)
-      .reduce((s, e) => s + Number(e.amount), 0);
-
-    const fixedExpenses = expenses
-      .filter(e => (e as any).expense_type === 'fixed')
-      .reduce((s, e) => s + Number(e.amount), 0);
-
-    const totalExpenses = variableExpenses + fixedExpenses;
+    const summary = summarizeFinancialPeriod(loads, expenses, fuelLogs);
+    const grossRevenue = summary.grossRevenue;
+    const fixedExpenses = summary.fuelPolicy.expensesForMath
+      .filter(e => e.category !== 'Fuel' && e.expense_type === 'fixed')
+      .reduce((s, e) => s + (Number.isFinite(Number(e.amount)) ? Number(e.amount) : 0), 0);
+    // Remaining canonical costs are variable, including fuel exactly once.
+    const totalExpenses = summary.expensesTotal;
+    const variableExpenses = totalExpenses - fixedExpenses;
     const contributionMargin = grossRevenue - variableExpenses;
     const cmPercent = grossRevenue > 0 ? (contributionMargin / grossRevenue) * 100 : 0;
-    const netProfit = grossRevenue - totalExpenses;
+    const netProfit = summary.netProfit;
 
-    const totalMiles = sumOperatingMiles(loads);
+    const totalMiles = summary.totalMiles;
     const cmPerMile = totalMiles > 0 ? contributionMargin / totalMiles : 0;
 
     return {
@@ -46,7 +40,7 @@ export function ContributionMarginCard({ loads, expenses }: ContributionMarginCa
       cmPerMile,
       netProfit,
     };
-  }, [loads, expenses]);
+  }, [loads, expenses, fuelLogs]);
 
   if (!data || data.grossRevenue === 0) return null;
   // Only show if there are both fixed and variable expenses

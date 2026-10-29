@@ -8,6 +8,7 @@ import { Calculator, DollarSign, Fuel, Truck, TrendingUp, ArrowRight } from 'luc
 import { useNavigate } from 'react-router-dom';
 import { formatCurrency } from '@/lib/loadUtils';
 import { trackCalculatorUsed } from '@/lib/analytics';
+import { estimateFinancialScenario } from '@/lib/financialEstimates';
 
 export default function LoadProfitCalculator() {
   const navigate = useNavigate();
@@ -19,27 +20,17 @@ export default function LoadProfitCalculator() {
   const [taxRate, setTaxRate] = useState('');
   const [otherExpenses, setOtherExpenses] = useState('');
 
-  const results = useMemo(() => {
-    const m = parseFloat(miles) || 0;
-    const rpm = parseFloat(ratePerMile) || 0;
-    const fp = parseFloat(fuelPrice) || 0;
-    const mpgVal = parseFloat(mpg) || 1;
-    const maint = parseFloat(maintenancePerMile) || 0;
-    const tax = parseFloat(taxRate) || 0;
-    const other = parseFloat(otherExpenses) || 0;
-
-    const grossRevenue = m * rpm;
-    const fuelCost = (m / mpgVal) * fp;
-    const maintenanceCost = m * maint;
-    const taxEstimate = grossRevenue * (tax / 100);
-    const totalExpenses = fuelCost + maintenanceCost + other;
-    const netProfit = grossRevenue - totalExpenses - taxEstimate;
-    const profitPerMile = m > 0 ? netProfit / m : 0;
-
-    return { grossRevenue, fuelCost, maintenanceCost, taxEstimate, totalExpenses, netProfit, profitPerMile };
-  }, [miles, ratePerMile, fuelPrice, mpg, maintenancePerMile, taxRate, otherExpenses]);
-
-  const hasInput = parseFloat(miles) > 0 && parseFloat(ratePerMile) > 0;
+  const calculation = useMemo(() => estimateFinancialScenario({
+    miles,
+    revenue: { kind: 'rate', ratePerMile },
+    nonFuelCostPerMile: maintenancePerMile,
+    fuel: { kind: 'consumption', pricePerGallon: fuelPrice, mpg },
+    otherExpenses,
+    taxReservePercent: taxRate,
+  }), [miles, ratePerMile, fuelPrice, mpg, maintenancePerMile, taxRate, otherExpenses]);
+  const results = calculation.ok ? calculation.estimate : null;
+  const hasInput = results != null;
+  const hasAnyInput = [miles, ratePerMile, fuelPrice, mpg, maintenancePerMile, taxRate, otherExpenses].some(v => v !== '');
 
   useEffect(() => {
     if (hasInput) {
@@ -62,7 +53,7 @@ export default function LoadProfitCalculator() {
           </div>
           <h1 className="text-3xl font-black font-heading">Load Profit Calculator</h1>
           <p className="text-muted-foreground max-w-lg mx-auto">
-            Calculate your true profit per load after fuel, maintenance, taxes, and other expenses.
+            Estimate load profit after fuel, maintenance, other expenses, and a separate tax reserve.
           </p>
         </div>
 
@@ -121,11 +112,14 @@ export default function LoadProfitCalculator() {
           </CardContent>
         </Card>
 
+        {hasAnyInput && calculation.ok === false && (
+          <div role="alert" className="text-sm text-destructive">{calculation.errors.join(' ')}</div>
+        )}
         {/* Results */}
-        {hasInput && (
+        {results && (
           <Card className="shadow-card border-primary/20">
             <CardContent className="p-5 space-y-3">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Results</p>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Scenario Estimate</p>
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center py-2">
@@ -138,22 +132,26 @@ export default function LoadProfitCalculator() {
                 </div>
                 <div className="flex justify-between items-center py-2 border-t border-border/50">
                   <span className="text-sm text-muted-foreground">Maintenance</span>
-                  <span className="text-sm font-mono text-destructive">−{formatCurrency(results.maintenanceCost)}</span>
+                  <span className="text-sm font-mono text-destructive">−{formatCurrency(results.nonFuelCost)}</span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-t border-border/50">
-                  <span className="text-sm text-muted-foreground">Tax Estimate</span>
-                  <span className="text-sm font-mono text-destructive">−{formatCurrency(results.taxEstimate)}</span>
+                  <span className="text-sm text-muted-foreground">Tax Reserve Estimate</span>
+                  <span className="text-sm font-mono text-destructive">−{formatCurrency(results.taxReserve)}</span>
                 </div>
-                {parseFloat(otherExpenses) > 0 && (
+                {results.otherExpenses > 0 && (
                   <div className="flex justify-between items-center py-2 border-t border-border/50">
                     <span className="text-sm text-muted-foreground">Other Expenses</span>
-                    <span className="text-sm font-mono text-destructive">−{formatCurrency(parseFloat(otherExpenses))}</span>
+                    <span className="text-sm font-mono text-destructive">−{formatCurrency(results.otherExpenses)}</span>
                   </div>
                 )}
+                <div className="flex justify-between items-center py-2 border-t border-border/50">
+                  <span className="text-sm text-muted-foreground">Operating Profit Estimate (before tax reserve)</span>
+                  <span className="text-sm font-mono">{formatCurrency(results.operatingProfit)}</span>
+                </div>
                 <div className="flex justify-between items-center py-3 border-t-2 border-primary/30">
-                  <span className="font-bold">Net Profit</span>
-                  <span className={`text-xl font-black font-mono ${results.netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(results.netProfit)}
+                  <span className="font-bold">After-Tax Estimate</span>
+                  <span className={`text-xl font-black font-mono ${results.afterTaxEstimate >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {formatCurrency(results.afterTaxEstimate)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-t border-border/50">
@@ -161,6 +159,7 @@ export default function LoadProfitCalculator() {
                   <span className="text-sm font-bold font-mono">{formatCurrency(results.profitPerMile)}/mi</span>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground">Tax reserve uses your entered percentage of gross revenue; it is not actual tax owed or a recorded financial report.</p>
             </CardContent>
           </Card>
         )}

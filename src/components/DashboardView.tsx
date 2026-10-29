@@ -723,7 +723,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           })()}
 
           {/* Cost Breakdown: Fixed vs Variable + Contribution Margin */}
-          <ContributionMarginCard loads={activeLoads} expenses={filteredExpenses} />
+          <ContributionMarginCard loads={filteredLoads} expenses={filteredExpenses} fuelLogs={filteredFuelLogs} />
 
 
           {/* Fuel Analytics */}
