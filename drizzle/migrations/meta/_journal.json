@@ -8,6 +8,13 @@
       "when": 1793083598967,
       "tag": "0000_phase3_assistant_history_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793287640266,
+      "tag": "0001_loads_total_miles_component_consistency_check",
+      "breakpoints": true
     }
   ]
 }
