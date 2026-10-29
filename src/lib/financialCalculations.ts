@@ -42,7 +42,7 @@ import {
 
 // ── Filters ────────────────────────────────────────────────────────────────
 
-/** Returns loads with `status === 'cancelled'` removed. Use before any KPI sum. */
+/** Operational filter only; financial KPIs must use onlyFinanciallyCompleted. */
 export function excludeCancelled<T extends { status?: string | null }>(loads: T[]): T[] {
   return loads.filter(l => (l.status ?? 'completed') !== 'cancelled');
 }
@@ -212,7 +212,7 @@ export interface LoadFinancialSummary {
   actualPay: number;
   /**
    * Driver-facing "Gross Revenue":
-   *   Σ actual where present, else expected, for non-cancelled loads.
+   *   Σ actual where present, else expected, for financially completed loads.
    */
   grossRevenue: number;
 
@@ -321,10 +321,51 @@ export function summarizeLoads(allLoads: Load[], expenses: Expense[] = []): Load
   };
 }
 
+/**
+ * Canonical period adapter. Callers supply owner-scoped, date-filtered inputs.
+ * Fuel logs replace Fuel expense records when at least one log is present;
+ * otherwise recorded Fuel expenses remain the source. No rows are changed.
+ * Operating profit is before tax reserve (tax remains a separate estimate).
+ */
+export function summarizeFinancialPeriod(
+  loads: Load[],
+  expenses: Expense[] = [],
+  fuelLogs: { total_cost?: number | string | null }[] = [],
+) {
+  const policy = applyFuelLogPolicy(expenses, fuelLogs);
+  const base = summarizeLoads(loads, policy.expensesForMath);
+  const expensesTotal = policy.combinedExpensesTotal;
+  const netProfit = base.grossRevenue - expensesTotal;
+  const fuelLogsExist = fuelLogs.length > 0;
+  const fuelExpenses = expenses.filter(e => e.category === 'Fuel');
+  const canonicalFuelTotal = fuelLogsExist
+    ? policy.fuelTotal
+    : fuelExpenses.reduce((s, e) => s + num(e.amount), 0);
+
+  return {
+    ...base,
+    expensesTotal,
+    netProfit,
+    netRPM: base.totalMiles > 0 ? netProfit / base.totalMiles : 0,
+    costPerMile: base.totalMiles > 0 ? expensesTotal / base.totalMiles : 0,
+    marginPct: base.grossRevenue > 0 ? netProfit / base.grossRevenue * 100 : 0,
+    fuelPolicy: {
+      ...policy,
+      fuelLogsExist,
+      source: fuelLogsExist ? 'fuel_logs' as const : 'expenses' as const,
+      canonicalFuelTotal,
+      otherExpensesTotal: expensesTotal - canonicalFuelTotal,
+      expenseEntryCount: policy.expensesForMath.length,
+      fuelLogCount: fuelLogs.length,
+      totalEntryCount: policy.expensesForMath.length + fuelLogs.length,
+    },
+  };
+}
+
 // ── Tooltip copy (single source so labels stay consistent) ─────────────────
 
 export const FINANCIAL_TOOLTIPS = {
-  grossRevenue: 'Total estimated or confirmed load income before expenses. Cancelled loads are excluded.',
+  grossRevenue: 'Completed load income before expenses: actual pay when recorded, otherwise expected pay. Pending, en-route and cancelled loads are excluded.',
   netProfit: 'Gross revenue minus all expenses in the selected period.',
   effectiveRPM: 'Gross revenue divided by all miles, including deadhead. This is not your contract rate — it shows what the load actually pays per mile.',
   netRPM: 'Net profit divided by all miles (including deadhead).',

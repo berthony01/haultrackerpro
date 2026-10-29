@@ -6,7 +6,7 @@ import { useUserSettings } from '@/hooks/useUserSettings';
 import { useFuelLogs } from '@/hooks/useFuelLogs';
 import { useAuth } from '@/hooks/useAuth';
 import { getWeekSummaries, formatCurrency, formatNumber, exportToCSV, getCurrentMonthLoads, getEffectiveDate, weekStartDayToNumber } from '@/lib/loadUtils';
-import { summarizeLoads, excludeCancelled, onlyCancelled, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
+import { summarizeFinancialPeriod, onlyCancelled, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -84,6 +84,8 @@ export function ReportsView({
   const [dateRange, setDateRange] = useState<{ from?: string; to?: string }>({});
   const { stops } = useLoadStops();
   const { settings: ownSettings } = useUserSettings();
+  // Existing hook scopes reads/cache to the validated managed driver or self.
+  const { fuelLogs } = useFuelLogs(dateRange);
   // Managed-driver settings win whenever provided (assistant acting mode).
   const settings: any = settingsOverride ?? ownSettings;
   const exportsAllowed = canExport && isPro;
@@ -117,21 +119,14 @@ export function ReportsView({
   const hasFilter = !!(dateRange.from || dateRange.to);
 
   const summary = useMemo(
-    () => summarizeLoads(filteredLoads, filteredExpenses),
-    [filteredLoads, filteredExpenses]
+    () => summarizeFinancialPeriod(filteredLoads, filteredExpenses, fuelLogs),
+    [filteredLoads, filteredExpenses, fuelLogs]
   );
   const cancelledLoads = useMemo(() => onlyCancelled(filteredLoads), [filteredLoads]);
-  const actualPayTotal = useMemo(
-    () => excludeCancelled(filteredLoads).reduce(
-      (s, l) => s + (l.actual_pay_received != null ? Number(l.actual_pay_received) : 0),
-      0,
-    ),
-    [filteredLoads],
-  );
+  const actualPayTotal = summary.actualPay;
 
   // ── Report Center state ──────────────────────────────────────────────
   const { user } = useAuth();
-  const { fuelLogs } = useFuelLogs();
   const [reportType, setReportType] = useState<ReportType>('full_profit');
 
   const aggregation = useMemo(() => {
@@ -262,7 +257,7 @@ export function ReportsView({
             <p className="text-label" title={FINANCIAL_TOOLTIPS.grossRevenue}>Gross Revenue</p>
           </div>
           <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatCurrency(summary.grossRevenue)}</p>
-          <p className="text-[11px] text-muted-foreground mt-1">{summary.loadCount} loads · cancelled excluded</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{summary.loadCount} completed loads</p>
         </div>
         <div className="premium-card p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -272,7 +267,7 @@ export function ReportsView({
             <p className="text-label">Total Expenses</p>
           </div>
           <p className="text-xl font-mono font-black text-foreground whitespace-nowrap">{formatCurrency(summary.expensesTotal)}</p>
-          <p className="text-[11px] text-muted-foreground mt-1">{filteredExpenses.length} entries</p>
+          <p className="text-[11px] text-muted-foreground mt-1">{summary.fuelPolicy.expenseEntryCount} expenses · {summary.fuelPolicy.fuelLogCount} fuel logs</p>
         </div>
         <div className="premium-card p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -359,7 +354,7 @@ export function ReportsView({
           </div>
         </div>
         <p className="text-[10px] text-muted-foreground/70 mt-3 pt-3 border-t border-border/40">
-          Cancelled loads are excluded from Gross Revenue, Net Profit, RPM, and load counts.
+          Pending, en-route and cancelled loads are excluded from earnings, mileage, and completed load counts.
         </p>
       </div>
 
@@ -410,6 +405,7 @@ export function ReportsView({
                   <p className="font-bold text-sm text-foreground">{s.weekLabel}</p>
                   <div className="text-right">
                     <p className="text-lg font-mono font-black text-primary whitespace-nowrap">{formatCurrency(s.totalEstimatedPay)}</p>
+                    <p className="text-[10px] text-muted-foreground">Expected pay · completed loads</p>
                     {s.totalActualPay > 0 && (
                       <p className={`text-xs font-mono whitespace-nowrap ${s.totalActualPay >= s.totalEstimatedPay ? 'text-success' : 'text-destructive'}`}>
                         Actual: {formatCurrency(s.totalActualPay)}
@@ -427,7 +423,7 @@ export function ReportsView({
                     <p className="text-sm font-mono font-bold text-foreground mt-0.5 whitespace-nowrap">{formatNumber(s.totalLoadedMiles)}</p>
                   </div>
                   <div>
-                    <p className="text-label">Avg $/mi</p>
+                    <p className="text-label">Expected $/mi</p>
                     <p className="text-sm font-mono font-bold text-foreground mt-0.5 whitespace-nowrap">{formatCurrency(s.avgRatePerMile)}</p>
                   </div>
                 </div>
