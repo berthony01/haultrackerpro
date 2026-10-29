@@ -2,7 +2,7 @@ import { Load } from '@/hooks/useLoads';
 import type { Expense } from '@/hooks/useExpenses';
 import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
-import { onlyFinanciallyCompleted } from '@/lib/financialCalculations';
+import { onlyFinanciallyCompleted, summarizeLoads, getLoadRealizedRevenue, getLoadNetProfit, getPaymentDifference } from '@/lib/financialCalculations';
 import { getScheduleCLine, groupByScheduleC } from '@/lib/scheduleCMapping';
 import { dedupeRouteStops } from '@/lib/stopNormalization';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
@@ -298,26 +298,29 @@ export function exportToCSV(loads: Load[], filename: string, stops: LoadStop[] =
 }
 
 export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: string = 'profit-report', stops: LoadStop[] = [], companyMeta?: { companyName?: string; companyStartDate?: string }) {
-  // Cancelled loads are excluded from financial totals
-  const activeLoads = loads.filter(l => (l.status ?? 'completed') !== 'cancelled');
+  // Legacy exporter (no active callers). Totals come from the canonical
+  // engine: financially completed loads only (legacy null status included);
+  // pending, en-route and cancelled are never counted as earned.
+  const activeLoads = onlyFinanciallyCompleted(loads);
   const cancelledLoads = loads.filter(l => (l.status ?? 'completed') === 'cancelled');
 
-  const totalRevenue = activeLoads.reduce((s, l) => s + Number(l.actual_pay_received ?? getLoadExpectedPay(l) ?? 0), 0);
-  const totalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
-  const totalMiles = sumOperatingMiles(activeLoads);
-  const netProfit = totalRevenue - totalExpenses;
-  const netPerMile = totalMiles > 0 ? netProfit / totalMiles : 0;
+  const canonical = summarizeLoads(loads, expenses);
+  const totalRevenue = canonical.grossRevenue;
+  const totalExpenses = canonical.expensesTotal;
+  const netProfit = canonical.netProfit;
+  const netPerMile = canonical.netRPM;
 
   const headers = [...CSV_HEADERS_PROFIT];
   const rows = activeLoads.map(l => {
     const est = getLoadExpectedPay(l);
     const act = l.actual_pay_received != null ? Number(l.actual_pay_received) : null;
-    const linkedExp = expenses.filter(e => e.linked_load_id === l.id).reduce((s, e) => s + Number(e.amount), 0);
-    const gross = act ?? est;
-    const diff = act != null ? (act - est) : 0;
+    const linked = expenses.filter(e => e.linked_load_id === l.id);
+    const gross = getLoadRealizedRevenue(l);
+    const netLoadProfit = getLoadNetProfit(l, linked);
+    const linkedExp = gross - netLoadProfit;
+    const diff = getPaymentDifference(l) ?? 0;
     const totalMi = getLoadOperatingMiles(l);
     const effRpm = getLoadEffectiveRPM(l);
-    const netLoadProfit = gross - linkedExp;
     const netRpm = totalMi > 0 ? netLoadProfit / totalMi : 0;
     return [
       getEffectiveDate(l), l.pickup_location, l.dropoff_location,
@@ -339,7 +342,7 @@ export function exportProfitCSV(loads: Load[], expenses: Expense[], filename: st
 
   // Summary rows
   rows.push([]);
-  rows.push(['SUMMARY (cancelled loads excluded)'].map(escapeCSV));
+  rows.push(['SUMMARY (completed loads only; pending, en-route and cancelled excluded)'].map(escapeCSV));
   rows.push(['Total Gross Revenue', totalRevenue.toFixed(2)].map(escapeCSV));
   rows.push(['Total Expenses', totalExpenses.toFixed(2)].map(escapeCSV));
   rows.push(['Net Profit', netProfit.toFixed(2)].map(escapeCSV));

@@ -22,7 +22,11 @@ export interface FinancialEstimate {
   taxReserve: number;
   operatingProfit: number;
   afterTaxEstimate: number;
+  /** Gross ÷ miles, 4 decimals (half away from zero) from reconciled cents. */
   ratePerMile: number;
+  /** Operating profit (before tax reserve) ÷ miles, 4 decimals. */
+  operatingProfitPerMile: number;
+  /** After-tax estimate ÷ miles, 4 decimals. */
   profitPerMile: number;
 }
 export type FinancialEstimateResult =
@@ -46,7 +50,11 @@ function fraction(value: number): Fraction {
 const multiply = (a: Fraction, b: Fraction): Fraction => ({ n: a.n * b.n, d: a.d * b.d });
 const divide = (a: Fraction, b: Fraction): Fraction => ({ n: a.n * b.d, d: a.d * b.n });
 function cents(a: Fraction): bigint {
-  const scaled = a.n * hundred;
+  return roundTo(a, hundred);
+}
+const tenThousand = BigInt(10000);
+function roundTo(a: Fraction, factor: bigint): bigint {
+  const scaled = a.n * factor;
   const sign = scaled < zero ? -one : one;
   const absolute = scaled * sign;
   return sign * ((absolute * BigInt(2) + a.d) / (a.d * BigInt(2)));
@@ -87,12 +95,16 @@ export function estimateFinancialScenario(input: FinancialEstimateInput): Financ
   const reserve = cents(multiply({ n: gross, d: hundred }, { n: fraction(tax).n, d: fraction(tax).d * hundred }));
   const operating = gross - expenses;
   const afterTax = operating - reserve;
-  const rpm = cents(divide({ n: gross, d: hundred }, fraction(miles)));
-  const ppm = cents(divide({ n: afterTax, d: hundred }, fraction(miles)));
-  const values = [gross, nonFuel, fuelCents, otherCents, expenses, reserve, operating, afterTax, rpm, ppm];
-  if (values.some(v => v > maxCents || v < -maxCents)) {
+  // Per-mile ratios: 4 decimals from the reconciled cent totals.
+  const perMile = (c: bigint) => roundTo(divide({ n: c, d: hundred }, fraction(miles)), tenThousand);
+  const rpm = perMile(gross);
+  const opm = perMile(operating);
+  const ppm = perMile(afterTax);
+  const values = [gross, nonFuel, fuelCents, otherCents, expenses, reserve, operating, afterTax];
+  if ([...values, rpm, opm, ppm].some(v => v > maxCents || v < -maxCents)) {
     return { ok: false, errors: ['Values are too large to estimate safely. Enter smaller amounts or mileage.'] };
   }
-  const [grossRevenue, nonFuelCost, fuelCost, otherExpenses, totalExpenses, taxReserve, operatingProfit, afterTaxEstimate, ratePerMile, profitPerMile] = values.map(v => Number(v) / 100);
-  return { ok: true, estimate: { grossRevenue, nonFuelCost, fuelCost, otherExpenses, totalExpenses, taxReserve, operatingProfit, afterTaxEstimate, ratePerMile, profitPerMile } };
+  const [grossRevenue, nonFuelCost, fuelCost, otherExpenses, totalExpenses, taxReserve, operatingProfit, afterTaxEstimate] = values.map(v => Number(v) / 100);
+  const [ratePerMile, operatingProfitPerMile, profitPerMile] = [rpm, opm, ppm].map(v => Number(v) / 10000);
+  return { ok: true, estimate: { grossRevenue, nonFuelCost, fuelCost, otherExpenses, totalExpenses, taxReserve, operatingProfit, afterTaxEstimate, ratePerMile, operatingProfitPerMile, profitPerMile } };
 }

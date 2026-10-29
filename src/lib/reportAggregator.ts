@@ -8,6 +8,7 @@ import { getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadExpectedPay, getLoadOperatingMiles } from '@/lib/loadMetrics';
 import { computeTaxEstimate, type TaxEstimateResult } from '@/lib/reportTax';
 import type { DateRange } from '@/lib/reportRanges';
+import { toCents, centsToDollars, sumCents } from '@/lib/financialMoney';
 
 export type ReportType =
   | 'full_profit'
@@ -118,6 +119,8 @@ function inRange(dateStr: string, range: DateRange): boolean {
 }
 
 const num = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+/** Recorded money recognized to cents (F3-P1). */
+const money = (v: any) => centsToDollars(toCents(v));
 
 export function aggregateReport(args: {
   loads: Load[];
@@ -142,7 +145,7 @@ export function aggregateReport(args: {
   // Fuel
   const fuelTotalCost = canonicalFuelTotal;
   const fuelTotalGallons = filteredFuel.reduce((s, f) => s + num(f.gallons), 0);
-  const fuelCosts = filteredFuel.map(f => num(f.total_cost));
+  const fuelCosts = filteredFuel.map(f => money(f.total_cost));
   const fuel = {
     totalCost: fuelTotalCost,
     totalGallons: fuelTotalGallons,
@@ -185,7 +188,7 @@ export function aggregateReport(args: {
   // Export breakdown keeps fuel separate; summary.expensesTotal is inclusive.
   const actualPay = summary.actualPay;
   const expectedPay = summary.estimatedPay;
-  const differenceUnpaid = expectedPay - actualPay;
+  const differenceUnpaid = centsToDollars(toCents(expectedPay) - toCents(actualPay));
   const grossRevenue = summary.grossRevenue;
   const expensesTotal = summary.fuelPolicy.otherExpensesTotal;
   const netAfterExpenses = summary.netProfit;
@@ -206,21 +209,22 @@ export function aggregateReport(args: {
 
   // Expense stats — built from `expensesForMath` so byCategory / totals do
   // not duplicate fuel-category rows already counted via Fuel Logs.
+  // Category totals accumulate integer cents, converted once below.
   const catMap = new Map<string, { total: number; count: number }>();
   let largest = 0;
   for (const e of expensesForMath) {
-    const amt = num(e.amount);
-    if (amt > largest) largest = amt;
+    const amtCents = toCents(e.amount);
+    if (amtCents / 100 > largest) largest = amtCents / 100;
     const cur = catMap.get(e.category) ?? { total: 0, count: 0 };
-    cur.total += amt; cur.count += 1;
+    cur.total = sumCents([cur.total, amtCents]); cur.count += 1;
     catMap.set(e.category, cur);
   }
   const byCategory = [...catMap.entries()]
-    .map(([category, v]) => ({ category, total: v.total, count: v.count }))
+    .map(([category, v]) => ({ category, total: centsToDollars(v.total), count: v.count }))
     .sort((a, b) => b.total - a.total);
   const catTotal = (name: string) => catMap.get(name)?.total ?? 0;
   const knownCats = new Set(['Fuel', 'Maintenance', 'Repairs', 'Tires', 'Tolls', 'Parking']);
-  const otherTotal = byCategory.filter(c => !knownCats.has(c.category)).reduce((s, c) => s + c.total, 0);
+  const otherTotal = centsToDollars(sumCents(byCategory.filter(c => !knownCats.has(c.category)).map(c => toCents(c.total))));
   // Fuel line: prefer Fuel Logs when present, else the Fuel expense category.
   // Never sum both — that was the source of the double-count.
   const fuelStat = canonicalFuelTotal;
@@ -230,7 +234,7 @@ export function aggregateReport(args: {
     average: summary.fuelPolicy.totalEntryCount > 0 ? summary.expensesTotal / summary.fuelPolicy.totalEntryCount : 0,
     byCategory,
     fuel: fuelStat,
-    maintenance: catTotal('Maintenance') + catTotal('Repairs') + catTotal('Tires'),
+    maintenance: centsToDollars(sumCents(['Maintenance', 'Repairs', 'Tires'].map(c => toCents(catTotal(c))))),
     tolls: catTotal('Tolls'),
     parking: catTotal('Parking'),
     other: otherTotal,
@@ -254,7 +258,7 @@ export function aggregateReport(args: {
     }
     const m = (l as any).pay_model ?? 'loaded_miles_only';
     const cur = payModelMap.get(m) ?? { count: 0, gross: 0 };
-    cur.count += 1; cur.gross += pay;
+    cur.count += 1; cur.gross = centsToDollars(toCents(cur.gross) + toCents(pay));
     payModelMap.set(m, cur);
   }
   const loadStats = {
