@@ -234,9 +234,10 @@ export function aggregateReport(args: {
     average: summary.fuelPolicy.totalEntryCount > 0 ? summary.expensesTotal / summary.fuelPolicy.totalEntryCount : 0,
     byCategory,
     fuel: fuelStat,
-    maintenance: centsToDollars(sumCents(['Maintenance', 'Repairs', 'Tires'].map(c => toCents(catTotal(c))))),
-    tolls: catTotal('Tolls'),
-    parking: catTotal('Parking'),
+    // catTotal returns integer cents; convert to dollars exactly once.
+    maintenance: centsToDollars(sumCents(['Maintenance', 'Repairs', 'Tires'].map(catTotal))),
+    tolls: centsToDollars(catTotal('Tolls')),
+    parking: centsToDollars(catTotal('Parking')),
     other: otherTotal,
     // Deductible = non-fuel expenses + canonical fuel cost (single-counted).
     deductibleEstimate: summary.expensesTotal,

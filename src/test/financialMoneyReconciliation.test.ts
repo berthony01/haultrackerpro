@@ -159,3 +159,49 @@ describe('F3-P1 what-if 4-decimal per-mile from reconciled cents', () => {
     expect(r.estimate.operatingProfitPerMile).toBe(3.3333);
   });
 });
+
+describe('F3-P1 correction — expense category stats are dollars, not cents', () => {
+  const exps = [
+    expense({ id: 'm', category: 'Maintenance', amount: 100.05 }),
+    expense({ id: 'r', category: 'Repairs', amount: 23.45 }),
+    expense({ id: 't', category: 'Tires', amount: 1 }),
+    expense({ id: 'to', category: 'Tolls', amount: 7.3 }),
+    expense({ id: 'p', category: 'Parking', amount: 4.2 }),
+    expense({ id: 'dup', category: 'Fuel', amount: 300 }), // duplicate; fuel logs win
+  ];
+  const fuel = [fuelLog({ total_cost: 150.25 }), fuelLog({ id: 'g', total_cost: 49.75 })];
+  const agg = aggregateReport({ loads: [load({ estimated_pay: 1000 })], expenses: exps, fuelLogs: fuel, settings: null, range, preparedFor: 'x' });
+
+  it('maintenance/tolls/parking/fuel are exact dollars', () => {
+    expect(agg.expenseStats.maintenance).toBe(124.5);
+    expect(agg.expenseStats.tolls).toBe(7.3);
+    expect(agg.expenseStats.parking).toBe(4.2);
+    expect(agg.expenseStats.fuel).toBe(200);
+    expect(agg.expenseStats.other).toBe(0);
+  });
+  it('category totals + canonical fuel equal the canonical summary (no double count)', () => {
+    const byCat = agg.expenseStats.byCategory.reduce((s, c) => s + Math.round(c.total * 100), 0);
+    expect(agg.expenseStats.byCategory.some(c => c.category === 'Fuel')).toBe(false);
+    expect(byCat).toBe(13600);
+    expect(byCat + Math.round(agg.expenseStats.fuel * 100)).toBe(Math.round(agg.summary.expensesTotal * 100));
+    expect(agg.summary.expensesTotal).toBe(336);
+    expect(agg.expenseStats.deductibleEstimate).toBe(336);
+  });
+  it('expense PDF prints dollar values', async () => {
+    const { buildReportPdf } = await import('@/lib/reportPdf');
+    const { inflateSync } = await import('node:zlib');
+    const pdf = buildReportPdf('expense', agg);
+    const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader(); reader.onerror = reject;
+      reader.onload = () => resolve(reader.result as ArrayBuffer);
+      reader.readAsArrayBuffer(pdf);
+    });
+    const raw = Buffer.from(bytes).toString('latin1');
+    const text = [...raw.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)].map(m => {
+      try { return inflateSync(Buffer.from(m[1], 'latin1')).toString('latin1'); } catch { return m[1]; }
+    }).join('\n');
+    for (const v of ['($124.50)', '($7.30)', '($4.20)', '($200.00)', '($336.00)']) expect(text).toContain(v);
+    expect(text).not.toContain('$12,450.00');
+    expect(text).not.toContain('$730.00');
+  });
+});
