@@ -162,7 +162,11 @@ describe('F1 production page KPIs and generated exports', () => {
     state.fuel = [fuel(50), fuel(70, '2026-04-30')];
     const dash = render(createElement(DashboardView, { loads, expenses, fuelLogs: state.fuel, isAssistantView: true }));
     fireEvent.click(dash.getByRole('button', { name: /^All Time$/ }));
-    const metric = (root: HTMLElement, id: string) => Number(root.querySelector(`[data-testid="${id}"]`)?.getAttribute('data-value'));
+    const metric = (root: HTMLElement, id: string) => {
+      const value = root.querySelector(`[data-testid="${id}"]`)?.getAttribute('data-value');
+      if (value == null) throw new Error(`Missing financial metric: ${id}`);
+      return Number(value);
+    };
     const report = render(createElement(ReportsView, { loads, expenses, isPro: false, canExport: false }));
     for (const [d, r, expected] of [
       ['gross-revenue-v', 'gross-revenue', 300], ['total-expenses', 'total-expenses', 145],
