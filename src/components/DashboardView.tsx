@@ -9,7 +9,7 @@ import {
   sumOperatingMiles,
   fleetDeadheadPct,
 } from '@/lib/loadMetrics';
-import { excludeCancelled, summarizeLoads, applyFuelLogPolicy, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
+import { excludeCancelled, onlyFinanciallyCompleted, summarizeFinancialPeriod, FINANCIAL_TOOLTIPS } from '@/lib/financialCalculations';
 import { Expense } from '@/hooks/useExpenses';
 import { FuelLog } from '@/hooks/useFuelLogs';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -285,19 +285,10 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
     });
   }, [fuelLogs, activePreset, customFrom, customTo, weekStartsOn]);
 
-  // Apply the shared fuel double-count policy so Dashboard net profit /
-  // Net RPM / Cost-per-Mile match Reports & exports when both Fuel Logs and
-  // Fuel-category expenses exist.
-  const fuelPolicy = useMemo(
-    () => applyFuelLogPolicy(filteredExpenses, filteredFuelLogs),
-    [filteredExpenses, filteredFuelLogs],
-  );
-
-  // Canonical financial summary (cancelled loads automatically excluded).
-  // Feed `expensesForMath` so summarizeLoads doesn't double-count fuel.
+  // One canonical period summary, inclusive of single-counted fuel.
   const summary = useMemo(
-    () => summarizeLoads(filteredLoads, fuelPolicy.expensesForMath),
-    [filteredLoads, fuelPolicy.expensesForMath],
+    () => summarizeFinancialPeriod(filteredLoads, filteredExpenses, filteredFuelLogs),
+    [filteredLoads, filteredExpenses, filteredFuelLogs],
   );
 
 
@@ -307,7 +298,8 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
   const deadheadMiles = summary.deadheadMiles;
 
   const activeLoads = useMemo(() => excludeCancelled(filteredLoads), [filteredLoads]);
-  const paidLoads = activeLoads.filter(l => l.actual_pay_received != null);
+  const completedLoads = useMemo(() => onlyFinanciallyCompleted(filteredLoads), [filteredLoads]);
+  const paidLoads = completedLoads.filter(l => l.actual_pay_received != null);
   const missingPayCount = summary.pendingPaymentCount;
   const paidEstimated = sumExpectedPay(paidLoads);
   const knownDifference = paidLoads.length > 0 ? actual - paidEstimated : null;
@@ -327,13 +319,11 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
   // ---- Premium hero KPI metrics + week-over-week trends ----
   // Driver-facing Gross Revenue uses actual when present, else expected.
-  // Cancelled loads are excluded by summarizeLoads (above).
-  // Net Profit / Net RPM include Fuel Logs via the shared fuel double-count
-  // policy so Dashboard agrees with Reports & exports.
+  // Only completed loads earn revenue; canonical expenses already include fuel.
   const grossRevenue = summary.grossRevenue;
-  const totalExpensesAmt = fuelPolicy.combinedExpensesTotal;
-  const netProfit = grossRevenue - totalExpensesAmt;
-  const netRPM = summary.totalMiles > 0 ? netProfit / summary.totalMiles : 0;
+  const totalExpensesAmt = summary.expensesTotal;
+  const netProfit = summary.netProfit;
+  const netRPM = summary.netRPM;
 
 
   // Previous comparison range — matches the selected preset (not always last week).
@@ -396,17 +386,13 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
       return isWithinInterval(d, prevRange);
     });
   }, [fuelLogs, prevRange]);
-  const prevFuelPolicy = useMemo(
-    () => applyFuelLogPolicy(prevExpenses, prevFuelLogs),
-    [prevExpenses, prevFuelLogs],
-  );
   const prevSummary = useMemo(
-    () => summarizeLoads(prevLoads, prevFuelPolicy.expensesForMath),
-    [prevLoads, prevFuelPolicy.expensesForMath],
+    () => summarizeFinancialPeriod(prevLoads, prevExpenses, prevFuelLogs),
+    [prevLoads, prevExpenses, prevFuelLogs],
   );
   const prevGross = prevSummary.grossRevenue;
-  const prevNet = prevGross - prevFuelPolicy.combinedExpensesTotal;
-  const prevPpm = prevSummary.totalMiles > 0 ? prevNet / prevSummary.totalMiles : 0;
+  const prevNet = prevSummary.netProfit;
+  const prevPpm = prevSummary.netRPM;
   const pct = computeTrendPct;
   const trendRevenue = pct(grossRevenue, prevGross);
   const trendNet = pct(netProfit, prevNet);
@@ -466,7 +452,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
               <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-gross-revenue" data-value={grossRevenue}><PremiumKpiCard label="Gross Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} trendLabel={trendSuffix} delay={0} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.grossRevenue}</TooltipContent></Tooltip>
               <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-net-profit" data-value={netProfit}><PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} trendLabel={trendSuffix} delay={0.05} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netProfit}</TooltipContent></Tooltip>
               <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-net-rpm" data-value={netRPM}><PremiumKpiCard label="Net RPM" value={formatCurrency(netRPM)} icon={Route} trendPct={trendPpm} trendLabel={trendSuffix} delay={0.1} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netRPM}</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Loads Completed" value={summary.loadCount.toString()} icon={Truck} trendPct={trendLoads} trendLabel={trendSuffix} delay={0.15} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">Active loads in this period (cancelled excluded).{summary.cancelledCount > 0 ? ` ${summary.cancelledCount} cancelled load${summary.cancelledCount === 1 ? '' : 's'} not counted.` : ''}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Loads Completed" value={summary.loadCount.toString()} icon={Truck} trendPct={trendLoads} trendLabel={trendSuffix} delay={0.15} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">Completed loads only; pending, en-route and cancelled excluded.{summary.cancelledCount > 0 ? ` ${summary.cancelledCount} cancelled load${summary.cancelledCount === 1 ? '' : 's'} not counted.` : ''}</TooltipContent></Tooltip>
             </TooltipProvider>
           </div>
 
@@ -480,7 +466,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             <span data-testid="dashboard-loaded-miles" data-value={loadedMiles} />
             <span data-testid="dashboard-operating-miles" data-value={totalMiles} />
             <span data-testid="dashboard-loaded-rpm" data-value={loadedMiles > 0 ? grossRevenue / loadedMiles : 0} />
-            <span data-testid="dashboard-effective-rpm" data-value={totalMiles > 0 ? grossRevenue / totalMiles : 0} />
+            <span data-testid="dashboard-effective-rpm" data-value={summary.effectiveRPM} />
           </div>
 
           {(() => {
@@ -622,14 +608,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             let projectedNet: number | null = null;
             let projectedWarnings: string[] = [];
             if (profileHasUsableData(costProfile) && totalMiles > 0) {
-              const grossForProj = (() => {
-                const paid = activeLoads.filter(l => l.actual_pay_received != null);
-                if (paid.length > 0) {
-                  return paid.reduce((s, l) => s + Number(l.actual_pay_received ?? 0), 0)
-                    + sumExpectedPay(activeLoads.filter(l => l.actual_pay_received == null));
-                }
-                return estimated;
-              })();
+              const grossForProj = summary.grossRevenue;
               const { cpm, warnings } = computeCostProfileCPM(costProfile, totalMiles);
               projectedWarnings = warnings;
               // cpm already includes the per-day share (meals + lodging amortized over miles),

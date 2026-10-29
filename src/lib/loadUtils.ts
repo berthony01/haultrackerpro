@@ -2,6 +2,7 @@ import { Load } from '@/hooks/useLoads';
 import type { Expense } from '@/hooks/useExpenses';
 import type { LoadStop } from '@/hooks/useLoadStops';
 import { WeekSummary } from '@/lib/types';
+import { onlyFinanciallyCompleted } from '@/lib/financialCalculations';
 import { getScheduleCLine, groupByScheduleC } from '@/lib/scheduleCMapping';
 import { dedupeRouteStops } from '@/lib/stopNormalization';
 import { startOfWeek, endOfWeek, format, parseISO, isWithinInterval, startOfMonth, endOfMonth } from 'date-fns';
@@ -95,15 +96,15 @@ export function getPayWeekRange(date: Date, weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 
 export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 = 0): WeekSummary[] {
   const weekMap = new Map<string, Load[]>();
 
-  // Phase 23A.4: weekly financial summaries must exclude cancelled loads.
-  loads
-    .filter(load => (load.status ?? 'completed') !== 'cancelled')
+  // Expected-pay weekly financials retain their historical basis, but only
+  // completed (including legacy null-status) loads have earned that pay.
+  onlyFinanciallyCompleted(loads)
     .forEach(load => {
       const date = parseISO(getEffectiveDate(load));
       const ws = startOfWeek(date, { weekStartsOn });
       const key = ws.toISOString();
       if (!weekMap.has(key)) weekMap.set(key, []);
-      weekMap.get(key)!.push(load);
+      weekMap.get(key)?.push(load);
     });
 
 
@@ -123,7 +124,7 @@ export function getWeekSummaries(loads: Load[], weekStartsOn: 0 | 1 | 2 | 3 | 4 
       totalDeadheadMiles: weekLoads.reduce((s, l) => s + Number(l.deadhead_miles), 0),
       totalEstimatedPay,
       totalActualPay,
-      // Effective RPM uses TOTAL operating miles and respects pay_model.
+      // Expected RPM (not realized): weighted expected pay / operating miles.
       avgRatePerMile: fleetEffectiveRPM(weekLoads),
     });
   });

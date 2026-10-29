@@ -3,7 +3,7 @@ import type { Expense } from '@/hooks/useExpenses';
 import type { FuelLog } from '@/hooks/useFuelLogs';
 import type { UserSettings } from '@/hooks/useUserSettings';
 import { parseISO, isWithinInterval, endOfDay, format, startOfMonth } from 'date-fns';
-import { summarizeLoads, excludeCancelled, onlyCancelled, getLoadRealizedRevenue } from '@/lib/financialCalculations';
+import { summarizeFinancialPeriod, excludeCancelled, onlyFinanciallyCompleted, onlyCancelled, getLoadRealizedRevenue } from '@/lib/financialCalculations';
 import { getEffectiveDate } from '@/lib/loadUtils';
 import { getLoadExpectedPay, getLoadOperatingMiles } from '@/lib/loadMetrics';
 import { computeTaxEstimate, type TaxEstimateResult } from '@/lib/reportTax';
@@ -51,12 +51,13 @@ export interface ReportAggregation {
   range: DateRange;
   /** All in-range loads (active + cancelled). Kept for backward compat. */
   loads: Load[];
-  /** In-range loads with `status !== 'cancelled'`. Use for revenue/lane/broker breakdowns. */
+  /** Operational noncancelled detail rows; never use for financial totals. */
   activeLoads: Load[];
+  completedLoads: Load[];
   cancelledLoads: Load[];
   expenses: Expense[];
   fuelLogs: FuelLog[];
-  summary: ReturnType<typeof summarizeLoads>;
+  summary: ReturnType<typeof summarizeFinancialPeriod>;
   fuel: {
     totalCost: number;
     totalGallons: number;
@@ -132,24 +133,14 @@ export function aggregateReport(args: {
   const filteredExpenses = expenses.filter(e => inRange(e.expense_date, range));
   const filteredFuel = fuelLogs.filter(f => inRange(f.date, range));
 
-  // Fuel double-count policy:
-  // If at least one Fuel Log exists in the report range, Fuel Logs are the
-  // canonical fuel source. Expense rows with category === 'Fuel' are removed
-  // from all report math (net profit, expense totals, by-category, deductible)
-  // to avoid double-counting. They still exist in the raw `expenses` array
-  // for detail tables, but every aggregate number derives from
-  // `expensesForMath`.
-  const fuelLogsExist = filteredFuel.length > 0;
-  const expensesForMath = fuelLogsExist
-    ? filteredExpenses.filter(e => e.category !== 'Fuel')
-    : filteredExpenses;
-
-  const summary = summarizeLoads(filteredLoads, expensesForMath);
+  const summary = summarizeFinancialPeriod(filteredLoads, filteredExpenses, filteredFuel);
+  const { expensesForMath, fuelLogsExist, canonicalFuelTotal } = summary.fuelPolicy;
   const cancelledLoads = onlyCancelled(filteredLoads);
   const activeLoads = excludeCancelled(filteredLoads);
+  const completedLoads = onlyFinanciallyCompleted(filteredLoads);
 
   // Fuel
-  const fuelTotalCost = filteredFuel.reduce((s, f) => s + num(f.total_cost), 0);
+  const fuelTotalCost = canonicalFuelTotal;
   const fuelTotalGallons = filteredFuel.reduce((s, f) => s + num(f.gallons), 0);
   const fuelCosts = filteredFuel.map(f => num(f.total_cost));
   const fuel = {
@@ -189,17 +180,15 @@ export function aggregateReport(args: {
   const taxExpenses = syntheticFuelExpenseForTax
     ? [...expensesForMath, syntheticFuelExpenseForTax]
     : expensesForMath;
-  const tax = computeTaxEstimate(activeLoads, taxExpenses, settings);
+  const tax = computeTaxEstimate(completedLoads, taxExpenses, settings);
 
-  // Profit — `expensesTotal` here is the non-fuel total when logs exist,
-  // and `fuel.totalCost` provides the canonical fuel line.
-  const actualPay = activeLoads.reduce(
-    (s, l) => s + (l.actual_pay_received != null ? num(l.actual_pay_received) : 0), 0);
-  const expectedPay = activeLoads.reduce((s, l) => s + getLoadExpectedPay(l), 0);
+  // Export breakdown keeps fuel separate; summary.expensesTotal is inclusive.
+  const actualPay = summary.actualPay;
+  const expectedPay = summary.estimatedPay;
   const differenceUnpaid = expectedPay - actualPay;
   const grossRevenue = summary.grossRevenue;
-  const expensesTotal = summary.expensesTotal;
-  const netAfterExpenses = grossRevenue - expensesTotal - fuel.totalCost;
+  const expensesTotal = summary.fuelPolicy.otherExpensesTotal;
+  const netAfterExpenses = summary.netProfit;
   const netAfterTax = netAfterExpenses - tax.totalTax;
   const profit = {
     grossRevenue,
@@ -210,9 +199,9 @@ export function aggregateReport(args: {
     estimatedTaxReserve: tax.totalTax,
     netAfterExpenses,
     netAfterTax,
-    profitPerMile: summary.totalMiles > 0 ? netAfterExpenses / summary.totalMiles : 0,
+    profitPerMile: summary.netRPM,
     avgPayPerLoad: summary.loadCount > 0 ? grossRevenue / summary.loadCount : 0,
-    avgRatePerMile: summary.totalMiles > 0 ? grossRevenue / summary.totalMiles : 0,
+    avgRatePerMile: summary.effectiveRPM,
   };
 
   // Expense stats — built from `expensesForMath` so byCategory / totals do
@@ -234,11 +223,11 @@ export function aggregateReport(args: {
   const otherTotal = byCategory.filter(c => !knownCats.has(c.category)).reduce((s, c) => s + c.total, 0);
   // Fuel line: prefer Fuel Logs when present, else the Fuel expense category.
   // Never sum both — that was the source of the double-count.
-  const fuelStat = fuelLogsExist ? fuel.totalCost : catTotal('Fuel');
+  const fuelStat = canonicalFuelTotal;
   const expenseStats = {
-    totalEntries: expensesForMath.length,
-    largest,
-    average: expensesForMath.length > 0 ? expensesTotal / expensesForMath.length : 0,
+    totalEntries: summary.fuelPolicy.totalEntryCount,
+    largest: Math.max(largest, ...fuelCosts, 0),
+    average: summary.fuelPolicy.totalEntryCount > 0 ? summary.expensesTotal / summary.fuelPolicy.totalEntryCount : 0,
     byCategory,
     fuel: fuelStat,
     maintenance: catTotal('Maintenance') + catTotal('Repairs') + catTotal('Tires'),
@@ -246,7 +235,7 @@ export function aggregateReport(args: {
     parking: catTotal('Parking'),
     other: otherTotal,
     // Deductible = non-fuel expenses + canonical fuel cost (single-counted).
-    deductibleEstimate: expensesTotal + fuel.totalCost,
+    deductibleEstimate: summary.expensesTotal,
   };
 
 
@@ -254,8 +243,8 @@ export function aggregateReport(args: {
   let bestPaying: { label: string; amount: number } | null = null;
   let bestMileage: { label: string; miles: number } | null = null;
   const payModelMap = new Map<string, { count: number; gross: number }>();
-  for (const l of activeLoads) {
-    const pay = getLoadExpectedPay(l);
+  for (const l of completedLoads) {
+    const pay = getLoadRealizedRevenue(l);
     if (!bestPaying || pay > bestPaying.amount) {
       bestPaying = { label: `${l.pickup_location} → ${l.dropoff_location}`, amount: pay };
     }
@@ -269,7 +258,7 @@ export function aggregateReport(args: {
     payModelMap.set(m, cur);
   }
   const loadStats = {
-    completed: activeLoads.length,
+    completed: completedLoads.length,
     cancelled: cancelledLoads.length,
     bestPaying,
     bestMileage,
@@ -282,7 +271,7 @@ export function aggregateReport(args: {
 
   // Monthly breakdown (year-end)
   const monthMap = new Map<string, MonthlyBucket>();
-  for (const l of activeLoads) {
+  for (const l of completedLoads) {
     const key = format(startOfMonth(parseISO(getEffectiveDate(l))), 'yyyy-MM');
     const cur = monthMap.get(key) ?? { month: key, gross: 0, expenses: 0, fuel: 0, net: 0, loads: 0 };
     cur.gross += getLoadRealizedRevenue(l);
@@ -302,7 +291,19 @@ export function aggregateReport(args: {
     monthMap.set(key, cur);
   }
   const monthly = [...monthMap.values()]
-    .map(b => ({ ...b, net: b.gross - b.expenses - b.fuel }))
+    .map(b => {
+      const monthOf = (date: string) => format(startOfMonth(parseISO(date)), 'yyyy-MM');
+      // Reuse the period's eligible expense rows so the selected-range fuel
+      // policy also holds across months (no excluded Fuel row reintroduced).
+      const period = summarizeFinancialPeriod(
+        completedLoads.filter(l => monthOf(getEffectiveDate(l)) === b.month),
+        expensesForMath.filter(e => monthOf(e.expense_date) === b.month),
+        filteredFuel.filter(f => monthOf(f.date) === b.month),
+      );
+      return { ...b, gross: period.grossRevenue, loads: period.loadCount,
+        expenses: period.fuelPolicy.otherExpensesTotal,
+        fuel: period.fuelPolicy.canonicalFuelTotal, net: period.netProfit };
+    })
     .sort((a, b) => a.month.localeCompare(b.month));
 
   const isEmpty =
@@ -312,6 +313,7 @@ export function aggregateReport(args: {
     range,
     loads: filteredLoads,
     activeLoads,
+    completedLoads,
     cancelledLoads,
     expenses: filteredExpenses,
     fuelLogs: filteredFuel,
