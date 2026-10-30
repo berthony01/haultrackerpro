@@ -4925,6 +4925,150 @@ export type Database = {
           },
         ]
       }
+      telegram_dispatch_review_outbox: {
+        Row: {
+          attempt_count: number
+          claim_token: string | null
+          completed_at: string | null
+          created_at: string
+          delivery_state: string
+          id: string
+          last_failure_code: string | null
+          lease_expires_at: string | null
+          max_attempts: number
+          next_attempt_at: string
+          proposal_id: string
+          telegram_message_id: number | null
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          claim_token?: string | null
+          completed_at?: string | null
+          created_at?: string
+          delivery_state?: string
+          id?: string
+          last_failure_code?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          proposal_id: string
+          telegram_message_id?: number | null
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          claim_token?: string | null
+          completed_at?: string | null
+          created_at?: string
+          delivery_state?: string
+          id?: string
+          last_failure_code?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          next_attempt_at?: string
+          proposal_id?: string
+          telegram_message_id?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_dispatch_review_outbox_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: true
+            referencedRelation: "telegram_dispatch_review_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      telegram_dispatch_review_proposals: {
+        Row: {
+          binding_id: string
+          created_at: string
+          decided_at: string | null
+          decision_update_id: number | null
+          expected_previous_status: string
+          expires_at: string
+          id: string
+          load_id: string
+          load_reference: string
+          proposal_key: string
+          proposed_status: string
+          recruiter_id: string
+          relationship_id: string
+          reviewer_telegram_user_id: number | null
+          reviewer_user_id: string | null
+          source_payload_hash: string
+          source_update_id: number
+          status: string
+          telegram_chat_id: number
+        }
+        Insert: {
+          binding_id: string
+          created_at?: string
+          decided_at?: string | null
+          decision_update_id?: number | null
+          expected_previous_status: string
+          expires_at?: string
+          id?: string
+          load_id: string
+          load_reference: string
+          proposal_key: string
+          proposed_status: string
+          recruiter_id: string
+          relationship_id: string
+          reviewer_telegram_user_id?: number | null
+          reviewer_user_id?: string | null
+          source_payload_hash: string
+          source_update_id: number
+          status?: string
+          telegram_chat_id: number
+        }
+        Update: {
+          binding_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decision_update_id?: number | null
+          expected_previous_status?: string
+          expires_at?: string
+          id?: string
+          load_id?: string
+          load_reference?: string
+          proposal_key?: string
+          proposed_status?: string
+          recruiter_id?: string
+          relationship_id?: string
+          reviewer_telegram_user_id?: number | null
+          reviewer_user_id?: string | null
+          source_payload_hash?: string
+          source_update_id?: number
+          status?: string
+          telegram_chat_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_dispatch_review_proposals_binding_id_fkey"
+            columns: ["binding_id"]
+            isOneToOne: false
+            referencedRelation: "telegram_chat_bindings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_dispatch_review_proposals_load_id_fkey"
+            columns: ["load_id"]
+            isOneToOne: false
+            referencedRelation: "loads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "telegram_dispatch_review_proposals_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_driver_relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       telegram_link_tokens: {
         Row: {
           consumed_at: string | null
@@ -8163,6 +8307,10 @@ export type Database = {
           result_code: string
         }[]
       }
+      telegram_ack_dispatch_review_delivery: {
+        Args: { _claim_token: string; _message_id: number; _outbox_id: string }
+        Returns: boolean
+      }
       telegram_advance_poll_cursor: {
         Args: { _last_update_id: number; _lease_token: string }
         Returns: number
@@ -8205,6 +8353,18 @@ export type Database = {
         Returns: {
           delivery_id: string
           message_body: string
+          telegram_chat_id: number
+        }[]
+      }
+      telegram_claim_dispatch_review_delivery: {
+        Args: never
+        Returns: {
+          claim_token: string
+          expires_at: string
+          load_reference: string
+          outbox_id: string
+          proposal_id: string
+          proposed_status: string
           telegram_chat_id: number
         }[]
       }
@@ -8350,6 +8510,14 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      telegram_fail_dispatch_review_delivery: {
+        Args: {
+          _claim_token: string
+          _failure_code: string
+          _outbox_id: string
+        }
+        Returns: boolean
+      }
       telegram_mark_conversation_alert_failed: {
         Args: { _alert_id: string; _error_code: string }
         Returns: string
@@ -8414,6 +8582,40 @@ export type Database = {
           _telegram_chat_id: number
           _telegram_user_id: number
           _text: string
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+        }[]
+      }
+      telegram_process_dispatch_group_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _proposed_status: string
+          _reference: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          expires_at: string
+          is_new: boolean
+          proposal_id: string
+          result_code: string
+        }[]
+      }
+      telegram_process_dispatch_review_action: {
+        Args: {
+          _action: string
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _proposal_id: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
           _update_id: number
         }
         Returns: {
