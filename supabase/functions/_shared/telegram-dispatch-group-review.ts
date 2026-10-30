@@ -284,7 +284,7 @@ export async function processDispatchDelivery(
   } catch {
     result = { ok: false, code: "unknown" };
   }
-  if (!result.ok) return await ledger.fail(claim.outboxId, claim.claimToken, result.code) ? "retry" : "lease_lost";
+  if (result.ok === false) return await ledger.fail(claim.outboxId, claim.claimToken, result.code) ? "retry" : "lease_lost";
   if (!Number.isSafeInteger(result.messageId) || result.messageId <= 0) {
     return await ledger.fail(claim.outboxId, claim.claimToken, "unknown") ? "retry" : "lease_lost";
   }

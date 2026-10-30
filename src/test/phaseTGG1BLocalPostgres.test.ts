@@ -110,4 +110,17 @@ describe('TG-G1B real disposable PostgreSQL transactions',()=>{
  it.each(['anon','authenticated'])('%s cannot invoke delivery or read queue',async(role)=>{await proposal();await expect(rpc('SELECT * FROM telegram_claim_dispatch_review_delivery()',[],role)).rejects.toMatchObject({code:'42501'});await expect(rpc('SELECT * FROM telegram_dispatch_review_outbox',[],role)).rejects.toMatchObject({code:'42501'});await expect(rpc('SELECT * FROM telegram_dispatch_review_proposals',[],role)).rejects.toMatchObject({code:'42501'});});
  it('canonical event failure rolls back load, decision, receipt; retry succeeds',async()=>{const id=await proposal();await q(`CREATE FUNCTION local_reject_event() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'local event failure'; END $$; CREATE TRIGGER local_event_failure BEFORE INSERT ON load_events FOR EACH ROW EXECUTE FUNCTION local_reject_event();`);try{await expect(review(id)).rejects.toThrow('local event failure');expect((await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status).toBe('en_route');expect(await counts()).toEqual({p:1,o:1,r:1,e:0});}finally{await q('DROP TRIGGER local_event_failure ON load_events; DROP FUNCTION local_reject_event()');}expect((await review(id))[0].result_code).toBe('dispatch_review_accepted');});
  it('explicit multi-session transaction rollback leaves no proposal/receipt/outbox',async()=>{const c=await pool.connect();try{await c.query('BEGIN');await c.query('SET LOCAL ROLE service_role');await c.query("SELECT * FROM telegram_process_dispatch_group_update($1,10,$2,900,-100,'group','AB-123','completed')",[LEASE,hash(10)]);expect(await counts()).toEqual({p:0,o:0,r:0,e:0});await c.query('ROLLBACK');expect(await counts()).toEqual({p:0,o:0,r:0,e:0});}finally{c.release();}});
+ it('outbox insert failure rolls back proposal and receipt together',async()=>{await q(`CREATE FUNCTION local_reject_outbox() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'local outbox failure'; END $$; CREATE TRIGGER local_outbox_failure BEFORE INSERT ON telegram_dispatch_review_outbox FOR EACH ROW EXECUTE FUNCTION local_reject_outbox();`);try{await expect(intake()).rejects.toThrow('local outbox failure');expect(await counts()).toEqual({p:0,o:0,r:0,e:0});}finally{await q('DROP TRIGGER local_outbox_failure ON telegram_dispatch_review_outbox; DROP FUNCTION local_reject_outbox()');}});
+ it('uncommitted reviewer revocation wins before waiting approval',async()=>{
+   const id=await proposal(); const c=await pool.connect();
+   try {
+     await c.query('BEGIN'); await c.query("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501");
+     let settled=false; const approval=review(id).finally(()=>{settled=true;});
+     // Wait for a REAL lock wait, not merely Promise scheduling/timing.
+     for(let n=0;n<100;n++) { if((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_process_dispatch_review_action%'"))[0].n>0) break; await new Promise(r=>setTimeout(r,10)); }
+     expect((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_process_dispatch_review_action%'"))[0].n).toBeGreaterThan(0);
+     expect(settled).toBe(false); await c.query('COMMIT');
+     expect((await approval)[0].result_code).toBe('dispatch_review_denied'); expect((await counts()).e).toBe(0);
+   } finally { await c.query('ROLLBACK');c.release(); }
+ });
 });
