@@ -13,6 +13,27 @@
 //   * no raw update JSON, message text, or link token is ever logged or
 //     returned.
 
+// TG-G1C. Dispatch-group review wiring. Every branch below is gated by the
+// compile-time `TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false`; with it off the
+// classification, RPCs, sends, receipts and cursor are unchanged.
+import {
+  DISPATCH_REVIEW_ACTION_RESULT_CODES,
+  DISPATCH_REVIEW_ANSWERS,
+  TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
+  isDispatchReviewCallbackData,
+  parseDispatchReviewData,
+  processDispatchDelivery,
+  type DispatchDeliveryFailure,
+  type DispatchDeliveryLedger,
+  type DispatchIntakeResultCode,
+  type DispatchReviewAction,
+  type DispatchReviewActionResultCode,
+} from "./telegram-dispatch-group-review.ts";
+import {
+  parseDispatchMessageCandidate,
+  type DispatchTargetStatus,
+} from "./telegram-dispatch-group-proposals.ts";
+
 export type TelegramIgnoredResultCode =
   | "non_private_message"
   | "non_start_message"
@@ -195,7 +216,15 @@ export type TelegramResultCode =
   | TelegramMenuResultCode
   | TelegramConversationActionResultCode
   | TelegramConversationReplyResultCode
-  | TelegramQuickPostResultCode;
+  | TelegramQuickPostResultCode
+  | DispatchIntakeResultCode
+  | DispatchReviewActionResultCode;
+
+function isDispatchReviewActionResultCode(
+  code: TelegramResultCode,
+): code is DispatchReviewActionResultCode {
+  return (DISPATCH_REVIEW_ACTION_RESULT_CODES as readonly string[]).includes(code);
+}
 
 export interface TelegramPollLease {
   leaseToken: string;
@@ -366,6 +395,30 @@ export interface TelegramPollLedger {
     action: TelegramQuickPostAction | null;
     draftId: string | null;
   }): Promise<TelegramTerminalResult>;
+  /** TG-G1C (gated). `telegram_process_dispatch_group_update`: terminal
+   *  receipt + proposal + outbox in ONE transaction; never changes a load.
+   *  Absent = fail CLOSED (no receipt, no cursor advance). */
+  processDispatchGroupUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    reference: string | null;
+    proposedStatus: DispatchTargetStatus | null;
+  }): Promise<TelegramTerminalResult>;
+  /** TG-G1C (gated). `telegram_process_dispatch_review_action`. */
+  processDispatchReviewActionUpdate?(input: {
+    leaseToken: string;
+    updateId: number;
+    payloadHash: string;
+    telegramUserId: number;
+    telegramChatId: number;
+    chatType: string;
+    action: DispatchReviewAction | null;
+    proposalId: string | null;
+  }): Promise<TelegramTerminalResult>;
 }
 
 /** RB-3A. The canonical extractor, reached through the ai-insight delegated
@@ -453,6 +506,10 @@ export interface TelegramPollDeps {
   /** RB-3A. Absent = Quick Post extraction is unavailable and a reserved draft
    *  is marked failed rather than retried, so no model call is ever implied. */
   quickPostExtractor?: TelegramQuickPostExtractor;
+  /** TG-G1C. Synthetic-test injection ONLY. The Edge Function never sets it,
+   *  so the compile-time `TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false` applies.
+   *  Not an environment/runtime toggle. */
+  dispatchReviewEnabled?: boolean;
 }
 
 export type TelegramPollRunResult =
@@ -717,11 +774,24 @@ export type TelegramClassification =
       draftId: string | null;
       chatType: string;
     }
-  | { kind: "quick_post_source"; text: string };
+  | { kind: "quick_post_source"; text: string }
+  // TG-G1C. Produced ONLY when the dispatch-review gate is explicitly on.
+  | { kind: "dispatch_group_message"; text: string; chatType: string }
+  | {
+      kind: "dispatch_review_action";
+      action: DispatchReviewAction | null;
+      proposalId: string | null;
+      chatType: string;
+    };
 
 /** Pure classification. Exported so the contract can be tested directly
- *  without a gateway or a database. */
-export function classifyUpdate(identity: ParsedIdentity): TelegramClassification {
+ *  without a gateway or a database. `dispatchReviewEnabled` defaults to the
+ *  compile-time `false` gate; with it off the output is bit-for-bit the
+ *  pre-TG-G1C classification. */
+export function classifyUpdate(
+  identity: ParsedIdentity,
+  dispatchReviewEnabled: boolean = TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
+): TelegramClassification {
   if (identity.telegramUserId === null || identity.telegramChatId === null) {
     return { kind: "ignored", resultCode: "invalid_update_shape" };
   }
@@ -740,6 +810,18 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
         kind: "quick_post_action",
         action: quick?.action ?? null,
         draftId: quick?.draftId ?? null,
+        chatType: identity.chatType ?? "",
+      };
+    }
+    // TG-G1C (gated). `g1:` is disjoint from `c1:`/`q1:`; checked BEFORE the
+    // c1 fallback. A malformed g1 payload stays in the dispatch processor,
+    // which records the fail-closed outcome.
+    if (dispatchReviewEnabled === true && isDispatchReviewCallbackData(identity.callbackData)) {
+      const review = parseDispatchReviewData(identity.callbackData);
+      return {
+        kind: "dispatch_review_action",
+        action: review?.action ?? null,
+        proposalId: review?.proposalId ?? null,
         chatType: identity.chatType ?? "",
       };
     }
@@ -765,6 +847,17 @@ export function classifyUpdate(identity: ParsedIdentity): TelegramClassification
     if (bindMatch) {
       return { kind: "bind", rawToken: bindMatch[1], chatType: identity.chatType };
     }
+  }
+  // TG-G1C (gated, default OFF). Strictly AFTER the exact `/bind` branch and
+  // BEFORE the `non_private_message` fallback. Slash commands keep their
+  // existing outcome. Sender/chat come from the transport fields only.
+  if (
+    dispatchReviewEnabled === true &&
+    identity.text !== null &&
+    !identity.text.startsWith("/") &&
+    (identity.chatType === "group" || identity.chatType === "supergroup")
+  ) {
+    return { kind: "dispatch_group_message", text: identity.text, chatType: identity.chatType };
   }
   if (identity.chatType !== "private") {
     return { kind: "ignored", resultCode: "non_private_message" };
@@ -851,6 +944,10 @@ export async function runTelegramPoll(
 ): Promise<TelegramPollRunResult> {
   const { ledger, gateway, sha256 } = deps;
   const log: TelegramPollLogger = deps.log ?? (() => {});
+  // TG-G1C. Production never sets this field, so the compile-time `false`
+  // constant governs. Only synthetic tests inject `true`.
+  const dispatchReviewEnabled =
+    (deps.dispatchReviewEnabled ?? TGG1B_DISPATCH_GROUP_REVIEW_ENABLED) === true;
 
   const lease = await ledger.claimLease();
   if (!lease) {
@@ -905,7 +1002,7 @@ export async function runTelegramPoll(
     }
 
     const identity = parseIdentity(update, updateId);
-    const classification = classifyUpdate(identity);
+    const classification = classifyUpdate(identity, dispatchReviewEnabled);
 
     let terminal: TelegramTerminalResult;
     try {
@@ -1046,6 +1143,48 @@ export async function runTelegramPoll(
             : Promise.reject(
                 new Error("telegram_quick_post_action_processor_unavailable"),
               ))
+        // TG-G1C (gated). Group dispatch intake: the database writes the
+        // terminal receipt plus proposal + outbox atomically and NEVER changes
+        // a load. Nothing is sent here; only the outbox drain delivers reviews.
+        // Fail CLOSED when the processor is unavailable.
+        : classification.kind === "dispatch_group_message"
+        ? await (ledger.processDispatchGroupUpdate
+            ? (() => {
+                const candidate = parseDispatchMessageCandidate({
+                  chatType: classification.chatType,
+                  telegramChatId: identity.telegramChatId as number,
+                  updateId,
+                  text: classification.text,
+                });
+                const proposed = candidate.kind === "proposed" ? candidate : null;
+                return ledger.processDispatchGroupUpdate({
+                  leaseToken: lease.leaseToken,
+                  updateId,
+                  payloadHash,
+                  telegramUserId: identity.telegramUserId as number,
+                  telegramChatId: identity.telegramChatId as number,
+                  chatType: classification.chatType,
+                  reference: proposed?.reference ?? null,
+                  proposedStatus: proposed?.event ?? null,
+                });
+              })()
+            : Promise.reject(new Error("telegram_dispatch_group_processor_unavailable")))
+        // TG-G1C (gated). g1 review tap: reviewer = callback_query.from.id; the
+        // payload is an untrusted locator. Permission, binding, relationship
+        // and load status are re-checked in ONE database transaction.
+        : classification.kind === "dispatch_review_action"
+        ? await (ledger.processDispatchReviewActionUpdate
+            ? ledger.processDispatchReviewActionUpdate({
+                leaseToken: lease.leaseToken,
+                updateId,
+                payloadHash,
+                telegramUserId: identity.telegramUserId as number,
+                telegramChatId: identity.telegramChatId as number,
+                chatType: classification.chatType,
+                action: classification.action,
+                proposalId: classification.proposalId,
+              })
+            : Promise.reject(new Error("telegram_dispatch_review_processor_unavailable")))
         : await ledger.recordIgnoredUpdate({
             leaseToken: lease.leaseToken,
             updateId,
@@ -1180,6 +1319,11 @@ export async function runTelegramPoll(
             // every RB-2B answer is unchanged.
             text: isQuickPostResultCode(terminal.resultCode)
               ? TELEGRAM_QUICK_POST_ANSWERS[terminal.resultCode]
+              // TG-G1C. Only reachable when the gated g1 branch produced the
+              // terminal; every RB-2B answer is unchanged.
+              : classification.kind === "dispatch_review_action" &&
+                  isDispatchReviewActionResultCode(terminal.resultCode)
+              ? DISPATCH_REVIEW_ANSWERS[terminal.resultCode]
               : composeConversationActionAnswer(terminal.resultCode),
           });
           if (!answered.ok) {
