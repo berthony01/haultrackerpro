@@ -71,6 +71,35 @@ export interface ParsedLoadData {
   mileage_warning?: string;
   /** Best-guess pay model based on which fields were detected. UI may override. */
   pay_model_suggestion?: ParsedPayModelSuggestion;
+  /** Explicitly labelled load/trip reference (TRIP#, TRIP ID, LOAD#, REF#...), normalized uppercase. */
+  load_reference?: string;
+  /** Review-only structured stop blocks (LIVE LOAD / UNLOAD / PICKUP / DELIVERY). Not persisted. */
+  stop_details?: ParsedStopDetail[];
+  /** Conditional penalties/deductions found in the text. NEVER revenue or expense. */
+  conditional_penalties?: ParsedConditionalPenalty[];
+  /** Non-financial requirements, e.g. "NEED EMPTY TRAILER". */
+  requirements?: string[];
+  /** Human-readable review warnings (ambiguity, unsafe money, etc.). */
+  review_warnings?: string[];
+}
+
+export interface ParsedStopDetail {
+  kind: 'pickup' | 'drop';
+  /** Source label as written, e.g. "LIVE LOAD". */
+  label: string;
+  facility?: string;
+  street?: string;
+  city: string;
+  state: string;
+  zip: string;
+  appointment_date?: string;
+  window_start?: string;
+  window_end?: string;
+}
+
+export interface ParsedConditionalPenalty {
+  label: string;
+  amount: string;
 }
 
 /** Strip $ and commas from a number string */
@@ -312,6 +341,127 @@ function pickLoaded(matches: MileageMatch[], deadheadValue?: string): string | u
   return sorted[0].value;
 }
 
+
+/* ---------------------------------------------------------------------------
+ * Paste repair: load reference, block stops, conditional penalties.
+ * All conservative / fail-closed. Nothing here ever fills money fields.
+ * ------------------------------------------------------------------------- */
+function stripLead(line: string): string {
+  return line.replace(/^[^\p{L}\p{N}$]+/u, '').trim();
+}
+
+const REF_LINE_RE =
+  /^(?:trip|load|ref(?:erence)?|order|pro|confirmation|conf)\s*(?:#|no\.?|num(?:ber)?|id)\s*[:=]?\s*([A-Za-z0-9][A-Za-z0-9-]{2,39})(?=\s|$)/i;
+
+function extractLoadReference(lines: string[], warnings: string[]): string | undefined {
+  const found: string[] = [];
+  for (const raw of lines) {
+    const line = stripLead(raw);
+    const m = line.match(REF_LINE_RE);
+    if (!m) continue;
+    const tok = m[1].toUpperCase();
+    if (!/\d/.test(tok)) continue;
+    if (/^\d{1,2}-\d{1,2}(-\d{2,4})?$/.test(tok) || /^\d{4}-\d{2}-\d{2}$/.test(tok)) continue;
+    if (!found.includes(tok)) found.push(tok);
+  }
+  if (found.length === 1) return found[0];
+  if (found.length > 1) warnings.push(`Multiple load references found (${found.join(', ')}). Enter the correct one manually.`);
+  return undefined;
+}
+
+const PENALTY_KW_RE = /\b(late|no\s+update|no\s+(?:pu|del|pickup|delivery)|photos?|fines?|penalt(?:y|ies)|deduct(?:ion)?s?|charge\s*backs?|chargebacks?|missed)\b/i;
+const MONEY_IN_LINE_RE = /\$\s*([\d,]+(?:\.\d{1,2})?)/;
+
+function isPenaltyLine(raw: string): boolean {
+  const line = stripLead(raw);
+  return MONEY_IN_LINE_RE.test(line) && PENALTY_KW_RE.test(line);
+}
+
+function extractPenalties(lines: string[]): ParsedConditionalPenalty[] {
+  const out: ParsedConditionalPenalty[] = [];
+  for (const raw of lines) {
+    if (!isPenaltyLine(raw)) continue;
+    const line = stripLead(raw);
+    const m = line.match(MONEY_IN_LINE_RE)!;
+    const label = line.slice(0, m.index).replace(/[:=\-–\s]+$/, '').trim() || line;
+    out.push({ label, amount: cleanNum(m[1]) });
+  }
+  return out;
+}
+
+const REQUIREMENT_RE = /^(?:need|needs|must|required|requires|require)\b[^$]*$/i;
+
+function extractRequirements(lines: string[]): string[] {
+  const out: string[] = [];
+  for (const raw of lines) {
+    const line = stripLead(raw);
+    if (!REQUIREMENT_RE.test(line)) continue;
+    if (!out.some(r => r.toLowerCase() === line.toLowerCase())) out.push(line);
+  }
+  return out;
+}
+
+const BLOCK_LABEL_RE =
+  /^(live\s*load|live\s*unload|unload|pick\s*up|pickup|delivery|drop\s*off|dropoff|drop|shipper|consignee|receiver)(?:\s*#?\s*\d+)?\s*:\s*(.*)$/i;
+// City, ST 12345 — state must be literal uppercase two letters.
+const CITY_ST_ZIP_RE = /^([A-Za-z][A-Za-z .'-]*?),?\s+([A-Z]{2})\s+(\d{5})(?:-\d{4})?$/;
+const WINDOW_RE = /^(\d{1,2}\/\d{1,2}\/\d{4})(?:\s+(\d{1,2}:\d{2})(?:\s*[-–—]\s*(\d{1,2}:\d{2}))?)?$/;
+
+function blockKind(label: string): 'pickup' | 'drop' {
+  const l = label.toLowerCase().replace(/\s+/g, ' ');
+  return l === 'live load' || l === 'pick up' || l === 'pickup' || l === 'shipper' ? 'pickup' : 'drop';
+}
+
+function extractStopBlocks(lines: string[], warnings: string[]): ParsedStopDetail[] {
+  const out: ParsedStopDetail[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const head = stripLead(lines[i]);
+    const m = head.match(BLOCK_LABEL_RE);
+    if (!m) continue;
+    const label = m[1].toUpperCase().replace(/\s+/g, ' ');
+    const facilityRaw = m[2].trim();
+    // Value on the label line must not be money / a bare number.
+    if (/^\$|^[\d,.]+$/.test(facilityRaw)) continue;
+    const street: string[] = [];
+    let city: RegExpMatchArray | null = null;
+    let j = i + 1;
+    for (; j < lines.length && j <= i + 4; j++) {
+      const l = lines[j].trim();
+      if (!l || stripLead(l).match(BLOCK_LABEL_RE)) break;
+      const cm = l.match(CITY_ST_ZIP_RE);
+      if (cm) { city = cm; break; }
+      street.push(l);
+    }
+    if (!city) {
+      // A bare "Pickup: Dallas, TX" single-line form is handled elsewhere;
+      // only warn when this clearly looked like a multi-line block.
+      if (street.length > 0) warnings.push(`${label} block has no "City, ST ZIP" line — left blank, please review.`);
+      continue;
+    }
+    const detail: ParsedStopDetail = {
+      kind: blockKind(label),
+      label,
+      ...(facilityRaw ? { facility: facilityRaw } : {}),
+      ...(street.length ? { street: street.join(', ') } : {}),
+      city: city[1].trim(),
+      state: city[2],
+      zip: city[3],
+    };
+    const next = (lines[j + 1] ?? '').trim();
+    const wm = next.match(WINDOW_RE);
+    if (wm) {
+      const d = tryParseDate(wm[1]);
+      if (d && isValidISODate(d)) detail.appointment_date = d;
+      if (wm[2]) detail.window_start = wm[2];
+      if (wm[3]) detail.window_end = wm[3];
+      j++;
+    }
+    out.push(detail);
+    i = j;
+  }
+  return out;
+}
+
 export function parseLoadText(text: string): ParsedLoadData {
   const result: ParsedLoadData = {};
   if (!text || !text.trim()) return result;
@@ -324,6 +474,25 @@ export function parseLoadText(text: string): ParsedLoadData {
   const tripIdMatch = t.match(/trip\s*id\s*[:=]?\s*([A-Z0-9][A-Z0-9\-]{2,})/i);
   if (tripIdMatch) result.trip_id = tripIdMatch[1].trim();
 
+  const allLines = t.split('\n');
+  const warnings: string[] = [];
+
+  // --- Load reference (explicit label only) ---
+  const ref = extractLoadReference(allLines, warnings);
+  if (ref) result.load_reference = ref;
+  else if (result.trip_id && !warnings.length) result.load_reference = result.trip_id.toUpperCase();
+
+  // --- Conditional penalties & requirements (review-only, never money) ---
+  const penalties = extractPenalties(allLines);
+  if (penalties.length) {
+    result.conditional_penalties = penalties;
+    for (const p of penalties) warnings.push(`Conditional penalty (not revenue): ${p.label} $${p.amount}`);
+  }
+  const reqs = extractRequirements(allLines);
+  if (reqs.length) result.requirements = reqs;
+  // Money fields are scanned WITHOUT penalty lines so fines can never become pay.
+  const moneyText = allLines.filter(l => !isPenaltyLine(l)).join('\n');
+
   // --- Locations ---
   // "from X to Y" pattern
   let m = t.match(/from\s+(.+?)\s+to\s+(.+?)(?:\n|,\s*\d|$)/i);
@@ -332,14 +501,46 @@ export function parseLoadText(text: string): ParsedLoadData {
     result.dropoff_location = m[2].replace(/,\s*$/, '').trim();
   }
 
+  // --- Multi-line facility blocks (LIVE LOAD / UNLOAD / PICKUP / DELIVERY) ---
+  const blocks = extractStopBlocks(allLines, warnings);
+  let blocksUsable = false;
+  if (blocks.length >= 2) {
+    if (blocks[0].kind === 'pickup' && blocks[blocks.length - 1].kind === 'drop') {
+      blocksUsable = true;
+      result.stop_details = blocks;
+      if (!result.pickup_location && !result.dropoff_location) {
+        result.pickup_location = `${blocks[0].city}, ${blocks[0].state}`;
+        result.dropoff_location = `${blocks[blocks.length - 1].city}, ${blocks[blocks.length - 1].state}`;
+      }
+    } else {
+      warnings.push('Stop order is unclear (route does not start with a pickup and end with a delivery). Locations left blank — please enter them.');
+    }
+  } else if (blocks.length === 1) {
+    result.stop_details = blocks;
+    warnings.push('Only one pickup/delivery block was recognized. Please confirm both locations.');
+  }
+
   // "Origin: X" / "Dest: Y" or "PU: X" / "DEL: Y" or "Pickup: X" / "Dropoff: Y"
+  // Values that are money or follow a penalty word (e.g. "Late PU: $1000") are rejected.
+  const pickLabelled = (re: RegExp): string | undefined => {
+    if (blocksUsable || blocks.length > 0) return undefined;
+    for (const raw of allLines) {
+      if (isPenaltyLine(raw)) continue;
+      const lm = raw.match(re);
+      if (!lm) continue;
+      const v = lm[1].replace(/,\s*$/, '').trim();
+      if (!v || /^\$/.test(v) || /^[\d,.]+$/.test(v)) continue;
+      return v;
+    }
+    return undefined;
+  };
   if (!result.pickup_location) {
-    m = t.match(/(?:origin|pu|pick\s*up|pickup)\s*[:=]\s*(.+)/i);
-    if (m) result.pickup_location = m[1].split(/\n/)[0].replace(/,\s*$/, '').trim();
+    const v = pickLabelled(/(?:origin|pu|pick\s*up|pickup)\s*[:=]\s*(.+)/i);
+    if (v) result.pickup_location = v;
   }
   if (!result.dropoff_location) {
-    m = t.match(/(?:dest(?:ination)?|del(?:ivery)?|drop\s*off|dropoff|consignee)\s*[:=]\s*(.+)/i);
-    if (m) result.dropoff_location = m[1].split(/\n/)[0].replace(/,\s*$/, '').trim();
+    const v = pickLabelled(/(?:dest(?:ination)?|del(?:ivery)?|drop\s*off|dropoff|consignee)\s*[:=]\s*(.+)/i);
+    if (v) result.dropoff_location = v;
   }
 
   // "City, ST → City, ST" or "City, ST - City, ST"
@@ -512,25 +713,25 @@ export function parseLoadText(text: string): ParsedLoadData {
   // --- Deadhead rate per mile (Phase 5) — must run BEFORE general rate to avoid stealing.
   // "DH rate $1.00/mi", "deadhead rate: 1.00", "empty rate 0.85/mile"
   const dhRateMatch =
-    t.match(/(?:dh|dead\s*head|empty)\s*rate\s*[:=]?\s*\$?([\d,.]+)/i) ||
-    t.match(/\$?([\d,.]+)\s*\/\s*mi(?:le)?\s+(?:dh|dead\s*head|empty)/i);
+    moneyText.match(/(?:dh|dead\s*head|empty)\s*rate\s*[:=]?\s*\$?([\d,.]+)/i) ||
+    moneyText.match(/\$?([\d,.]+)\s*\/\s*mi(?:le)?\s+(?:dh|dead\s*head|empty)/i);
   if (dhRateMatch) result.deadhead_rate_per_mile = cleanNum(dhRateMatch[1]);
 
   // --- Loaded rate per mile (also accept explicit "loaded rate") ---
-  const loadedRateMatch = t.match(/loaded\s*rate\s*[:=]?\s*\$?([\d,.]+)/i);
+  const loadedRateMatch = moneyText.match(/loaded\s*rate\s*[:=]?\s*\$?([\d,.]+)/i);
   if (loadedRateMatch) result.rate_per_mile = cleanNum(loadedRateMatch[1]);
 
   // --- Rate per mile (generic) ---
   // "$2.45/mi", "$2.45 CPM", "$2.45 per mile", "2.45 rpm", "rate: $2.45"
   if (!result.rate_per_mile) {
-    m = t.match(/\$?([\d,.]+)\s*(?:\/\s*mi(?:le)?|cpm|rpm|per\s+mile)\b/i);
+    m = moneyText.match(/\$?([\d,.]+)\s*(?:\/\s*mi(?:le)?|cpm|rpm|per\s+mile)\b/i);
     if (m) {
       const v = cleanNum(m[1]);
       if (v !== result.deadhead_rate_per_mile) result.rate_per_mile = v;
     }
   }
   if (!result.rate_per_mile) {
-    m = t.match(/(?:rate|cpm|rpm)\s*[:=]?\s*\$?([\d,.]+)/i);
+    m = moneyText.match(/(?:rate|cpm|rpm)\s*[:=]?\s*\$?([\d,.]+)/i);
     if (m) {
       const v = cleanNum(m[1]);
       if (v !== result.deadhead_rate_per_mile) result.rate_per_mile = v;
@@ -540,7 +741,7 @@ export function parseLoadText(text: string): ParsedLoadData {
   // --- Flat rate (Phase 5) ---
   // "Flat rate: $850", "Flat $850", "Flat pay 850"
   const flatMatch =
-    t.match(/\bflat\s*(?:rate|pay)?\s*[:=]?\s*\$?\s*([\d,]+(?:\.\d{1,2})?)\b/i);
+    moneyText.match(/\bflat\s*(?:rate|pay)?\s*[:=]?\s*\$?\s*([\d,]+(?:\.\d{1,2})?)\b/i);
   if (flatMatch) {
     const v = cleanNum(flatMatch[1]);
     const num = parseFloat(v);
@@ -550,18 +751,16 @@ export function parseLoadText(text: string): ParsedLoadData {
   // --- Gross Revenue ---
   // Use a more specific pattern that excludes "total miles" / "total mile" phrasing
   // so it doesn't pick up mileage labels.
-  m = t.match(/(?:gross|revenue|total\s*(?:pay|revenue|load))\s*[:=]?\s*\$?([\d,.]+)/i);
+  m = moneyText.match(/(?:gross|revenue|total\s*(?:pay|revenue|load))\s*[:=]?\s*\$?([\d,.]+)/i);
   if (m) result.gross_revenue = cleanNum(m[1]);
   if (!result.gross_revenue) {
-    m = t.match(/\$?([\d,.]+)\s*(?:gross|load\s*(?:pay|revenue)?)\b/i);
+    m = moneyText.match(/\$?([\d,.]+)[ \t]*(?:gross|load\s*(?:pay|revenue)?)\b/i);
     if (m) result.gross_revenue = cleanNum(m[1]);
   }
-  if (!result.gross_revenue && !result.rate_per_mile && !result.flat_rate) {
-    m = t.match(/\$([\d,]+(?:\.\d{1,2})?)/);
-    if (m) {
-      const val = parseFloat(cleanNum(m[1]));
-      if (val > 100) result.gross_revenue = cleanNum(m[1]);
-    }
+  // Paste repair: the old "first $ amount > 100 => gross" fallback was removed.
+  // Only explicitly labelled pay can fill revenue (fail closed).
+  if (!result.gross_revenue && !result.rate_per_mile && !result.flat_rate && /\$\s*[\d,]+/.test(moneyText)) {
+    warnings.push('A dollar amount was found but not labelled as pay/rate. Pay was left blank — enter the agreed rate manually.');
   }
 
   // --- Pay model suggestion (Phase 5) ---
@@ -578,9 +777,9 @@ export function parseLoadText(text: string): ParsedLoadData {
   }
 
   // --- Accessorial fees (Phase 1S-B1) ---
-  const waitFee = extractFee(t, 'wait|waiting');
+  const waitFee = extractFee(moneyText, 'wait|waiting');
   if (waitFee) result.wait_fee = waitFee;
-  const detentionFee = extractFee(t, 'detention');
+  const detentionFee = extractFee(moneyText, 'detention');
   if (detentionFee) result.detention_fee = detentionFee;
 
   // --- Date ---
@@ -598,6 +797,16 @@ export function parseLoadText(text: string): ParsedLoadData {
     if (dateStr) result.load_date = dateStr;
   }
   if (explicitDeliveryDate) result.dropoff_date = explicitDeliveryDate;
+  if (blocksUsable) {
+    const first = blocks[0];
+    const last = blocks[blocks.length - 1];
+    if (!explicitPickupDate && first.appointment_date && isWithinSanityWindow(first.appointment_date)) {
+      result.load_date = first.appointment_date;
+    }
+    if (!explicitDeliveryDate && last.appointment_date && isWithinSanityWindow(last.appointment_date)) {
+      result.dropoff_date = last.appointment_date;
+    }
+  }
 
 
   // --- Numbered Stop Detection (e.g. "1#:", "2#:", "3#:") ---
@@ -676,5 +885,21 @@ export function parseLoadText(text: string): ParsedLoadData {
     }
   }
 
+  // Block-form multi-stop (>2 stops) only when numbered markers didn't already define stops.
+  if (blocksUsable && !result.stops && blocks.length > 2) {
+    const stops: ParsedStopData[] = blocks.map(b => ({
+      location: `${b.city}, ${b.state}`,
+      stop_type: b.kind === 'pickup' ? 'Pickup' : 'Drop',
+      ...(b.appointment_date && isWithinSanityWindow(b.appointment_date) ? { stop_date: b.appointment_date } : {}),
+    }));
+    result.stops = stops;
+    result.multiStopDetected = true;
+    result.detectedStopsCount = stops.length;
+    if (blocks.slice(1, -1).length > 0) {
+      warnings.push('Intermediate stops are saved as plain "Stop" — their Pickup/Drop type is shown here for review only.');
+    }
+  }
+
+  if (warnings.length) result.review_warnings = warnings;
   return result;
 }
