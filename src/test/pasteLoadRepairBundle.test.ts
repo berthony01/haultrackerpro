@@ -1,4 +1,30 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import React from 'react';
+import { render, fireEvent, cleanup, act } from '@testing-library/react';
+import type { ParsedLoadData } from '@/lib/parseLoadText';
+
+class ResizeObserverStub { observe() {} unobserve() {} disconnect() {} }
+vi.stubGlobal('ResizeObserver', ResizeObserverStub);
+
+const h = vi.hoisted(() => ({
+  onParsed: null as null | ((d: any) => void),
+  settings: { default_rate_per_mile: 2.1, default_other_fees: 0 } as any,
+}));
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), warning: vi.fn(), info: vi.fn(), success: vi.fn() } }));
+vi.mock('@/hooks/useUserSettings', () => ({ useUserSettings: () => ({ settings: h.settings }) }));
+vi.mock('@/hooks/useCostProfile', () => ({
+  useCostProfile: () => ({ profile: null }),
+  computeCostProfileCPM: () => ({ cpm: 0, warnings: [] }),
+}));
+vi.mock('@/hooks/useProfitCheck', () => ({ useProfitCheck: () => ({ result: null }) }));
+vi.mock('@/components/SmartChips', () => ({ SmartChips: () => null }));
+vi.mock('@/components/PasteLoadParser', () => ({
+  PasteLoadParser: (p: { onParsed: (d: any) => void }) => { h.onParsed = p.onParsed; return null; },
+}));
+vi.mock('@/components/ScanLoadModal', () => ({ ScanLoadModal: () => null }));
+vi.mock('@/components/ProfitCheckCard', () => ({ ProfitCheckCard: () => null }));
+vi.mock('@/components/MultiStopEditor', () => ({ MultiStopEditor: () => null }));
+import { LoadForm } from '@/components/LoadForm';
 import { parseLoadText } from '@/lib/parseLoadText';
 import { mergePasteIntoForm, createPasteSession, PASTE_MANAGED_FIELDS, type PasteManagedValues } from '@/lib/loadPasteMerge';
 import { normalizeParsedStops } from '@/lib/stopNormalization';
@@ -165,5 +191,56 @@ describe('load_reference paste merge', () => {
     const edited = { ...a.values, load_reference: 'MY-REF-1' };
     const b = mergePasteIntoForm({ session: a.session, current: edited, notes: '', incoming: {}, fallbacks: blank });
     expect(b.values.load_reference).toBe('MY-REF-1');
+  });
+});
+
+describe('LoadForm paste pay safety (default RPM configured = 2.1)', () => {
+  afterEach(cleanup);
+  const WARN = 'No agreed load pay detected; enter/verify pay before saving';
+  const mount = () => {
+    const view = render(React.createElement(LoadForm, { onSubmit: vi.fn() }));
+    const rate = () => (view.getByLabelText(/Rate per Mile/i) as HTMLInputElement).value;
+    const paste = (txt: string) => act(() => { h.onParsed!(parseLoadText(txt) as ParsedLoadData); });
+    return { ...view, rate, paste };
+  };
+
+  it('manual entry keeps default rate', () => {
+    const v = mount();
+    expect(v.rate()).toBe('2.1');
+  });
+  it('sample with no pay clears autofilled default and warns', () => {
+    const v = mount();
+    v.paste(SAMPLE);
+    expect(v.rate()).toBe('');
+    expect(v.getByText(new RegExp(WARN))).toBeTruthy();
+    expect((v.getByLabelText(/Load Reference/i) as HTMLInputElement).value).toBe('84B8233');
+  });
+  it('explicit RPM is used and no warning', () => {
+    const v = mount();
+    v.paste('Dallas TX to Atlanta GA, 780 mi, $2.45/mi');
+    expect(v.rate()).toBe('2.45');
+    expect(v.queryByText(new RegExp(WARN))).toBeNull();
+  });
+  it('deliberate manual rate survives a no-pay paste', () => {
+    const v = mount();
+    fireEvent.change(v.getByLabelText(/Rate per Mile/i), { target: { value: '3.00' } });
+    v.paste(SAMPLE);
+    expect(v.rate()).toBe('3.00');
+    expect(v.getByText(new RegExp(WARN))).toBeTruthy();
+  });
+  it('re-paste: explicit rate then no-pay clears to blank, not default', () => {
+    const v = mount();
+    v.paste('Dallas TX to Atlanta GA, 780 mi, $2.45/mi');
+    expect(v.rate()).toBe('2.45');
+    v.paste(SAMPLE);
+    expect(v.rate()).toBe('');
+  });
+  it('settings re-hydration does not refill pay after paste', () => {
+    const v = mount();
+    v.paste(SAMPLE);
+    h.settings = { ...h.settings };
+    v.rerender(React.createElement(LoadForm, { onSubmit: vi.fn() }));
+    expect(v.rate()).toBe('');
+    h.settings = { default_rate_per_mile: 2.1, default_other_fees: 0 };
   });
 });
