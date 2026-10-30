@@ -21,6 +21,7 @@ const FALLBACKS: PasteManagedValues = {
   wait_fee: '0',
   detention_fee: '0',
   pay_model: 'loaded_miles_only',
+  load_reference: '',
 };
 
 const EMPTY_FORM: PasteManagedValues = {
@@ -33,6 +34,7 @@ const EMPTY_FORM: PasteManagedValues = {
   wait_fee: '0',
   detention_fee: '0',
   pay_model: 'loaded_miles_only',
+  load_reference: '',
 };
 
 /**

@@ -502,6 +502,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     setForm({
       load_date: copyToday,
       dropoff_date: '',
+      load_reference: '',
       pickup_location: lastLoad.pickup_location,
       dropoff_location: lastLoad.dropoff_location,
       loaded_miles: lastLoad.loaded_miles.toString(),

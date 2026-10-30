@@ -502,7 +502,9 @@ export function parseLoadText(text: string): ParsedLoadData {
   }
 
   // --- Multi-line facility blocks (LIVE LOAD / UNLOAD / PICKUP / DELIVERY) ---
+  const warnCountBeforeBlocks = warnings.length;
   const blocks = extractStopBlocks(allLines, warnings);
+  const ambiguousBlock = warnings.length > warnCountBeforeBlocks;
   let blocksUsable = false;
   if (blocks.length >= 2) {
     if (blocks[0].kind === 'pickup' && blocks[blocks.length - 1].kind === 'drop') {
@@ -523,7 +525,7 @@ export function parseLoadText(text: string): ParsedLoadData {
   // "Origin: X" / "Dest: Y" or "PU: X" / "DEL: Y" or "Pickup: X" / "Dropoff: Y"
   // Values that are money or follow a penalty word (e.g. "Late PU: $1000") are rejected.
   const pickLabelled = (re: RegExp): string | undefined => {
-    if (blocksUsable || blocks.length > 0) return undefined;
+    if (blocksUsable || blocks.length > 0 || ambiguousBlock) return undefined;
     for (const raw of allLines) {
       if (isPenaltyLine(raw)) continue;
       const lm = raw.match(re);
