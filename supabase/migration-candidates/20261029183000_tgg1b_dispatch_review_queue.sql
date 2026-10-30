@@ -273,6 +273,9 @@ DECLARE
   _new_id uuid;
   _new_expires timestamptz;
 BEGIN
+  -- One workflow lock: consistent proposal/load/outbox order, absent receipt dedupe.
+  -- Serializes G1B only; no changes to existing poller or dispatch authority.
+  PERFORM pg_advisory_xact_lock(741029, 1);
   IF _update_id IS NULL
      OR _update_id <= 0
      OR _payload_hash IS NULL
@@ -293,7 +296,8 @@ BEGIN
     SELECT 1 FROM public.telegram_poll_state s
      WHERE s.id = 1
        AND s.lease_token = _lease_token
-       AND s.lease_expires_at > now()
+       AND s.lease_expires_at > clock_timestamp()
+     FOR SHARE
   ) THEN
     RAISE EXCEPTION 'telegram_poll_lease_invalid';
   END IF;
@@ -328,7 +332,8 @@ BEGIN
     SELECT * INTO _binding
       FROM public.telegram_chat_bindings b
      WHERE b.telegram_chat_id = _telegram_chat_id
-       AND b.status = 'active';
+       AND b.status = 'active'
+     FOR SHARE;
 
     IF FOUND THEN
       -- ONLY loads of the bound recruiter's ACTIVE relationships, owned by
@@ -350,14 +355,20 @@ BEGIN
          WHERE l.id = _load_id
          FOR UPDATE;
 
-        IF _load_status IN ('pending','en_route') THEN
+        IF _load_status IN ('pending','en_route') AND EXISTS (
+          SELECT 1 FROM public.loads l
+          JOIN public.carrier_driver_relationships r ON r.id=l.carrier_driver_relationship_id
+          WHERE l.id=_load_id AND r.recruiter_id=_binding.recruiter_id
+            AND r.status='active' AND l.user_id=r.driver_user_id
+            AND upper(btrim(l.load_reference))=_reference FOR SHARE OF r
+        ) THEN
           -- Retire this load's expired pending proposal so the per-load cap
           -- does not block a fresh, legitimate report.
           UPDATE public.telegram_dispatch_review_proposals p
              SET status = 'expired', decided_at = now()
            WHERE p.load_id = _load_id
              AND p.status = 'pending'
-             AND p.expires_at <= now();
+             AND p.expires_at <= clock_timestamp();
 
           IF NOT EXISTS (
             SELECT 1 FROM public.telegram_dispatch_review_proposals p
@@ -377,6 +388,8 @@ BEGIN
             )
             RETURNING id, telegram_dispatch_review_proposals.expires_at
               INTO _new_id, _new_expires;
+
+            INSERT INTO public.telegram_dispatch_review_outbox(proposal_id) VALUES (_new_id);
 
             _outcome := 'dispatch_review_proposed';
           END IF;
@@ -439,6 +452,9 @@ DECLARE
   _sqlstate text;
   _message text;
 BEGIN
+  -- One workflow lock: consistent proposal/load/outbox order, absent receipt dedupe.
+  -- Serializes G1B only; no changes to existing poller or dispatch authority.
+  PERFORM pg_advisory_xact_lock(741029, 1);
   IF _update_id IS NULL
      OR _update_id <= 0
      OR _payload_hash IS NULL
@@ -454,7 +470,8 @@ BEGIN
     SELECT 1 FROM public.telegram_poll_state s
      WHERE s.id = 1
        AND s.lease_token = _lease_token
-       AND s.lease_expires_at > now()
+       AND s.lease_expires_at > clock_timestamp()
+     FOR SHARE
   ) THEN
     RAISE EXCEPTION 'telegram_poll_lease_invalid';
   END IF;
@@ -498,7 +515,7 @@ BEGIN
       _outcome := 'dispatch_review_invalid';
     ELSIF _p.status <> 'pending' THEN
       _outcome := 'dispatch_review_already_handled';
-    ELSIF _p.expires_at <= now() THEN
+    ELSIF _p.expires_at <= clock_timestamp() THEN
       UPDATE public.telegram_dispatch_review_proposals
          SET status = 'expired', decided_at = now()
        WHERE id = _p.id;
@@ -510,18 +527,21 @@ BEGIN
     SELECT * INTO _binding
       FROM public.telegram_chat_bindings b
      WHERE b.telegram_chat_id = _telegram_chat_id
-       AND b.status = 'active';
+       AND b.status = 'active'
+     FOR SHARE;
 
     SELECT l.user_id INTO _reviewer
       FROM public.telegram_user_links l
      WHERE l.telegram_user_id = _telegram_user_id
-       AND l.status = 'active';
+       AND l.status = 'active'
+     FOR SHARE;
 
     SELECT r.driver_user_id INTO _driver_user_id
       FROM public.carrier_driver_relationships r
      WHERE r.id = _p.relationship_id
        AND r.recruiter_id = _p.recruiter_id
-       AND r.status = 'active';
+       AND r.status = 'active'
+     FOR SHARE;
 
     IF _binding.id IS NULL
        OR _binding.id <> _p.binding_id
@@ -551,6 +571,9 @@ BEGIN
   END IF;
 
   IF _outcome IS NULL THEN
+    -- Freeze permission/membership revocation until this decision commits.
+    PERFORM 1 FROM public.recruiter_profiles WHERE id=_p.recruiter_id FOR SHARE;
+    PERFORM 1 FROM public.recruiter_members WHERE recruiter_id=_p.recruiter_id FOR SHARE;
     -- Same actor-claim pattern the existing TG-2C wrapper uses (local only).
     PERFORM pg_catalog.set_config('request.jwt.claim.sub', _reviewer::text, true);
 
@@ -631,5 +654,101 @@ REVOKE ALL ON FUNCTION public.telegram_process_dispatch_review_action(uuid, bigi
 REVOKE ALL ON FUNCTION public.telegram_process_dispatch_review_action(uuid, bigint, text, bigint, bigint, text, text, uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.telegram_process_dispatch_review_action(uuid, bigint, text, bigint, bigint, text, text, uuid) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.telegram_process_dispatch_review_action(uuid, bigint, text, bigint, bigint, text, text, uuid) TO service_role;
+
+-- E. Delivery worker RPCs. Service-role ONLY, no provider calls here.
+-- All G1B operations take the same transaction advisory lock. Small bounded
+-- batches trade throughput for a single explicit lock order and predictable
+-- dedupe/decision/delivery races. Existing dispatch RPCs remain untouched.
+-- Failed/exhausted rows remain visible for operator inspection, never deleted.
+-- No automatic manual dead-letter requeue is provided; retryable failures and
+-- crashed leases retry until max_attempts or proposal expiry. At-least-once:
+-- a send succeeded + ack lost can deliver duplicate buttons for the SAME proposal.
+CREATE FUNCTION public.telegram_claim_dispatch_review_delivery()
+RETURNS TABLE(outbox_id uuid, claim_token uuid, proposal_id uuid,
+  telegram_chat_id bigint, load_reference text, proposed_status text, expires_at timestamptz)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public'
+AS $$
+DECLARE _id uuid; _token uuid := gen_random_uuid(); _now timestamptz;
+BEGIN
+  PERFORM pg_advisory_xact_lock(741029, 1);
+  _now := clock_timestamp();
+  -- Expired, decided, revoked, re-owned, stale or ended proposals are not sent.
+  UPDATE public.telegram_dispatch_review_outbox o
+    SET delivery_state='cancelled', claim_token=NULL, lease_expires_at=NULL,
+        completed_at=_now, updated_at=_now, last_failure_code='proposal_closed'
+    FROM public.telegram_dispatch_review_proposals p
+    WHERE p.id=o.proposal_id AND o.delivery_state IN ('pending','sending','failed')
+      AND (p.status<>'pending' OR p.expires_at<=_now OR NOT EXISTS (
+        SELECT 1 FROM public.telegram_chat_bindings b
+        JOIN public.carrier_driver_relationships r ON r.id=p.relationship_id
+        JOIN public.loads l ON l.id=p.load_id
+        WHERE b.id=p.binding_id AND b.telegram_chat_id=p.telegram_chat_id
+          AND b.recruiter_id=p.recruiter_id AND b.status='active'
+          AND r.recruiter_id=p.recruiter_id AND r.status='active'
+          AND l.carrier_driver_relationship_id=r.id AND l.user_id=r.driver_user_id
+          AND l.status=p.expected_previous_status));
+  UPDATE public.telegram_dispatch_review_outbox o
+    SET delivery_state='failed', claim_token=NULL, lease_expires_at=NULL,
+        completed_at=_now, updated_at=_now, last_failure_code='attempts_exhausted'
+    WHERE o.delivery_state='sending' AND o.lease_expires_at<=_now AND o.attempt_count>=o.max_attempts;
+  SELECT o.id INTO _id FROM public.telegram_dispatch_review_outbox o
+    WHERE (o.delivery_state='pending' AND o.next_attempt_at<=_now
+       OR o.delivery_state='sending' AND o.lease_expires_at<=_now)
+      AND o.attempt_count<o.max_attempts
+    ORDER BY o.next_attempt_at,o.id LIMIT 1 FOR UPDATE SKIP LOCKED;
+  IF _id IS NULL THEN RETURN; END IF;
+  UPDATE public.telegram_dispatch_review_outbox o
+    SET delivery_state='sending', attempt_count=attempt_count+1, claim_token=_token,
+        lease_expires_at=_now+interval '60 seconds', updated_at=_now
+    WHERE o.id=_id;
+  RETURN QUERY SELECT o.id,o.claim_token,p.id,p.telegram_chat_id,p.load_reference,p.proposed_status,p.expires_at
+    FROM public.telegram_dispatch_review_outbox o
+    JOIN public.telegram_dispatch_review_proposals p ON p.id=o.proposal_id WHERE o.id=_id;
+END;
+$$;
+
+CREATE FUNCTION public.telegram_ack_dispatch_review_delivery(_outbox_id uuid,_claim_token uuid,_message_id bigint)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public'
+AS $$
+DECLARE _n integer;
+BEGIN
+  PERFORM pg_advisory_xact_lock(741029, 1);
+  IF _message_id IS NULL OR _message_id<=0 THEN RAISE EXCEPTION 'dispatch_delivery_invalid'; END IF;
+  UPDATE public.telegram_dispatch_review_outbox o SET delivery_state='sent', telegram_message_id=_message_id,
+    claim_token=NULL, lease_expires_at=NULL, completed_at=clock_timestamp(), updated_at=clock_timestamp()
+    WHERE o.id=_outbox_id AND o.delivery_state='sending' AND o.claim_token=_claim_token
+      AND o.lease_expires_at>clock_timestamp();
+  GET DIAGNOSTICS _n=ROW_COUNT;
+  RETURN _n=1;
+END;
+$$;
+
+CREATE FUNCTION public.telegram_fail_dispatch_review_delivery(_outbox_id uuid,_claim_token uuid,_failure_code text)
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public'
+AS $$
+DECLARE _n integer;
+BEGIN
+  PERFORM pg_advisory_xact_lock(741029, 1);
+  IF _failure_code IS NULL OR _failure_code NOT IN
+    ('network','timeout','rate_limited','telegram_server','telegram_rejected','chat_unavailable','unknown')
+    THEN RAISE EXCEPTION 'dispatch_delivery_invalid'; END IF;
+  UPDATE public.telegram_dispatch_review_outbox o SET
+    delivery_state=CASE WHEN o.attempt_count>=o.max_attempts THEN 'failed' ELSE 'pending' END,
+    completed_at=CASE WHEN o.attempt_count>=o.max_attempts THEN clock_timestamp() ELSE NULL END,
+    next_attempt_at=clock_timestamp()+make_interval(secs=>LEAST(300,5*o.attempt_count)),
+    last_failure_code=_failure_code, claim_token=NULL, lease_expires_at=NULL, updated_at=clock_timestamp()
+    WHERE o.id=_outbox_id AND o.delivery_state='sending' AND o.claim_token=_claim_token
+      AND o.lease_expires_at>clock_timestamp();
+  GET DIAGNOSTICS _n=ROW_COUNT;
+  RETURN _n=1;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.telegram_claim_dispatch_review_delivery() FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.telegram_ack_dispatch_review_delivery(uuid,uuid,bigint) FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.telegram_fail_dispatch_review_delivery(uuid,uuid,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.telegram_claim_dispatch_review_delivery() TO service_role;
+GRANT EXECUTE ON FUNCTION public.telegram_ack_dispatch_review_delivery(uuid,uuid,bigint) TO service_role;
+GRANT EXECUTE ON FUNCTION public.telegram_fail_dispatch_review_delivery(uuid,uuid,text) TO service_role;
 
 COMMIT;
