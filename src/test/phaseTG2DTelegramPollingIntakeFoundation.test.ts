@@ -873,11 +873,14 @@ describe("TG-2D edge function shell", () => {
     expect(EDGE_SOURCE).toContain("runTelegramPoll");
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\(\s*"(\w+)"/g)].map((m) => m[1]);
     expect([...new Set(rpcs)].sort()).toEqual([
+      "telegram_ack_dispatch_review_delivery",
       "telegram_advance_poll_cursor",
       "telegram_claim_conversation_alerts",
       "telegram_claim_conversation_message_deliveries",
+      "telegram_claim_dispatch_review_delivery",
       "telegram_claim_poll_lease",
       "telegram_complete_quick_post_extraction",
+      "telegram_fail_dispatch_review_delivery",
       "telegram_mark_conversation_alert_failed",
       "telegram_mark_conversation_alert_sent",
       "telegram_mark_conversation_message_delivery_failed",
@@ -885,6 +888,9 @@ describe("TG-2D edge function shell", () => {
       "telegram_process_bind_update",
       "telegram_process_conversation_action_update",
       "telegram_process_conversation_reply_update",
+      // TG-G1C staged (compile-time gated OFF): dispatch intake/review.
+      "telegram_process_dispatch_group_update",
+      "telegram_process_dispatch_review_action",
       "telegram_process_menu_update",
       "telegram_process_quick_post_action_update",
       "telegram_process_quick_post_command_update",

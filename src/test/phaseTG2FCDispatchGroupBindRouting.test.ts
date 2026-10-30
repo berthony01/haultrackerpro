@@ -403,12 +403,18 @@ describe("TG-2F-C E — edge adapter delegates to the atomic RPC only", () => {
   it("calls telegram_process_bind_update and nothing else new", () => {
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\("(\w+)"/g)].map((m) => m[1]);
     expect([...new Set(rpcs)].sort()).toEqual([
+      "telegram_ack_dispatch_review_delivery",
       "telegram_advance_poll_cursor",
       "telegram_claim_conversation_alerts",
+      "telegram_claim_dispatch_review_delivery",
       "telegram_claim_poll_lease",
+      "telegram_fail_dispatch_review_delivery",
       "telegram_mark_conversation_alert_failed",
       "telegram_mark_conversation_alert_sent",
       "telegram_process_bind_update",
+      // TG-G1C staged (compile-time gated OFF): dispatch intake/review.
+      "telegram_process_dispatch_group_update",
+      "telegram_process_dispatch_review_action",
       "telegram_process_menu_update",
       "telegram_process_start_update",
       "telegram_record_ignored_update",
