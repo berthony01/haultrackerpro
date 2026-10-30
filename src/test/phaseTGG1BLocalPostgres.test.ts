@@ -41,7 +41,7 @@ beforeAll(async()=>{
  run('initdb',['-D',join(dir,'data'),'-U','local_owner','-A','trust','--no-locale']);
  run('pg_ctl',['-D',join(dir,'data'),'-l',join(dir,'postgres.log'),'-o',`-k ${dir} -h '' -p 55439`,'-w','start']);
  // Explicit socket/user/db/port: no production PG environment is consulted.
- pool=new pg.Pool({host:dir,port:55439,user:'local_owner',database:'postgres',max:8,statement_timeout:10000});
+ pool=new pg.Pool({host:dir,port:55439,user:'local_owner',database:'postgres',ssl:false,max:8,statement_timeout:10000});
  expect((await q('SHOW server_version'))[0].server_version).toContain('17.9');
  await q(read('src/test/fixtures/phase3AssistantCanonical.sql'));
  for(const [path,names] of SOURCES) for(const name of names) await q(exactFunction(mig(path),name));
@@ -51,7 +51,7 @@ beforeAll(async()=>{
  await q(`CREATE TABLE loads(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),user_id uuid NOT NULL REFERENCES auth.users(id),status text CHECK(status IN('pending','en_route','completed','cancelled')),load_reference text,carrier_driver_relationship_id uuid REFERENCES carrier_driver_relationships(id),updated_by_user_id uuid);
  ALTER TABLE loads ENABLE ROW LEVEL SECURITY; GRANT ALL ON loads TO service_role;`);
  const tg=mig('20260820050546_547ac998-f935-423e-be67-c1be3923948d.sql');
- await q(tg.slice(tg.indexOf('CREATE TABLE public.telegram_user_links'),tg.indexOf('-- C. public.telegram_link_tokens')-80).split('-- ---------------------------------------------------------------------------\n-- C.')[0]);
+ await q(tg.slice(tg.indexOf('CREATE TABLE public.telegram_user_links'),tg.lastIndexOf('-- ---------------------------------------------------------------------------',tg.indexOf('-- C. public.telegram_link_tokens'))));
  const dispatch=mig('20260819162100_2a7bb78e-ad6a-4417-a7d1-28ef6ba433aa.sql');
  await q(dispatch.slice(dispatch.indexOf('CREATE TABLE IF NOT EXISTS public.load_events'),dispatch.indexOf('-- G. Dispatch authorization helper')));
  await q(exactFunction(dispatch,'current_user_can_dispatch_load_action'));
