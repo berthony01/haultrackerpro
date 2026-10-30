@@ -994,11 +994,11 @@ const MENU_UNSUPPORTED_TEXT =
 const MENU_HEADER_TEXT = "HaulTracker Pro — recruiter status";
 
 const WORK_WELCOME_TEXT =
-  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to find work that matches your preferences, keep your Work Profile current, and manage your recruiter conversations in one place.\n\nThis bot is your companion for quick navigation and notifications as those features arrive.\n\nSend /menu for options or /status for your account status.";
+  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to find work that matches your preferences, keep your Work Profile current, and manage your recruiter conversations in one place.\n\nThis bot is your companion for quick navigation and notifications as those features arrive.\n\nSend /menu for options, /status for your account status, or /help for a guide.";
 const RECRUITER_WELCOME_TEXT =
-  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to post and manage opportunities, work through qualified conversations, and review your results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options or /status for your workspace status.";
+  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to post and manage opportunities, work through qualified conversations, and review your results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options, /status for your workspace status, or /help for a guide.";
 const COMBINED_WELCOME_TEXT =
-  "HaulTracker Pro — welcome\n\nYour account is connected with both work-seeking and recruiter access.\n\nWork: find work that matches your preferences and keep your Work Profile current.\nRecruiter: post and manage opportunities, work qualified conversations, and review results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options or /status for your account status.";
+  "HaulTracker Pro — welcome\n\nYour account is connected with both work-seeking and recruiter access.\n\nWork: find work that matches your preferences and keep your Work Profile current.\nRecruiter: post and manage opportunities, work qualified conversations, and review results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options, /status for your account status, or /help for a guide.";
 
 // RB-1B. Each capability group gets its OWN menu copy. A recruiter must never
 // be shown work-seeking wording, and a multi-capability account must see both
@@ -1011,6 +1011,34 @@ const COMBINED_MENU_TEXT =
   "HaulTracker Pro — menu\n\nWork:\nFind work that matches your preferences, or keep your Work Profile current.\n\nRecruiter:\nManage your opportunities, work through conversations, or review your results.";
 
 const WORK_STATUS_TEXT = "HaulTracker Pro — account status\n\nWork account connected.";
+
+// UX-1. /help copy. Read-only guidance chosen by the SAME server-returned
+// result code as /menu; it never grants an action. Dispatch group updates are
+// described truthfully as not active: the menu RPC returns no load-status
+// capability, so no dispatch control is ever shown here.
+//
+// Proposed native command list (NOT registered; setMyCommands / BotFather is
+// a separate release step). Privacy caveat: in privacy-enabled groups the bot
+// only receives commands addressed to it (e.g. /bind@HaulTrackerBot), not all
+// plain text.
+//   private: start, menu, status, help
+//   group:   bind
+const HELP_COMMANDS_TEXT =
+  "Commands:\n/menu — your buttons\n/status — account status\n/help — this guide";
+const DISPATCH_NOT_ACTIVE_TEXT =
+  "Dispatch group updates: not active yet. Messages in a connected group do not change any load.";
+const HELP_UNLINKED_TEXT =
+  "HaulTracker Pro — help\n\nThis Telegram account is not connected yet. In HaulTracker Pro, open Settings and create a Telegram connection link, then open it on this phone.\n\n" +
+  HELP_COMMANDS_TEXT;
+const HELP_WORK_TEXT =
+  "HaulTracker Pro — help\n\nYou are connected as a driver.\n• Find Work — browse matching opportunities\n• Work Profile — keep your details current\n\n" +
+  HELP_COMMANDS_TEXT;
+const HELP_RECRUITER_TEXT =
+  "HaulTracker Pro — help\n\nYou are connected as a recruiter.\n• Post Opportunity — send a job description here to draft a post for review\n• My Opportunities, Conversations, Results — open in the app\n\n" +
+  DISPATCH_NOT_ACTIVE_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
+const HELP_COMBINED_TEXT =
+  "HaulTracker Pro — help\n\nYou have driver and recruiter access.\n\nDriver:\n• Find Work, Work Profile\n\nRecruiter:\n• Post Opportunity, My Opportunities, Conversations, Results\n\n" +
+  DISPATCH_NOT_ACTIVE_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
 
 interface MenuWorkspaceDescriptor {
   workspace_name?: unknown;
@@ -1062,6 +1090,15 @@ function composeMenuText(
   workspaces: unknown,
   command: TelegramMenuCommand,
 ): string | null {
+  if (command === "help") {
+    if (resultCode === "menu_unlinked") return HELP_UNLINKED_TEXT;
+    if (resultCode === "menu_driver") return HELP_WORK_TEXT;
+    if (resultCode === "menu_recruiter") return HELP_RECRUITER_TEXT;
+    if (resultCode === "menu_multi_role") return HELP_COMBINED_TEXT;
+    if (resultCode === "menu_linked_no_workspace") return MENU_NO_WORKSPACE_TEXT;
+    if (resultCode === "menu_linked_unsupported") return MENU_UNSUPPORTED_TEXT;
+    return null;
+  }
   if (resultCode === "menu_unlinked") return MENU_UNLINKED_TEXT;
   if (resultCode === "menu_linked_no_workspace") return MENU_NO_WORKSPACE_TEXT;
   if (resultCode === "menu_linked_unsupported") return MENU_UNSUPPORTED_TEXT;
