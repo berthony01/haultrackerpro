@@ -1028,7 +1028,7 @@ const HELP_COMMANDS_TEXT =
 const DISPATCH_NOT_ACTIVE_TEXT =
   "Dispatch group updates: not active yet. Messages in a connected group do not change any load.";
 const HELP_UNLINKED_TEXT =
-  "HaulTracker Pro — help\n\nThis Telegram account is not connected yet. In HaulTracker Pro, open Settings and create a Telegram connection link, then open it on this phone.\n\n" +
+  "HaulTracker Pro — help\n\nThis Telegram account is not connected yet. In HaulTracker Pro, open Settings and create a Telegram connection link, then open it on this device.\n\n" +
   HELP_COMMANDS_TEXT;
 const HELP_WORK_TEXT =
   "HaulTracker Pro — help\n\nYou are connected as a driver.\n• Find Work — browse matching opportunities\n• Work Profile — keep your details current\n\n" +
