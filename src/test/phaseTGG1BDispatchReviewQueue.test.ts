@@ -140,10 +140,13 @@ describe("TG-G1B gate and namespace", () => {
     expect(routeDispatchGroupUpdate({ chatType: "group", callbackData: null, text: "x" }, true)).toBe("group_message");
     expect(routeDispatchGroupUpdate({ chatType: "private", callbackData: null, text: "x" }, true)).toBeNull();
   });
-  it("live poller does not import or reference the new module", () => {
+  it("TG-G1C: poller wiring is staged but governed only by the compile-time false gate (no env toggle)", () => {
+    expect(ADAPTER).toMatch(/export const TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false as const;/);
     for (const src of [INGEST, POLL]) {
-      expect(src).not.toMatch(/telegram-dispatch-group-review|dispatch_review|TGG1B/);
+      expect(src).not.toMatch(/TGG1B_DISPATCH_GROUP_REVIEW_ENABLED\s*=\s*true/);
+      expect(src).not.toMatch(/Deno\.env\.get\(["'][^"']*(DISPATCH|TGG1)/i);
     }
+    expect(POLL).not.toMatch(/dispatchReviewEnabled|enabled:\s*true/);
   });
   it("default classification is unchanged: group text → non_private_message, /bind stays bind, g1 tap fails closed in c1 path", () => {
     const base = { updateId: 1, telegramUserId: 11, telegramChatId: -22, chatType: "group", callbackQueryId: null, callbackData: null, replyToMessageId: null };
