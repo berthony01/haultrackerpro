@@ -1857,3 +1857,78 @@ export async function runTelegramMessageDeliveryDrain(
   });
   return result;
 }
+
+// ─────────────── TG-G1C — dispatch review outbox drain (gated) ───────────────
+//
+// Runs AFTER inbound polling and lease release, in its own isolated scope. It
+// is the ONLY path that sends a dispatch review card. With the compile-time
+// gate off it returns before any claim/RPC/send. Delivery is at-least-once: a
+// crash between a successful send and the ack lets the SQL lease expire and
+// the card may be re-sent (visible duplicate). Only bounded failure codes are
+// persisted or logged — never provider text, chat content or secrets.
+
+export const TELEGRAM_DISPATCH_REVIEW_DRAIN_LIMIT = 10;
+
+export function classifyDispatchDeliveryFailure(
+  response: { status: number; errorCode?: string },
+): DispatchDeliveryFailure {
+  const s = response.status;
+  if (s === 429) return "rate_limited";
+  if (s === 403) return "chat_unavailable";
+  if (s >= 500) return "telegram_server";
+  if (s >= 400) return "telegram_rejected";
+  if (response.errorCode === "telegram_gateway_timeout") return "timeout";
+  if (s === 0) return "network";
+  return "unknown";
+}
+
+export interface TelegramDispatchReviewDrainResult {
+  status: "disabled" | "ok" | "failed";
+  sent: number;
+  retried: number;
+  leaseLost: number;
+}
+
+export async function runDispatchReviewDeliveryDrain(deps: {
+  ledger: DispatchDeliveryLedger;
+  gateway: TelegramGateway;
+  log?: TelegramPollLogger;
+  /** Synthetic-test injection ONLY; production uses the compile-time gate. */
+  enabled?: boolean;
+  limit?: number;
+}): Promise<TelegramDispatchReviewDrainResult> {
+  const enabled = (deps.enabled ?? TGG1B_DISPATCH_GROUP_REVIEW_ENABLED) === true;
+  const result: TelegramDispatchReviewDrainResult = { status: "ok", sent: 0, retried: 0, leaseLost: 0 };
+  if (!enabled) return { ...result, status: "disabled" };
+  const log: TelegramPollLogger = deps.log ?? (() => {});
+  const limit = Math.max(0, Math.min(deps.limit ?? TELEGRAM_DISPATCH_REVIEW_DRAIN_LIMIT, 50));
+  const port = {
+    deliver: async (input: { chatId: number; text: string; buttons: { text: string; callbackData: string }[][] }) => {
+      const response = await deps.gateway.sendMessage({
+        chatId: input.chatId,
+        text: input.text,
+        buttons: input.buttons.map((row) => row.map((b) => ({ text: b.text, callbackData: b.callbackData }))),
+      });
+      const messageId = response.result?.message_id;
+      if (response.ok && response.status >= 200 && response.status < 300 && typeof messageId === "number") {
+        return { ok: true as const, messageId };
+      }
+      return { ok: false as const, code: classifyDispatchDeliveryFailure(response) };
+    },
+  };
+  for (let i = 0; i < limit; i++) {
+    let outcome: Awaited<ReturnType<typeof processDispatchDelivery>>;
+    try {
+      outcome = await processDispatchDelivery(deps.ledger, port, true);
+    } catch (error) {
+      log("dispatch_review_drain_failed", { code: sanitizeErrorCode(error) });
+      return { ...result, status: "failed" };
+    }
+    if (outcome === "empty" || outcome === "disabled") break;
+    if (outcome === "sent") result.sent += 1;
+    else if (outcome === "retry") result.retried += 1;
+    else result.leaseLost += 1;
+    log("dispatch_review_delivery", { outcome });
+  }
+  return result;
+}
