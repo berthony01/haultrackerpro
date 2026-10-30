@@ -478,12 +478,14 @@ describe("TG-2F-C F — shared orchestrator holds no token or command surface", 
   // by RB-1B; both are read-only private-chat commands. The protected
   // property is that the orchestrator grows no ACTION command surface, so the
   // assertion is re-pinned to the current legitimate set rather than relaxed.
-  it("adds no command beyond /start, /bind, /status and /menu", () => {
+  // UX-1 re-pin: `/help` is a read-only private guide routed through the
+  // same menu RPC; no ACTION command (/load, /unbind) is ever added.
+  it("adds no command beyond /start, /bind, /status, /menu and /help", () => {
     const commands = [...new Set(INGEST_SOURCE.match(/\/(?:[a-z]{3,12})\b/g) ?? [])]
       .filter((c) => ["/start", "/bind", "/status", "/menu", "/load", "/help", "/unbind"].includes(c))
       .sort();
-    expect(commands).toEqual(["/bind", "/menu", "/start", "/status"]);
-    for (const forbidden of ["/load", "/help", "/unbind"]) {
+    expect(commands).toEqual(["/bind", "/help", "/menu", "/start", "/status"]);
+    for (const forbidden of ["/load", "/unbind"]) {
       expect(INGEST_SOURCE).not.toContain(forbidden);
     }
   });
