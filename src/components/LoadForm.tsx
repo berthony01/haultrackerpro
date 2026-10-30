@@ -103,7 +103,7 @@ interface LoadFormProps {
   onOpenSettings?: () => void;
 }
 
-export const NO_AGREED_PAY_WARNING = 'No agreed load pay detected; enter/verify pay before saving';
+const NO_AGREED_PAY_WARNING = 'No agreed load pay detected; enter/verify pay before saving';
 
 const SAMPLE_LOAD = {
   pickup_location: 'Atlanta, GA',
