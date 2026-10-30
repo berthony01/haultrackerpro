@@ -29,6 +29,7 @@ export const PASTE_MANAGED_FIELDS = [
   'wait_fee',
   'detention_fee',
   'pay_model',
+  'load_reference',
 ] as const;
 
 export type PasteManagedField = (typeof PASTE_MANAGED_FIELDS)[number];

@@ -150,7 +150,10 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     total_miles: initialData?.total_miles?.toString() ?? '',
     flat_rate_amount: initialData?.flat_rate_amount?.toString() ?? '',
     dh_rate_per_mile: (initialData as any)?.deadhead_rate_per_mile?.toString() ?? '',
+    load_reference: (initialData as any)?.load_reference ?? '',
   });
+  // Legacy value as loaded; edit mode only sends load_reference when the driver changed it.
+  const initialLoadReference = ((initialData as any)?.load_reference ?? '') as string;
   const [showPaymentTracking, setShowPaymentTracking] = useState(
     !!(initialData?.invoice_submitted_date || initialData?.pod_submitted_date || initialData?.payment_due_date || initialData?.paid_date || (initialData?.short_paid_amount && Number(initialData.short_paid_amount) > 0) || initialData?.payment_notes)
   );
@@ -160,6 +163,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
     loaded_miles?: string;
     deadhead_miles?: string;
     trip_id?: string;
+    load_reference?: string;
+    stop_details?: ParsedLoadData['stop_details'];
+    requirements?: string[];
+    review_warnings?: string[];
+    stops?: ParsedLoadData['stops'];
   } | null>(null);
 
   // Sync default settings when they load asynchronously (only for new loads)
@@ -454,6 +462,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       total_miles: form.total_miles ? parseFloat(form.total_miles) : null,
       flat_rate_amount: form.pay_model === 'flat_rate' && form.flat_rate_amount ? parseFloat(form.flat_rate_amount) : null,
       deadhead_rate_per_mile: form.pay_model === 'loaded_plus_deadhead' && form.dh_rate_per_mile ? parseFloat(form.dh_rate_per_mile) : null,
+      ...(!initialData || form.load_reference.trim() !== initialLoadReference.trim()
+        ? { load_reference: form.load_reference.trim().slice(0, 200) || null }
+        : {}),
       // Persist computed expected gross pay (single source of truth from computeLoadPay)
       // so dashboards/reports/exports reflect the active pay model. For percentage-pay
       // users we already routed `estimated` through the percentage formula above.
@@ -628,6 +639,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                       wait_fee: prev.wait_fee,
                       detention_fee: prev.detention_fee,
                       pay_model: prev.pay_model,
+                      load_reference: prev.load_reference,
                     },
                     notes: prev.notes,
                     incoming: {
@@ -640,6 +652,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                       wait_fee: data.wait_fee,
                       detention_fee: data.detention_fee,
                       pay_model: isPayModel(data.pay_model_suggestion) ? data.pay_model_suggestion : undefined,
+                      load_reference: data.load_reference,
                     },
                     fallbacks: {
                       pickup_location: '',
@@ -651,6 +664,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                       wait_fee: '0',
                       detention_fee: '0',
                       pay_model: resolvePayModel(null, (settings as any)?.default_pay_model),
+                      load_reference: '',
                     },
                     tripId: data.trip_id,
                   });
@@ -675,6 +689,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   loaded_miles: data.loaded_miles,
                   deadhead_miles: data.deadhead_miles,
                   trip_id: data.trip_id,
+                  load_reference: data.load_reference,
+                  stop_details: data.stop_details,
+                  requirements: data.requirements,
+                  review_warnings: data.review_warnings,
+                  stops: data.stops,
                 });
                 // Phase 29B: interior stops only go into stops state.
                 // When no interior stops exist (single-stop or [Pickup,Drop]),
@@ -700,7 +719,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
           )}
 
           {/* Phase 6: Parser detection summary */}
-          {parserDetected && (parserDetected.loaded_miles || parserDetected.deadhead_miles || parserDetected.trip_id) && (
+          {parserDetected && (parserDetected.loaded_miles || parserDetected.deadhead_miles || parserDetected.trip_id || parserDetected.load_reference || parserDetected.stop_details?.length || parserDetected.requirements?.length || parserDetected.review_warnings?.length) && (
             <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-1.5 animate-fade-in">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-bold flex items-center gap-1.5">
@@ -712,12 +731,43 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
               </div>
               <ul className="text-[11px] text-foreground/90 space-y-0.5">
                 {parserDetected.trip_id && <li>• Trip ID: <span className="font-mono">{parserDetected.trip_id}</span></li>}
+                {parserDetected.load_reference && <li>• Load Reference: <span className="font-mono">{parserDetected.load_reference}</span></li>}
                 {parserDetected.loaded_miles && <li>• Loaded/Trip Miles: <span className="font-bold">{parserDetected.loaded_miles}</span></li>}
                 {parserDetected.deadhead_miles && <li>• Deadhead Miles: <span className="font-bold">{parserDetected.deadhead_miles}</span></li>}
                 {parserDetected.deadhead_miles && (
                   <li>• Deadhead Pay: <span className="font-bold">{form.dh_pay_status === 'unpaid' ? 'Unpaid by default' : form.dh_pay_status === 'same' ? 'Same as loaded rate' : 'Custom rate'}</span></li>
                 )}
               </ul>
+              {parserDetected.stop_details && parserDetected.stop_details.length > 0 && (
+                <div className="space-y-1 pt-1" data-testid="paste-review-stops">
+                  <p className="text-[11px] font-bold">Stops (review only — appointment windows are not saved)</p>
+                  <ol className="text-[11px] text-foreground/90 space-y-1">
+                    {parserDetected.stop_details.map((s, i) => (
+                      <li key={i} className="rounded border border-border/60 p-1.5">
+                        <span className="font-bold">{i + 1}. {s.kind === 'pickup' ? 'Pickup' : 'Drop'}</span> <span className="text-muted-foreground">({s.label})</span>
+                        {s.facility && <div>{s.facility}</div>}
+                        {s.street && <div>{s.street}</div>}
+                        <div>{s.city}, {s.state} {s.zip}</div>
+                        {s.appointment_date && (
+                          <div className="text-muted-foreground">
+                            Appt {s.appointment_date}{s.window_start ? ` ${s.window_start}` : ''}{s.window_end ? `–${s.window_end}` : ''} (timezone not specified)
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {parserDetected.requirements && parserDetected.requirements.length > 0 && (
+                <ul className="text-[11px] text-foreground/90 space-y-0.5 pt-1" data-testid="paste-review-requirements">
+                  {parserDetected.requirements.map((r, i) => <li key={i}>• Requirement: {r}</li>)}
+                </ul>
+              )}
+              {parserDetected.review_warnings && parserDetected.review_warnings.length > 0 && (
+                <ul className="text-[11px] text-warning space-y-0.5 pt-1" data-testid="paste-review-warnings">
+                  {parserDetected.review_warnings.map((w, i) => <li key={i}>⚠ {w}</li>)}
+                </ul>
+              )}
             </div>
           )}
 
