@@ -4,9 +4,9 @@
 // (supabase/migration-candidates/20261029183000_tgg1b_dispatch_review_queue.sql).
 //
 // HARD-DISABLED. `TGG1B_DISPATCH_GROUP_REVIEW_ENABLED` is a compile-time
-// `false` literal — there is deliberately NO environment/runtime flag. The
-// live poller (telegram-poll-ingest.ts / telegram-poll/index.ts) does not
-// import this module, so its behaviour is bit-for-bit unchanged.
+// `false` literal — there is deliberately NO environment/runtime flag. TG-G1C
+// stages the poller wiring (telegram-poll-ingest.ts / telegram-poll/index.ts)
+// behind this constant, so with it off behaviour is bit-for-bit unchanged.
 //
 // Activation gates (each separately approved, in order):
 //   1. apply the candidate migration and verify receipts/RLS/grants live;
