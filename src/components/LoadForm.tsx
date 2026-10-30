@@ -1218,6 +1218,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
 
 
           <div>
+            <Label htmlFor="load_reference">Load Reference / Trip Number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <Input id="load_reference" maxLength={200} placeholder="e.g. 84B8233" value={form.load_reference} onChange={e => update('load_reference', e.target.value)} />
+          </div>
+
+          <div>
             <Label htmlFor="notes" className="flex items-center gap-1">
               <FileText className="h-3 w-3" /> Notes
             </Label>
