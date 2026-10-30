@@ -140,6 +140,16 @@ const STATUS_WORD: Record<DispatchTargetStatus, string> = {
   completed: "delivered (completed)",
   cancelled: "cancelled",
 };
+/** UX-1. Explicit review button labels. Labels are presentation only; the
+ *  callback payload is unchanged and the database re-authorizes every tap. */
+const CONFIRM_LABEL: Record<DispatchTargetStatus, string> = {
+  completed: "✅ Confirm Delivery",
+  cancelled: "✅ Confirm Cancellation",
+};
+export const DISPATCH_REJECT_LABEL = "✖️ Reject Update";
+export function dispatchReviewButtonLabels(status: DispatchTargetStatus): [string, string] {
+  return [CONFIRM_LABEL[status], DISPATCH_REJECT_LABEL];
+}
 
 function bound(text: string): string {
   return text.length <= MAX_REPLY_CHARS ? text : text.slice(0, MAX_REPLY_CHARS);
@@ -192,7 +202,7 @@ export async function processDispatchGroupMessage(
       `Review needed: mark load ${proposed.reference} as ${STATUS_WORD[proposed.event]}? ` +
         "Nothing has changed yet. An authorized dispatcher must confirm within 15 minutes.",
     ),
-    buttons: [[{ text: "Confirm", callbackData: accept }, { text: "Reject", callbackData: reject }]],
+    buttons: [[{ text: CONFIRM_LABEL[proposed.event], callbackData: accept }, { text: DISPATCH_REJECT_LABEL, callbackData: reject }]],
   };
 }
 
@@ -278,8 +288,8 @@ export async function processDispatchDelivery(
   try {
     result = await port.deliver({
       chatId: claim.telegramChatId,
-      text: bound(`Review needed: mark load ${claim.loadReference} as ${STATUS_WORD[claim.proposedStatus]}? Nothing has changed yet.`),
-      buttons: [[{ text: "Confirm", callbackData: accept }, { text: "Reject", callbackData: reject }]],
+      text: bound(`Review needed: mark load ${claim.loadReference} as ${STATUS_WORD[claim.proposedStatus]}? Nothing has changed yet. Only an authorized dispatcher in this workspace can confirm; the request expires in 15 minutes.`),
+      buttons: [[{ text: CONFIRM_LABEL[claim.proposedStatus], callbackData: accept }, { text: DISPATCH_REJECT_LABEL, callbackData: reject }]],
     });
   } catch {
     result = { ok: false, code: "unknown" };

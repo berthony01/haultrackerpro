@@ -71,7 +71,7 @@ export function isMenuResultCode(code: TelegramResultCode): code is TelegramMenu
 
 /** RB-1B. Which bare private command produced a menu update. Used ONLY to
  *  choose copy in the adapter — never to widen data access or authority. */
-export type TelegramMenuCommand = "start" | "menu" | "status";
+export type TelegramMenuCommand = "start" | "menu" | "status" | "help";
 
 /** Phase RB-2B — private-chat Accept / Pass button terminal outcomes. The
  *  database owns every one of these; the orchestrator only transports them. */
@@ -563,6 +563,9 @@ const MENU_COMMANDS: Record<string, TelegramMenuCommand> = {
   "/start": "start",
   "/menu": "menu",
   "/status": "status",
+  // UX-1. Read-only private guidance. Same server-authorized menu RPC and
+  // receipt as /menu; it selects copy only and grants no action.
+  "/help": "help",
 };
 
 // ───────────────────── RB-2B — conversation action locator ─────────────────────
