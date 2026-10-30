@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { classifyUpdate } from "../../supabase/functions/_shared/telegram-poll-ingest";
 import {
-  classifyUpdate,
   TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
-} from "../../supabase/functions/_shared/telegram-poll-ingest";
-import {
   dispatchReviewButtonLabels,
   DISPATCH_REJECT_LABEL,
 } from "../../supabase/functions/_shared/telegram-dispatch-group-review";
