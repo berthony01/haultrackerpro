@@ -3,7 +3,7 @@
 // NOT a real Postgres integration test and NOT live Telegram E2E.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
   composeDispatchReviewData,
@@ -15,6 +15,8 @@ import {
   DISPATCH_REVIEW_ACTION_RESULT_CODES,
   DISPATCH_INTAKE_RESULT_CODES,
   type DispatchReviewLedger,
+  processDispatchDelivery,
+  type DispatchDeliveryLedger,
 } from "../../supabase/functions/_shared/telegram-dispatch-group-review";
 import { classifyUpdate } from "../../supabase/functions/_shared/telegram-poll-ingest";
 
@@ -93,6 +95,40 @@ describe("TG-G1B SQL candidate (static contract only)", () => {
     expect(body).toMatch(/ELSE\s+RAISE;/);
     expect(body).not.toMatch(/INSERT INTO public\.load_events|UPDATE public\.loads/);
     expect(SQL).not.toMatch(/(CREATE OR REPLACE|ALTER) FUNCTION public\.(telegram_)?dispatch_update_driver_load_status/);
+  });
+});
+
+describe("TG-G1B pure durable delivery adapter", () => {
+  const claim = { outboxId: "outbox", claimToken: "claim", proposalId: "00000000-0000-4000-8000-000000000001", telegramChatId: -100, loadReference: "AB-123", proposedStatus: "completed" as const };
+  function world() {
+    const ledger: DispatchDeliveryLedger = { claim: vi.fn().mockResolvedValue(claim), ack: vi.fn().mockResolvedValue(true), fail: vi.fn().mockResolvedValue(true) };
+    const port = { deliver: vi.fn().mockResolvedValue({ ok: true, messageId: 123 }) };
+    return { ledger, port };
+  }
+  it("OFF means zero ledger and delivery calls", async () => {
+    const { ledger, port } = world();
+    expect(await processDispatchDelivery(ledger, port)).toBe("disabled");
+    expect(ledger.claim).not.toHaveBeenCalled(); expect(port.deliver).not.toHaveBeenCalled();
+  });
+  it("claims durable metadata, delivers bounded buttons and acks exact claim", async () => {
+    const { ledger, port } = world();
+    expect(await processDispatchDelivery(ledger, port, true)).toBe("sent");
+    expect(ledger.ack).toHaveBeenCalledWith("outbox", "claim", 123);
+    expect(port.deliver.mock.calls[0][0].buttons[0][0].callbackData).toBe(composeDispatchReviewData("accept", claim.proposalId));
+  });
+  it("bounded failure retries; no provider text persists", async () => {
+    const { ledger, port } = world(); port.deliver.mockRejectedValue(new Error("sensitive provider text"));
+    expect(await processDispatchDelivery(ledger, port, true)).toBe("retry");
+    expect(ledger.fail).toHaveBeenCalledWith("outbox", "claim", "unknown"); expect(ledger.ack).not.toHaveBeenCalled();
+  });
+  it("ack failure propagates for lease recovery, never treats send as acknowledged", async () => {
+    const { ledger, port } = world(); vi.mocked(ledger.ack).mockRejectedValue(new Error("database unavailable"));
+    await expect(processDispatchDelivery(ledger, port, true)).rejects.toThrow("database unavailable");
+    expect(ledger.fail).not.toHaveBeenCalled();
+  });
+  it("lost lease cannot acknowledge success", async () => {
+    const { ledger, port } = world(); vi.mocked(ledger.ack).mockResolvedValue(false);
+    expect(await processDispatchDelivery(ledger, port, true)).toBe("lease_lost");
   });
 });
 

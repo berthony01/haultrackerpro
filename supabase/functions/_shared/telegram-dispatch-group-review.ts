@@ -233,3 +233,60 @@ export async function processDispatchReviewCallback(
   });
   return { resultCode: result.resultCode, isNew: result.isNew, answerText: DISPATCH_REVIEW_ANSWERS[result.resultCode] };
 }
+
+export type DispatchDeliveryFailure = "network" | "timeout" | "rate_limited" | "telegram_server" | "telegram_rejected" | "chat_unavailable" | "unknown";
+export interface DispatchDeliveryClaim {
+  outboxId: string;
+  claimToken: string;
+  proposalId: string;
+  telegramChatId: number;
+  loadReference: string;
+  proposedStatus: DispatchTargetStatus;
+}
+export interface DispatchDeliveryLedger {
+  claim(): Promise<DispatchDeliveryClaim | null>;
+  ack(outboxId: string, claimToken: string, messageId: number): Promise<boolean>;
+  fail(outboxId: string, claimToken: string, code: DispatchDeliveryFailure): Promise<boolean>;
+}
+/** Injected port only: this module performs no network I/O. The durable
+ * outbox, NOT the intake reply, owns future notification delivery. */
+export interface DispatchDeliveryPort {
+  deliver(input: { chatId: number; text: string; buttons: DispatchInlineButton[][] }): Promise<
+    { ok: true; messageId: number } | { ok: false; code: DispatchDeliveryFailure }
+  >;
+}
+/** Default OFF. An explicitly supplied test gate exercises the pure adapter.
+ * Unknown failures are bounded, never logged/persisted as provider text.
+ * Ack errors propagate: the SQL lease will recover, possibly duplicating a
+ * successfully delivered message. Exactly-once Telegram delivery is impossible. */
+export async function processDispatchDelivery(
+  ledger: DispatchDeliveryLedger,
+  port: DispatchDeliveryPort,
+  enabled: boolean = TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
+): Promise<"disabled" | "empty" | "sent" | "retry" | "lease_lost"> {
+  if (enabled !== true) return "disabled";
+  const claim = await ledger.claim();
+  if (!claim) return "empty";
+  const accept = composeDispatchReviewData("accept", claim.proposalId);
+  const reject = composeDispatchReviewData("reject", claim.proposalId);
+  if (!accept || !reject || !Number.isSafeInteger(claim.telegramChatId) || claim.telegramChatId === 0 ||
+      !/^(?=[A-Z0-9-]*[0-9])[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/.test(claim.loadReference) ||
+      !(claim.proposedStatus in STATUS_WORD)) {
+    return await ledger.fail(claim.outboxId, claim.claimToken, "unknown") ? "retry" : "lease_lost";
+  }
+  let result: Awaited<ReturnType<DispatchDeliveryPort["deliver"]>>;
+  try {
+    result = await port.deliver({
+      chatId: claim.telegramChatId,
+      text: bound(`Review needed: mark load ${claim.loadReference} as ${STATUS_WORD[claim.proposedStatus]}? Nothing has changed yet.`),
+      buttons: [[{ text: "Confirm", callbackData: accept }, { text: "Reject", callbackData: reject }]],
+    });
+  } catch {
+    result = { ok: false, code: "unknown" };
+  }
+  if (!result.ok) return await ledger.fail(claim.outboxId, claim.claimToken, result.code) ? "retry" : "lease_lost";
+  if (!Number.isSafeInteger(result.messageId) || result.messageId <= 0) {
+    return await ledger.fail(claim.outboxId, claim.claimToken, "unknown") ? "retry" : "lease_lost";
+  }
+  return await ledger.ack(claim.outboxId, claim.claimToken, result.messageId) ? "sent" : "lease_lost";
+}
