@@ -21,7 +21,6 @@ import {
   composeQuickPostNewData,
   runTelegramAlertDrain,
   runTelegramMessageDeliveryDrain,
-  runDispatchReviewDeliveryDrain,
   runTelegramPoll,
   sanitizeErrorCode,
   type TelegramAlertClaim,
@@ -42,13 +41,6 @@ import {
   type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
-import type {
-  DispatchDeliveryClaim,
-  DispatchDeliveryFailure,
-  DispatchDeliveryLedger,
-  DispatchReviewAction,
-} from "../_shared/telegram-dispatch-group-review.ts";
-import type { DispatchTargetStatus } from "../_shared/telegram-dispatch-group-proposals.ts";
 
 
 const GATEWAY_URL = "https://connector-gateway.lovable.dev/telegram";
@@ -176,48 +168,6 @@ function buildGateway(lovableApiKey: string, connectionKey: string): TelegramGat
 }
 
 type RpcClient = ReturnType<typeof createClient>;
-
-// TG-G1C (gated). Durable dispatch review outbox over the TG-G1B candidate
-// RPCs. Constructing it performs no I/O; the drain never calls it while the
-// compile-time gate is false.
-function buildDispatchDeliveryLedger(supabase: RpcClient): DispatchDeliveryLedger {
-  return {
-    async claim(): Promise<DispatchDeliveryClaim | null> {
-      const { data, error } = await supabase.rpc("telegram_claim_dispatch_review_delivery");
-      if (error) throw new Error(boundedRpcErrorCode(error));
-      const row = (Array.isArray(data) ? data[0] : data) as
-        | { outbox_id?: string; claim_token?: string; proposal_id?: string; telegram_chat_id?: number | string; load_reference?: string; proposed_status?: string }
-        | null;
-      if (!row?.outbox_id || !row.claim_token || !row.proposal_id) return null;
-      return {
-        outboxId: row.outbox_id,
-        claimToken: row.claim_token,
-        proposalId: row.proposal_id,
-        telegramChatId: Number(row.telegram_chat_id),
-        loadReference: String(row.load_reference ?? ""),
-        proposedStatus: row.proposed_status as DispatchTargetStatus,
-      };
-    },
-    async ack(outboxId: string, claimToken: string, messageId: number): Promise<boolean> {
-      const { data, error } = await supabase.rpc("telegram_ack_dispatch_review_delivery", {
-        _outbox_id: outboxId,
-        _claim_token: claimToken,
-        _message_id: messageId,
-      });
-      if (error) throw new Error(boundedRpcErrorCode(error));
-      return data === true;
-    },
-    async fail(outboxId: string, claimToken: string, code: DispatchDeliveryFailure): Promise<boolean> {
-      const { data, error } = await supabase.rpc("telegram_fail_dispatch_review_delivery", {
-        _outbox_id: outboxId,
-        _claim_token: claimToken,
-        _failure_code: code,
-      });
-      if (error) throw new Error(boundedRpcErrorCode(error));
-      return data === true;
-    },
-  };
-}
 
 function buildLedger(supabase: RpcClient): TelegramPollLedger {
   const unwrapTerminal = (rows: unknown): TelegramTerminalResult => {
@@ -544,57 +494,6 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
     // creation all happen inside the one database transaction that writes the
     // terminal receipt — so a duplicate tap can never create twice, and this
     // adapter contains no creation logic of its own.
-    // TG-G1C (gated; unreachable while TGG1B_DISPATCH_GROUP_REVIEW_ENABLED is
-    // false). Intake: receipt + proposal + outbox atomically; never a load
-    // change. Transports parser-normalized reference/status only — no text.
-    async processDispatchGroupUpdate(input: {
-      leaseToken: string;
-      updateId: number;
-      payloadHash: string;
-      telegramUserId: number;
-      telegramChatId: number;
-      chatType: string;
-      reference: string | null;
-      proposedStatus: DispatchTargetStatus | null;
-    }): Promise<TelegramTerminalResult> {
-      const { data, error } = await supabase.rpc("telegram_process_dispatch_group_update", {
-        _lease_token: input.leaseToken,
-        _update_id: input.updateId,
-        _payload_hash: input.payloadHash,
-        _telegram_user_id: input.telegramUserId,
-        _telegram_chat_id: input.telegramChatId,
-        _chat_type: input.chatType,
-        _reference: input.reference,
-        _proposed_status: input.proposedStatus,
-      });
-      if (error) throw new Error(boundedRpcErrorCode(error));
-      return unwrapTerminal(data);
-    },
-    // TG-G1C (gated). Review tap; reviewer = callback_query.from.id. The DB
-    // re-checks binding, linked reviewer, permission, relationship, status.
-    async processDispatchReviewActionUpdate(input: {
-      leaseToken: string;
-      updateId: number;
-      payloadHash: string;
-      telegramUserId: number;
-      telegramChatId: number;
-      chatType: string;
-      action: DispatchReviewAction | null;
-      proposalId: string | null;
-    }): Promise<TelegramTerminalResult> {
-      const { data, error } = await supabase.rpc("telegram_process_dispatch_review_action", {
-        _lease_token: input.leaseToken,
-        _update_id: input.updateId,
-        _payload_hash: input.payloadHash,
-        _telegram_user_id: input.telegramUserId,
-        _telegram_chat_id: input.telegramChatId,
-        _chat_type: input.chatType,
-        _action: input.action,
-        _proposal_id: input.proposalId,
-      });
-      if (error) throw new Error(boundedRpcErrorCode(error));
-      return unwrapTerminal(data);
-    },
     async processQuickPostActionUpdate(input: {
       leaseToken: string;
       updateId: number;
@@ -1174,17 +1073,6 @@ Deno.serve(async (req: Request) => {
 
     await drainAlerts();
     await drainMessageDeliveries();
-    // TG-G1C. Isolated, AFTER inbound poll + lease release. Returns
-    // "disabled" before any RPC/send while the compile-time gate is false.
-    try {
-      await runDispatchReviewDeliveryDrain({
-        ledger: buildDispatchDeliveryLedger(supabase),
-        gateway,
-        log,
-      });
-    } catch (error) {
-      log("dispatch_review_drain_unhandled_error", { code: sanitizeErrorCode(error) });
-    }
 
 
 
