@@ -368,7 +368,7 @@ BEGIN
              SET status = 'expired', decided_at = now()
            WHERE p.load_id = _load_id
              AND p.status = 'pending'
-             AND p.expires_at <= now();
+             AND p.expires_at <= clock_timestamp();
 
           IF NOT EXISTS (
             SELECT 1 FROM public.telegram_dispatch_review_proposals p
@@ -515,7 +515,7 @@ BEGIN
       _outcome := 'dispatch_review_invalid';
     ELSIF _p.status <> 'pending' THEN
       _outcome := 'dispatch_review_already_handled';
-    ELSIF _p.expires_at <= now() THEN
+    ELSIF _p.expires_at <= clock_timestamp() THEN
       UPDATE public.telegram_dispatch_review_proposals
          SET status = 'expired', decided_at = now()
        WHERE id = _p.id;
@@ -668,9 +668,10 @@ RETURNS TABLE(outbox_id uuid, claim_token uuid, proposal_id uuid,
   telegram_chat_id bigint, load_reference text, proposed_status text, expires_at timestamptz)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public'
 AS $$
-DECLARE _id uuid; _token uuid := gen_random_uuid(); _now timestamptz := clock_timestamp();
+DECLARE _id uuid; _token uuid := gen_random_uuid(); _now timestamptz;
 BEGIN
   PERFORM pg_advisory_xact_lock(741029, 1);
+  _now := clock_timestamp();
   -- Expired, decided, revoked, re-owned, stale or ended proposals are not sent.
   UPDATE public.telegram_dispatch_review_outbox o
     SET delivery_state='cancelled', claim_token=NULL, lease_expires_at=NULL,

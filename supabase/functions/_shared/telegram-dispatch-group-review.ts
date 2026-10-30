@@ -271,7 +271,7 @@ export async function processDispatchDelivery(
   const reject = composeDispatchReviewData("reject", claim.proposalId);
   if (!accept || !reject || !Number.isSafeInteger(claim.telegramChatId) || claim.telegramChatId === 0 ||
       !/^(?=[A-Z0-9-]*[0-9])[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/.test(claim.loadReference) ||
-      !(claim.proposedStatus in STATUS_WORD)) {
+      (claim.proposedStatus !== "completed" && claim.proposedStatus !== "cancelled")) {
     return await ledger.fail(claim.outboxId, claim.claimToken, "unknown") ? "retry" : "lease_lost";
   }
   let result: Awaited<ReturnType<DispatchDeliveryPort["deliver"]>>;
