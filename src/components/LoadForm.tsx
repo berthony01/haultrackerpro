@@ -103,6 +103,8 @@ interface LoadFormProps {
   onOpenSettings?: () => void;
 }
 
+export const NO_AGREED_PAY_WARNING = 'No agreed load pay detected; enter/verify pay before saving';
+
 const SAMPLE_LOAD = {
   pickup_location: 'Atlanta, GA',
   dropoff_location: 'Miami, FL',
@@ -177,7 +179,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
       const sDhRate = (settings as any).default_dh_pay_rate?.toString() ?? '';
       setForm(prev => ({
         ...prev,
-        rate_per_mile: prev.rate_per_mile || (settings.default_rate_per_mile?.toString() ?? ''),
+        rate_per_mile: pasteAppliedRef.current ? prev.rate_per_mile : (prev.rate_per_mile || (settings.default_rate_per_mile?.toString() ?? '')),
         other_fees: prev.other_fees === '0' || prev.other_fees === '' ? (settings.default_other_fees?.toString() ?? '0') : prev.other_fees,
         // Only apply DH defaults if user hasn't already touched them this session
         dh_pay_status: prev.dh_pay_status === 'unpaid' && !prev.dh_pay_rate && sDh ? sDh : prev.dh_pay_status,
@@ -215,6 +217,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   // Phase 1S-B1: paste session provenance — which paste-managed values the last
   // paste imported, plus the parser-added Trip ID note.
   const pasteSessionRef = useRef<PasteSession>(createPasteSession());
+  // Paste pay safety: true only after the driver deliberately sets the loaded
+  // rate (typing, default/last/common-rate buttons). Autofilled defaults never set it.
+  const userSetRateRef = useRef(false);
+  // Once any paste was applied, the async default-rate hydration must not refill pay.
+  const pasteAppliedRef = useRef(false);
 
 
   // Phase 29A: reset the "save again to confirm" acknowledgement whenever the
@@ -473,6 +480,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
   };
 
   const update = (key: string, value: string) => {
+    if (key === 'rate_per_mile') userSetRateRef.current = true;
     setForm(prev => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors(prev => { const n = { ...prev }; delete n[key]; return n; });
   };
@@ -621,6 +629,11 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                 const dropRes = resolveImportedDropoffDate(form.dropoff_date, norm.dropoff_date ?? data.dropoff_date, userTouchedDropoffDate);
                 if (loadRes.kept === 'manual') toast.info('No pickup date found in imported text. Kept your manual pickup date.');
                 if (dropRes.kept === 'manual') toast.info('No delivery date found in imported text. Kept your manual drop-off date.');
+                // Paste pay safety: no explicit agreed pay in the source means an
+                // autofilled default rate must not silently price this load.
+                const noAgreedPay = !data.gross_revenue && !data.flat_rate && !data.rate_per_mile && !data.deadhead_rate_per_mile;
+                const clearDefaultRate = noAgreedPay && !userSetRateRef.current;
+                pasteAppliedRef.current = true;
                 // Atomic apply: always reset mileage fields on a new paste so a
                 // stale "loaded_miles" from a previous paste can't leak into the
                 // new load if this paste only contains deadhead (and vice versa).
@@ -674,6 +687,7 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                     ...prev,
                     ...merged.values,
                     pay_model: merged.values.pay_model as PayModel,
+                    ...(clearDefaultRate ? { rate_per_mile: '' } : {}),
                     notes: merged.notes,
                     loaded_miles: data.loaded_miles ?? '',
                     deadhead_miles: data.deadhead_miles ?? '',
@@ -693,7 +707,9 @@ export function LoadForm({ onSubmit, onCancel, initialData, initialStops, loadin
                   load_reference: data.load_reference,
                   stop_details: data.stop_details,
                   requirements: data.requirements,
-                  review_warnings: data.review_warnings,
+                  review_warnings: noAgreedPay
+                    ? [NO_AGREED_PAY_WARNING, ...(data.review_warnings ?? [])]
+                    : data.review_warnings,
                   stops: data.stops,
                 });
                 // Phase 29B: interior stops only go into stops state.
