@@ -1210,7 +1210,7 @@ Deno.serve(async (req: Request) => {
       log,
       quickPostExtractor: buildQuickPostExtractor(supabase),
       dispatchGuidanceButtons: {
-        private: [[{ text: "Dispatch Tools", url: URL_OPEN_APP }]],
+        private: [[{ text: "Open App", url: URL_OPEN_APP }]],
         group: [
           [{ text: "Open Dispatch Menu", url: "https://t.me/HaulTrackerBot" }],
           [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],
