@@ -16,7 +16,7 @@ const GROUP = -100777;
 const ID = "00000000-0000-4000-8000-000000000001";
 const command = "/cancelled@HaulTrackerBot HTP-QA-L2";
 const identity = (text: string, chatId = GROUP) => ({
-  telegramUserId: 501, telegramChatId: chatId, chatType: "supergroup",
+  updateId: 1, telegramUserId: 501, telegramChatId: chatId, chatType: "supergroup",
   text, callbackQueryId: null, callbackData: null, replyToMessageId: null,
 });
 const message = (text = command, chatId = GROUP) => ({ update_id: 1,
