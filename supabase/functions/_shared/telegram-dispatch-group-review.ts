@@ -27,7 +27,7 @@ import {
 
 export const TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false as const;
 // Separately approved single-load QA release only. Never an environment flag.
-export const TELEGRAM_SINGLE_LOAD_QA_ENABLED = false as const;
+export const TELEGRAM_SINGLE_LOAD_QA_ENABLED = true as const;
 export const TELEGRAM_SINGLE_LOAD_QA_REFERENCE = "HTP-QA-L2";
 export const TELEGRAM_SINGLE_LOAD_QA_EXPIRES_AT = Date.parse("2026-11-02T23:59:59Z");
 export const TELEGRAM_SINGLE_LOAD_QA_RPCS = {
