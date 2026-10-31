@@ -1377,6 +1377,10 @@ export async function runTelegramPoll(
         }
       }
     } else if (terminal.isNew && identity.telegramChatId !== null) {
+      // Guidance uses the existing terminal receipt, so retries never send
+      // twice. Read-only authorization failure cannot stall existing traffic.
+      const dispatchGuidance = await getTelegramDispatchGuidance(identity,
+        deps.authorizeDispatchGuidance, deps.dispatchGuidanceEnabled);
       const feedback = terminal.resultCode === "link_success"
         ? TELEGRAM_LINK_SUCCESS_MESSAGE
         : terminal.resultCode === "link_rejected" ||
@@ -1444,6 +1448,20 @@ export async function runTelegramPoll(
             updateId,
             code: sanitizeErrorCode(error),
           });
+        }
+      }
+      if (dispatchGuidance) {
+        try {
+          await gateway.sendMessage({
+            chatId: identity.telegramChatId,
+            text: TELEGRAM_DISPATCH_GUIDANCE_TEXT,
+            buttons: identity.chatType === "private" ? [
+              [{ text: "Dispatch Tools", url: "https://haultrackerpro.com/dashboard" }],
+              [{ text: "My Dispatch Status", url: "https://haultrackerpro.com/dashboard" }],
+            ] : TELEGRAM_DISPATCH_GUIDANCE_BUTTONS,
+          });
+        } catch {
+          log("dispatch_guidance_send_failed");
         }
       }
     }

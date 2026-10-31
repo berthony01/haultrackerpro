@@ -23,6 +23,7 @@ import {
   runTelegramMessageDeliveryDrain,
   runDispatchReviewDeliveryDrain,
   runTelegramPoll,
+  TELEGRAM_DISPATCH_GUIDANCE_ENABLED,
   sanitizeErrorCode,
   type TelegramAlertClaim,
   type TelegramAlertOutbox,
@@ -1022,7 +1023,8 @@ const WORK_STATUS_TEXT = "HaulTracker Pro — account status\n\nWork account con
 // only receives commands addressed to it (e.g. /bind@HaulTrackerBot), not all
 // plain text.
 //   private: start, menu, status, help
-//   group:   bind
+  //   private (staged OFF): dispatch; group (staged OFF): dispatch, help
+  //   group:   bind
 const HELP_COMMANDS_TEXT =
   "Commands:\n/menu — your buttons\n/status — account status\n/help — this guide";
 const DISPATCH_NOT_ACTIVE_TEXT =
