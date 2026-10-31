@@ -129,6 +129,59 @@ describe("Single-load QA route", () => {
     expect(f.review).toHaveBeenCalledWith(expect.objectContaining({ telegramUserId: 501, proposalId: ID, action: "accept" }));
     expect(f.genericReview).not.toHaveBeenCalled();
   });
+  it("new accepted QA callback sends one button-free acknowledgement to its transport chat; replay sends none", async () => {
+    const f = fixture([message(), callback()]);
+    const first = await f.poll();
+    expect(first).toMatchObject({ kind: "ok", advancedTo: 2 });
+    expect(f.status()).toBe("cancelled");
+    expect(f.send.mock.calls).toEqual([[{
+      chatId: GROUP,
+      text: "✅ Cancellation confirmed for load HTP-QA-L2. Status: Cancelled. Review completed.",
+    }]]);
+    await f.poll();
+    expect(f.send).toHaveBeenCalledTimes(1);
+    expect(f.gateway.answerCallbackQuery).toHaveBeenCalledTimes(2);
+  });
+  it.each(["dispatch_review_denied", "dispatch_review_stale", "dispatch_review_expired",
+    "dispatch_review_already_handled", "dispatch_review_rejected", "dispatch_review_invalid"] as const)(
+    "%s never sends a QA acknowledgement", async resultCode => {
+      const f = fixture([callback()]);
+      f.ledger.processQaDispatchReviewActionUpdate = vi.fn(async () => ({ isNew: true, resultCode }));
+      expect((await f.poll()).kind).toBe("ok");
+      expect(f.send).not.toHaveBeenCalled(); expect(f.status()).toBe("pending");
+    });
+  it("other callback namespaces retain their existing answer-only behavior", async () => {
+    const update = callback(); update.callback_query.data = `c1:accept:${ID}`;
+    const f = fixture([update]); await f.poll();
+    expect(f.review).not.toHaveBeenCalled(); expect(f.send).not.toHaveBeenCalled();
+    expect(f.gateway.answerCallbackQuery).toHaveBeenCalledTimes(1);
+  });
+  it("QA expiry prevents review and acknowledgement", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-02T23:59:59Z"));
+    const f = fixture([callback()]); await f.poll();
+    expect(f.review).not.toHaveBeenCalled(); expect(f.send).not.toHaveBeenCalled();
+  });
+  it("callback toast failure cannot suppress the accepted QA acknowledgement", async () => {
+    const f = fixture([callback()]);
+    f.gateway.answerCallbackQuery = vi.fn(async () => { throw new Error("telegram_gateway_http_error"); });
+    expect(await f.poll()).toMatchObject({ kind: "ok", advancedTo: 2 });
+    expect(f.status()).toBe("cancelled"); expect(f.send).toHaveBeenCalledTimes(1);
+  });
+  it.each(["response", "throw"])("acknowledgement %s failure is sanitized, preserves commit/cursor and is not retried", async failure => {
+    const f = fixture([callback()]); const log = vi.fn();
+    f.gateway.sendMessage = vi.fn(async () => {
+      if (failure === "throw") throw new Error("private chat/user details must not appear");
+      return { ok: false, status: 403, errorCode: "private chat/user details must not appear" };
+    });
+    const poll = () => runTelegramPoll({ ledger: f.ledger, gateway: f.gateway, log,
+      sha256: async s => createHash("sha256").update(s).digest("hex"), singleLoadQaEnabled: true });
+    expect(await poll()).toMatchObject({ kind: "ok", processed: 1, advancedTo: 2 });
+    expect(f.status()).toBe("cancelled");
+    expect(log).toHaveBeenCalledWith("qa_review_ack_failed", { code: "telegram_poll_unexpected_error" });
+    await poll();
+    expect(f.gateway.sendMessage).toHaveBeenCalledTimes(1);
+    expect(f.review).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("Single-load QA delivery isolation", () => {
