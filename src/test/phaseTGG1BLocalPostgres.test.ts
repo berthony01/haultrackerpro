@@ -119,6 +119,16 @@ describe('TG-G1B real disposable PostgreSQL transactions',()=>{
    for(const sql of ["(999,-100,'group')","(501,-100,'supergroup')","(501,-999,'group')","(503,-100,'group')","(501,NULL,'group')","(501,-100,'private')"])
      expect((await rpc('SELECT telegram_get_dispatch_guidance'+sql+' ok'))[0].ok).toBe(false);
  });
+ it('expired pending invitation cannot provide dispatch delegation',async()=>{
+   await q("UPDATE recruiter_members SET member_user_id=NULL,status='pending',invite_token_hash='expired-local',invite_expires_at=now()-interval '1 minute' WHERE member_user_id=$1",[STAFF]);
+   expect((await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group') ok"))[0].ok).toBe(false);
+ });
+ it('read-only guidance leaves loads, receipts, proposals and delivery untouched',async()=>{
+   const before=await counts();
+   await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group')");
+   expect(await counts()).toEqual(before);
+   expect((await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status).toBe('en_route');
+ });
  it('intake atomically enqueues one durable notification, no load update',async()=>{await proposal();expect(await counts()).toEqual({p:1,o:1,r:1,e:0});expect((await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status).toBe('en_route');});
  it('concurrent identical receipts dedupe to one proposal/outbox',async()=>{const r=await Promise.all([intake(),intake()]);expect(r.map(x=>x[0].is_new).sort()).toEqual([false,true]);expect(await counts()).toEqual({p:1,o:1,r:1,e:0});});
  it('content conflict rolls back without an extra notification',async()=>{await proposal();await expect(intake(10,'AB-123',-100,hash(999))).rejects.toThrow('telegram_update_conflict');expect(await counts()).toEqual({p:1,o:1,r:1,e:0});});
