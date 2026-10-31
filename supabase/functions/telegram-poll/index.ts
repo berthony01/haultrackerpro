@@ -43,7 +43,7 @@ import {
   type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
-import { TELEGRAM_SINGLE_LOAD_QA_RPCS } from "../_shared/telegram-dispatch-group-review.ts";
+import { TELEGRAM_SINGLE_LOAD_QA_RPCS, TELEGRAM_GENQA_RPCS, buildGenQaDeliveryLedger } from "../_shared/telegram-dispatch-group-review.ts";
 import type {
   DispatchDeliveryClaim,
   DispatchDeliveryFailure,
@@ -552,6 +552,34 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
     // TG-G1C (gated; unreachable while TGG1B_DISPATCH_GROUP_REVIEW_ENABLED is
     // false). Intake: receipt + proposal + outbox atomically; never a load
     // change. Transports parser-normalized reference/status only — no text.
+    async processGenQaDispatchGroupUpdate(input): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(TELEGRAM_GENQA_RPCS.intake, {
+        _lease_token: input.leaseToken,
+        _update_id: input.updateId,
+        _payload_hash: input.payloadHash,
+        _telegram_user_id: input.telegramUserId,
+        _telegram_chat_id: input.telegramChatId,
+        _chat_type: input.chatType,
+        _reference: input.reference,
+        _proposed_status: input.proposedStatus,
+      });
+      if (error) throw new Error(boundedRpcErrorCode(error));
+      return unwrapTerminal(data);
+    },
+    async processGenQaDispatchReviewActionUpdate(input): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(TELEGRAM_GENQA_RPCS.review, {
+        _lease_token: input.leaseToken,
+        _update_id: input.updateId,
+        _payload_hash: input.payloadHash,
+        _telegram_user_id: input.telegramUserId,
+        _telegram_chat_id: input.telegramChatId,
+        _chat_type: input.chatType,
+        _action: input.action,
+        _proposal_id: input.proposalId,
+      });
+      if (error) throw new Error(boundedRpcErrorCode(error));
+      return unwrapTerminal(data);
+    },
     async processQaDispatchGroupUpdate(input): Promise<TelegramTerminalResult> {
       const { data, error } = await supabase.rpc(TELEGRAM_SINGLE_LOAD_QA_RPCS.intake, {
         _lease_token: input.leaseToken,
@@ -1270,6 +1298,10 @@ Deno.serve(async (req: Request) => {
       await runDispatchReviewDeliveryDrain({
         ledger: buildDispatchDeliveryLedger(supabase),
         qaLedger: buildDispatchDeliveryLedger(supabase, true),
+        genQaLedger: buildGenQaDeliveryLedger(async (name, args) => {
+          const { data, error } = await supabase.rpc(name, args);
+          return { data, error };
+        }),
         gateway,
         log,
       });
