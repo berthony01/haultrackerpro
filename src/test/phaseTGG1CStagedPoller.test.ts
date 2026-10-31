@@ -284,7 +284,8 @@ describe("TG-G1C outbox drain + review", () => {
     const { answers, sent } = await poll(w, [tap(2, accept)]);
     expect(w.loads.get("AB-123")!.status).toBe("completed");
     expect(answers).toEqual(["Confirmed. The load status was updated."]);
-    expect(sent).toHaveLength(0);
+    expect(sent).toEqual([{ chatId: GROUP,
+      text: "✅ Dispatch review confirmed. The approved load status was updated in HaulTracker Pro.", buttons: undefined }]);
     // second drain: nothing left
     expect((await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true })).sent).toBe(0);
   });
@@ -338,8 +339,11 @@ describe("TG-G1C outbox drain + review", () => {
     const rj = composeDispatchReviewData("reject", p.id)!;
     let res = await poll(w, [tap(20, rj)]);
     expect(res.answers[0]).toMatch(/Rejected/);
+    expect(res.sent).toEqual([{ chatId: GROUP,
+      text: "❌ Dispatch review rejected. No load was changed.", buttons: undefined }]);
     res = await poll(w, [tap(20, rj)]);
     expect(res.answers[0]).toMatch(/Rejected/);
+    expect(res.sent).toHaveLength(0);
     expect(w.loads.get("AB-124")!.status).toBe("pending");
     expect(p.state).toBe("rejected");
   });
