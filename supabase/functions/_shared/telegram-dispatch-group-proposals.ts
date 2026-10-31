@@ -99,6 +99,21 @@ export function normalizeDispatchReference(v: unknown): string | null {
   return REFERENCE_SHAPE.test(r) ? r : null;
 }
 
+// Exact privacy-safe reports, not instructions to mutate a load. Telegram
+// privacy-enabled non-admin bots receive addressed commands, not ambient text.
+// Do not advertise/register these until separately approved live status QA.
+const STATUS_REPORT_COMMAND = /^\/(delivered|cancelled)(?:@HaulTrackerBot)? ([A-Za-z0-9-]{4,24})$/;
+export function parseDispatchStatusReportCommand(text: unknown): {
+  event: DispatchTargetStatus; reference: string;
+} | null {
+  if (typeof text !== "string" || /[\r\n]/.test(text)) return null;
+  const match = STATUS_REPORT_COMMAND.exec(text);
+  if (!match) return null;
+  const reference = normalizeDispatchReference(match[2]);
+  if (!reference || DISQUALIFIERS.some(rx => rx.test(match[2]))) return null;
+  return { event: match[1] === "delivered" ? "completed" : "cancelled", reference };
+}
+
 export function parseDispatchMessageCandidate(input: DispatchGroupMessageInput): DispatchMessageCandidate {
   if (input == null || typeof input !== "object") return { kind: "no_op", reason: "invalid_metadata" };
   if (input.chatType !== "group" && input.chatType !== "supergroup") return { kind: "no_op", reason: "not_group_chat" };
@@ -108,7 +123,12 @@ export function parseDispatchMessageCandidate(input: DispatchGroupMessageInput):
   if (typeof input.text !== "string" || input.text.trim() === "") return { kind: "no_op", reason: "no_text" };
   const text = input.text;
   if (text.length > MAX_TEXT) return { kind: "no_op", reason: "text_too_long" };
-  if (text.trim().startsWith("/")) return { kind: "no_op", reason: "non_assertive_wording" };
+  if (text.trim().startsWith("/")) {
+    const command = parseDispatchStatusReportCommand(text);
+    return command ? { kind: "proposed", ...command,
+      telegramChatId: input.telegramChatId, updateId: input.updateId } :
+      { kind: "no_op", reason: "non_assertive_wording" };
+  }
   if (DISQUALIFIERS.some(rx => rx.test(text))) return { kind: "no_op", reason: "non_assertive_wording" };
 
   const completed = COMPLETION.test(text);
