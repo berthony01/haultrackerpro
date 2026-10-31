@@ -14,8 +14,9 @@ DO $version$ DECLARE n integer; BEGIN
  OR (p.oid='public.telegram_ack_dispatch_review_delivery(uuid,uuid,bigint)'::regprocedure AND md5(p.prosrc)='5019f8f307fc2ee3661194201fd86059')
  OR (p.oid='public.telegram_fail_dispatch_review_delivery(uuid,uuid,text)'::regprocedure AND md5(p.prosrc)='ecb6478018179bff796c0e1ab9d2d4a1')
  OR (p.oid='public.telegram_dispatch_update_driver_load_status(bigint,bigint,uuid,uuid,text,text)'::regprocedure AND md5(p.prosrc)='5aa31914e9aa122500dd0c47f3b9fa37')
- OR (p.oid='public.current_user_can_dispatch_load_action(uuid,uuid,uuid,public.recruiter_workspace_permission)'::regprocedure AND md5(p.prosrc)='d979f69a2096197cee353cc4f0796e38'));
- IF n<>7 THEN RAISE EXCEPTION 'genqa_dispatch_version_mismatch'; END IF;
+ OR (p.oid='public.current_user_can_dispatch_load_action(uuid,uuid,uuid,public.recruiter_workspace_permission)'::regprocedure AND md5(p.prosrc)='d979f69a2096197cee353cc4f0796e38')
+ OR (p.oid='public.dispatch_update_driver_load_status(uuid,uuid,uuid,uuid,text,text,text)'::regprocedure AND md5(p.prosrc)='4ff8b99be0a9499b2a774dea5f4e2107'));
+ IF n<>8 THEN RAISE EXCEPTION 'genqa_dispatch_version_mismatch'; END IF;
  IF EXISTS(SELECT 1 FROM pg_catalog.pg_proc p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
  WHERE p.pronamespace='public'::regnamespace AND p.proname IN ('telegram_process_dispatch_group_update','telegram_process_dispatch_review_action','telegram_claim_dispatch_review_delivery','telegram_ack_dispatch_review_delivery','telegram_fail_dispatch_review_delivery','telegram_dispatch_update_driver_load_status')
  AND a.privilege_type='EXECUTE' AND (a.grantee=0 OR a.grantee IN (SELECT oid FROM pg_catalog.pg_roles WHERE rolname IN ('anon','authenticated'))))
@@ -281,6 +282,7 @@ DECLARE
   _outcome text;
   _sqlstate text;
   _message text;
+  _receipt_hash text;
 BEGIN
   -- One workflow lock: consistent proposal/load/outbox order, absent receipt dedupe.
   -- Serializes G1B only; no changes to existing poller or dispatch authority.
@@ -310,6 +312,8 @@ BEGIN
   END IF;
 
   IF public._telegram_genqa_dispatch_active() AND NOT public._telegram_genqa_dispatch_proposal(_proposal_id) THEN RAISE EXCEPTION 'qa_dispatch_scope_denied'; END IF;
+  -- Bind EVERY terminal receipt to its locator/action without schema additions.
+  _receipt_hash := encode(sha256(convert_to(_payload_hash || ':' || _proposal_id::text || ':' || COALESCE(_action,'invalid'),'UTF8')),'hex');
   PERFORM public._telegram_genqa_dispatch_actor(_telegram_user_id);
   SELECT * INTO _existing
     FROM public.telegram_update_receipts r
@@ -317,8 +321,7 @@ BEGIN
    FOR UPDATE;
 
   IF FOUND THEN
-    IF NOT EXISTS (SELECT 1 FROM public.telegram_dispatch_review_proposals p WHERE p.id=_proposal_id AND public._telegram_genqa_dispatch_proposal(p.id) AND p.decision_update_id=_update_id AND p.reviewer_telegram_user_id=_telegram_user_id) THEN RAISE EXCEPTION 'genqa_dispatch_receipt_scope_denied'; END IF;
-    IF _existing.payload_hash = _payload_hash
+    IF _existing.payload_hash = _receipt_hash
        AND _existing.update_type = 'callback_query'
        AND _existing.telegram_user_id IS NOT DISTINCT FROM _telegram_user_id
        AND _existing.telegram_chat_id IS NOT DISTINCT FROM _telegram_chat_id
@@ -419,7 +422,11 @@ BEGIN
     PERFORM pg_catalog.set_config('request.jwt.claim.sub', _reviewer::text, true);
 
     IF public._telegram_genqa_dispatch_active() THEN PERFORM public._telegram_genqa_dispatch_assert(_telegram_chat_id,_chat_type); END IF;
-    IF _action = 'reject' THEN
+    -- The load lock may have waited beyond the proposal deadline.
+    IF _p.expires_at <= clock_timestamp() THEN
+      UPDATE public.telegram_dispatch_review_proposals SET status='expired',decided_at=now() WHERE id=_p.id;
+      _outcome := 'dispatch_review_expired';
+    ELSIF _action = 'reject' THEN
       IF public.current_user_can_dispatch_load_action(
            _p.recruiter_id, _p.relationship_id, _driver_user_id, 'loads_update_status'
          ) THEN
@@ -483,7 +490,7 @@ BEGIN
     update_id, payload_hash, update_type,
     telegram_user_id, telegram_chat_id, status, result_code
   ) VALUES (
-    _update_id, _payload_hash, 'callback_query',
+    _update_id, _receipt_hash, 'callback_query',
     _telegram_user_id, _telegram_chat_id, 'processed', _outcome
   );
 
@@ -536,6 +543,11 @@ BEGIN
     RETURN;
   END IF;
   IF public._telegram_genqa_dispatch_active() THEN PERFORM public._telegram_genqa_dispatch_assert(); END IF;
+  _now := clock_timestamp();
+  IF NOT EXISTS(SELECT 1 FROM public.telegram_dispatch_review_outbox o JOIN public.telegram_dispatch_review_proposals p ON p.id=o.proposal_id WHERE o.id=_id AND p.status='pending' AND p.expires_at>_now FOR SHARE OF p) THEN
+    UPDATE public.telegram_dispatch_review_outbox SET delivery_state='cancelled',claim_token=NULL,lease_expires_at=NULL,completed_at=_now,updated_at=_now,last_failure_code='proposal_closed' WHERE id=_id;
+    RETURN;
+  END IF;
   UPDATE public.telegram_dispatch_review_outbox o
     SET delivery_state='sending', attempt_count=attempt_count+1, claim_token=_token,
         lease_expires_at=LEAST(_now+interval '60 seconds','2026-11-05 23:59:59+00'::timestamptz), updated_at=_now

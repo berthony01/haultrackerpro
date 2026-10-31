@@ -81,6 +81,8 @@ beforeAll(async()=>{
  // New candidate is compiled byte-for-byte against canonical function hashes.
  await seedGenFixture();
  await q(read(GEN_CANDIDATE));
+ // Production numeric/nullability/default projection; no invented recompute trigger.
+ await q(`ALTER TABLE loads ADD COLUMN loaded_miles numeric NOT NULL DEFAULT 0, ADD COLUMN deadhead_miles numeric NOT NULL DEFAULT 0, ADD COLUMN rate_per_mile numeric NOT NULL DEFAULT 0, ADD COLUMN total_miles numeric, ADD COLUMN estimated_pay numeric, ADD COLUMN actual_pay_received numeric, ADD COLUMN gross_revenue numeric, ADD COLUMN flat_rate_amount numeric, ADD COLUMN wait_fee numeric NOT NULL DEFAULT 0, ADD COLUMN detention_fee numeric NOT NULL DEFAULT 0, ADD COLUMN other_fees numeric NOT NULL DEFAULT 0;`);
 },60000);
 async function seedFixture() {
  await q('TRUNCATE auth.users,telegram_update_receipts CASCADE');
@@ -90,7 +92,7 @@ async function seedFixture() {
  INSERT INTO recruiter_billing_profiles VALUES('${R}','${OWNER}','growth','active');
  INSERT INTO recruiter_members(recruiter_id,member_user_id,status,role,permissions) VALUES('${R}','${OWNER}','active','recruiter_owner','{}'),('${R}','${STAFF}','active','recruiter_staff','{"loads_update_status":true}');
  INSERT INTO carrier_driver_relationships(id,recruiter_id,driver_user_id,status,created_by_user_id) VALUES('${REL}','${R}','${D}','active','${OWNER}'),('${uid(202)}','${uid(102)}','${uid(5)}','active','${uid(4)}');
- INSERT INTO loads VALUES('${LOAD}','${D}','en_route','AB-123','${REL}',NULL),('${uid(302)}','${uid(5)}','pending','ZZ-999','${uid(202)}',NULL);
+ INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,updated_by_user_id) VALUES('${LOAD}','${D}','en_route','AB-123','${REL}',NULL),('${uid(302)}','${uid(5)}','pending','ZZ-999','${uid(202)}',NULL);
  INSERT INTO telegram_chat_bindings(id,telegram_chat_id,recruiter_id,chat_type,bound_by_user_id) VALUES('${uid(401)}',-100,'${R}','group','${OWNER}'),('${uid(402)}',-200,'${uid(102)}','group','${uid(4)}');
  INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(501,'${STAFF}'),(502,'${uid(4)}');
  UPDATE telegram_poll_state SET lease_token='${LEASE}',lease_expires_at=now()+interval '1 hour';`);
@@ -417,5 +419,94 @@ describe('TG-G1 GEN1 hash-pinned one-group acceptance, disposable PostgreSQL onl
   const rows=await q("SELECT p.oid::regprocedure::text sig,proname,pronargs FROM pg_proc p WHERE pronamespace='public'::regnamespace AND (proname LIKE 'telegram_genqa_%' OR proname LIKE '_telegram_genqa_%')");
   expect(rows.length).toBe(11);
   for(const row of rows) await expect(rpc(`SELECT public.${row.proname}(${Array(Number(row.pronargs)).fill('NULL').join(',')})`,[],role)).rejects.toMatchObject({code:'42501'});
+ });
+});
+
+
+async function waitForGenLock(name:string) {
+ for(let n=0;n<150;n++) {
+  const rows=await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE $1",['SELECT * FROM '+name+'%']);
+  if(rows[0].n>0)return;
+  await new Promise(r=>setTimeout(r,10));
+ }
+ throw new Error('Expected real PostgreSQL lock wait');
+}
+async function financialState(id:string) {
+ return (await q('SELECT loaded_miles,deadhead_miles,rate_per_mile,total_miles,estimated_pay,actual_pay_received,gross_revenue,flat_rate_amount,wait_fee,detention_fee,other_fees FROM loads WHERE id=$1',[id]))[0];
+}
+async function historicalSnapshot() {
+ const tables=['loads','telegram_dispatch_review_proposals','telegram_dispatch_review_outbox','load_events','dispatch_command_receipts'];
+ const result:Record<string,unknown>={};
+ for(const table of tables){
+  const filter=table==='loads'?'t.id<>$1':table==='telegram_dispatch_review_outbox'?'t.proposal_id IN (SELECT id FROM telegram_dispatch_review_proposals WHERE load_id<>$1)':'t.load_id<>$1';
+  result[table]=await q(`SELECT row_to_json(t)::text row FROM ${table} t WHERE ${filter} ORDER BY t.id`,[GEN_LOAD]);
+ }
+ result.receipts=await q('SELECT row_to_json(t)::text row FROM telegram_update_receipts t WHERE update_id IN (100,130) ORDER BY update_id');
+ return result;
+}
+describe('TG-G1 GEN1 terminal replay, lock-deadline and financial preservation regressions',()=>{
+ beforeEach(seedGenFixture);
+ it.each(['accepted','rejected','already_handled','expired','stale'])('exact terminal %s replay returns old result with no extra writes; wrong locator/action denied',async(kind)=>{
+  const id=await genProposal();let n=430,action='accept';
+  if(kind==='rejected')action='reject';
+  if(kind==='already_handled'){await genReview(id);n=431;}
+  if(kind==='expired')await q("UPDATE telegram_dispatch_review_proposals SET created_at=now()-interval '16 minutes',expires_at=now()-interval '1 minute' WHERE id=$1",[id]);
+  if(kind==='stale')await q("UPDATE loads SET status='en_route' WHERE id=$1",[GEN_LOAD]);
+  const result=(await genReview(id,n,501,GEN_CHAT,action))[0];expect(result.result_code).toBe('dispatch_review_'+kind);
+  const before=await counts(),load=await q('SELECT row_to_json(l)::text row FROM loads l ORDER BY id');
+  expect((await genReview(id,n,501,GEN_CHAT,action))[0]).toEqual({is_new:false,result_code:result.result_code});
+  await expect(genReview(uid(777),n,501,GEN_CHAT,action)).rejects.toThrow();
+  await expect(genReview(id,n,501,GEN_CHAT,action==='accept'?'reject':'accept')).rejects.toThrow('telegram_update_conflict');
+  expect(await counts()).toEqual(before);expect(await q('SELECT row_to_json(l)::text row FROM loads l ORDER BY id')).toEqual(load);
+ });
+ it('same payload/update replay cannot select another in-scope proposal',async()=>{
+  const id=await genProposal();await genReview(id,430,501,GEN_CHAT,'reject');const second=(await genIntake(401))[0].proposal_id as string;
+  const before=await counts();await expect(genReview(second,430)).rejects.toThrow('telegram_update_conflict');expect(await counts()).toEqual(before);
+ });
+ it.each(['accept','reject'])('proposal expiry crossing load-lock upgrade prevents %s after earlier validation',async(action)=>{
+  const id=await genProposal();await q("UPDATE telegram_dispatch_review_proposals SET expires_at=clock_timestamp()+interval '1 second' WHERE id=$1",[id]);
+  const c=await pool.connect();
+  try{await c.query('BEGIN');await c.query('SELECT id FROM loads WHERE id=$1 FOR KEY SHARE',[GEN_LOAD]);
+   const pending=genReview(id,430,501,GEN_CHAT,action);await waitForGenLock('telegram_genqa_process_dispatch_review_action');
+   // Database deadline, not a synthetic replacement of the candidate clock.
+   while(!(await q('SELECT clock_timestamp()>=expires_at elapsed FROM telegram_dispatch_review_proposals WHERE id=$1',[id]))[0].elapsed)await c.query('SELECT pg_sleep(0.02)');
+   await c.query('COMMIT');expect((await pending)[0].result_code).toBe('dispatch_review_expired');
+   expect((await q('SELECT status FROM loads WHERE id=$1',[GEN_LOAD]))[0].status).toBe('pending');expect((await counts()).e).toBe(0);
+  }finally{await c.query('ROLLBACK');c.release();}
+ });
+ it('claim waiting in cleanup cannot deliver a proposal that expired during the wait',async()=>{
+  // A closed QA row forces a genuine cleanup UPDATE wait before selecting the live row.
+  const closed=await genProposal();await genReview(closed,430,501,GEN_CHAT,'reject');
+  const id=(await genIntake(401))[0].proposal_id as string;await q("UPDATE telegram_dispatch_review_proposals SET expires_at=clock_timestamp()+interval '1 second' WHERE id=$1",[id]);
+  const c=await pool.connect();
+  try{await c.query('BEGIN');await c.query('SELECT id FROM telegram_dispatch_review_outbox WHERE proposal_id=$1 FOR UPDATE',[closed]);
+   const pending=genClaim();await waitForGenLock('telegram_genqa_claim_dispatch_review_delivery');
+   while(!(await q('SELECT clock_timestamp()>=expires_at elapsed FROM telegram_dispatch_review_proposals WHERE id=$1',[id]))[0].elapsed)await c.query('SELECT pg_sleep(0.02)');
+   await c.query('COMMIT');expect(await pending).toHaveLength(0);
+  }finally{await c.query('ROLLBACK');c.release();}
+ });
+ it('candidate aborts on drift of the actual canonical status-mutating body',async()=>{
+  const c=await pool.connect();
+  try{await c.query('BEGIN');
+   const def=(await c.query("SELECT pg_get_functiondef('public.dispatch_update_driver_load_status(uuid,uuid,uuid,uuid,text,text,text)'::regprocedure) d,md5(prosrc) h FROM pg_proc WHERE oid='public.dispatch_update_driver_load_status(uuid,uuid,uuid,uuid,text,text,text)'::regprocedure")).rows[0];
+   expect(def.h).toBe('4ff8b99be0a9499b2a774dea5f4e2107');
+   await c.query((def.d as string).replace('BEGIN','BEGIN\n -- simulated upstream mutation drift'));
+   const sql=read(GEN_CANDIDATE),begin=sql.indexOf('DO $version$'),end=sql.indexOf('DO $provenance$');
+   await expect(c.query(sql.slice(begin,end))).rejects.toThrow('genqa_dispatch_version_mismatch');
+  }finally{await c.query('ROLLBACK');c.release();}
+ });
+ it('historical accepted L2 load/proposal/outbox/events/receipts and financial histories remain byte-identical across GEN1 lifecycle',async()=>{
+  await q("INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,rate_per_mile,estimated_pay,gross_revenue,actual_pay_received) VALUES($1,$2,'pending','HTP-QA-L2',$3,235,15,2.40,564,564,560)",[QA_LOAD,D,REL]);
+  const old=await qaProposal(),oldClaim=(await qaClaim())[0];await ack(oldClaim);await qaReview(old);
+  await q('UPDATE loads SET loaded_miles=780,deadhead_miles=20,rate_per_mile=2.45,estimated_pay=1911,gross_revenue=1911,actual_pay_received=1900 WHERE id=$1',[LOAD]);
+  const before=await historicalSnapshot(),money=await financialState(GEN_LOAD);
+  expect(money).toEqual({loaded_miles:'0',deadhead_miles:'0',rate_per_mile:'0',total_miles:null,estimated_pay:null,actual_pay_received:null,gross_revenue:null,flat_rate_amount:null,wait_fee:'0',detention_fee:'0',other_fees:'0'});
+  const id=await genProposal();expect(await historicalSnapshot()).toEqual(before);
+  const c=(await genClaim())[0];expect(await historicalSnapshot()).toEqual(before);await genFail(c);
+  await q("UPDATE telegram_dispatch_review_outbox SET next_attempt_at=now()-interval '1 second' WHERE id=$1",[c.outbox_id]);
+  await genAck((await genClaim())[0]);await genReview(id);await genClaim();
+  await expect(genReview(old)).rejects.toThrow('qa_dispatch_scope_denied');
+  expect(await historicalSnapshot()).toEqual(before);expect(await financialState(GEN_LOAD)).toEqual(money);
+  expect((await q('SELECT status FROM loads WHERE id=$1',[QA_LOAD]))[0].status).toBe('cancelled');
  });
 });
