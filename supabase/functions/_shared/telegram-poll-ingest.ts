@@ -1400,11 +1400,6 @@ export async function runTelegramPoll(
     // duplicate delivery (which reports the already-recorded outcome) and a
     // failure here can never re-apply or roll back the database action.
     if (identity.callbackQueryId != null) {
-    if (genQaActive(genQaEnabled) && identity.telegramChatId === TELEGRAM_GENQA_CHAT_ID &&
-        (identity.chatType === "group" || identity.chatType === "supergroup")) {
-      const review = parseDispatchReviewData(identity.callbackData);
-      if (review) return { kind: "dispatch_review_action", ...review, chatType: identity.chatType, genQaOnly: true };
-    }
       const callbackQueryId = identity.callbackQueryId;
       if (gateway.answerCallbackQuery) {
         try {
