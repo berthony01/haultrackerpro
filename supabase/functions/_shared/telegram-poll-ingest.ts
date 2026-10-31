@@ -510,6 +510,10 @@ export interface TelegramPollDeps {
    *  so the compile-time `TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false` applies.
    *  Not an environment/runtime toggle. */
   dispatchReviewEnabled?: boolean;
+  /** Synthetic tests only; production uses the independent OFF literal. */
+  dispatchGuidanceEnabled?: boolean;
+  dispatchGuidanceButtons?: { private: TelegramInlineUrlButton[][]; group: TelegramInlineUrlButton[][] };
+  authorizeDispatchGuidance?: (input: { telegramUserId: number; telegramChatId: number | null; chatType: string }) => Promise<unknown>;
 }
 
 export type TelegramPollRunResult =
@@ -551,6 +555,33 @@ const START_COMMAND_PATTERN = /^\/start ([0-9a-f]{64})$/;
 /** TG-2F-C. `/bind <64 lowercase hex>`, optionally addressed to the bot. The
  *  bot username is a public, non-secret constant. */
 export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
+// Sprint 1: independent staging gate. Never enables dispatch processing or AI.
+export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = false as const;
+export const TELEGRAM_DISPATCH_GUIDANCE_TEXT =
+  "Dispatcher\nMy Dispatch Status: updates not active. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
+
+/** Read-only guidance only. Exact transport command, never ordinary group text.
+ * Missing/uninstalled RPC, denial, malformed output or errors all fail closed. */
+export async function getTelegramDispatchGuidance(
+  input: { telegramUserId: number | null; telegramChatId: number | null; chatType: string | null; text: string | null },
+  authorize: ((input: { telegramUserId: number; telegramChatId: number | null; chatType: string }) => Promise<unknown>) | undefined,
+  enabled: boolean = TELEGRAM_DISPATCH_GUIDANCE_ENABLED,
+): Promise<boolean> {
+  if (!enabled || !authorize || !Number.isSafeInteger(input.telegramUserId) ||
+      input.telegramUserId === null || input.telegramUserId <= 0 ||
+      !Number.isSafeInteger(input.telegramChatId) || input.telegramChatId === null) return false;
+  const privateChat = input.chatType === "private";
+  if (privateChat ? input.telegramChatId !== input.telegramUserId :
+      !["group", "supergroup"].includes(input.chatType ?? "") || input.telegramChatId >= 0) return false;
+  const commands = privateChat ? ["/start", "/menu", "/status", "/help", "/dispatch"] :
+    ["/dispatch", "/dispatch@HaulTrackerBot", "/help", "/help@HaulTrackerBot"];
+  if (!commands.includes(input.text ?? "")) return false;
+  try {
+    return await authorize({ telegramUserId: input.telegramUserId,
+      telegramChatId: privateChat ? null : input.telegramChatId,
+      chatType: input.chatType ?? "" }) === true;
+  } catch { return false; }
+}
 const BIND_COMMAND_PATTERN = new RegExp(
   `^\\/bind(?:@${TELEGRAM_BOT_USERNAME})? ([0-9a-f]{64})$`,
 );
@@ -1343,6 +1374,10 @@ export async function runTelegramPoll(
         }
       }
     } else if (terminal.isNew && identity.telegramChatId !== null) {
+      // Guidance uses the existing terminal receipt, so retries never send
+      // twice. Read-only authorization failure cannot stall existing traffic.
+      const dispatchGuidance = await getTelegramDispatchGuidance(identity,
+        deps.authorizeDispatchGuidance, deps.dispatchGuidanceEnabled);
       const feedback = terminal.resultCode === "link_success"
         ? TELEGRAM_LINK_SUCCESS_MESSAGE
         : terminal.resultCode === "link_rejected" ||
@@ -1410,6 +1445,19 @@ export async function runTelegramPoll(
             updateId,
             code: sanitizeErrorCode(error),
           });
+        }
+      }
+      if (dispatchGuidance) {
+        try {
+          await gateway.sendMessage({
+            chatId: identity.telegramChatId,
+            text: TELEGRAM_DISPATCH_GUIDANCE_TEXT,
+            buttons: identity.chatType === "private"
+              ? deps.dispatchGuidanceButtons?.private
+              : deps.dispatchGuidanceButtons?.group,
+          });
+        } catch {
+          log("dispatch_guidance_send_failed");
         }
       }
     }

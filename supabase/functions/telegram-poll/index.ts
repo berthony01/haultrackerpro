@@ -23,6 +23,7 @@ import {
   runTelegramMessageDeliveryDrain,
   runDispatchReviewDeliveryDrain,
   runTelegramPoll,
+  TELEGRAM_DISPATCH_GUIDANCE_ENABLED,
   sanitizeErrorCode,
   type TelegramAlertClaim,
   type TelegramAlertOutbox,
@@ -1022,7 +1023,8 @@ const WORK_STATUS_TEXT = "HaulTracker Pro — account status\n\nWork account con
 // only receives commands addressed to it (e.g. /bind@HaulTrackerBot), not all
 // plain text.
 //   private: start, menu, status, help
-//   group:   bind
+  //   private (staged OFF): dispatch; group (staged OFF): dispatch, help
+  //   group:   bind
 const HELP_COMMANDS_TEXT =
   "Commands:\n/menu — your buttons\n/status — account status\n/help — this guide";
 const DISPATCH_NOT_ACTIVE_TEXT =
@@ -1207,6 +1209,25 @@ Deno.serve(async (req: Request) => {
       sha256: sha256Hex,
       log,
       quickPostExtractor: buildQuickPostExtractor(supabase),
+      dispatchGuidanceButtons: {
+        private: [[{ text: "Dispatch Tools", url: URL_OPEN_APP }]],
+        group: [
+          [{ text: "Open Dispatch Menu", url: "https://t.me/HaulTrackerBot" }],
+          [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],
+        ],
+      },
+      // Independent read-only UX gate. Missing candidate RPC is a silent
+      // denial; no raw database error or identifier reaches a chat or log.
+      authorizeDispatchGuidance: TELEGRAM_DISPATCH_GUIDANCE_ENABLED
+        ? async (input) => {
+            const { data, error } = await supabase.rpc("telegram_get_dispatch_guidance", {
+              _telegram_user_id: input.telegramUserId,
+              _telegram_chat_id: input.telegramChatId,
+              _chat_type: input.chatType,
+            });
+            return !error && data === true;
+          }
+        : undefined,
     });
 
     await drainAlerts();

@@ -69,6 +69,9 @@ beforeAll(async()=>{
  for(const f of await q("SELECT p.oid::regprocedure::text sig FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid WHERE n.nspname='public'"))
   await q(`REVOKE ALL ON FUNCTION ${f.sig} FROM PUBLIC,anon,authenticated; GRANT EXECUTE ON FUNCTION ${f.sig} TO service_role`);
  await q(read('supabase/migration-candidates/20261029183000_tgg1b_dispatch_review_queue.sql'));
+ // Faithful live membership lifecycle column, absent from older projection.
+ await q('ALTER TABLE recruiter_members ADD COLUMN revoked_at timestamptz');
+ await q(read('supabase/migration-candidates/20261031030000_telegram_dispatch_guidance.sql'));
 },60000);
 beforeEach(async()=>{
  await q('TRUNCATE auth.users,telegram_update_receipts CASCADE');
@@ -86,6 +89,46 @@ beforeEach(async()=>{
 afterAll(async()=>{ await pool?.end(); if(dir) { try { run('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop']); } finally { rmSync(dir,{recursive:true,force:true}); } } });
 
 describe('TG-G1B real disposable PostgreSQL transactions',()=>{
+ it('guidance checks explicit permission, exact bound workspace and restores caller identity',async()=>{
+   const c=await pool.connect();
+   try {
+     await c.query('BEGIN'); await c.query('SET LOCAL ROLE service_role');
+     await c.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[OWNER]);
+     expect((await c.query("SELECT telegram_get_dispatch_guidance(501,-100,'group') ok")).rows[0].ok).toBe(true);
+     expect((await c.query("SELECT telegram_get_dispatch_guidance(501,-200,'group') ok")).rows[0].ok).toBe(false);
+     expect((await c.query("SELECT telegram_get_dispatch_guidance(501,NULL,'private') ok")).rows[0].ok).toBe(true);
+     expect((await c.query("SELECT current_setting('request.jwt.claim.sub') s")).rows[0].s).toBe(OWNER);
+   } finally { await c.query('ROLLBACK'); c.release(); }
+ });
+ it.each(['anon','authenticated'])('%s cannot invoke guidance',async(role)=>{
+   await expect(rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group')",[],role)).rejects.toMatchObject({code:'42501'});
+ });
+ it.each([
+   "UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501",
+   "UPDATE telegram_chat_bindings SET status='revoked',revoked_at=now() WHERE telegram_chat_id=-100",
+   "UPDATE recruiter_members SET status='revoked',revoked_at=now() WHERE member_user_id='"+STAFF+"'",
+   "UPDATE recruiter_members SET permissions='{}' WHERE member_user_id='"+STAFF+"'",
+   "UPDATE recruiter_members SET permissions='{\"loads_update_status\":\"true\"}' WHERE member_user_id='"+STAFF+"'",
+   "UPDATE recruiter_profiles SET status='suspended' WHERE id='"+R+"'",
+   "UPDATE recruiter_billing_profiles SET status='canceled' WHERE recruiter_id='"+R+"'",
+ ])('guidance denies revoked/missing/invalid authority: %s',async(sql)=>{
+   await q(sql); expect((await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group') ok"))[0].ok).toBe(false);
+ });
+ it('guidance denies unlinked, mismatched type, absent binding and owner role alone',async()=>{
+   await q('INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(503,$1)',[OWNER]);
+   for(const sql of ["(999,-100,'group')","(501,-100,'supergroup')","(501,-999,'group')","(503,-100,'group')","(501,NULL,'group')","(501,-100,'private')"])
+     expect((await rpc('SELECT telegram_get_dispatch_guidance'+sql+' ok'))[0].ok).toBe(false);
+ });
+ it('expired pending invitation cannot provide dispatch delegation',async()=>{
+   await q("UPDATE recruiter_members SET member_user_id=NULL,status='pending',invite_token_hash='expired-local',invite_expires_at=now()-interval '1 minute' WHERE member_user_id=$1",[STAFF]);
+   expect((await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group') ok"))[0].ok).toBe(false);
+ });
+ it('read-only guidance leaves loads, receipts, proposals and delivery untouched',async()=>{
+   const before=await counts();
+   await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group')");
+   expect(await counts()).toEqual(before);
+   expect((await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status).toBe('en_route');
+ });
  it('intake atomically enqueues one durable notification, no load update',async()=>{await proposal();expect(await counts()).toEqual({p:1,o:1,r:1,e:0});expect((await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status).toBe('en_route');});
  it('concurrent identical receipts dedupe to one proposal/outbox',async()=>{const r=await Promise.all([intake(),intake()]);expect(r.map(x=>x[0].is_new).sort()).toEqual([false,true]);expect(await counts()).toEqual({p:1,o:1,r:1,e:0});});
  it('content conflict rolls back without an extra notification',async()=>{await proposal();await expect(intake(10,'AB-123',-100,hash(999))).rejects.toThrow('telegram_update_conflict');expect(await counts()).toEqual({p:1,o:1,r:1,e:0});});

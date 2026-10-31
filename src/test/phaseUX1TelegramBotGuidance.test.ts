@@ -33,7 +33,8 @@ describe("UX-1 Telegram bot guidance", () => {
   });
   it("help copy says dispatch is not active and offers no dispatch control", () => {
     expect(EDGE).toContain("Dispatch group updates: not active yet.");
-    expect(EDGE).not.toMatch(/text:\s*"[^"]*Dispatch (Tools|Menu)/);
+    // New independent guidance gate remains OFF; existing help is unchanged.
+    expect(EDGE).toContain("authorizeDispatchGuidance: TELEGRAM_DISPATCH_GUIDANCE_ENABLED");
     expect(EDGE).not.toContain("setMyCommands(");
   });
   it("uses explicit review labels", () => {
