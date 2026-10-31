@@ -450,7 +450,7 @@ describe('TG-G1 GEN1 terminal replay, lock-deadline and financial preservation r
   const id=await genProposal();let n=430,action='accept';
   if(kind==='rejected')action='reject';
   if(kind==='already_handled'){await genReview(id);n=431;}
-  if(kind==='expired')await q("UPDATE telegram_dispatch_review_proposals SET created_at=now()-interval '16 minutes',expires_at=now()-interval '1 second' WHERE id=$1",[id]);
+  if(kind==='expired')await q("UPDATE telegram_dispatch_review_proposals SET created_at=now()-interval '16 minutes',expires_at=now()-interval '1 minute' WHERE id=$1",[id]);
   if(kind==='stale')await q("UPDATE loads SET status='en_route' WHERE id=$1",[GEN_LOAD]);
   const result=(await genReview(id,n,501,GEN_CHAT,action))[0];expect(result.result_code).toBe('dispatch_review_'+kind);
   const before=await counts(),load=await q('SELECT row_to_json(l)::text row FROM loads l ORDER BY id');
@@ -475,9 +475,11 @@ describe('TG-G1 GEN1 terminal replay, lock-deadline and financial preservation r
   }finally{await c.query('ROLLBACK');c.release();}
  });
  it('claim waiting in cleanup cannot deliver a proposal that expired during the wait',async()=>{
-  const id=await genProposal();await q("UPDATE telegram_dispatch_review_proposals SET expires_at=clock_timestamp()+interval '1 second' WHERE id=$1",[id]);
+  // A closed QA row forces a genuine cleanup UPDATE wait before selecting the live row.
+  const closed=await genProposal();await genReview(closed,430,501,GEN_CHAT,'reject');
+  const id=(await genIntake(401))[0].proposal_id as string;await q("UPDATE telegram_dispatch_review_proposals SET expires_at=clock_timestamp()+interval '1 second' WHERE id=$1",[id]);
   const c=await pool.connect();
-  try{await c.query('BEGIN');await c.query('SELECT id FROM telegram_dispatch_review_outbox WHERE proposal_id=$1 FOR UPDATE',[id]);
+  try{await c.query('BEGIN');await c.query('SELECT id FROM telegram_dispatch_review_outbox WHERE proposal_id=$1 FOR UPDATE',[closed]);
    const pending=genClaim();await waitForGenLock('telegram_genqa_claim_dispatch_review_delivery');
    while(!(await q('SELECT clock_timestamp()>=expires_at elapsed FROM telegram_dispatch_review_proposals WHERE id=$1',[id]))[0].elapsed)await c.query('SELECT pg_sleep(0.02)');
    await c.query('COMMIT');expect(await pending).toHaveLength(0);
