@@ -23,6 +23,8 @@ async function rpc(sql: string, params: unknown[] = [], role='service_role') {
   try { await c.query('BEGIN'); await c.query(`SET LOCAL ROLE ${role}`); const rows=(await c.query(sql,params)).rows; await c.query('COMMIT'); return rows; }
   catch(e) { await c.query('ROLLBACK'); throw e; } finally { c.release(); }
 }
+const QA_LOAD='cb3d3a90-ac48-4d20-af52-d6710d854e81';
+const QA_CANDIDATE='supabase/migration-candidates/20261031040000_qa_single_load_dispatch_review.sql';
 const hash=(n: number)=>n.toString(16).padStart(64,'0');
 function intake(n=10, ref: string|null='AB-123', chat=-100, h=hash(n)) {
  return rpc('SELECT * FROM telegram_process_dispatch_group_update($1,$2,$3,900,$4,\'group\',$5,$6)',[LEASE,n,h,chat,ref,ref ? 'completed':null]);
@@ -72,8 +74,12 @@ beforeAll(async()=>{
  // Faithful live membership lifecycle column, absent from older projection.
  await q('ALTER TABLE recruiter_members ADD COLUMN revoked_at timestamptz');
  await q(read('supabase/migration-candidates/20261031030000_telegram_dispatch_guidance.sql'));
+ // Candidate validation uses exact production prosrc, not a simplified mock.
+ await seedFixture();
+ await q("INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id) VALUES($1,$2,'pending','HTP-QA-L2',$3)",[QA_LOAD,D,REL]);
+ await q(read(QA_CANDIDATE));
 },60000);
-beforeEach(async()=>{
+async function seedFixture() {
  await q('TRUNCATE auth.users,telegram_update_receipts CASCADE');
  for(let n=1;n<=5;n++) await q('INSERT INTO auth.users VALUES($1)',[uid(n)]);
  await q(`INSERT INTO recruiter_profiles(id,user_id,recruiter_name,company_name,status,company_type,posting_terms_accepted_at) VALUES('${R}','${OWNER}','Local','Local','active','carrier',now()),('${uid(102)}','${uid(4)}','Other','Other','active','carrier',now());
@@ -85,7 +91,8 @@ beforeEach(async()=>{
  INSERT INTO telegram_chat_bindings(id,telegram_chat_id,recruiter_id,chat_type,bound_by_user_id) VALUES('${uid(401)}',-100,'${R}','group','${OWNER}'),('${uid(402)}',-200,'${uid(102)}','group','${uid(4)}');
  INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(501,'${STAFF}'),(502,'${uid(4)}');
  UPDATE telegram_poll_state SET lease_token='${LEASE}',lease_expires_at=now()+interval '1 hour';`);
-});
+}
+beforeEach(seedFixture);
 afterAll(async()=>{ await pool?.end(); if(dir) { try { run('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop']); } finally { rmSync(dir,{recursive:true,force:true}); } } });
 
 describe('TG-G1B real disposable PostgreSQL transactions',()=>{
@@ -199,5 +206,108 @@ describe('TG-G1B real disposable PostgreSQL transactions',()=>{
      expect(settled).toBe(false); await c.query('COMMIT');
      expect((await approval)[0].result_code).toBe('dispatch_review_denied'); expect((await counts()).e).toBe(0);
    } finally { await c.query('ROLLBACK');c.release(); }
+ });
+});
+
+
+const qaIntake=(n=100,ref='HTP-QA-L2',chat=-100,status='cancelled',user=501)=>rpc(
+ "SELECT * FROM telegram_qa_process_dispatch_group_update($1,$2,$3,$4,$5,'group',$6,$7)",[LEASE,n,hash(n),user,chat,ref,status]);
+const qaReview=(id:string,n=130,user=501,chat=-100)=>rpc(
+ "SELECT * FROM telegram_qa_process_dispatch_review_action($1,$2,$3,$4,$5,'group','accept',$6)",[LEASE,n,hash(n),user,chat,id]);
+const qaClaim=()=>rpc('SELECT * FROM telegram_qa_claim_dispatch_review_delivery()');
+async function qaProposal(){const rows=await qaIntake();expect(rows[0].result_code).toBe('dispatch_review_proposed');return rows[0].proposal_id as string;}
+async function unrelatedState(){return q(`SELECT row_to_json(o) row FROM telegram_dispatch_review_outbox o JOIN telegram_dispatch_review_proposals p ON p.id=o.proposal_id WHERE p.load_id<>'${QA_LOAD}' ORDER BY o.id`);}
+describe('TG-G1 QA exact single-load disposable transactions',()=>{
+ beforeEach(async()=>{await q("INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id) VALUES($1,$2,'pending','HTP-QA-L2',$3)",[QA_LOAD,D,REL]);});
+ it('exact QA intake proposes cancellation without changing loads or events',async()=>{
+  const before=await q('SELECT row_to_json(l) row FROM loads l ORDER BY id');await qaProposal();
+  expect(await q('SELECT row_to_json(l) row FROM loads l ORDER BY id')).toEqual(before);expect(await counts()).toEqual({p:1,o:1,r:1,e:0});
+ });
+ it.each([['AB-123',-100,'cancelled'],['HTP-QA-L2',-200,'cancelled'],['HTP-QA-L2',-100,'completed']])('denies non-QA scope %s/%s/%s without writes',async(ref,chat,status)=>{
+  await expect(qaIntake(100,String(ref),Number(chat),String(status))).rejects.toThrow('qa_dispatch_scope_denied');expect(await counts()).toEqual({p:0,o:0,r:0,e:0});
+ });
+ it('reference moved to a different load cannot substitute the exact UUID',async()=>{
+  await q("UPDATE loads SET load_reference='OLD-QA' WHERE id=$1",[QA_LOAD]);await q("UPDATE loads SET load_reference='HTP-QA-L2' WHERE id=$1",[LOAD]);
+  await expect(qaIntake()).rejects.toThrow('qa_dispatch_scope_denied');expect((await counts()).p).toBe(0);
+ });
+ it('no active relationship or revoked binding fails closed without writes',async()=>{
+  await q("UPDATE carrier_driver_relationships SET status='ended' WHERE id=$1",[REL]);await expect(qaIntake()).rejects.toThrow('qa_dispatch_scope_denied');expect((await counts()).p).toBe(0);
+ });
+ it('fresh poll lease is required, even for exact QA',async()=>{
+  await q('UPDATE telegram_poll_state SET lease_token=NULL,lease_expires_at=NULL');await expect(qaIntake()).rejects.toThrow('telegram_poll_lease_invalid');expect(await counts()).toEqual({p:0,o:0,r:0,e:0});
+ });
+ it.each(['unlinked','revoked','permission'])('QA intake denies %s actor with no proposals or receipts',async(reason)=>{
+  if(reason==='revoked')await q("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501");
+  if(reason==='permission')await q("UPDATE recruiter_members SET permissions='{}' WHERE member_user_id=$1",[STAFF]);
+  await expect(qaIntake(100,'HTP-QA-L2',-100,'cancelled',reason==='unlinked'?999:501)).rejects.toThrow('qa_dispatch_actor_denied');
+  expect(await counts()).toEqual({p:0,o:0,r:0,e:0});
+ });
+ it('duplicate concurrent QA commands have one proposal and outbox',async()=>{
+  const rows=await Promise.all([qaIntake(),qaIntake()]);expect(rows.map(r=>r[0].is_new).sort()).toEqual([false,true]);expect(await counts()).toEqual({p:1,o:1,r:1,e:0});
+ });
+ it('wrong proposal callback does not mutate unrelated proposal, receipt, event or load',async()=>{
+  const id=await proposal();const before=await q('SELECT row_to_json(p) row FROM telegram_dispatch_review_proposals p');
+  await expect(qaReview(id)).rejects.toThrow('qa_dispatch_scope_denied');expect(await q('SELECT row_to_json(p) row FROM telegram_dispatch_review_proposals p')).toEqual(before);expect(await counts()).toEqual({p:1,o:1,r:1,e:0});
+ });
+ it('authorized QA callback uses canonical cancellation once with replay',async()=>{
+  const id=await qaProposal();const other=await q('SELECT row_to_json(l) row FROM loads l WHERE id<>$1 ORDER BY id',[QA_LOAD]);
+  expect((await qaReview(id))[0].result_code).toBe('dispatch_review_accepted');expect((await qaReview(id))[0].is_new).toBe(false);
+  expect((await q('SELECT status FROM loads WHERE id=$1',[QA_LOAD]))[0].status).toBe('cancelled');expect((await counts()).e).toBe(1);
+  expect(await q('SELECT row_to_json(l) row FROM loads l WHERE id<>$1 ORDER BY id',[QA_LOAD])).toEqual(other);
+ });
+ it.each(['link','permission','chat'])('QA confirmation rejects revoked %s',async(reason)=>{
+  const id=await qaProposal();
+  if(reason==='link')await q("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501");
+  if(reason==='permission')await q("UPDATE recruiter_members SET permissions='{}' WHERE member_user_id=$1",[STAFF]);
+  if(reason==='chat'){await expect(qaReview(id,130,501,-200)).rejects.toThrow('qa_dispatch_scope_denied');}
+  else expect((await qaReview(id))[0].result_code).toBe('dispatch_review_denied');
+  expect((await q('SELECT status FROM loads WHERE id=$1',[QA_LOAD]))[0].status).toBe('pending');expect((await counts()).e).toBe(0);
+ });
+ it('claim and cleanup leave unrelated expired/exhausted outbox byte-for-byte unchanged',async()=>{
+  await proposal();await q("UPDATE telegram_dispatch_review_proposals SET created_at=now()-interval '16 minutes',expires_at=now()-interval '1 minute' WHERE load_id=$1",[LOAD]);
+  const before=await unrelatedState();await qaProposal();const c=(await qaClaim())[0];expect(c.load_reference).toBe('HTP-QA-L2');expect(c.proposed_status).toBe('cancelled');expect(await unrelatedState()).toEqual(before);
+ });
+ it('exhaustion cleanup cannot alter an unrelated sending row',async()=>{
+  await proposal();await claim();await q("UPDATE telegram_dispatch_review_outbox SET lease_expires_at=now()-interval '1 second',max_attempts=attempt_count");
+  const before=await unrelatedState();expect(await qaClaim()).toHaveLength(0);expect(await unrelatedState()).toEqual(before);
+ });
+ it('expired QA proposal cleans only QA outbox and cannot change load',async()=>{
+  await proposal();const id=await qaProposal();await q("UPDATE telegram_dispatch_review_proposals SET created_at=now()-interval '16 minutes',expires_at=now()-interval '1 minute' WHERE id=$1",[id]);
+  const before=await unrelatedState();expect(await qaClaim()).toHaveLength(0);expect(await unrelatedState()).toEqual(before);
+  expect((await qaReview(id))[0].result_code).toBe('dispatch_review_expired');expect((await counts()).e).toBe(0);
+ });
+ it('stale QA status cannot be updated by confirmation',async()=>{
+  const id=await qaProposal();await q("UPDATE loads SET status='en_route' WHERE id=$1",[QA_LOAD]);expect((await qaReview(id))[0].result_code).toBe('dispatch_review_stale');expect((await counts()).e).toBe(0);
+ });
+ it('exclusive QA delivery lease and ordinary ack reuse',async()=>{
+  await qaProposal();const rows=await Promise.all([qaClaim(),qaClaim()]);expect(rows.map(x=>x.length).sort()).toEqual([0,1]);const c=rows.flat()[0];expect((await ack(c))[0].ok).toBe(true);
+ });
+ it('revocation committed during a real lock wait denies QA confirmation',async()=>{
+  const id=await qaProposal(),c=await pool.connect();
+  try{await c.query('BEGIN');await c.query("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501");
+   let settled=false;const approval=qaReview(id).finally(()=>{settled=true;});
+   for(let n=0;n<100;n++){if((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_qa_process_dispatch_review_action%'"))[0].n>0)break;await new Promise(r=>setTimeout(r,10));}
+   expect((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_qa_process_dispatch_review_action%'"))[0].n).toBeGreaterThan(0);
+   expect(settled).toBe(false);await c.query('COMMIT');expect((await approval)[0].result_code).toBe('dispatch_review_denied');expect((await counts()).e).toBe(0);
+  }finally{await c.query('ROLLBACK');c.release();}
+ });
+ it('absolute expiry rolls back intake, callback and all cleanup',async()=>{
+  const id=await qaProposal();await proposal();const before=await counts(),other=await unrelatedState();
+  const def=(await q("SELECT pg_get_functiondef('public._telegram_qa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
+  try{await q(def.split('2026-11-02 23:59:59+00').join('2000-01-01 00:00:00+00'));
+   await expect(qaIntake(101)).rejects.toThrow('qa_dispatch_expired');await expect(qaReview(id)).rejects.toThrow('qa_dispatch_expired');await expect(qaClaim()).rejects.toThrow('qa_dispatch_expired');
+   expect(await counts()).toEqual(before);expect(await unrelatedState()).toEqual(other);
+  }finally{await q(def);}
+ });
+ it('scope is restored on success and error; ordinary calls remain unchanged',async()=>{
+  const c=await pool.connect();try{await c.query('BEGIN');await c.query('SET LOCAL ROLE service_role');await c.query("SELECT set_config('haultracker.qa_dispatch_scope','prior',true)");
+   await c.query("SELECT * FROM telegram_qa_process_dispatch_group_update($1,100,$2,501,-100,'group','HTP-QA-L2','cancelled')",[LEASE,hash(100)]);
+   expect((await c.query("SELECT current_setting('haultracker.qa_dispatch_scope') s")).rows[0].s).toBe('prior');await c.query('ROLLBACK');
+  }finally{c.release();}
+  await expect(qaIntake(100,'AB-123')).rejects.toThrow('qa_dispatch_scope_denied');expect((await intake())[0].result_code).toBe('dispatch_review_proposed');
+ });
+ it.each(['anon','authenticated'])('%s cannot invoke any QA entry point or helper',async(role)=>{
+  for(const sql of ["SELECT * FROM telegram_qa_claim_dispatch_review_delivery()","SELECT _telegram_qa_dispatch_active()","SELECT * FROM _telegram_qa_dispatch_scope()","SELECT _telegram_qa_dispatch_assert()","SELECT _telegram_qa_dispatch_proposal(NULL)","SELECT _telegram_qa_dispatch_actor(501)","SELECT * FROM telegram_qa_process_dispatch_group_update(NULL,1,'x',501,-100,'group','HTP-QA-L2','cancelled')","SELECT * FROM telegram_qa_process_dispatch_review_action(NULL,1,'x',501,-100,'group','accept',NULL)"])
+   await expect(rpc(sql,[],role)).rejects.toMatchObject({code:'42501'});
  });
 });
