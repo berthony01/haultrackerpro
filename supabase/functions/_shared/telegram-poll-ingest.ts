@@ -838,6 +838,11 @@ export function classifyUpdate(
   dispatchReviewEnabled: boolean = TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
   singleLoadQaEnabled: boolean = TELEGRAM_SINGLE_LOAD_QA_ENABLED,
 ): TelegramClassification {
+  // Conflicting release modes must never select either dispatch processor.
+  if (dispatchReviewEnabled && singleLoadQaEnabled) {
+    dispatchReviewEnabled = false;
+    singleLoadQaEnabled = false;
+  }
   if (identity.telegramUserId === null || identity.telegramChatId === null) {
     return { kind: "ignored", resultCode: "invalid_update_shape" };
   }
@@ -1005,6 +1010,9 @@ export async function runTelegramPoll(
   // constant governs. Only synthetic tests inject `true`.
   const dispatchReviewEnabled =
     (deps.dispatchReviewEnabled ?? TGG1B_DISPATCH_GROUP_REVIEW_ENABLED) === true;
+  if (dispatchReviewEnabled && (deps.singleLoadQaEnabled ?? TELEGRAM_SINGLE_LOAD_QA_ENABLED)) {
+    return { kind: "failed", errorCode: "dispatch_modes_conflict", processed: 0, advancedTo: null };
+  }
 
   const lease = await ledger.claimLease();
   if (!lease) {
@@ -1371,7 +1379,7 @@ export async function runTelegramPoll(
     // deliberately outside cursor correctness: a failed send must never make
     // the update look unprocessed.
     // RB-2B. A button tap is resolved by ANSWERING the callback. Only a newly
-    // accepted QA cancellation also gets the bounded group acknowledgement below.
+    // committed dispatch decision also gets the bounded group acknowledgement below.
     // Answering is not a state mutation, so it runs even for a
     // duplicate delivery (which reports the already-recorded outcome) and a
     // failure here can never re-apply or roll back the database action.
@@ -1433,6 +1441,35 @@ export async function runTelegramPoll(
           }
         } catch (error) {
           log("qa_review_ack_failed", { code: sanitizeErrorCode(error) });
+        }
+      }
+      // General RPC results are the authority. Never identify a load from
+      // untrusted callback data; transport chat was passed to the same RPC.
+      // One attempt after commit, never on replay or an unsuccessful decision.
+      if (
+        dispatchReviewEnabled &&
+        classification.kind === "dispatch_review_action" &&
+        classification.qaOnly !== true &&
+        classification.proposalId !== null &&
+        terminal.isNew === true &&
+        ((classification.action === "accept" && terminal.resultCode === "dispatch_review_accepted") ||
+         (classification.action === "reject" && terminal.resultCode === "dispatch_review_rejected")) &&
+        identity.telegramChatId !== null && Number.isSafeInteger(identity.telegramChatId) &&
+        identity.telegramChatId < 0 &&
+        (identity.chatType === "group" || identity.chatType === "supergroup")
+      ) {
+        try {
+          const sent = await gateway.sendMessage({
+            chatId: identity.telegramChatId,
+            text: terminal.resultCode === "dispatch_review_accepted"
+              ? "✅ Dispatch review confirmed. The approved load status was updated in HaulTracker Pro."
+              : "❌ Dispatch review rejected. No load was changed.",
+          });
+          if (!sent.ok) log("dispatch_review_ack_failed", {
+            code: sanitizeErrorCode(sent.errorCode ?? "telegram_gateway_error"),
+          });
+        } catch (error) {
+          log("dispatch_review_ack_failed", { code: sanitizeErrorCode(error) });
         }
       }
     } else if (terminal.isNew && identity.telegramChatId !== null) {
@@ -2015,6 +2052,7 @@ export async function runDispatchReviewDeliveryDrain(deps: {
   const enabled = (deps.enabled ?? TGG1B_DISPATCH_GROUP_REVIEW_ENABLED) === true;
   const qaEnabled = singleLoadQaActive(deps.singleLoadQaEnabled);
   const result: TelegramDispatchReviewDrainResult = { status: "ok", sent: 0, retried: 0, leaseLost: 0 };
+  if (enabled && (deps.singleLoadQaEnabled ?? TELEGRAM_SINGLE_LOAD_QA_ENABLED)) return { ...result, status: "failed" };
   if (!enabled && !qaEnabled) return { ...result, status: "disabled" };
   if (qaEnabled && !deps.qaLedger) return { ...result, status: "failed" };
   const deliveryLedger = qaEnabled && deps.qaLedger ? guardSingleLoadQaDelivery(deps.qaLedger) : deps.ledger;

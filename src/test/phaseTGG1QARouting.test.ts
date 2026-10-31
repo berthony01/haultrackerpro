@@ -68,8 +68,8 @@ function fixture(updates: unknown[]) {
 
 afterEach(() => vi.useRealTimers());
 describe("Single-load QA route", () => {
-  it("QA activation is ON, global review remains OFF and only QA service RPC names are selected", () => {
-    expect(TELEGRAM_SINGLE_LOAD_QA_ENABLED).toBe(true);
+  it("staged QA and global review remain OFF and only QA service RPC names are selected", () => {
+    expect(TELEGRAM_SINGLE_LOAD_QA_ENABLED).toBe(false);
     expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
     expect(TELEGRAM_SINGLE_LOAD_QA_RPCS).toEqual({ intake: "telegram_qa_process_dispatch_group_update",
       review: "telegram_qa_process_dispatch_review_action", claim: "telegram_qa_claim_dispatch_review_delivery" });
