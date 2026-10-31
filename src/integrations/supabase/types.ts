@@ -8518,6 +8518,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      telegram_get_dispatch_guidance: {
+        Args: {
+          _chat_type: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+        }
+        Returns: boolean
+      }
       telegram_mark_conversation_alert_failed: {
         Args: { _alert_id: string; _error_code: string }
         Returns: string
