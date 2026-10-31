@@ -43,6 +43,7 @@ import {
   type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
+import { TELEGRAM_SINGLE_LOAD_QA_RPCS } from "../_shared/telegram-dispatch-group-review.ts";
 import type {
   DispatchDeliveryClaim,
   DispatchDeliveryFailure,
@@ -181,13 +182,15 @@ type RpcClient = ReturnType<typeof createClient>;
 // TG-G1C (gated). Durable dispatch review outbox over the TG-G1B candidate
 // RPCs. Constructing it performs no I/O; the drain never calls it while the
 // compile-time gate is false.
-function buildDispatchDeliveryLedger(supabase: RpcClient): DispatchDeliveryLedger {
+function buildDispatchDeliveryLedger(supabase: RpcClient, qaOnly = false): DispatchDeliveryLedger {
   return {
     async claim(): Promise<DispatchDeliveryClaim | null> {
-      const { data, error } = await supabase.rpc("telegram_claim_dispatch_review_delivery");
+      const { data, error } = qaOnly
+        ? await supabase.rpc(TELEGRAM_SINGLE_LOAD_QA_RPCS.claim)
+        : await supabase.rpc("telegram_claim_dispatch_review_delivery");
       if (error) throw new Error(boundedRpcErrorCode(error));
       const row = (Array.isArray(data) ? data[0] : data) as
-        | { outbox_id?: string; claim_token?: string; proposal_id?: string; telegram_chat_id?: number | string; load_reference?: string; proposed_status?: string }
+        | { outbox_id?: string; claim_token?: string; proposal_id?: string; telegram_chat_id?: number | string; load_reference?: string; proposed_status?: string; expires_at?: string }
         | null;
       if (!row?.outbox_id || !row.claim_token || !row.proposal_id) return null;
       return {
@@ -197,6 +200,7 @@ function buildDispatchDeliveryLedger(supabase: RpcClient): DispatchDeliveryLedge
         telegramChatId: Number(row.telegram_chat_id),
         loadReference: String(row.load_reference ?? ""),
         proposedStatus: row.proposed_status as DispatchTargetStatus,
+        expiresAt: row.expires_at,
       };
     },
     async ack(outboxId: string, claimToken: string, messageId: number): Promise<boolean> {
@@ -548,6 +552,34 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
     // TG-G1C (gated; unreachable while TGG1B_DISPATCH_GROUP_REVIEW_ENABLED is
     // false). Intake: receipt + proposal + outbox atomically; never a load
     // change. Transports parser-normalized reference/status only — no text.
+    async processQaDispatchGroupUpdate(input): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(TELEGRAM_SINGLE_LOAD_QA_RPCS.intake, {
+        _lease_token: input.leaseToken,
+        _update_id: input.updateId,
+        _payload_hash: input.payloadHash,
+        _telegram_user_id: input.telegramUserId,
+        _telegram_chat_id: input.telegramChatId,
+        _chat_type: input.chatType,
+        _reference: input.reference,
+        _proposed_status: input.proposedStatus,
+      });
+      if (error) throw new Error(boundedRpcErrorCode(error));
+      return unwrapTerminal(data);
+    },
+    async processQaDispatchReviewActionUpdate(input): Promise<TelegramTerminalResult> {
+      const { data, error } = await supabase.rpc(TELEGRAM_SINGLE_LOAD_QA_RPCS.review, {
+        _lease_token: input.leaseToken,
+        _update_id: input.updateId,
+        _payload_hash: input.payloadHash,
+        _telegram_user_id: input.telegramUserId,
+        _telegram_chat_id: input.telegramChatId,
+        _chat_type: input.chatType,
+        _action: input.action,
+        _proposal_id: input.proposalId,
+      });
+      if (error) throw new Error(boundedRpcErrorCode(error));
+      return unwrapTerminal(data);
+    },
     async processDispatchGroupUpdate(input: {
       leaseToken: string;
       updateId: number;
@@ -1237,6 +1269,7 @@ Deno.serve(async (req: Request) => {
     try {
       await runDispatchReviewDeliveryDrain({
         ledger: buildDispatchDeliveryLedger(supabase),
+        qaLedger: buildDispatchDeliveryLedger(supabase, true),
         gateway,
         log,
       });
