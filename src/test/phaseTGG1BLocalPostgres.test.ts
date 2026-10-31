@@ -236,6 +236,12 @@ describe('TG-G1 QA exact single-load disposable transactions',()=>{
  it('fresh poll lease is required, even for exact QA',async()=>{
   await q('UPDATE telegram_poll_state SET lease_token=NULL,lease_expires_at=NULL');await expect(qaIntake()).rejects.toThrow('telegram_poll_lease_invalid');expect(await counts()).toEqual({p:0,o:0,r:0,e:0});
  });
+ it.each(['unlinked','revoked','permission'])('QA intake denies %s actor with no proposals or receipts',async(reason)=>{
+  if(reason==='revoked')await q("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501");
+  if(reason==='permission')await q("UPDATE recruiter_members SET permissions='{}' WHERE member_user_id=$1",[STAFF]);
+  await expect(qaIntake(100,'HTP-QA-L2',-100,'cancelled',reason==='unlinked'?999:501)).rejects.toThrow('qa_dispatch_actor_denied');
+  expect(await counts()).toEqual({p:0,o:0,r:0,e:0});
+ });
  it('duplicate concurrent QA commands have one proposal and outbox',async()=>{
   const rows=await Promise.all([qaIntake(),qaIntake()]);expect(rows.map(r=>r[0].is_new).sort()).toEqual([false,true]);expect(await counts()).toEqual({p:1,o:1,r:1,e:0});
  });
@@ -276,6 +282,15 @@ describe('TG-G1 QA exact single-load disposable transactions',()=>{
  it('exclusive QA delivery lease and ordinary ack reuse',async()=>{
   await qaProposal();const rows=await Promise.all([qaClaim(),qaClaim()]);expect(rows.map(x=>x.length).sort()).toEqual([0,1]);const c=rows.flat()[0];expect((await ack(c))[0].ok).toBe(true);
  });
+ it('revocation committed during a real lock wait denies QA confirmation',async()=>{
+  const id=await qaProposal(),c=await pool.connect();
+  try{await c.query('BEGIN');await c.query("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501");
+   let settled=false;const approval=qaReview(id).finally(()=>{settled=true;});
+   for(let n=0;n<100;n++){if((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_qa_process_dispatch_review_action%'"))[0].n>0)break;await new Promise(r=>setTimeout(r,10));}
+   expect((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_qa_process_dispatch_review_action%'"))[0].n).toBeGreaterThan(0);
+   expect(settled).toBe(false);await c.query('COMMIT');expect((await approval)[0].result_code).toBe('dispatch_review_denied');expect((await counts()).e).toBe(0);
+  }finally{await c.query('ROLLBACK');c.release();}
+ });
  it('absolute expiry rolls back intake, callback and all cleanup',async()=>{
   const id=await qaProposal();await proposal();const before=await counts(),other=await unrelatedState();
   const def=(await q("SELECT pg_get_functiondef('public._telegram_qa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
@@ -292,7 +307,7 @@ describe('TG-G1 QA exact single-load disposable transactions',()=>{
   await expect(qaIntake(100,'AB-123')).rejects.toThrow('qa_dispatch_scope_denied');expect((await intake())[0].result_code).toBe('dispatch_review_proposed');
  });
  it.each(['anon','authenticated'])('%s cannot invoke any QA entry point or helper',async(role)=>{
-  for(const sql of ["SELECT * FROM telegram_qa_claim_dispatch_review_delivery()","SELECT _telegram_qa_dispatch_active()","SELECT * FROM _telegram_qa_dispatch_scope()","SELECT _telegram_qa_dispatch_assert()","SELECT _telegram_qa_dispatch_proposal(NULL)"])
+  for(const sql of ["SELECT * FROM telegram_qa_claim_dispatch_review_delivery()","SELECT _telegram_qa_dispatch_active()","SELECT * FROM _telegram_qa_dispatch_scope()","SELECT _telegram_qa_dispatch_assert()","SELECT _telegram_qa_dispatch_proposal(NULL)","SELECT _telegram_qa_dispatch_actor(501)","SELECT * FROM telegram_qa_process_dispatch_group_update(NULL,1,'x',501,-100,'group','HTP-QA-L2','cancelled')","SELECT * FROM telegram_qa_process_dispatch_review_action(NULL,1,'x',501,-100,'group','accept',NULL)"])
    await expect(rpc(sql,[],role)).rejects.toMatchObject({code:'42501'});
  });
 });
