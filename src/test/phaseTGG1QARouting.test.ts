@@ -68,8 +68,8 @@ function fixture(updates: unknown[]) {
 
 afterEach(() => vi.useRealTimers());
 describe("Single-load QA route", () => {
-  it("both mutation gates remain OFF and only QA service RPC names are selected", () => {
-    expect(TELEGRAM_SINGLE_LOAD_QA_ENABLED).toBe(false);
+  it("QA activation is ON, global review remains OFF and only QA service RPC names are selected", () => {
+    expect(TELEGRAM_SINGLE_LOAD_QA_ENABLED).toBe(true);
     expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
     expect(TELEGRAM_SINGLE_LOAD_QA_RPCS).toEqual({ intake: "telegram_qa_process_dispatch_group_update",
       review: "telegram_qa_process_dispatch_review_action", claim: "telegram_qa_claim_dispatch_review_delivery" });
@@ -93,7 +93,7 @@ describe("Single-load QA route", () => {
     expect(classifyUpdate(identity(`/bind ${"a".repeat(64)}`), false, true).kind).toBe("bind");
     expect(classifyUpdate({ ...identity("/help"), chatType: "private" }, false, true)).toEqual({ kind: "menu", command: "help" });
   });
-  it("default OFF never invokes any dispatch port", async () => {
+  it("injected QA OFF never invokes any dispatch port", async () => {
     const f = fixture([message(), callback()]); await f.poll(false);
     expect(f.intake).not.toHaveBeenCalled(); expect(f.review).not.toHaveBeenCalled();
     expect(f.genericIntake).not.toHaveBeenCalled(); expect(f.genericReview).not.toHaveBeenCalled();
@@ -140,7 +140,7 @@ describe("Single-load QA delivery isolation", () => {
   }
   it("OFF makes zero claims or sends", async () => {
     const f = fixture([]); const qa = delivery();
-    expect((await runDispatchReviewDeliveryDrain({ ledger: qa, qaLedger: qa, gateway: f.gateway })).status).toBe("disabled");
+    expect((await runDispatchReviewDeliveryDrain({ ledger: qa, qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: false })).status).toBe("disabled");
     expect(qa.claim).not.toHaveBeenCalled(); expect(f.send).not.toHaveBeenCalled();
   });
   it("ON only claims QA port and acknowledges its claim token", async () => {

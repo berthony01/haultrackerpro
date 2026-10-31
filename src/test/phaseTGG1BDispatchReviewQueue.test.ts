@@ -148,12 +148,12 @@ describe("TG-G1B gate and namespace", () => {
     }
     expect(POLL).not.toMatch(/dispatchReviewEnabled|enabled:\s*true/);
   });
-  it("default classification is unchanged: group text → non_private_message, /bind stays bind, g1 tap fails closed in c1 path", () => {
+  it("QA OFF classification is unchanged: group text → non_private_message, /bind stays bind, g1 tap fails closed in c1 path", () => {
     const base = { updateId: 1, telegramUserId: 11, telegramChatId: -22, chatType: "group", callbackQueryId: null, callbackData: null, replyToMessageId: null };
-    expect(classifyUpdate({ ...base, text: "Load #AB-123 delivered" } as never)).toEqual({ kind: "ignored", resultCode: "non_private_message" });
-    expect(classifyUpdate({ ...base, text: `/bind ${"a".repeat(64)}` } as never).kind).toBe("bind");
+    expect(classifyUpdate({ ...base, text: "Load #AB-123 delivered" } as never, false, false)).toEqual({ kind: "ignored", resultCode: "non_private_message" });
+    expect(classifyUpdate({ ...base, text: `/bind ${"a".repeat(64)}` } as never, false, false).kind).toBe("bind");
     const data = composeDispatchReviewData("accept", "00000000-0000-4000-8000-000000000001")!;
-    const tap = classifyUpdate({ ...base, text: null, callbackQueryId: "q", callbackData: data } as never);
+    const tap = classifyUpdate({ ...base, text: null, callbackQueryId: "q", callbackData: data } as never, false, false);
     expect(tap).toMatchObject({ kind: "conversation_action", action: null });
   });
   it("callback data is disjoint from c1/q1, ≤64 bytes, and strict", () => {
