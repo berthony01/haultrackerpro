@@ -63,7 +63,7 @@ describe('GENQA committed cancellation feedback',()=>{
   const f=fixture([cb()]);const advance=vi.fn(async(_lease:string,n:number)=>n);f.ledger.advanceCursor=advance;
   if(failure==='throw')vi.mocked(f.gateway.sendMessage).mockRejectedValue(new Error('network_failure'));
   else vi.mocked(f.gateway.sendMessage).mockResolvedValue({ok:false,status:500,errorCode:'network_failure'});
-  expect((await f.poll()).kind).toBe('ok');expect(advance).toHaveBeenCalledWith(ID,3);
+  expect((await f.poll()).kind).toBe('ok');expect(advance).toHaveBeenCalledWith(ID,2);
   expect(f.review).toHaveBeenCalledTimes(1);expect(f.gateway.answerCallbackQuery).toHaveBeenCalledTimes(1);
   f.review.mockResolvedValue({isNew:false,resultCode:'dispatch_review_accepted'});
   expect((await f.poll()).kind).toBe('ok');expect(f.gateway.sendMessage).toHaveBeenCalledTimes(1);
