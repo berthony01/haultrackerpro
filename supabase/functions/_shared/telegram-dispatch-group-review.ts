@@ -36,6 +36,65 @@ export const TELEGRAM_SINGLE_LOAD_QA_RPCS = {
   claim: "telegram_qa_claim_dispatch_review_delivery",
 } as const;
 
+// Separate acceptance lane. No environment or remote toggle.
+export const TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED = false as const;
+export const TELEGRAM_GENQA_REFERENCE = "HTP-QA-GEN1";
+export const TELEGRAM_GENQA_CHAT_ID = -5335739793;
+export const TELEGRAM_GENQA_EXPIRES_AT = Date.parse("2026-11-05T23:59:59Z");
+export const TELEGRAM_GENQA_RPCS = {
+  intake: "telegram_genqa_process_dispatch_group_update",
+  review: "telegram_genqa_process_dispatch_review_action",
+  claim: "telegram_genqa_claim_dispatch_review_delivery",
+  ack: "telegram_genqa_ack_dispatch_review_delivery",
+  fail: "telegram_genqa_fail_dispatch_review_delivery",
+} as const;
+export function genQaActive(enabled: boolean = TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED): boolean {
+  return enabled === true && Date.now() < TELEGRAM_GENQA_EXPIRES_AT;
+}
+export function isGenQaCommand(text: string | null): boolean {
+  return text === "/cancelled@HaulTrackerBot HTP-QA-GEN1" || text === "/cancelled HTP-QA-GEN1";
+}
+export function dispatchModesConflict(general: boolean, qa: boolean, genqa: boolean): boolean {
+  return [general, qa, genqa].filter(value => value === true).length > 1;
+}
+/** All five RPC names selected together; construction performs no I/O. */
+export function buildGenQaDeliveryLedger(rpc: (name: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>): DispatchDeliveryLedger {
+  async function call(name: string, args?: Record<string, unknown>) {
+    const result = await rpc(name, args);
+    if (result.error) throw new Error("genqa_rpc_unavailable");
+    return result.data;
+  }
+  return {
+    async claim() {
+      const data = await call(TELEGRAM_GENQA_RPCS.claim);
+      const row = (Array.isArray(data) ? data[0] : data) as Record<string, unknown> | null;
+      if (!row) return null;
+      if (typeof row.outbox_id !== "string" || typeof row.claim_token !== "string" || typeof row.proposal_id !== "string") throw new Error("genqa_claim_invalid");
+      return { outboxId: row.outbox_id, claimToken: row.claim_token, proposalId: row.proposal_id,
+        telegramChatId: Number(row.telegram_chat_id), loadReference: String(row.load_reference),
+        proposedStatus: row.proposed_status as DispatchTargetStatus, expiresAt: typeof row.expires_at === "string" ? row.expires_at : undefined };
+    },
+    ack: async (id, token, messageId) => await call(TELEGRAM_GENQA_RPCS.ack, { _outbox_id: id, _claim_token: token, _message_id: messageId }) === true,
+    fail: async (id, token, code) => await call(TELEGRAM_GENQA_RPCS.fail, { _outbox_id: id, _claim_token: token, _failure_code: code }) === true,
+  };
+}
+export function guardGenQaDelivery(ledger: DispatchDeliveryLedger): DispatchDeliveryLedger {
+  const assertActive = () => { if (!genQaActive(true)) throw new Error("genqa_expired"); };
+  return {
+    async claim() {
+      assertActive();
+      const claim = await ledger.claim();
+      assertActive();
+      if (!claim) return null;
+      const expires = Date.parse(claim.expiresAt ?? "");
+      if (claim.telegramChatId !== TELEGRAM_GENQA_CHAT_ID || claim.loadReference !== TELEGRAM_GENQA_REFERENCE || claim.proposedStatus !== "cancelled" || !Number.isFinite(expires) || expires <= Date.now() || expires > TELEGRAM_GENQA_EXPIRES_AT) throw new Error("genqa_scope_denied");
+      return claim;
+    },
+    ack: (id, token, messageId) => { assertActive(); return ledger.ack(id, token, messageId); },
+    fail: (id, token, code) => { assertActive(); return ledger.fail(id, token, code); },
+  };
+}
+
 export function singleLoadQaActive(enabled: boolean = TELEGRAM_SINGLE_LOAD_QA_ENABLED): boolean {
   return enabled === true && Date.now() < TELEGRAM_SINGLE_LOAD_QA_EXPIRES_AT;
 }

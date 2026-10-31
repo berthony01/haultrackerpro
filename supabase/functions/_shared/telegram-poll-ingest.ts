@@ -21,6 +21,8 @@ import {
   DISPATCH_REVIEW_ANSWERS,
   TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
   TELEGRAM_SINGLE_LOAD_QA_ENABLED,
+  TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED, TELEGRAM_GENQA_CHAT_ID,
+  genQaActive, isGenQaCommand, guardGenQaDelivery, dispatchModesConflict,
   singleLoadQaActive,
   isSingleLoadQaCommand,
   guardSingleLoadQaDelivery,
@@ -425,6 +427,8 @@ export interface TelegramPollLedger {
     proposalId: string | null;
   }): Promise<TelegramTerminalResult>;
   /** Separate ports: QA can NEVER fall back to ordinary dispatch RPCs. */
+  processGenQaDispatchGroupUpdate?: TelegramPollLedger["processDispatchGroupUpdate"];
+  processGenQaDispatchReviewActionUpdate?: TelegramPollLedger["processDispatchReviewActionUpdate"];
   processQaDispatchGroupUpdate?: TelegramPollLedger["processDispatchGroupUpdate"];
   processQaDispatchReviewActionUpdate?: TelegramPollLedger["processDispatchReviewActionUpdate"];
 }
@@ -520,6 +524,7 @@ export interface TelegramPollDeps {
   dispatchReviewEnabled?: boolean;
   /** Synthetic injection exercises the same strict QA command and wrapper ports. */
   singleLoadQaEnabled?: boolean;
+  genQaEnabled?: boolean;
   /** Synthetic tests may force OFF; production uses the independent guidance gate. */
   dispatchGuidanceEnabled?: boolean;
   dispatchGuidanceButtons?: { private: TelegramInlineUrlButton[][]; group: TelegramInlineUrlButton[][] };
@@ -820,10 +825,10 @@ export type TelegramClassification =
     }
   | { kind: "quick_post_source"; text: string }
   // TG-G1C. Produced ONLY when the dispatch-review gate is explicitly on.
-  | { kind: "dispatch_group_message"; text: string; chatType: string; qaOnly?: true }
+  | { kind: "dispatch_group_message"; text: string; chatType: string; qaOnly?: true; genQaOnly?: true }
   | {
       kind: "dispatch_review_action";
-      qaOnly?: true;
+      qaOnly?: true; genQaOnly?: true;
       action: DispatchReviewAction | null;
       proposalId: string | null;
       chatType: string;
@@ -837,11 +842,13 @@ export function classifyUpdate(
   identity: ParsedIdentity,
   dispatchReviewEnabled: boolean = TGG1B_DISPATCH_GROUP_REVIEW_ENABLED,
   singleLoadQaEnabled: boolean = TELEGRAM_SINGLE_LOAD_QA_ENABLED,
+  genQaEnabled: boolean = TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED,
 ): TelegramClassification {
   // Conflicting release modes must never select either dispatch processor.
-  if (dispatchReviewEnabled && singleLoadQaEnabled) {
+  if (dispatchModesConflict(dispatchReviewEnabled, singleLoadQaEnabled, genQaEnabled)) {
     dispatchReviewEnabled = false;
     singleLoadQaEnabled = false;
+    genQaEnabled = false;
   }
   if (identity.telegramUserId === null || identity.telegramChatId === null) {
     return { kind: "ignored", resultCode: "invalid_update_shape" };
@@ -851,6 +858,11 @@ export function classifyUpdate(
   // processor so its terminal receipt is recorded as `callback_query`, and the
   // processor — not this pure function — decides the fail-closed outcome.
   if (identity.callbackQueryId != null) {
+    if (genQaActive(genQaEnabled) && identity.telegramChatId === TELEGRAM_GENQA_CHAT_ID &&
+        (identity.chatType === "group" || identity.chatType === "supergroup")) {
+      const review = parseDispatchReviewData(identity.callbackData);
+      if (review) return { kind: "dispatch_review_action", ...review, chatType: identity.chatType, genQaOnly: true };
+    }
     if (singleLoadQaActive(singleLoadQaEnabled) &&
         (identity.chatType === "group" || identity.chatType === "supergroup") &&
         identity.telegramChatId < 0 && isDispatchReviewCallbackData(identity.callbackData)) {
@@ -909,6 +921,10 @@ export function classifyUpdate(
   // BEFORE the `non_private_message` fallback. Only exact validated status
   // report commands join natural text; /bind/help/dispatch remain unchanged.
   // Sender/chat come from the transport fields only. Gate stays OFF in live code.
+  if (genQaActive(genQaEnabled) && identity.telegramChatId === TELEGRAM_GENQA_CHAT_ID && identity.text !== null &&
+      (identity.chatType === "group" || identity.chatType === "supergroup") && isGenQaCommand(identity.text)) {
+    return { kind: "dispatch_group_message", text: identity.text, chatType: identity.chatType, genQaOnly: true };
+  }
   if (singleLoadQaActive(singleLoadQaEnabled) && identity.telegramChatId < 0 &&
       (identity.chatType === "group" || identity.chatType === "supergroup") && isSingleLoadQaCommand(identity.text)) {
     return { kind: "dispatch_group_message", text: identity.text as string, chatType: identity.chatType, qaOnly: true };
@@ -1010,7 +1026,7 @@ export async function runTelegramPoll(
   // constant governs. Only synthetic tests inject `true`.
   const dispatchReviewEnabled =
     (deps.dispatchReviewEnabled ?? TGG1B_DISPATCH_GROUP_REVIEW_ENABLED) === true;
-  if (dispatchReviewEnabled && (deps.singleLoadQaEnabled ?? TELEGRAM_SINGLE_LOAD_QA_ENABLED)) {
+  if (dispatchModesConflict(dispatchReviewEnabled, deps.singleLoadQaEnabled ?? TELEGRAM_SINGLE_LOAD_QA_ENABLED, deps.genQaEnabled ?? TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED)) {
     return { kind: "failed", errorCode: "dispatch_modes_conflict", processed: 0, advancedTo: null };
   }
 
@@ -1067,7 +1083,7 @@ export async function runTelegramPoll(
     }
 
     const identity = parseIdentity(update, updateId);
-    const classification = classifyUpdate(identity, dispatchReviewEnabled, deps.singleLoadQaEnabled);
+    const classification = classifyUpdate(identity, dispatchReviewEnabled, deps.singleLoadQaEnabled, deps.genQaEnabled);
 
     let terminal: TelegramTerminalResult;
     try {
@@ -1213,10 +1229,10 @@ export async function runTelegramPoll(
         // a load. Nothing is sent here; only the outbox drain delivers reviews.
         // Fail CLOSED when the processor is unavailable.
         : classification.kind === "dispatch_group_message"
-        ? await ((classification.qaOnly ? ledger.processQaDispatchGroupUpdate : ledger.processDispatchGroupUpdate)
+        ? await ((classification.genQaOnly ? ledger.processGenQaDispatchGroupUpdate : classification.qaOnly ? ledger.processQaDispatchGroupUpdate : ledger.processDispatchGroupUpdate)
             ? (() => {
-                const process = classification.qaOnly ? ledger.processQaDispatchGroupUpdate : ledger.processDispatchGroupUpdate;
-                if (!process || (classification.qaOnly && (!singleLoadQaActive(true) || !isSingleLoadQaCommand(classification.text)))) {
+                const process = classification.genQaOnly ? ledger.processGenQaDispatchGroupUpdate : classification.qaOnly ? ledger.processQaDispatchGroupUpdate : ledger.processDispatchGroupUpdate;
+                if (!process || (classification.genQaOnly && (!genQaActive(true) || !isGenQaCommand(classification.text))) || (classification.qaOnly && (!singleLoadQaActive(true) || !isSingleLoadQaCommand(classification.text)))) {
                   throw new Error("qa_dispatch_scope_denied");
                 }
                 const candidate = parseDispatchMessageCandidate({
@@ -1242,10 +1258,10 @@ export async function runTelegramPoll(
         // payload is an untrusted locator. Permission, binding, relationship
         // and load status are re-checked in ONE database transaction.
         : classification.kind === "dispatch_review_action"
-        ? await ((classification.qaOnly ? ledger.processQaDispatchReviewActionUpdate : ledger.processDispatchReviewActionUpdate)
+        ? await ((classification.genQaOnly ? ledger.processGenQaDispatchReviewActionUpdate : classification.qaOnly ? ledger.processQaDispatchReviewActionUpdate : ledger.processDispatchReviewActionUpdate)
             ? (() => {
-              const process = classification.qaOnly ? ledger.processQaDispatchReviewActionUpdate : ledger.processDispatchReviewActionUpdate;
-              if (!process || (classification.qaOnly && !singleLoadQaActive(true))) throw new Error("qa_dispatch_expired");
+              const process = classification.genQaOnly ? ledger.processGenQaDispatchReviewActionUpdate : classification.qaOnly ? ledger.processQaDispatchReviewActionUpdate : ledger.processDispatchReviewActionUpdate;
+              if (!process || (classification.genQaOnly && !genQaActive(true)) || (classification.qaOnly && !singleLoadQaActive(true))) throw new Error("qa_dispatch_expired");
               return process({
                 leaseToken: lease.leaseToken,
                 updateId,
@@ -1384,6 +1400,11 @@ export async function runTelegramPoll(
     // duplicate delivery (which reports the already-recorded outcome) and a
     // failure here can never re-apply or roll back the database action.
     if (identity.callbackQueryId != null) {
+    if (genQaActive(genQaEnabled) && identity.telegramChatId === TELEGRAM_GENQA_CHAT_ID &&
+        (identity.chatType === "group" || identity.chatType === "supergroup")) {
+      const review = parseDispatchReviewData(identity.callbackData);
+      if (review) return { kind: "dispatch_review_action", ...review, chatType: identity.chatType, genQaOnly: true };
+    }
       const callbackQueryId = identity.callbackQueryId;
       if (gateway.answerCallbackQuery) {
         try {
@@ -1450,6 +1471,7 @@ export async function runTelegramPoll(
         dispatchReviewEnabled &&
         classification.kind === "dispatch_review_action" &&
         classification.qaOnly !== true &&
+        classification.genQaOnly !== true &&
         classification.proposalId !== null &&
         terminal.isNew === true &&
         ((classification.action === "accept" && terminal.resultCode === "dispatch_review_accepted") ||
@@ -2046,16 +2068,20 @@ export async function runDispatchReviewDeliveryDrain(deps: {
   /** Synthetic-test injection ONLY; production uses the compile-time gate. */
   enabled?: boolean;
   singleLoadQaEnabled?: boolean;
+  genQaEnabled?: boolean;
   qaLedger?: DispatchDeliveryLedger;
+  genQaLedger?: DispatchDeliveryLedger;
   limit?: number;
 }): Promise<TelegramDispatchReviewDrainResult> {
   const enabled = (deps.enabled ?? TGG1B_DISPATCH_GROUP_REVIEW_ENABLED) === true;
   const qaEnabled = singleLoadQaActive(deps.singleLoadQaEnabled);
+  const genEnabled = genQaActive(deps.genQaEnabled);
   const result: TelegramDispatchReviewDrainResult = { status: "ok", sent: 0, retried: 0, leaseLost: 0 };
-  if (enabled && (deps.singleLoadQaEnabled ?? TELEGRAM_SINGLE_LOAD_QA_ENABLED)) return { ...result, status: "failed" };
-  if (!enabled && !qaEnabled) return { ...result, status: "disabled" };
+  if (dispatchModesConflict(enabled, deps.singleLoadQaEnabled ?? TELEGRAM_SINGLE_LOAD_QA_ENABLED, deps.genQaEnabled ?? TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED)) return { ...result, status: "failed" };
+  if (!enabled && !qaEnabled && !genEnabled) return { ...result, status: "disabled" };
   if (qaEnabled && !deps.qaLedger) return { ...result, status: "failed" };
-  const deliveryLedger = qaEnabled && deps.qaLedger ? guardSingleLoadQaDelivery(deps.qaLedger) : deps.ledger;
+  if (genEnabled && !deps.genQaLedger) return { ...result, status: "failed" };
+  const deliveryLedger = genEnabled && deps.genQaLedger ? guardGenQaDelivery(deps.genQaLedger) : qaEnabled && deps.qaLedger ? guardSingleLoadQaDelivery(deps.qaLedger) : deps.ledger;
   const log: TelegramPollLogger = deps.log ?? (() => {});
   const limit = Math.max(0, Math.min(deps.limit ?? TELEGRAM_DISPATCH_REVIEW_DRAIN_LIMIT, 50));
   const port = {
