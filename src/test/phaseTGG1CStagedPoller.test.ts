@@ -189,6 +189,35 @@ describe("TG-G1C gate", () => {
 });
 
 describe("TG-G1C intake (enabled synthetic)", () => {
+  it.each(["/delivered@HaulTrackerBot AB-123", "/cancelled@HaulTrackerBot AB-123", "/delivered AB-123", "/cancelled AB-123"])("%s creates only one uncommitted proposal and replay is harmless", async text => {
+    const w = makeWorld();
+    await poll(w,[groupMsg(1,text)]);
+    expect(w.proposals.size).toBe(1);
+    expect([...w.proposals.values()][0].target).toBe(text.startsWith('/delivered')?'completed':'cancelled');
+    expect(w.outbox).toHaveLength(1);
+    expect(w.loads.get('AB-123')?.status).toBe('en_route');
+    const replay=await poll(w,[groupMsg(1,text)]);
+    expect(replay.r.kind).toBe('ok'); expect(replay.sent).toHaveLength(0);
+    expect(w.proposals.size).toBe(1); expect(w.outbox).toHaveLength(1);
+    expect(w.loads.get('AB-123')?.status).toBe('en_route');
+  });
+  it('disabled live gate ignores status reports; enabled gate still preserves other slash commands',async()=>{
+    const w=makeWorld();
+    await poll(w,[groupMsg(1,'/delivered@HaulTrackerBot AB-123'),groupMsg(2,'/cancelled AB-124')],false);
+    expect(w.proposals.size).toBe(0); expect(w.outbox).toHaveLength(0);
+    expect(w.calls).not.toContain('dispatch_intake');
+    const base={updateId:1,telegramUserId:SENDER,telegramChatId:GROUP,chatType:'supergroup',callbackQueryId:null,callbackData:null,replyToMessageId:null};
+    for(const text of ['/help','/help@HaulTrackerBot','/dispatch','/menu','/delivered@OtherBot AB-123','/delivered AB-123 extra'])
+      expect(classifyUpdate({...base,text},true)).toEqual({kind:'ignored',resultCode:'non_private_message'});
+  });
+  it('addressed status report requires independent authorized review before changing a load',async()=>{
+    const w=makeWorld(); await poll(w,[groupMsg(1,'/delivered@HaulTrackerBot AB-123')]);
+    const p=[...w.proposals.values()][0]; const data=composeDispatchReviewData('accept',p.id);
+    const denied=await poll(w,[tap(2,data,UNAUTH)]);
+    expect(denied.answers[0]).toMatch(/not authorized/); expect(w.loads.get('AB-123')?.status).toBe('en_route');
+    await poll(w,[tap(3,data)]); expect(w.loads.get('AB-123')?.status).toBe('completed');
+    await poll(w,[tap(3,data)]); expect(w.loads.get('AB-123')?.status).toBe('completed');
+  });
   it("delivered and cancelled create proposals + outbox, never change loads, never send on intake", async () => {
     const w = makeWorld();
     const { r, sent } = await poll(w, [groupMsg(1, "Load #AB-123 delivered"), groupMsg(2, "Load #AB-124 cancelled")]);

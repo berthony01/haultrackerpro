@@ -31,6 +31,7 @@ import {
 } from "./telegram-dispatch-group-review.ts";
 import {
   parseDispatchMessageCandidate,
+  parseDispatchStatusReportCommand,
   type DispatchTargetStatus,
 } from "./telegram-dispatch-group-proposals.ts";
 
@@ -558,7 +559,7 @@ export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
 // Independently authorized read-only guidance. Never enables dispatch processing or AI.
 export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = true as const;
 export const TELEGRAM_DISPATCH_GUIDANCE_TEXT =
-  "Dispatcher\nLoad updates not active. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
+  "Dispatcher\nLoad updates not active. Status report commands are unavailable until live updates are approved. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
 
 /** Read-only guidance only. Exact transport command, never ordinary group text.
  * Missing/uninstalled RPC, denial, malformed output or errors all fail closed. */
@@ -883,12 +884,13 @@ export function classifyUpdate(
     }
   }
   // TG-G1C (gated, default OFF). Strictly AFTER the exact `/bind` branch and
-  // BEFORE the `non_private_message` fallback. Slash commands keep their
-  // existing outcome. Sender/chat come from the transport fields only.
+  // BEFORE the `non_private_message` fallback. Only exact validated status
+  // report commands join natural text; /bind/help/dispatch remain unchanged.
+  // Sender/chat come from the transport fields only. Gate stays OFF in live code.
   if (
     dispatchReviewEnabled === true &&
     identity.text !== null &&
-    !identity.text.startsWith("/") &&
+    (!identity.text.startsWith("/") || parseDispatchStatusReportCommand(identity.text) !== null) &&
     (identity.chatType === "group" || identity.chatType === "supergroup")
   ) {
     return { kind: "dispatch_group_message", text: identity.text, chatType: identity.chatType };

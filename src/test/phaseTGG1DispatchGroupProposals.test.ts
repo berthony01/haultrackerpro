@@ -32,6 +32,34 @@ function proposalFor(text = "Load #ABC123 delivered", loads: unknown[] = [loadRo
 
 describe("TG-G1A parse — high-confidence past-tense events", () => {
   it.each([
+    ["/delivered HTP-QA-L2", "completed"],
+    ["/delivered@HaulTrackerBot htp-qa-l2", "completed"],
+    ["/cancelled HTP-QA-L2", "cancelled"],
+    ["/cancelled@HaulTrackerBot HTP-QA-L2", "cancelled"],
+    ["/delivered AB12", "completed"],
+    [`/delivered A${"1".repeat(23)}`, "completed"],
+  ])("exact status report %s → uncommitted %s", (text, event) => {
+    const c = msg(text);
+    expect(c).toEqual({kind:"proposed",event,reference:text.split(" ")[1].toUpperCase(),telegramChatId:CHAT,updateId:77});
+    const rows = [loadRow({reference:text.split(" ")[1]})];
+    const before = JSON.stringify(rows);
+    expect(resolveDispatchCandidate(c,rows,scope)).toMatchObject({kind:"review_proposal",committed:false,requiresServerAuthorization:true,targetStatus:event});
+    expect(JSON.stringify(rows)).toBe(before);
+  });
+  it.each([
+    "/delivered@OtherBot HTP-QA-L2", "/delivered@HaulTrackerBot@OtherBot HTP-QA-L2",
+    "/delivered HTP-QA-L2 AB123", "/delivered HTP-QA-L2 HTP-QA-L2",
+    "/delivered AB1", "/delivered ABCDEF", "/delivered -AB12", "/delivered AB12-",
+    "/delivered AB_12", "/delivered #AB12", `/delivered A${"1".repeat(24)}`,
+    "/completed AB12", "/canceled AB12", "/DELIVERED AB12", "/delivered AB12;",
+    "/delivered AB12\n", "/delivered AB12\n/cancelled AB12", "/delivered\tAB12",
+    " /delivered AB12", "/delivered AB12 ", '"/delivered AB12"',
+    "> /delivered AB12", "test /delivered AB12", "tomorrow /delivered AB12",
+    "/delivered TEST-12", "/delivered FUTURE-12 tomorrow", "/delivered TOMORROW-12",
+  ])("invalid/quoted/test/future report never proposed: %s", text => {
+    expect(msg(text).kind).not.toBe("proposed");
+  });
+  it.each([
     ["Load #ABC123 delivered", "completed"],
     ["Load #abc123 completed", "completed"],
     ["Ref ABC123 delivered at 3pm", "completed"],
