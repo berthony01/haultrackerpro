@@ -73,6 +73,27 @@ AS $$ SELECT EXISTS(SELECT 1 FROM public.telegram_dispatch_review_proposals p CR
  WHERE p.id=_id AND p.load_id='cb3d3a90-ac48-4d20-af52-d6710d854e81' AND p.load_reference='HTP-QA-L2' AND p.proposed_status='cancelled'
  AND p.binding_id=s.binding_id AND p.telegram_chat_id=s.chat_id AND p.recruiter_id=s.recruiter_id AND p.relationship_id=s.relationship_id) $$;
 
+CREATE FUNCTION public._telegram_qa_dispatch_actor(_actor bigint) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public'
+AS $$ DECLARE actor_user uuid; s record; driver_user uuid;
+ previous_actor text:=current_setting('request.jwt.claim.sub',true);
+BEGIN
+ SELECT l.user_id INTO actor_user FROM public.telegram_user_links l
+ WHERE l.telegram_user_id=_actor AND l.status='active' AND l.revoked_at IS NULL FOR SHARE;
+ IF actor_user IS NULL THEN RAISE EXCEPTION 'qa_dispatch_actor_denied'; END IF;
+ SELECT * INTO STRICT s FROM public._telegram_qa_dispatch_scope();
+ PERFORM 1 FROM public.recruiter_profiles WHERE id=s.recruiter_id FOR SHARE;
+ PERFORM 1 FROM public.recruiter_members WHERE recruiter_id=s.recruiter_id FOR SHARE;
+ SELECT r.driver_user_id INTO driver_user FROM public.carrier_driver_relationships r WHERE r.id=s.relationship_id FOR SHARE;
+ PERFORM set_config('request.jwt.claim.sub',actor_user::text,true);
+ IF NOT public.current_user_can_dispatch_load_action(s.recruiter_id,s.relationship_id,driver_user,'loads_update_status') THEN
+  RAISE EXCEPTION 'qa_dispatch_actor_denied';
+ END IF;
+ PERFORM set_config('request.jwt.claim.sub',COALESCE(previous_actor,''),true);
+EXCEPTION WHEN OTHERS THEN
+ PERFORM set_config('request.jwt.claim.sub',COALESCE(previous_actor,''),true); RAISE;
+END; $$;
+
 CREATE OR REPLACE FUNCTION public.telegram_process_dispatch_group_update(_lease_token uuid, _update_id bigint, _payload_hash text, _telegram_user_id bigint, _telegram_chat_id bigint, _chat_type text, _reference text, _proposed_status text)
  RETURNS TABLE(is_new boolean, result_code text, proposal_id uuid, expires_at timestamp with time zone)
  LANGUAGE plpgsql
@@ -151,6 +172,7 @@ BEGIN
   END IF;
 
   IF public._telegram_qa_dispatch_active() AND (_reference IS DISTINCT FROM 'HTP-QA-L2' OR _proposed_status IS DISTINCT FROM 'cancelled') THEN RAISE EXCEPTION 'qa_dispatch_scope_denied'; END IF;
+  IF public._telegram_qa_dispatch_active() THEN PERFORM public._telegram_qa_dispatch_actor(_telegram_user_id); END IF;
   IF _reference IS NOT NULL THEN
     SELECT * INTO _binding
       FROM public.telegram_chat_bindings b
@@ -201,7 +223,10 @@ BEGIN
             _key := 'tg-dg:v1:' || _telegram_chat_id::text || ':' || _update_id::text
                     || ':' || _load_id::text || ':' || _proposed_status;
 
-            IF public._telegram_qa_dispatch_active() THEN PERFORM public._telegram_qa_dispatch_assert(_telegram_chat_id,_chat_type); END IF;
+            IF public._telegram_qa_dispatch_active() THEN
+              PERFORM public._telegram_qa_dispatch_actor(_telegram_user_id);
+              PERFORM public._telegram_qa_dispatch_assert(_telegram_chat_id,_chat_type);
+            END IF;
             INSERT INTO public.telegram_dispatch_review_proposals (
               proposal_key, binding_id, recruiter_id, telegram_chat_id,
               source_update_id, source_payload_hash, load_id, load_reference,
@@ -320,6 +345,10 @@ BEGIN
       FROM public.telegram_dispatch_review_proposals p
      WHERE p.id = _proposal_id
      FOR UPDATE;
+    IF public._telegram_qa_dispatch_active() THEN
+      PERFORM public._telegram_qa_dispatch_assert(_telegram_chat_id,_chat_type);
+      IF NOT public._telegram_qa_dispatch_proposal(_proposal_id) THEN RAISE EXCEPTION 'qa_dispatch_scope_denied'; END IF;
+    END IF;
 
     -- Unknown id and another chat's proposal are indistinguishable.
     IF NOT FOUND OR _p.telegram_chat_id <> _telegram_chat_id THEN
@@ -500,7 +529,10 @@ BEGIN
        OR o.delivery_state='sending' AND o.lease_expires_at<=_now)
       AND o.attempt_count<o.max_attempts
     ORDER BY o.next_attempt_at,o.id LIMIT 1 FOR UPDATE SKIP LOCKED;
-  IF _id IS NULL THEN RETURN; END IF;
+  IF _id IS NULL THEN
+    IF public._telegram_qa_dispatch_active() THEN PERFORM public._telegram_qa_dispatch_assert(); END IF;
+    RETURN;
+  END IF;
   IF public._telegram_qa_dispatch_active() THEN PERFORM public._telegram_qa_dispatch_assert(); END IF;
   UPDATE public.telegram_dispatch_review_outbox o
     SET delivery_state='sending', attempt_count=attempt_count+1, claim_token=_token,
