@@ -43,6 +43,7 @@ CREATE FUNCTION public._telegram_genqa_dispatch_assert(_chat bigint DEFAULT NULL
 LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'pg_catalog','public'
 AS $$
 BEGIN
+ IF (SELECT count(*) FROM public.telegram_chat_bindings WHERE recruiter_id='f6b00b66-cd1c-4037-a382-8b1b9c629f3b' AND status='active' AND revoked_at IS NULL)<>1 THEN RAISE EXCEPTION 'qa_dispatch_scope_denied'; END IF;
  PERFORM 1 FROM public._telegram_genqa_dispatch_scope() s
  JOIN public.telegram_chat_bindings b ON b.id=s.binding_id
  JOIN public.carrier_driver_relationships r ON r.id=s.relationship_id
@@ -244,6 +245,8 @@ BEGIN
     END IF;
   END IF;
 
+  IF _outcome IS DISTINCT FROM 'dispatch_review_proposed' THEN RAISE EXCEPTION 'genqa_dispatch_target_unavailable'; END IF;
+  PERFORM public._telegram_genqa_dispatch_assert(_telegram_chat_id,_chat_type);
   INSERT INTO public.telegram_update_receipts (
     update_id, payload_hash, update_type,
     telegram_user_id, telegram_chat_id, status, result_code
@@ -484,6 +487,7 @@ BEGIN
     _telegram_user_id, _telegram_chat_id, 'processed', _outcome
   );
 
+  PERFORM public._telegram_genqa_dispatch_assert(_telegram_chat_id,_chat_type);
   is_new := true;
   result_code := _outcome;
   RETURN NEXT;

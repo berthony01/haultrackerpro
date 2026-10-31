@@ -374,7 +374,7 @@ describe('TG-G1 GEN1 hash-pinned one-group acceptance, disposable PostgreSQL onl
  });
  it.each(['link','permission','relationship','binding','driver','reference'])('revoked or changed %s blocks confirmation without writes',async(reason)=>{
   const id=await genProposal();
-  const sql:Record<string,string>={link:"UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501",permission:"UPDATE recruiter_members SET permissions='{}' WHERE member_user_id='"+STAFF+"'",relationship:"UPDATE carrier_driver_relationships SET status='ended' WHERE id='"+GEN_REL+"'",binding:"UPDATE telegram_chat_bindings SET revoked_at=now() WHERE id='"+GEN_BINDING+"'",driver:"UPDATE loads SET user_id='"+D+"' WHERE id='"+GEN_LOAD+"'",reference:"UPDATE loads SET load_reference='OLD' WHERE id='"+GEN_LOAD+"'"};
+  const sql:Record<string,string>={link:"UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501",permission:"UPDATE recruiter_members SET permissions='{}' WHERE member_user_id='"+STAFF+"'",relationship:"UPDATE carrier_driver_relationships SET status='ended' WHERE id='"+GEN_REL+"'",binding:"UPDATE telegram_chat_bindings SET status='revoked',revoked_at=now() WHERE id='"+GEN_BINDING+"'",driver:"UPDATE loads SET user_id='"+D+"' WHERE id='"+GEN_LOAD+"'",reference:"UPDATE loads SET load_reference='OLD' WHERE id='"+GEN_LOAD+"'"};
   await q(sql[reason]);const before=await counts();await expect(genReview(id)).rejects.toThrow();expect(await counts()).toEqual(before);
  });
  it('wrong group or unrelated proposal callback cannot consume receipts/history',async()=>{
