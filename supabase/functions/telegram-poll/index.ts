@@ -1209,6 +1209,18 @@ Deno.serve(async (req: Request) => {
       sha256: sha256Hex,
       log,
       quickPostExtractor: buildQuickPostExtractor(supabase),
+      // Independent read-only UX gate. Missing candidate RPC is a silent
+      // denial; no raw database error or identifier reaches a chat or log.
+      authorizeDispatchGuidance: TELEGRAM_DISPATCH_GUIDANCE_ENABLED
+        ? async (input) => {
+            const { data, error } = await supabase.rpc("telegram_get_dispatch_guidance", {
+              _telegram_user_id: input.telegramUserId,
+              _telegram_chat_id: input.telegramChatId,
+              _chat_type: input.chatType,
+            });
+            return !error && data === true;
+          }
+        : undefined,
     });
 
     await drainAlerts();

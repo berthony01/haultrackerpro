@@ -557,7 +557,7 @@ export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
 // Sprint 1: independent staging gate. Never enables dispatch processing or AI.
 export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = false as const;
 export const TELEGRAM_DISPATCH_GUIDANCE_TEXT =
-  "Dispatcher\nDispatch updates not active. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
+  "Dispatcher\nMy Dispatch Status: updates not active. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
 export const TELEGRAM_DISPATCH_GUIDANCE_BUTTONS: TelegramInlineUrlButton[][] = [
   [{ text: "Open Dispatch Menu", url: "https://t.me/HaulTrackerBot" }],
   [{ text: "Open HaulTracker Pro", url: "https://haultrackerpro.com/dashboard" }],
@@ -1457,7 +1457,6 @@ export async function runTelegramPoll(
             text: TELEGRAM_DISPATCH_GUIDANCE_TEXT,
             buttons: identity.chatType === "private" ? [
               [{ text: "Dispatch Tools", url: "https://haultrackerpro.com/dashboard" }],
-              [{ text: "My Dispatch Status", url: "https://haultrackerpro.com/dashboard" }],
             ] : TELEGRAM_DISPATCH_GUIDANCE_BUTTONS,
           });
         } catch {

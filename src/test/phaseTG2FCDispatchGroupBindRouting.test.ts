@@ -409,6 +409,7 @@ describe("TG-2F-C E — edge adapter delegates to the atomic RPC only", () => {
       "telegram_claim_dispatch_review_delivery",
       "telegram_claim_poll_lease",
       "telegram_fail_dispatch_review_delivery",
+      "telegram_get_dispatch_guidance",
       "telegram_mark_conversation_alert_failed",
       "telegram_mark_conversation_alert_sent",
       "telegram_process_bind_update",
