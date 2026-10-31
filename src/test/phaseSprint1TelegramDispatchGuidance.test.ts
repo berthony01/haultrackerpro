@@ -5,10 +5,10 @@ import { getTelegramDispatchGuidance, runTelegramPoll, TELEGRAM_DISPATCH_GUIDANC
 import { TGG1B_DISPATCH_GROUP_REVIEW_ENABLED } from '../../supabase/functions/_shared/telegram-dispatch-group-review';
 const input = (text='/dispatch', chatType='group', telegramUserId=501, telegramChatId=-100) => ({text,chatType,telegramUserId,telegramChatId});
 describe('Sprint 1 dispatcher guidance production-used path',()=>{
- it('both production gates remain false and never call authorization by default',async()=>{
-   const auth=vi.fn(); expect(TELEGRAM_DISPATCH_GUIDANCE_ENABLED).toBe(false);
+ it('only read-only guidance is on; test-injected OFF never calls authorization',async()=>{
+   const auth=vi.fn(); expect(TELEGRAM_DISPATCH_GUIDANCE_ENABLED).toBe(true);
    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
-   expect(await getTelegramDispatchGuidance(input(),auth)).toBe(false); expect(auth).not.toHaveBeenCalled();
+   expect(await getTelegramDispatchGuidance(input(),auth,false)).toBe(false); expect(auth).not.toHaveBeenCalled();
  });
  it.each(['/dispatch','/dispatch@HaulTrackerBot','/help','/help@HaulTrackerBot'])('authorizes exact transport group command %s',async(text)=>{
    const auth=vi.fn().mockResolvedValue(true); expect(await getTelegramDispatchGuidance(input(text),auth,true)).toBe(true);
@@ -36,9 +36,43 @@ describe('Sprint 1 dispatcher guidance production-used path',()=>{
    const ledger={claimLease:async()=>({leaseToken:'lease',nextOffset:1}),releaseLease:async()=>true,
      advanceCursor:vi.fn().mockResolvedValue(2),recordIgnoredUpdate:ignored} as unknown as TelegramPollLedger;
    const gateway={getUpdates:async()=>({ok:true,status:200,result:[{update_id:1,message:{from:{id:501},chat:{id:-100,type:'group'},text:'/dispatch'}}]}),sendMessage} as TelegramGateway;
-   for(let n=0;n<2;n++) expect((await runTelegramPoll({ledger,gateway,sha256:async()=> 'a'.repeat(64),dispatchGuidanceEnabled:true,authorizeDispatchGuidance:auth,
+   for(let n=0;n<2;n++) expect((await runTelegramPoll({ledger,gateway,sha256:async()=> 'a'.repeat(64),authorizeDispatchGuidance:auth,
      dispatchGuidanceButtons:{private:[],group:[[{text:'Open Dispatch Menu',url:'https://t.me/HaulTrackerBot'}]]}})).kind).toBe('ok');
    expect(sendMessage).toHaveBeenCalledTimes(allowed?1:0); expect(ledger.advanceCursor).toHaveBeenCalledTimes(2);
    if(allowed) expect(sendMessage.mock.calls[0][0].buttons[0][0].url).toBe('https://t.me/HaulTrackerBot');
+ });
+ it.each([
+   ['/dispatch','group',true,true,1],
+   ['/dispatch@HaulTrackerBot','supergroup',true,true,1],
+   ['/help','group',true,true,1],
+   ['/help@HaulTrackerBot','supergroup',true,true,1],
+   ['/dispatch','group',false,true,0],
+   ['/dispatch','group',true,false,0],
+   ['Load AB123 delivered','group',true,true,0],
+   ['hello','supergroup',true,true,0],
+ ] as const)('explicit group flow %s/%s allowed=%s enabled=%s',async(text,chatType,allowed,enabled,sends)=>{
+   const auth=vi.fn().mockResolvedValue(allowed);
+   const sendMessage=vi.fn().mockResolvedValue({ok:true,status:200});
+   const ledger={claimLease:async()=>({leaseToken:'lease',nextOffset:1}),releaseLease:async()=>true,advanceCursor:async()=>2,
+     recordIgnoredUpdate:async()=>({isNew:true,resultCode:'non_private_message'})} as unknown as TelegramPollLedger;
+   const gateway={getUpdates:async()=>({ok:true,status:200,result:[{update_id:1,message:{from:{id:501},chat:{id:-100,type:chatType},text}}]}),sendMessage} as TelegramGateway;
+   expect((await runTelegramPoll({ledger,gateway,sha256:async()=> 'a'.repeat(64),authorizeDispatchGuidance:auth,dispatchGuidanceEnabled:enabled})).kind).toBe('ok');
+   expect(sendMessage).toHaveBeenCalledTimes(sends);
+   expect(auth).toHaveBeenCalledTimes(enabled && text.startsWith('/')?1:0);
+ });
+ it.each(['/start','/menu','/help','/status'])('private multi-role %s preserves menu actions alongside authorized dispatcher section',async(text)=>{
+   const menuButtons=[[{text:'Post Opportunity',callbackData:'q1:new'}],[{text:'Find Work',url:'https://haultrackerpro.com/find-work'}]];
+   const menu=vi.fn().mockResolvedValue({isNew:true,resultCode:'menu_multi_role',menuText:'Driver\nRecruiter',menuButtons});
+   const ledger={claimLease:async()=>({leaseToken:'lease',nextOffset:1}),releaseLease:async()=>true,advanceCursor:async()=>2,processMenuUpdate:menu} as unknown as TelegramPollLedger;
+   const sendMessage=vi.fn().mockResolvedValue({ok:true,status:200});
+   const auth=vi.fn().mockResolvedValue(true);
+   const gateway={getUpdates:async()=>({ok:true,status:200,result:[{update_id:1,message:{from:{id:501},chat:{id:501,type:'private'},text}}]}),sendMessage} as TelegramGateway;
+   expect((await runTelegramPoll({ledger,gateway,sha256:async()=> 'a'.repeat(64),authorizeDispatchGuidance:auth,
+     dispatchGuidanceButtons:{private:[[{text:'Open App',url:'https://haultrackerpro.com/dashboard'}]],group:[]}})).kind).toBe('ok');
+   expect(menu).toHaveBeenCalledTimes(1);
+   expect(auth).toHaveBeenCalledWith({telegramUserId:501,telegramChatId:null,chatType:'private'});
+   expect(sendMessage).toHaveBeenCalledTimes(2);
+   expect(sendMessage.mock.calls[0][0].buttons).toEqual(menuButtons);
+   expect(sendMessage.mock.calls[1][0].buttons).toEqual([[{text:'Open App',url:'https://haultrackerpro.com/dashboard'}]]);
  });
 });

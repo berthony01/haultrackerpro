@@ -510,7 +510,7 @@ export interface TelegramPollDeps {
    *  so the compile-time `TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false` applies.
    *  Not an environment/runtime toggle. */
   dispatchReviewEnabled?: boolean;
-  /** Synthetic tests only; production uses the independent OFF literal. */
+  /** Synthetic tests may force OFF; production uses the independent guidance gate. */
   dispatchGuidanceEnabled?: boolean;
   dispatchGuidanceButtons?: { private: TelegramInlineUrlButton[][]; group: TelegramInlineUrlButton[][] };
   authorizeDispatchGuidance?: (input: { telegramUserId: number; telegramChatId: number | null; chatType: string }) => Promise<unknown>;
@@ -555,10 +555,10 @@ const START_COMMAND_PATTERN = /^\/start ([0-9a-f]{64})$/;
 /** TG-2F-C. `/bind <64 lowercase hex>`, optionally addressed to the bot. The
  *  bot username is a public, non-secret constant. */
 export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
-// Sprint 1: independent staging gate. Never enables dispatch processing or AI.
-export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = false as const;
+// Independently authorized read-only guidance. Never enables dispatch processing or AI.
+export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = true as const;
 export const TELEGRAM_DISPATCH_GUIDANCE_TEXT =
-  "Dispatcher\nMy Dispatch Status: updates not active. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
+  "Dispatcher\nLoad updates not active. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
 
 /** Read-only guidance only. Exact transport command, never ordinary group text.
  * Missing/uninstalled RPC, denial, malformed output or errors all fail closed. */

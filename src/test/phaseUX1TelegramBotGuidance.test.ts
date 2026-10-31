@@ -21,7 +21,7 @@ describe("UX-1 Telegram bot guidance", () => {
     expect(classifyUpdate(id("/help"))).toEqual({ kind: "menu", command: "help" });
     for (const c of ["/start", "/menu", "/status"]) expect(classifyUpdate(id(c)).kind).toBe("menu");
   });
-  it("does not answer /help or /dispatch in groups (no bound-chat check exists)", () => {
+  it("keeps group commands on ignored receipts; separately authorized guidance owns replies", () => {
     for (const t of ["/help", "/help@HaulTrackerBot", "/dispatch", "/dispatch@HaulTrackerBot", "Load AB123 delivered"]) {
       expect(classifyUpdate(id(t, "supergroup"))).toEqual({ kind: "ignored", resultCode: "non_private_message" });
     }
@@ -33,7 +33,7 @@ describe("UX-1 Telegram bot guidance", () => {
   });
   it("help copy says dispatch is not active and offers no dispatch control", () => {
     expect(EDGE).toContain("Dispatch group updates: not active yet.");
-    // New independent guidance gate remains OFF; existing help is unchanged.
+    // Independent guidance authorization remains separate from existing help.
     expect(EDGE).toContain("authorizeDispatchGuidance: TELEGRAM_DISPATCH_GUIDANCE_ENABLED");
     expect(EDGE).not.toContain("setMyCommands(");
   });
