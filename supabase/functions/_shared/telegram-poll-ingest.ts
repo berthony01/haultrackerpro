@@ -1370,8 +1370,9 @@ export async function runTelegramPoll(
     // Best-effort user feedback. Deliberately AFTER the terminal receipt and
     // deliberately outside cursor correctness: a failed send must never make
     // the update look unprocessed.
-    // RB-2B. A button tap is resolved by ANSWERING the callback, never by a
-    // new message. Answering is not a state mutation, so it runs even for a
+    // RB-2B. A button tap is resolved by ANSWERING the callback. Only a newly
+    // accepted QA cancellation also gets the bounded group acknowledgement below.
+    // Answering is not a state mutation, so it runs even for a
     // duplicate delivery (which reports the already-recorded outcome) and a
     // failure here can never re-apply or roll back the database action.
     if (identity.callbackQueryId != null) {
@@ -1402,6 +1403,36 @@ export async function runTelegramPoll(
             updateId,
             code: sanitizeErrorCode(error),
           });
+        }
+      }
+      // The QA RPC has committed and validated the exact load, proposal,
+      // bound chat and reviewer. Its success is the authority, not callback
+      // data. Use only the transport chat supplied to that same RPC; never
+      // a payload/descriptor destination. Receipt replay suppresses retries.
+      // Best-effort only: no outbox, status rewrite or cursor dependency.
+      if (
+        classification.kind === "dispatch_review_action" &&
+        classification.qaOnly === true &&
+        classification.action === "accept" &&
+        classification.proposalId !== null &&
+        terminal.isNew === true &&
+        terminal.resultCode === "dispatch_review_accepted" &&
+        singleLoadQaActive(true) &&
+        identity.telegramChatId !== null && identity.telegramChatId < 0 &&
+        (identity.chatType === "group" || identity.chatType === "supergroup")
+      ) {
+        try {
+          const sent = await gateway.sendMessage({
+            chatId: identity.telegramChatId,
+            text: "✅ Cancellation confirmed for load HTP-QA-L2. Status: Cancelled. Review completed.",
+          });
+          if (!sent.ok) {
+            log("qa_review_ack_failed", {
+              code: sanitizeErrorCode(sent.errorCode ?? "telegram_gateway_error"),
+            });
+          }
+        } catch (error) {
+          log("qa_review_ack_failed", { code: sanitizeErrorCode(error) });
         }
       }
     } else if (terminal.isNew && identity.telegramChatId !== null) {
