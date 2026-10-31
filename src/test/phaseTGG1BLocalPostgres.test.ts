@@ -294,7 +294,7 @@ describe('TG-G1 QA exact single-load disposable transactions',()=>{
  it('absolute expiry rolls back intake, callback and all cleanup',async()=>{
   const id=await qaProposal();await proposal();const before=await counts(),other=await unrelatedState();
   const def=(await q("SELECT pg_get_functiondef('public._telegram_qa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
-  try{await q(def.replaceAll('2026-11-02 23:59:59+00','2000-01-01 00:00:00+00'));
+  try{await q(def.split('2026-11-02 23:59:59+00').join('2000-01-01 00:00:00+00'));
    await expect(qaIntake(101)).rejects.toThrow('qa_dispatch_expired');await expect(qaReview(id)).rejects.toThrow('qa_dispatch_expired');await expect(qaClaim()).rejects.toThrow('qa_dispatch_expired');
    expect(await counts()).toEqual(before);expect(await unrelatedState()).toEqual(other);
   }finally{await q(def);}
