@@ -109,15 +109,43 @@ describe('TG-G1B real disposable PostgreSQL transactions',()=>{
    "UPDATE recruiter_members SET status='revoked',revoked_at=now() WHERE member_user_id='"+STAFF+"'",
    "UPDATE recruiter_members SET permissions='{}' WHERE member_user_id='"+STAFF+"'",
    "UPDATE recruiter_members SET permissions='{\"loads_update_status\":\"true\"}' WHERE member_user_id='"+STAFF+"'",
+   "UPDATE recruiter_members SET permissions='{\"loads_update_status\":false}' WHERE member_user_id='"+STAFF+"'",
    "UPDATE recruiter_profiles SET status='suspended' WHERE id='"+R+"'",
    "UPDATE recruiter_billing_profiles SET status='canceled' WHERE recruiter_id='"+R+"'",
  ])('guidance denies revoked/missing/invalid authority: %s',async(sql)=>{
    await q(sql); expect((await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group') ok"))[0].ok).toBe(false);
  });
- it('guidance denies unlinked, mismatched type, absent binding and owner role alone',async()=>{
-   await q('INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(503,$1)',[OWNER]);
-   for(const sql of ["(999,-100,'group')","(501,-100,'supergroup')","(501,-999,'group')","(503,-100,'group')","(501,NULL,'group')","(501,-100,'private')"])
+ it('guidance denies unlinked, mismatched type, absent binding and unrelated owner',async()=>{
+   for(const sql of ["(999,-100,'group')","(501,-100,'supergroup')","(501,-999,'group')","(502,-100,'group')","(501,NULL,'group')","(501,-100,'private')"])
      expect((await rpc('SELECT telegram_get_dispatch_guidance'+sql+' ok'))[0].ok).toBe(false);
+ });
+ it('exact linked owner is allowed without a duplicate membership, including private guidance',async()=>{
+   await q('DELETE FROM recruiter_members WHERE member_user_id=$1',[OWNER]);
+   await q('INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(503,$1)',[OWNER]);
+   for(const args of ["(503,-100,'group')","(503,NULL,'private')"])
+     expect((await rpc('SELECT telegram_get_dispatch_guidance'+args+' ok'))[0].ok).toBe(true);
+   expect((await rpc("SELECT telegram_get_dispatch_guidance(503,-200,'group') ok"))[0].ok).toBe(false);
+ });
+ it.each(['unlinked','revoked','suspended','unbound'])('exact owner denied when %s',async(state)=>{
+   if(state!=='unlinked') await q('INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(503,$1)',[OWNER]);
+   if(state==='revoked') await q("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=503");
+   if(state==='suspended') await q("UPDATE recruiter_profiles SET status='suspended' WHERE id=$1",[R]);
+   if(state==='unbound') await q("UPDATE telegram_chat_bindings SET status='revoked',revoked_at=now() WHERE telegram_chat_id=-100");
+   expect((await rpc("SELECT telegram_get_dispatch_guidance(503,-100,'group') ok"))[0].ok).toBe(false);
+ });
+ it('staff over seat capacity denies while canonical exact-owner authority is preserved',async()=>{
+   await q('INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(503,$1)',[OWNER]);
+   const limit=(await q('SELECT recruiter_team_seat_limit($1) n',[R]))[0].n as number;
+   expect(limit).toBeGreaterThan(0);
+   for(let n=0;n<limit;n++) await q("INSERT INTO recruiter_members(recruiter_id,member_user_id,status,role,permissions) VALUES($1,$2,'active','recruiter_staff','{}')",[R,uid(1000+n)]);
+   expect((await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group') ok"))[0].ok).toBe(false);
+   expect((await rpc("SELECT telegram_get_dispatch_guidance(503,-100,'group') ok"))[0].ok).toBe(true);
+ });
+ it('guidance EXECUTE ACL contains service_role only, never PUBLIC or client roles',async()=>{
+   const acl=await q("SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee) END role FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a WHERE p.oid='public.telegram_get_dispatch_guidance(bigint,bigint,text)'::regprocedure AND a.privilege_type='EXECUTE'");
+   const roles=acl.map(row=>row.role);
+   expect(roles).toContain('service_role');
+   for(const role of ['PUBLIC','anon','authenticated']) expect(roles).not.toContain(role);
  });
  it('expired pending invitation cannot provide dispatch delegation',async()=>{
    await q("UPDATE recruiter_members SET member_user_id=NULL,status='pending',invite_token_hash='expired-local',invite_expires_at=now()-interval '1 minute' WHERE member_user_id=$1",[STAFF]);
@@ -126,6 +154,10 @@ describe('TG-G1B real disposable PostgreSQL transactions',()=>{
  it('read-only guidance leaves loads, receipts, proposals and delivery untouched',async()=>{
    const before=await counts();
    await rpc("SELECT telegram_get_dispatch_guidance(501,-100,'group')");
+   await q('INSERT INTO telegram_user_links(telegram_user_id,user_id) VALUES(503,$1)',[OWNER]);
+   const state=await q('SELECT row_to_json(l) row FROM loads l ORDER BY id');
+   await rpc("SELECT telegram_get_dispatch_guidance(503,-100,'group')");
+   expect(await q('SELECT row_to_json(l) row FROM loads l ORDER BY id')).toEqual(state);
    expect(await counts()).toEqual(before);
    expect((await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status).toBe('en_route');
  });
