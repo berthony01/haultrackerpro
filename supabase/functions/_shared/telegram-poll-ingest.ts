@@ -512,6 +512,7 @@ export interface TelegramPollDeps {
   dispatchReviewEnabled?: boolean;
   /** Synthetic tests only; production uses the independent OFF literal. */
   dispatchGuidanceEnabled?: boolean;
+  dispatchGuidanceButtons?: { private: TelegramInlineUrlButton[][]; group: TelegramInlineUrlButton[][] };
   authorizeDispatchGuidance?: (input: { telegramUserId: number; telegramChatId: number | null; chatType: string }) => Promise<unknown>;
 }
 
@@ -558,10 +559,6 @@ export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
 export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = false as const;
 export const TELEGRAM_DISPATCH_GUIDANCE_TEXT =
   "Dispatcher\nMy Dispatch Status: updates not active. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
-export const TELEGRAM_DISPATCH_GUIDANCE_BUTTONS: TelegramInlineUrlButton[][] = [
-  [{ text: "Open Dispatch Menu", url: "https://t.me/HaulTrackerBot" }],
-  [{ text: "Open HaulTracker Pro", url: "https://haultrackerpro.com/dashboard" }],
-];
 
 /** Read-only guidance only. Exact transport command, never ordinary group text.
  * Missing/uninstalled RPC, denial, malformed output or errors all fail closed. */
@@ -1455,9 +1452,9 @@ export async function runTelegramPoll(
           await gateway.sendMessage({
             chatId: identity.telegramChatId,
             text: TELEGRAM_DISPATCH_GUIDANCE_TEXT,
-            buttons: identity.chatType === "private" ? [
-              [{ text: "Dispatch Tools", url: "https://haultrackerpro.com/dashboard" }],
-            ] : TELEGRAM_DISPATCH_GUIDANCE_BUTTONS,
+            buttons: identity.chatType === "private"
+              ? deps.dispatchGuidanceButtons?.private
+              : deps.dispatchGuidanceButtons?.group,
           });
         } catch {
           log("dispatch_guidance_send_failed");

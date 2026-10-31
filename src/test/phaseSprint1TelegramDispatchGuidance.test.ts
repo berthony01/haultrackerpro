@@ -36,7 +36,8 @@ describe('Sprint 1 dispatcher guidance production-used path',()=>{
    const ledger={claimLease:async()=>({leaseToken:'lease',nextOffset:1}),releaseLease:async()=>true,
      advanceCursor:vi.fn().mockResolvedValue(2),recordIgnoredUpdate:ignored} as unknown as TelegramPollLedger;
    const gateway={getUpdates:async()=>({ok:true,status:200,result:[{update_id:1,message:{from:{id:501},chat:{id:-100,type:'group'},text:'/dispatch'}}]}),sendMessage} as TelegramGateway;
-   for(let n=0;n<2;n++) expect((await runTelegramPoll({ledger,gateway,sha256:async()=> 'a'.repeat(64),dispatchGuidanceEnabled:true,authorizeDispatchGuidance:auth})).kind).toBe('ok');
+   for(let n=0;n<2;n++) expect((await runTelegramPoll({ledger,gateway,sha256:async()=> 'a'.repeat(64),dispatchGuidanceEnabled:true,authorizeDispatchGuidance:auth,
+     dispatchGuidanceButtons:{private:[],group:[[{text:'Open Dispatch Menu',url:'https://t.me/HaulTrackerBot'}]]}})).kind).toBe('ok');
    expect(sendMessage).toHaveBeenCalledTimes(allowed?1:0); expect(ledger.advanceCursor).toHaveBeenCalledTimes(2);
    if(allowed) expect(sendMessage.mock.calls[0][0].buttons[0][0].url).toBe('https://t.me/HaulTrackerBot');
  });
