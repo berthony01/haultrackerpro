@@ -78,6 +78,9 @@ beforeAll(async()=>{
  await seedFixture();
  await q("INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id) VALUES($1,$2,'pending','HTP-QA-L2',$3)",[QA_LOAD,D,REL]);
  await q(read(QA_CANDIDATE));
+ // New candidate is compiled byte-for-byte against canonical function hashes.
+ await seedGenFixture();
+ await q(read(GEN_CANDIDATE));
 },60000);
 async function seedFixture() {
  await q('TRUNCATE auth.users,telegram_update_receipts CASCADE');
@@ -309,5 +312,110 @@ describe('TG-G1 QA exact single-load disposable transactions',()=>{
  it.each(['anon','authenticated'])('%s cannot invoke any QA entry point or helper',async(role)=>{
   for(const sql of ["SELECT * FROM telegram_qa_claim_dispatch_review_delivery()","SELECT _telegram_qa_dispatch_active()","SELECT * FROM _telegram_qa_dispatch_scope()","SELECT _telegram_qa_dispatch_assert()","SELECT _telegram_qa_dispatch_proposal(NULL)","SELECT _telegram_qa_dispatch_actor(501)","SELECT * FROM telegram_qa_process_dispatch_group_update(NULL,1,'x',501,-100,'group','HTP-QA-L2','cancelled')","SELECT * FROM telegram_qa_process_dispatch_review_action(NULL,1,'x',501,-100,'group','accept',NULL)"])
    await expect(rpc(sql,[],role)).rejects.toMatchObject({code:'42501'});
+ });
+});
+
+
+const GEN_LOAD='265e8be2-07d1-4e46-af05-8e7e50c8ae7c';
+const GEN_DRIVER='6cedbe7e-d717-4b34-9f1a-00c21e3298c1';
+const GEN_REL='df35ed7b-7e94-4280-9e0e-e94369ead8dd';
+const GEN_RECRUITER='f6b00b66-cd1c-4037-a382-8b1b9c629f3b';
+const GEN_BINDING='337876b7-307c-44f7-8693-1ec722c059f0';
+const GEN_CHAT=-5335739793;
+const GEN_CANDIDATE='supabase/migration-candidates/20261031_group_restricted_general_dispatch_qa.sql';
+async function seedGenFixture() {
+ await q('INSERT INTO auth.users VALUES($1)',[GEN_DRIVER]);
+ await q(`INSERT INTO recruiter_profiles(id,user_id,recruiter_name,company_name,status,company_type,posting_terms_accepted_at) VALUES('${GEN_RECRUITER}','${uid(5)}','QA','QA','active','carrier',now());
+ INSERT INTO user_capabilities VALUES('${uid(5)}','recruiter','active');
+ INSERT INTO recruiter_billing_profiles VALUES('${GEN_RECRUITER}','${uid(5)}','growth','active');
+ INSERT INTO recruiter_members(recruiter_id,member_user_id,status,role,permissions) VALUES('${GEN_RECRUITER}','${STAFF}','active','recruiter_staff','{"loads_update_status":true}');
+ INSERT INTO carrier_driver_relationships(id,recruiter_id,driver_user_id,status,created_by_user_id) VALUES('${GEN_REL}','${GEN_RECRUITER}','${GEN_DRIVER}','active','${uid(5)}');
+ INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id) VALUES('${GEN_LOAD}','${GEN_DRIVER}','pending','HTP-QA-GEN1','${GEN_REL}');
+ INSERT INTO telegram_chat_bindings(id,telegram_chat_id,recruiter_id,chat_type,bound_by_user_id) VALUES('${GEN_BINDING}',${GEN_CHAT},'${GEN_RECRUITER}','group','${uid(5)}');`);
+}
+const genIntake=(n=400,ref='HTP-QA-GEN1',chat=GEN_CHAT,status='cancelled',user=501)=>rpc(
+ "SELECT * FROM telegram_genqa_process_dispatch_group_update($1,$2,$3,$4,$5,'group',$6,$7)",[LEASE,n,hash(n),user,chat,ref,status]);
+const genReview=(id:string,n=430,user=501,chat=GEN_CHAT,action='accept')=>rpc(
+ "SELECT * FROM telegram_genqa_process_dispatch_review_action($1,$2,$3,$4,$5,'group',$6,$7)",[LEASE,n,hash(n),user,chat,action,id]);
+const genClaim=()=>rpc('SELECT * FROM telegram_genqa_claim_dispatch_review_delivery()');
+const genAck=(c:Record<string,unknown>,token=c.claim_token)=>rpc('SELECT telegram_genqa_ack_dispatch_review_delivery($1,$2,123) ok',[c.outbox_id,token]);
+const genFail=(c:Record<string,unknown>)=>rpc("SELECT telegram_genqa_fail_dispatch_review_delivery($1,$2,'network') ok",[c.outbox_id,c.claim_token]);
+async function genProposal(){const rows=await genIntake();expect(rows[0].result_code).toBe('dispatch_review_proposed');return rows[0].proposal_id as string;}
+async function genOtherState(){return q(`SELECT row_to_json(o) row FROM telegram_dispatch_review_outbox o JOIN telegram_dispatch_review_proposals p ON p.id=o.proposal_id WHERE p.load_id<>'${GEN_LOAD}' ORDER BY o.id`);}
+describe('TG-G1 GEN1 hash-pinned one-group acceptance, disposable PostgreSQL only',()=>{
+ beforeEach(seedGenFixture);
+ it('candidate version and provenance guards compile without changing canonical definitions',async()=>{
+  for(const [name,expected] of [['telegram_process_dispatch_group_update','5fc195e441b15004bb7d1f7b67b95f3a'],['telegram_process_dispatch_review_action','834d89f6186a920b3805e32bd42e8fef'],['telegram_claim_dispatch_review_delivery','5e38139dad516002d11804e8753c2e83']])
+   expect((await q('SELECT md5(prosrc) hash FROM pg_proc WHERE pronamespace=\'public\'::regnamespace AND proname=$1',[name]))[0].hash).toBe(expected);
+ });
+ it('authorized intake creates only one proposal/outbox/receipt and no load/event mutation',async()=>{
+  const before=await q('SELECT row_to_json(l) row FROM loads l ORDER BY id');await genProposal();
+  expect(await counts()).toEqual({p:1,o:1,r:1,e:0});expect(await q('SELECT row_to_json(l) row FROM loads l ORDER BY id')).toEqual(before);
+ });
+ it.each([['HTP-QA-L2',GEN_CHAT,'cancelled',501],['HTP-QA-GEN1',-100,'cancelled',501],['HTP-QA-GEN1',GEN_CHAT,'completed',501],['HTP-QA-GEN1',GEN_CHAT,'cancelled',502],['HTP-QA-GEN1',GEN_CHAT,'cancelled',999]])('wrong target/chat/status/actor rejects without any receipt: %s/%s/%s/%s',async(ref,chat,status,user)=>{
+  await expect(genIntake(400,String(ref),Number(chat),String(status),Number(user))).rejects.toThrow();expect(await counts()).toEqual({p:0,o:0,r:0,e:0});
+ });
+ it('duplicate concurrent intake dedupes exactly, conflict does not write',async()=>{
+  const rows=await Promise.all([genIntake(),genIntake()]);expect(rows.map(r=>r[0].is_new).sort()).toEqual([false,true]);
+  await expect(genIntake(400,'HTP-QA-GEN1',GEN_CHAT,'cancelled',502)).rejects.toThrow();expect(await counts()).toEqual({p:1,o:1,r:1,e:0});
+ });
+ it('genuine linked authorized confirmation commits one cancellation/event, replay is harmless',async()=>{
+  const id=await genProposal(),before=await q('SELECT row_to_json(l) row FROM loads l WHERE id<>$1 ORDER BY id',[GEN_LOAD]);
+  expect((await genReview(id))[0].result_code).toBe('dispatch_review_accepted');expect((await genReview(id))[0].is_new).toBe(false);
+  expect((await q('SELECT status FROM loads WHERE id=$1',[GEN_LOAD]))[0].status).toBe('cancelled');expect((await counts()).e).toBe(1);
+  expect(await q('SELECT row_to_json(l) row FROM loads l WHERE id<>$1 ORDER BY id',[GEN_LOAD])).toEqual(before);
+ });
+ it('two concurrent human confirmations decide once',async()=>{
+  const id=await genProposal();const rows=await Promise.all([genReview(id),genReview(id,431)]);
+  expect(rows.map(r=>r[0].result_code).sort()).toEqual(['dispatch_review_accepted','dispatch_review_already_handled']);expect((await counts()).e).toBe(1);
+ });
+ it('rejection never changes load, authorized decision remains recorded',async()=>{
+  const id=await genProposal();expect((await genReview(id,430,501,GEN_CHAT,'reject'))[0].result_code).toBe('dispatch_review_rejected');expect((await counts()).e).toBe(0);
+ });
+ it.each(['link','permission','relationship','binding','driver','reference'])('revoked or changed %s blocks confirmation without writes',async(reason)=>{
+  const id=await genProposal();
+  const sql:Record<string,string>={link:"UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501",permission:"UPDATE recruiter_members SET permissions='{}' WHERE member_user_id='"+STAFF+"'",relationship:"UPDATE carrier_driver_relationships SET status='ended' WHERE id='"+GEN_REL+"'",binding:"UPDATE telegram_chat_bindings SET status='revoked',revoked_at=now() WHERE id='"+GEN_BINDING+"'",driver:"UPDATE loads SET user_id='"+D+"' WHERE id='"+GEN_LOAD+"'",reference:"UPDATE loads SET load_reference='OLD' WHERE id='"+GEN_LOAD+"'"};
+  await q(sql[reason]);const before=await counts();await expect(genReview(id)).rejects.toThrow();expect(await counts()).toEqual(before);
+ });
+ it('wrong group or unrelated proposal callback cannot consume receipts/history',async()=>{
+  const id=await genProposal();await expect(genReview(id,430,501,-100)).rejects.toThrow();
+  const unrelated=await proposal();const before=await counts();await expect(genReview(unrelated)).rejects.toThrow();expect(await counts()).toEqual(before);
+ });
+ it('stale status never changed, expired proposal cannot be confirmed',async()=>{
+  const id=await genProposal();await q("UPDATE loads SET status='en_route' WHERE id=$1",[GEN_LOAD]);expect((await genReview(id))[0].result_code).toBe('dispatch_review_stale');expect((await counts()).e).toBe(0);
+ });
+ it('both cleanup sweeps and concurrent claims leave unrelated expired/exhausted rows unchanged',async()=>{
+  await proposal();await claim();await q("UPDATE telegram_dispatch_review_outbox SET lease_expires_at=now()-interval '1 second',max_attempts=attempt_count");
+  await q("UPDATE telegram_dispatch_review_proposals SET created_at=now()-interval '16 minutes',expires_at=now()-interval '1 minute' WHERE load_id=$1",[LOAD]);
+  const before=await genOtherState();await genProposal();const rows=await Promise.all([genClaim(),genClaim()]);expect(rows.map(r=>r.length).sort()).toEqual([0,1]);expect(await genOtherState()).toEqual(before);
+ });
+ it('exact expired proposal cleanup cannot affect historical or other load outboxes',async()=>{
+  await proposal();const id=await genProposal();await q("UPDATE telegram_dispatch_review_proposals SET created_at=now()-interval '16 minutes',expires_at=now()-interval '1 minute' WHERE id=$1",[id]);
+  const before=await genOtherState();expect(await genClaim()).toHaveLength(0);expect(await genOtherState()).toEqual(before);expect((await genReview(id))[0].result_code).toBe('dispatch_review_expired');expect((await counts()).e).toBe(0);
+ });
+ it('lease reclaim fences old token and failure retries without touching another outbox',async()=>{
+  await genProposal();const c=(await genClaim())[0];await q("UPDATE telegram_dispatch_review_outbox SET lease_expires_at=now()-interval '1 second' WHERE id=$1",[c.outbox_id]);
+  const d=(await genClaim())[0];expect((await genAck(c))[0].ok).toBe(false);expect((await genFail(d))[0].ok).toBe(true);
+  await q("UPDATE telegram_dispatch_review_outbox SET next_attempt_at=now()-interval '1 second' WHERE id=$1",[d.outbox_id]);expect((await genAck((await genClaim())[0]))[0].ok).toBe(true);
+  await proposal();const other=(await claim())[0];const before=await genOtherState();await expect(genAck(other)).rejects.toThrow();await expect(genFail(other)).rejects.toThrow();expect(await genOtherState()).toEqual(before);
+ });
+ it('absolute expiry blocks intake/callback/claim/cleanup/ack/fail atomically',async()=>{
+  const id=await genProposal(),c=(await genClaim())[0],before=await counts();
+  const def=(await q("SELECT pg_get_functiondef('public._telegram_genqa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
+  try {await q(def.split('2026-11-05 23:59:59+00').join('2000-01-01 00:00:00+00'));
+   for(const action of [()=>genIntake(401),()=>genReview(id),genClaim,()=>genAck(c),()=>genFail(c)]) await expect(action()).rejects.toThrow('qa_dispatch_expired');expect(await counts()).toEqual(before);
+  }finally{await q(def);}
+ });
+ it('post-lock revocation is rechecked after a real database wait',async()=>{
+  const id=await genProposal(),c=await pool.connect();
+  try{await c.query('BEGIN');await c.query("UPDATE telegram_user_links SET status='revoked',revoked_at=now() WHERE telegram_user_id=501");const approval=genReview(id);const assertion=expect(approval).rejects.toThrow('qa_dispatch_actor_denied');
+   for(let n=0;n<100;n++){if((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_genqa_process_dispatch_review_action%'"))[0].n>0)break;await new Promise(r=>setTimeout(r,10));}
+   expect((await q("SELECT count(*)::int n FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE 'SELECT * FROM telegram_genqa_process_dispatch_review_action%'"))[0].n).toBeGreaterThan(0);await c.query('COMMIT');await assertion;expect((await counts()).e).toBe(0);
+  }finally{await c.query('ROLLBACK');c.release();}
+ });
+ it.each(['anon','authenticated'])('%s cannot invoke any new wrapper/helper',async(role)=>{
+  const rows=await q("SELECT p.oid::regprocedure::text sig,proname,pronargs FROM pg_proc p WHERE pronamespace='public'::regnamespace AND (proname LIKE 'telegram_genqa_%' OR proname LIKE '_telegram_genqa_%')");
+  expect(rows.length).toBe(11);
+  for(const row of rows) await expect(rpc(`SELECT public.${row.proname}(${Array(Number(row.pronargs)).fill('NULL').join(',')})`,[],role)).rejects.toMatchObject({code:'42501'});
  });
 });
