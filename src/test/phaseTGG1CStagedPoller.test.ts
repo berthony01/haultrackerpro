@@ -145,7 +145,7 @@ const tap = (updateId: number, data: string, from = REVIEWER, chatId = GROUP) =>
 
 async function poll(w: ReturnType<typeof makeWorld>, updates: unknown[], enabled = true) {
   const g = makeGateway(updates);
-  const r = await runTelegramPoll({ ledger: w.ledger, gateway: g.gateway, sha256, dispatchReviewEnabled: enabled });
+  const r = await runTelegramPoll({ ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: enabled });
   return { r, ...g };
 }
 
@@ -157,16 +157,16 @@ describe("TG-G1C gate", () => {
     expect(POLL).not.toMatch(/Deno\.env\.get\(["'][^"']*(DISPATCH|TGG1)/i);
   });
 
-  it("disabled (default deps): group text → non_private_message, g1 tap → c1 path, zero dispatch RPCs/sends", async () => {
+  it("disabled (QA explicitly OFF): group text → non_private_message, g1 tap → c1 path, zero dispatch RPCs/sends", async () => {
     const w = makeWorld();
     const g = makeGateway([groupMsg(1, "Load #AB-123 delivered"), tap(2, composeDispatchReviewData("accept", uuid())!)]);
-    const r = await runTelegramPoll({ ledger: w.ledger, gateway: g.gateway, sha256 });
+    const r = await runTelegramPoll({ ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false });
     expect(r.kind).toBe("ok");
     expect(w.calls).toContain("ignored:non_private_message");
     expect(w.calls).toContain("c1");
     expect(w.calls.some((c) => c.startsWith("dispatch"))).toBe(false);
     expect(g.sent).toHaveLength(0);
-    const d = await runDispatchReviewDeliveryDrain({ ledger: w.delivery, gateway: g.gateway });
+    const d = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway });
     expect(d.status).toBe("disabled");
     expect(w.calls).not.toContain("claim");
     expect(w.loads.get("AB-123")!.status).toBe("en_route");
@@ -261,7 +261,7 @@ describe("TG-G1C intake (enabled synthetic)", () => {
     const w = makeWorld();
     const ledger = { ...w.ledger, processDispatchGroupUpdate: undefined };
     const g = makeGateway([groupMsg(1, "Load #AB-123 delivered")]);
-    const r = await runTelegramPoll({ ledger, gateway: g.gateway, sha256, dispatchReviewEnabled: true });
+    const r = await runTelegramPoll({ ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: true });
     expect(r.kind).toBe("failed");
     expect(w.receipts.size).toBe(0);
     expect(w.getCursor()).toBe(0);
@@ -273,7 +273,7 @@ describe("TG-G1C outbox drain + review", () => {
     const w = makeWorld();
     await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
     const g = makeGateway([]);
-    const d = await runDispatchReviewDeliveryDrain({ ledger: w.delivery, gateway: g.gateway, enabled: true });
+    const d = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true });
     expect(d).toMatchObject({ status: "ok", sent: 1, retried: 0 });
     expect(g.sent).toHaveLength(1);
     expect(g.sent[0].chatId).toBe(GROUP);
@@ -286,17 +286,17 @@ describe("TG-G1C outbox drain + review", () => {
     expect(answers).toEqual(["Confirmed. The load status was updated."]);
     expect(sent).toHaveLength(0);
     // second drain: nothing left
-    expect((await runDispatchReviewDeliveryDrain({ ledger: w.delivery, gateway: g.gateway, enabled: true })).sent).toBe(0);
+    expect((await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true })).sent).toBe(0);
   });
 
   it("drain failure is bounded and retried, then acked", async () => {
     const w = makeWorld();
     await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
     const g = makeGateway([], { sendStatus: [429] });
-    const d1 = await runDispatchReviewDeliveryDrain({ ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
+    const d1 = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
     expect(d1).toMatchObject({ retried: 1, sent: 0 });
     expect(w.calls).toContain("fail:rate_limited");
-    const d2 = await runDispatchReviewDeliveryDrain({ ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
+    const d2 = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
     expect(d2.sent).toBe(1);
     expect(w.outbox[0].state).toBe("sent");
     expect(classifyDispatchDeliveryFailure({ status: 0 })).toBe("network");
@@ -348,7 +348,7 @@ describe("TG-G1C outbox drain + review", () => {
     const w = makeWorld();
     await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
     const logs: string[] = [];
-    await runDispatchReviewDeliveryDrain({ ledger: w.delivery, gateway: makeGateway([]).gateway, enabled: true, log: (e, d) => logs.push(e + JSON.stringify(d ?? {})) });
+    await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: makeGateway([]).gateway, enabled: true, log: (e, d) => logs.push(e + JSON.stringify(d ?? {})) });
     expect(logs.join()).not.toMatch(/AB-123|delivered|-100777/);
   });
 });
