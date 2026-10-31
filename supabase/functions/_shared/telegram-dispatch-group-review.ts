@@ -26,6 +26,42 @@ import {
 } from "./telegram-dispatch-group-proposals.ts";
 
 export const TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false as const;
+// Separately approved single-load QA release only. Never an environment flag.
+export const TELEGRAM_SINGLE_LOAD_QA_ENABLED = false as const;
+export const TELEGRAM_SINGLE_LOAD_QA_REFERENCE = "HTP-QA-L2";
+export const TELEGRAM_SINGLE_LOAD_QA_EXPIRES_AT = Date.parse("2026-11-02T23:59:59Z");
+export const TELEGRAM_SINGLE_LOAD_QA_RPCS = {
+  intake: "telegram_qa_process_dispatch_group_update",
+  review: "telegram_qa_process_dispatch_review_action",
+  claim: "telegram_qa_claim_dispatch_review_delivery",
+} as const;
+
+export function singleLoadQaActive(enabled: boolean = TELEGRAM_SINGLE_LOAD_QA_ENABLED): boolean {
+  return enabled === true && Date.now() < TELEGRAM_SINGLE_LOAD_QA_EXPIRES_AT;
+}
+
+export function isSingleLoadQaCommand(text: string | null): boolean {
+  return text === "/cancelled@HaulTrackerBot HTP-QA-L2" || text === "/cancelled HTP-QA-L2";
+}
+
+/** Defense in depth BEFORE send/ack/fail, including injected ledger paths.
+ * Exact chat/workspace/load and lease ownership remain enforced by QA SQL. */
+export function guardSingleLoadQaDelivery(ledger: DispatchDeliveryLedger): DispatchDeliveryLedger {
+  return {
+    async claim() {
+      if (!singleLoadQaActive(true)) throw new Error("qa_dispatch_expired");
+      const claim = await ledger.claim();
+      if (!claim) return null;
+      if (!singleLoadQaActive(true) || claim.loadReference !== TELEGRAM_SINGLE_LOAD_QA_REFERENCE ||
+          claim.proposedStatus !== "cancelled" || !Number.isSafeInteger(claim.telegramChatId) ||
+          claim.telegramChatId >= 0 || !claim.expiresAt || !Number.isFinite(Date.parse(claim.expiresAt)) ||
+          Date.parse(claim.expiresAt) <= Date.now()) throw new Error("qa_dispatch_scope_denied");
+      return claim;
+    },
+    ack: (id, token, messageId) => ledger.ack(id, token, messageId),
+    fail: (id, token, code) => ledger.fail(id, token, code),
+  };
+}
 
 /** Callback namespace, disjoint from RB-2B `c1:` and RB-3A `q1:`. */
 export const DISPATCH_REVIEW_CALLBACK_PREFIX = "g1:";
@@ -252,6 +288,7 @@ export interface DispatchDeliveryClaim {
   telegramChatId: number;
   loadReference: string;
   proposedStatus: DispatchTargetStatus;
+  expiresAt?: string;
 }
 export interface DispatchDeliveryLedger {
   claim(): Promise<DispatchDeliveryClaim | null>;
