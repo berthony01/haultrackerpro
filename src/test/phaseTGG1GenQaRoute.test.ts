@@ -23,12 +23,51 @@ describe('GENQA isolated route',()=>{
  it.each(['Load HTP-QA-GEN1 cancelled','/delivered HTP-QA-GEN1','/cancelled HTP-QA-L2','/cancelled@OtherBot HTP-QA-GEN1',cmd+' extra',cmd+'\n','/help','/dispatch'])('ignores %s',text=>expect(classifyUpdate(identity(text),false,false,true).kind).toBe('ignored'));
  it('wrong group/private transport never enters GENQA',()=>{expect(classifyUpdate(identity(cmd,-100),false,false,true).kind).toBe('ignored');expect(classifyUpdate({...identity(),chatType:'private'},false,false,true).kind).not.toBe('dispatch_group_message');});
  it('all OFF invokes no processing or send',async()=>{const f=fixture([msg(),cb()]);await f.poll(false);expect(f.intake).not.toHaveBeenCalled();expect(f.review).not.toHaveBeenCalled();expect(f.generic).not.toHaveBeenCalled();expect(f.old).not.toHaveBeenCalled();expect(f.gateway.sendMessage).not.toHaveBeenCalled();});
- it('intake only proposes and uses transport scope; callback passes actual reviewer',async()=>{const f=fixture([msg(),cb()]);expect((await f.poll()).kind).toBe('ok');expect(f.intake).toHaveBeenCalledWith(expect.objectContaining({reference:'HTP-QA-GEN1',proposedStatus:'cancelled',telegramChatId:CHAT}));expect(f.review).toHaveBeenCalledWith(expect.objectContaining({telegramUserId:501,proposalId:ID,action:'accept'}));expect(f.generic).not.toHaveBeenCalled();expect(f.old).not.toHaveBeenCalled();expect(f.gateway.sendMessage).not.toHaveBeenCalled();});
+ it('intake only proposes and uses transport scope; callback passes actual reviewer',async()=>{const f=fixture([msg(),cb()]);expect((await f.poll()).kind).toBe('ok');expect(f.intake).toHaveBeenCalledWith(expect.objectContaining({reference:'HTP-QA-GEN1',proposedStatus:'cancelled',telegramChatId:CHAT}));expect(f.review).toHaveBeenCalledWith(expect.objectContaining({telegramUserId:501,proposalId:ID,action:'accept'}));expect(f.generic).not.toHaveBeenCalled();expect(f.old).not.toHaveBeenCalled();expect(f.gateway.sendMessage).toHaveBeenCalledTimes(1);});
  it('unauthorized role is rejected by isolated authority; no feedback message',async()=>{const f=fixture([cb(999)]);await f.poll();expect(f.review).toHaveBeenCalled();expect(f.gateway.sendMessage).not.toHaveBeenCalled();});
  it.each(['intake','review'])('missing %s fails without fallback',async path=>{const f=fixture([path==='intake'?msg():cb()]);if(path==='intake')delete f.ledger.processGenQaDispatchGroupUpdate;else delete f.ledger.processGenQaDispatchReviewActionUpdate;expect((await f.poll()).kind).toBe('failed');expect(f.generic).not.toHaveBeenCalled();expect(f.old).not.toHaveBeenCalled();});
  it('trusted replay suppresses feedback',async()=>{const f=fixture([cb()]);f.review.mockResolvedValue({isNew:false,resultCode:'dispatch_review_accepted'});await f.poll();expect(f.gateway.sendMessage).not.toHaveBeenCalled();});
  it.each([{dispatchReviewEnabled:true},{singleLoadQaEnabled:true},{dispatchReviewEnabled:true,singleLoadQaEnabled:true}])('conflict stops before poll lease %j',async extra=>{const f=fixture([]);expect(await f.poll(true,extra)).toMatchObject({kind:'failed',errorCode:'dispatch_modes_conflict'});expect(f.claimLease).not.toHaveBeenCalled();expect(f.gateway.getUpdates).not.toHaveBeenCalled();});
  it('expiry ignores intake/callback and makes no GENQA processing',async()=>{vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-05T23:59:59Z'));const f=fixture([msg(),cb()]);await f.poll();expect(f.intake).not.toHaveBeenCalled();expect(f.review).not.toHaveBeenCalled();});
+});
+describe('GENQA committed cancellation feedback',()=>{
+ it.each(['group','supergroup'])('accepted %s callback sends once after commit without buttons',async type=>{
+  const update=cb();update.callback_query.message.chat.type=type;
+  const f=fixture([update]);let committed=false;
+  f.review.mockImplementation(async()=>{committed=true;return {isNew:true,resultCode:'dispatch_review_accepted'};});
+  vi.mocked(f.gateway.sendMessage).mockImplementation(async input=>{
+   expect(committed).toBe(true);
+   expect(input).toEqual({chatId:CHAT,text:'✅ Cancellation confirmed for QA load HTP-QA-GEN1. Status: Cancelled.'});
+   return {ok:true,status:200,result:{message_id:9}};
+  });
+  expect((await f.poll()).kind).toBe('ok');expect(f.gateway.sendMessage).toHaveBeenCalledTimes(1);
+  expect(f.gateway.answerCallbackQuery).toHaveBeenCalledTimes(1);
+  f.review.mockResolvedValue({isNew:false,resultCode:'dispatch_review_accepted'});
+  expect((await f.poll()).kind).toBe('ok');expect(f.gateway.sendMessage).toHaveBeenCalledTimes(1);
+ });
+ it('proposal intake alone never confirms cancellation',async()=>{const f=fixture([msg()]);await f.poll();expect(f.gateway.sendMessage).not.toHaveBeenCalled();});
+ it.each(['dispatch_review_rejected','dispatch_review_denied','dispatch_review_stale','dispatch_review_expired','dispatch_review_invalid'] as const)('no status claim for %s',async resultCode=>{
+  const f=fixture([cb()]);f.ledger.processGenQaDispatchReviewActionUpdate=vi.fn(async()=>({isNew:true,resultCode}));
+  await f.poll();expect(f.gateway.sendMessage).not.toHaveBeenCalled();
+ });
+ it('reject action cannot confirm even with an accepted result',async()=>{const update=cb();update.callback_query.data=composeDispatchReviewData('reject',ID);const f=fixture([update]);await f.poll();expect(f.gateway.sendMessage).not.toHaveBeenCalled();});
+ it.each([{id:-100,type:'group'},{id:CHAT,type:'private'},{id:CHAT,type:'channel'}])('invalid callback transport %j never confirms',async chat=>{
+  const update=cb();update.callback_query.message.chat=chat;const f=fixture([update]);await f.poll();expect(f.review).not.toHaveBeenCalled();expect(f.gateway.sendMessage).not.toHaveBeenCalled();
+ });
+ it('expiry after committed result suppresses confirmation',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-05T23:59:58Z'));const f=fixture([cb()]);
+  f.review.mockImplementation(async()=>{vi.setSystemTime(new Date('2026-11-05T23:59:59Z'));return {isNew:true,resultCode:'dispatch_review_accepted'};});
+  expect((await f.poll()).kind).toBe('ok');expect(f.gateway.sendMessage).not.toHaveBeenCalled();
+ });
+ it.each(['response','throw'])('send %s failure preserves commit/cursor and replay suppression',async failure=>{
+  const f=fixture([cb()]);const advance=vi.fn(async(_lease:string,n:number)=>n);f.ledger.advanceCursor=advance;
+  if(failure==='throw')vi.mocked(f.gateway.sendMessage).mockRejectedValue(new Error('network_failure'));
+  else vi.mocked(f.gateway.sendMessage).mockResolvedValue({ok:false,status:500,errorCode:'network_failure'});
+  expect((await f.poll()).kind).toBe('ok');expect(advance).toHaveBeenCalledWith(ID,2);
+  expect(f.review).toHaveBeenCalledTimes(1);expect(f.gateway.answerCallbackQuery).toHaveBeenCalledTimes(1);
+  f.review.mockResolvedValue({isNew:false,resultCode:'dispatch_review_accepted'});
+  expect((await f.poll()).kind).toBe('ok');expect(f.gateway.sendMessage).toHaveBeenCalledTimes(1);
+ });
 });
 describe('GENQA five-path RPC and outbox isolation',()=>{
  function delivery(){const row={outbox_id:ID,claim_token:ID,proposal_id:ID,telegram_chat_id:CHAT,load_reference:'HTP-QA-GEN1',proposed_status:'cancelled',expires_at:'2026-11-05T23:59:58Z'};const rpc=vi.fn(async(name:string)=>({data:name===TELEGRAM_GENQA_RPCS.claim?[row]:true,error:null}));return {rpc,row,ledger:buildGenQaDeliveryLedger(rpc)};}

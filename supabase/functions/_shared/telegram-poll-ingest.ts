@@ -1459,6 +1459,30 @@ export async function runTelegramPoll(
           log("qa_review_ack_failed", { code: sanitizeErrorCode(error) });
         }
       }
+      // GENQA's service-only RPC committed the exact scoped cancellation.
+      // Never derive the load reference or destination from callback data.
+      if (
+        classification.kind === "dispatch_review_action" &&
+        classification.genQaOnly === true &&
+        classification.action === "accept" &&
+        terminal.isNew === true &&
+        terminal.resultCode === "dispatch_review_accepted" &&
+        genQaActive(deps.genQaEnabled ?? TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED) &&
+        identity.telegramChatId === TELEGRAM_GENQA_CHAT_ID &&
+        (identity.chatType === "group" || identity.chatType === "supergroup")
+      ) {
+        try {
+          const sent = await gateway.sendMessage({
+            chatId: identity.telegramChatId,
+            text: "✅ Cancellation confirmed for QA load HTP-QA-GEN1. Status: Cancelled.",
+          });
+          if (!sent.ok) log("genqa_review_ack_failed", {
+            code: sanitizeErrorCode(sent.errorCode ?? "telegram_gateway_error"),
+          });
+        } catch (error) {
+          log("genqa_review_ack_failed", { code: sanitizeErrorCode(error) });
+        }
+      }
       // General RPC results are the authority. Never identify a load from
       // untrusted callback data; transport chat was passed to the same RPC.
       // One attempt after commit, never on replay or an unsuccessful decision.
