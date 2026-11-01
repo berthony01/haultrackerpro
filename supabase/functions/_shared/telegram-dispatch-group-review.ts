@@ -37,7 +37,7 @@ export const TELEGRAM_SINGLE_LOAD_QA_RPCS = {
 } as const;
 
 // Separate acceptance lane. No environment or remote toggle.
-export const TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED = false as const;
+export const TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED = true as const;
 export const TELEGRAM_GENQA_REFERENCE = "HTP-QA-GEN1";
 export const TELEGRAM_GENQA_CHAT_ID = -5335739793;
 export const TELEGRAM_GENQA_EXPIRES_AT = Date.parse("2026-11-05T23:59:59Z");

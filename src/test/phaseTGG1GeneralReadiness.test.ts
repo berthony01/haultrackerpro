@@ -27,7 +27,7 @@ function fixture(code: DispatchReviewActionResultCode = "dispatch_review_accepte
   const gateway: TelegramGateway = { getUpdates: vi.fn(async () => ({ ok: true, status: 200, result: [update] })),
     sendMessage: send, answerCallbackQuery: vi.fn(async () => ({ ok: true, status: 200 })) };
   const log = vi.fn();
-  const poll = (general = true, qa = false) => runTelegramPoll({ ledger, gateway, sha256: async () => "hash",
+  const poll = (general = true, qa = false) => runTelegramPoll({ genQaEnabled: false, ledger, gateway, sha256: async () => "hash",
     dispatchReviewEnabled: general, singleLoadQaEnabled: qa, log });
   return { ledger, gateway, send, review, qaReview, update, poll, log };
 }
@@ -79,11 +79,11 @@ describe("General dispatch staged feedback", () => {
     const f = fixture(); expect(await f.poll(true, true)).toMatchObject({ kind: "failed", errorCode: "dispatch_modes_conflict" });
     expect(f.ledger.claimLease).not.toHaveBeenCalled(); expect(f.gateway.getUpdates).not.toHaveBeenCalled(); expect(f.review).not.toHaveBeenCalled();
     const delivery: DispatchDeliveryLedger = { claim: vi.fn(async () => null), ack: vi.fn(async () => true), fail: vi.fn(async () => true) };
-    expect(await runDispatchReviewDeliveryDrain({ ledger: delivery, qaLedger: delivery, gateway: f.gateway, enabled: true, singleLoadQaEnabled: true })).toMatchObject({ status: "failed" });
+    expect(await runDispatchReviewDeliveryDrain({ genQaEnabled: false, ledger: delivery, qaLedger: delivery, gateway: f.gateway, enabled: true, singleLoadQaEnabled: true })).toMatchObject({ status: "failed" });
     expect(delivery.claim).not.toHaveBeenCalled(); expect(f.send).not.toHaveBeenCalled();
     const identity = { updateId: 1, telegramUserId: 601, telegramChatId: GROUP, chatType: "supergroup", text: "/cancelled HTP-QA-L2",
       callbackQueryId: null, callbackData: null, replyToMessageId: null };
-    expect(classifyUpdate(identity, true, true).kind).toBe("ignored");
-    expect(classifyUpdate({ ...identity, text: `/bind ${"a".repeat(64)}` }, true, true).kind).toBe("bind");
+    expect(classifyUpdate(identity, true, true, false).kind).toBe("ignored");
+    expect(classifyUpdate({ ...identity, text: `/bind ${"a".repeat(64)}` }, true, true, false).kind).toBe("bind");
   });
 });

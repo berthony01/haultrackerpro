@@ -145,7 +145,7 @@ const tap = (updateId: number, data: string, from = REVIEWER, chatId = GROUP) =>
 
 async function poll(w: ReturnType<typeof makeWorld>, updates: unknown[], enabled = true) {
   const g = makeGateway(updates);
-  const r = await runTelegramPoll({ ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: enabled });
+  const r = await runTelegramPoll({ genQaEnabled: false, ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: enabled });
   return { r, ...g };
 }
 
@@ -160,13 +160,13 @@ describe("TG-G1C gate", () => {
   it("disabled (QA explicitly OFF): group text → non_private_message, g1 tap → c1 path, zero dispatch RPCs/sends", async () => {
     const w = makeWorld();
     const g = makeGateway([groupMsg(1, "Load #AB-123 delivered"), tap(2, composeDispatchReviewData("accept", uuid())!)]);
-    const r = await runTelegramPoll({ ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false });
+    const r = await runTelegramPoll({ genQaEnabled: false, ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false });
     expect(r.kind).toBe("ok");
     expect(w.calls).toContain("ignored:non_private_message");
     expect(w.calls).toContain("c1");
     expect(w.calls.some((c) => c.startsWith("dispatch"))).toBe(false);
     expect(g.sent).toHaveLength(0);
-    const d = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway });
+    const d = await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway });
     expect(d.status).toBe("disabled");
     expect(w.calls).not.toContain("claim");
     expect(w.loads.get("AB-123")!.status).toBe("en_route");
@@ -174,16 +174,16 @@ describe("TG-G1C gate", () => {
 
   it("classification: /bind, c1, q1 unchanged with gate on; slash commands in groups stay non_private_message", () => {
     const base = { updateId: 1, telegramUserId: 1, telegramChatId: GROUP, chatType: "group", callbackQueryId: null, callbackData: null, replyToMessageId: null };
-    expect(classifyUpdate({ ...base, text: `/bind ${"a".repeat(64)}` } as never, true).kind).toBe("bind");
-    expect(classifyUpdate({ ...base, text: "/start" } as never, true)).toEqual({ kind: "ignored", resultCode: "non_private_message" });
-    expect(classifyUpdate({ ...base, text: "hello" } as never, true).kind).toBe("dispatch_group_message");
-    expect(classifyUpdate({ ...base, chatType: "private", text: "hello" } as never, true).kind).toBe("quick_post_source");
+    expect(classifyUpdate({ ...base, text: `/bind ${"a".repeat(64)}` } as never, true, false, false).kind).toBe("bind");
+    expect(classifyUpdate({ ...base, text: "/start" } as never, true, false, false)).toEqual({ kind: "ignored", resultCode: "non_private_message" });
+    expect(classifyUpdate({ ...base, text: "hello" } as never, true, false, false).kind).toBe("dispatch_group_message");
+    expect(classifyUpdate({ ...base, chatType: "private", text: "hello" } as never, true, false, false).kind).toBe("quick_post_source");
     const cb = { ...base, text: null, callbackQueryId: "q" };
-    expect(classifyUpdate({ ...cb, callbackData: `c1:a:${uuid()}` } as never, true).kind).toBe("conversation_action");
-    expect(classifyUpdate({ ...cb, callbackData: "q1:n" } as never, true).kind).toBe("quick_post_action");
-    expect(classifyUpdate({ ...cb, callbackData: composeDispatchReviewData("reject", uuid())! } as never, true))
+    expect(classifyUpdate({ ...cb, callbackData: `c1:a:${uuid()}` } as never, true, false, false).kind).toBe("conversation_action");
+    expect(classifyUpdate({ ...cb, callbackData: "q1:n" } as never, true, false, false).kind).toBe("quick_post_action");
+    expect(classifyUpdate({ ...cb, callbackData: composeDispatchReviewData("reject", uuid())! } as never, true, false, false))
       .toMatchObject({ kind: "dispatch_review_action", action: "reject" });
-    expect(classifyUpdate({ ...cb, callbackData: "g1:zz" } as never, true))
+    expect(classifyUpdate({ ...cb, callbackData: "g1:zz" } as never, true, false, false))
       .toMatchObject({ kind: "dispatch_review_action", action: null, proposalId: null });
   });
 });
@@ -208,7 +208,7 @@ describe("TG-G1C intake (enabled synthetic)", () => {
     expect(w.calls).not.toContain('dispatch_intake');
     const base={updateId:1,telegramUserId:SENDER,telegramChatId:GROUP,chatType:'supergroup',callbackQueryId:null,callbackData:null,replyToMessageId:null};
     for(const text of ['/help','/help@HaulTrackerBot','/dispatch','/menu','/delivered@OtherBot AB-123','/delivered AB-123 extra'])
-      expect(classifyUpdate({...base,text},true)).toEqual({kind:'ignored',resultCode:'non_private_message'});
+      expect(classifyUpdate({...base,text},true,false,false)).toEqual({kind:'ignored',resultCode:'non_private_message'});
   });
   it('addressed status report requires independent authorized review before changing a load',async()=>{
     const w=makeWorld(); await poll(w,[groupMsg(1,'/delivered@HaulTrackerBot AB-123')]);
@@ -261,7 +261,7 @@ describe("TG-G1C intake (enabled synthetic)", () => {
     const w = makeWorld();
     const ledger = { ...w.ledger, processDispatchGroupUpdate: undefined };
     const g = makeGateway([groupMsg(1, "Load #AB-123 delivered")]);
-    const r = await runTelegramPoll({ ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: true });
+    const r = await runTelegramPoll({ genQaEnabled: false, ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: true });
     expect(r.kind).toBe("failed");
     expect(w.receipts.size).toBe(0);
     expect(w.getCursor()).toBe(0);
@@ -273,7 +273,7 @@ describe("TG-G1C outbox drain + review", () => {
     const w = makeWorld();
     await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
     const g = makeGateway([]);
-    const d = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true });
+    const d = await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true });
     expect(d).toMatchObject({ status: "ok", sent: 1, retried: 0 });
     expect(g.sent).toHaveLength(1);
     expect(g.sent[0].chatId).toBe(GROUP);
@@ -287,17 +287,17 @@ describe("TG-G1C outbox drain + review", () => {
     expect(sent).toEqual([{ chatId: GROUP,
       text: "✅ Dispatch review confirmed. The approved load status was updated in HaulTracker Pro.", buttons: undefined }]);
     // second drain: nothing left
-    expect((await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true })).sent).toBe(0);
+    expect((await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true })).sent).toBe(0);
   });
 
   it("drain failure is bounded and retried, then acked", async () => {
     const w = makeWorld();
     await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
     const g = makeGateway([], { sendStatus: [429] });
-    const d1 = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
+    const d1 = await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
     expect(d1).toMatchObject({ retried: 1, sent: 0 });
     expect(w.calls).toContain("fail:rate_limited");
-    const d2 = await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
+    const d2 = await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
     expect(d2.sent).toBe(1);
     expect(w.outbox[0].state).toBe("sent");
     expect(classifyDispatchDeliveryFailure({ status: 0 })).toBe("network");
@@ -352,7 +352,7 @@ describe("TG-G1C outbox drain + review", () => {
     const w = makeWorld();
     await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
     const logs: string[] = [];
-    await runDispatchReviewDeliveryDrain({ singleLoadQaEnabled: false, ledger: w.delivery, gateway: makeGateway([]).gateway, enabled: true, log: (e, d) => logs.push(e + JSON.stringify(d ?? {})) });
+    await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: makeGateway([]).gateway, enabled: true, log: (e, d) => logs.push(e + JSON.stringify(d ?? {})) });
     expect(logs.join()).not.toMatch(/AB-123|delivered|-100777/);
   });
 });
