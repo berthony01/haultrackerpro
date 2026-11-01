@@ -5645,6 +5645,33 @@ export type Database = {
         Args: { _user_id: string }
         Returns: undefined
       }
+      _telegram_genqa_dispatch_active: { Args: never; Returns: boolean }
+      _telegram_genqa_dispatch_actor: {
+        Args: { _actor: number }
+        Returns: undefined
+      }
+      _telegram_genqa_dispatch_assert: {
+        Args: { _chat?: number; _type?: string }
+        Returns: undefined
+      }
+      _telegram_genqa_dispatch_outbox: {
+        Args: { _id: string }
+        Returns: undefined
+      }
+      _telegram_genqa_dispatch_proposal: {
+        Args: { _id: string }
+        Returns: boolean
+      }
+      _telegram_genqa_dispatch_scope: {
+        Args: never
+        Returns: {
+          binding_id: string
+          chat_id: number
+          chat_type: string
+          recruiter_id: string
+          relationship_id: string
+        }[]
+      }
       _telegram_qa_dispatch_active: { Args: never; Returns: boolean }
       _telegram_qa_dispatch_actor: {
         Args: { _actor: number }
@@ -8540,6 +8567,64 @@ export type Database = {
           _outbox_id: string
         }
         Returns: boolean
+      }
+      telegram_genqa_ack_dispatch_review_delivery: {
+        Args: { _claim_token: string; _message_id: number; _outbox_id: string }
+        Returns: boolean
+      }
+      telegram_genqa_claim_dispatch_review_delivery: {
+        Args: never
+        Returns: {
+          claim_token: string
+          expires_at: string
+          load_reference: string
+          outbox_id: string
+          proposal_id: string
+          proposed_status: string
+          telegram_chat_id: number
+        }[]
+      }
+      telegram_genqa_fail_dispatch_review_delivery: {
+        Args: {
+          _claim_token: string
+          _failure_code: string
+          _outbox_id: string
+        }
+        Returns: boolean
+      }
+      telegram_genqa_process_dispatch_group_update: {
+        Args: {
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _proposed_status: string
+          _reference: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          expires_at: string
+          is_new: boolean
+          proposal_id: string
+          result_code: string
+        }[]
+      }
+      telegram_genqa_process_dispatch_review_action: {
+        Args: {
+          _action: string
+          _chat_type: string
+          _lease_token: string
+          _payload_hash: string
+          _proposal_id: string
+          _telegram_chat_id: number
+          _telegram_user_id: number
+          _update_id: number
+        }
+        Returns: {
+          is_new: boolean
+          result_code: string
+        }[]
       }
       telegram_get_dispatch_guidance: {
         Args: {
