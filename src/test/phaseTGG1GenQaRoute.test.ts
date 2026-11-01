@@ -1,7 +1,7 @@
 // Synthetic transport/ports only; real SQL authority remains in the disposable PG suite.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { classifyUpdate, runTelegramPoll, runDispatchReviewDeliveryDrain, type TelegramPollLedger, type TelegramGateway } from '../../supabase/functions/_shared/telegram-poll-ingest';
-import { TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED, TELEGRAM_GENQA_RPCS, TELEGRAM_GENQA_CHAT_ID as CHAT, buildGenQaDeliveryLedger, composeDispatchReviewData } from '../../supabase/functions/_shared/telegram-dispatch-group-review';
+import { TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED, TGG1B_DISPATCH_GROUP_REVIEW_ENABLED, TELEGRAM_SINGLE_LOAD_QA_ENABLED, TELEGRAM_GENQA_RPCS, TELEGRAM_GENQA_CHAT_ID as CHAT, buildGenQaDeliveryLedger, composeDispatchReviewData } from '../../supabase/functions/_shared/telegram-dispatch-group-review';
 const ID='00000000-0000-4000-8000-000000000001';
 const cmd='/cancelled@HaulTrackerBot HTP-QA-GEN1';
 const identity=(text=cmd,chat=CHAT)=>({updateId:1,telegramUserId:501,telegramChatId:chat,chatType:'group',text,callbackData:null,callbackQueryId:null,replyToMessageId:null});
@@ -18,7 +18,7 @@ function fixture(updates:unknown[]){
 }
 afterEach(()=>vi.useRealTimers());
 describe('GENQA isolated route',()=>{
- it('new gate is compile-time OFF',()=>expect(TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED).toBe(false));
+ it('restricted GENQA gate is ON with general and legacy QA OFF',()=>{expect(TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED).toBe(true);expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);expect(TELEGRAM_SINGLE_LOAD_QA_ENABLED).toBe(false);});
  it.each([cmd,'/cancelled HTP-QA-GEN1'])('exact %s enters only GENQA',text=>expect(classifyUpdate(identity(text),false,false,true)).toMatchObject({kind:'dispatch_group_message',genQaOnly:true}));
  it.each(['Load HTP-QA-GEN1 cancelled','/delivered HTP-QA-GEN1','/cancelled HTP-QA-L2','/cancelled@OtherBot HTP-QA-GEN1',cmd+' extra',cmd+'\n','/help','/dispatch'])('ignores %s',text=>expect(classifyUpdate(identity(text),false,false,true).kind).toBe('ignored'));
  it('wrong group/private transport never enters GENQA',()=>{expect(classifyUpdate(identity(cmd,-100),false,false,true).kind).toBe('ignored');expect(classifyUpdate({...identity(),chatType:'private'},false,false,true).kind).not.toBe('dispatch_group_message');});
