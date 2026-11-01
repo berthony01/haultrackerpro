@@ -1,6 +1,6 @@
 // Synthetic ports exercise production orchestration; schema/authorization proof
 // remains in phaseTGG1BLocalPostgres.test.ts. No network or production writes.
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createHash } from "node:crypto";
 import {
   classifyUpdate, runTelegramPoll, runDispatchReviewDeliveryDrain,
@@ -66,6 +66,7 @@ function fixture(updates: unknown[]) {
     status: () => status, proposals: () => proposals };
 }
 
+beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-31T12:00:00Z")); });
 afterEach(() => vi.useRealTimers());
 describe("Single-load QA route", () => {
   it("staged QA and global review remain OFF and only QA service RPC names are selected", () => {
