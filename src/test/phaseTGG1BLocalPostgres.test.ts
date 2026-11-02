@@ -828,16 +828,21 @@ describe('TG-G1 financial trigger parity',()=>{
   await withFinFixture(async c=>{
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
    const summaries=await finSummaries(c,D),countsBefore=await finCounts(c);
-   // Test-only failure trigger, created and dropped inside the rolled-back transaction.
+   // Test-only failure trigger, created and dropped as the table owner inside
+   // the rolled-back transaction; RPC calls stay under service_role.
+   await c.query('RESET ROLE');
    await fin(c,"CREATE FUNCTION public.test_forced_event_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test_forced_event_failure'; END $$");
    await fin(c,'CREATE TRIGGER test_forced_event_failure BEFORE INSERT ON public.load_events FOR EACH ROW EXECUTE FUNCTION test_forced_event_failure()');
+   await c.query('SET LOCAL ROLE service_role');
    const error=await finExpectError(c,"SELECT * FROM telegram_process_dispatch_review_action($1,$2,$3,501,-100,'group','accept',$4)",[LEASE,30,hash(30),id]);
    expect(String(error)).toContain('test_forced_event_failure');
    expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[LOAD])).rows[0].status).toBe('en_route');
    expect(await finSummaries(c,D)).toEqual(summaries);
    expect(await finCounts(c)).toEqual(countsBefore);
+   await c.query('RESET ROLE');
    await fin(c,'DROP TRIGGER test_forced_event_failure ON public.load_events');
    await fin(c,'DROP FUNCTION public.test_forced_event_failure()');
+   await c.query('SET LOCAL ROLE service_role');
    expect((await finReview(c,id,31,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
    expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[LOAD])).rows[0].status).toBe('completed');
    expect((await finCounts(c)).e).toBe(1);
