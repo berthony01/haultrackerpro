@@ -692,15 +692,25 @@ describe('TG-G1 financial trigger parity',()=>{
  const BROKER=uid(601),LOAD_B=uid(303),LOAD_C=uid(304),OTHER_LOAD=uid(302),OTHER=uid(5);
  const close=(actual:unknown,expected:number,eps=1e-9)=>expect(Math.abs(Number(actual)-expected)).toBeLessThan(eps);
  const fin=(c:pg.PoolClient,sql:string,params:unknown[]=[])=>c.query(sql,params);
- async function finCounts(c:pg.PoolClient){return (await fin(c,`SELECT (SELECT count(*)::int FROM telegram_dispatch_review_proposals) p,(SELECT count(*)::int FROM telegram_dispatch_review_outbox) o,(SELECT count(*)::int FROM telegram_update_receipts) r,(SELECT count(*)::int FROM load_events) e`)).rows[0];}
+ async function finCounts(c:pg.PoolClient){return (await fin(c,`SELECT (SELECT count(*)::int FROM telegram_dispatch_review_proposals) p,(SELECT count(*)::int FROM telegram_dispatch_review_outbox) o,(SELECT count(*)::int FROM telegram_update_receipts) r,(SELECT count(*)::int FROM load_events) e,(SELECT count(*)::int FROM dispatch_command_receipts) canonical`)).rows[0];}
+ async function finLoadRecorded(c:pg.PoolClient,id:string){return (await fin(c,"SELECT (to_jsonb(l)-'status'-'updated_by_user_id'-'updated_at')::text record FROM loads l WHERE id=$1",[id])).rows[0].record;}
+ async function finRows(c:pg.PoolClient,table:'loads'|'expenses'|'fuel_logs'|'lane_stats'|'broker_stats'|'operating_metrics'){
+  return (await fin(c,`SELECT row_to_json(t)::text row FROM ${table} t ORDER BY t.id`)).rows.map(r=>r.row);
+ }
+ async function finSnapshot(c:pg.PoolClient){
+  return Object.fromEntries(await Promise.all((['loads','expenses','fuel_logs','lane_stats','broker_stats','operating_metrics'] as const).map(async table=>[table,await finRows(c,table)])));
+ }
  const finIntake=(c:pg.PoolClient,n:number,ref:string,status:string)=>fin(c,"SELECT * FROM telegram_process_dispatch_group_update($1,$2,$3,900,-100,'group',$4,$5)",[LEASE,n,hash(n),ref,status]);
  const finReview=(c:pg.PoolClient,id:string,n:number,action:string)=>fin(c,"SELECT * FROM telegram_process_dispatch_review_action($1,$2,$3,501,-100,'group',$4,$5)",[LEASE,n,hash(n),action,id]);
  const finGenIntake=(c:pg.PoolClient,n:number)=>fin(c,"SELECT * FROM telegram_genqa_process_dispatch_group_update($1,$2,$3,501,$4,'group','HTP-QA-GEN1','cancelled')",[LEASE,n,hash(n),GEN_CHAT]);
  const finGenReview=(c:pg.PoolClient,id:string,n:number,action='accept')=>fin(c,"SELECT * FROM telegram_genqa_process_dispatch_review_action($1,$2,$3,501,$4,'group',$5,$6)",[LEASE,n,hash(n),GEN_CHAT,action,id]);
  async function finExpectError(c:pg.PoolClient,sql:string,params:unknown[]=[]){
   await fin(c,'SAVEPOINT fin_err');
-  try{await fin(c,sql,params);await fin(c,'ROLLBACK TO SAVEPOINT fin_err');throw new Error('expected error, got success');}
-  catch(e){await fin(c,'ROLLBACK TO SAVEPOINT fin_err');return e;}
+  let error:unknown;
+  try{await fin(c,sql,params);}catch(e){error=e;}
+  finally{try{await fin(c,'ROLLBACK TO SAVEPOINT fin_err');}finally{await fin(c,'RELEASE SAVEPOINT fin_err');}}
+  if(error===undefined) throw new Error('expected error, got success');
+  return error;
  }
  async function finSummaries(c:pg.PoolClient,user:string){
   return {
@@ -710,6 +720,33 @@ describe('TG-G1 financial trigger parity',()=>{
   };
  }
  async function verifyFinParity(c:pg.PoolClient){
+  const required:Record<string,[string,string|null]>={
+   id:['uuid','gen_random_uuid()'],user_id:['uuid',null],load_date:['date',null],pickup_location:['text',null],dropoff_location:['text',null],
+   loaded_miles:['numeric','0'],deadhead_miles:['numeric','0'],rate_per_mile:['numeric','0'],wait_fee:['numeric','0'],detention_fee:['numeric','0'],other_fees:['numeric','0'],
+   status:['text',"'completed'::text"],created_at:['timestamptz','now()'],updated_at:['timestamptz','now()'],payment_status:['text',"'unpaid'::text"],origin_channel:['text',"'web'::text"],
+  };
+  const optional:Record<string,[string,string|null]>={
+   estimated_pay:['numeric',null],actual_pay_received:['numeric',null],notes:['text',null],gross_revenue:['numeric',null],dropoff_date:['date',null],invoice_submitted_date:['date',null],pod_submitted_date:['date',null],payment_due_date:['date',null],paid_date:['date',null],short_paid_amount:['numeric','0'],payment_notes:['text',null],broker_id:['uuid',null],broker_name_raw:['text',null],total_miles:['numeric',null],pay_model:['text',null],flat_rate_amount:['numeric',null],deadhead_rate_per_mile:['numeric',null],deadhead_pay_status:['text',null],deadhead_pay_amount:['numeric',null],created_by_user_id:['uuid',null],updated_by_user_id:['uuid',null],assistant_delegate_id:['uuid',null],carrier_driver_relationship_id:['uuid',null],load_reference:['text',null],
+  };
+  const expectedColumns=[...Object.entries(required).map(([column_name,[udt_name,column_default]])=>({column_name,udt_name,is_nullable:'NO',column_default})),...Object.entries(optional).map(([column_name,[udt_name,column_default]])=>({column_name,udt_name,is_nullable:'YES',column_default}))].sort((a,b)=>a.column_name.localeCompare(b.column_name));
+  const columns=(await fin(c,"SELECT column_name,udt_name,is_nullable,column_default FROM information_schema.columns WHERE table_schema='public' AND table_name='loads'")).rows.sort((a,b)=>a.column_name.localeCompare(b.column_name));
+  expect(columns).toEqual(expectedColumns);expect(columns).toHaveLength(40);
+  const expectedConstraints:Record<string,string>={
+   loads_assistant_delegate_id_fkey:'FOREIGN KEY (assistant_delegate_id) REFERENCES driver_assistants(id) ON DELETE SET NULL',
+   loads_broker_id_fkey:'FOREIGN KEY (broker_id) REFERENCES brokers(id) ON DELETE SET NULL',
+   loads_carrier_driver_relationship_id_fkey:'FOREIGN KEY (carrier_driver_relationship_id) REFERENCES carrier_driver_relationships(id) ON DELETE SET NULL',
+   loads_deadhead_pay_status_check:"CHECK (((deadhead_pay_status IS NULL) OR (deadhead_pay_status = ANY (ARRAY['unpaid'::text, 'per_mile'::text, 'flat'::text]))))",
+   loads_load_reference_length_check:'CHECK (((load_reference IS NULL) OR (char_length(load_reference) <= 200)))',
+   loads_origin_channel_check:"CHECK ((origin_channel = ANY (ARRAY['web'::text, 'telegram'::text, 'import'::text, 'api'::text])))",
+   loads_pkey:'PRIMARY KEY (id)',
+   loads_status_check:"CHECK ((status = ANY (ARRAY['pending'::text, 'en_route'::text, 'completed'::text, 'cancelled'::text])))",
+   loads_total_miles_component_consistency_check:'CHECK (((total_miles IS NULL) OR ((total_miles >= (0)::numeric) AND (((loaded_miles + deadhead_miles) = (0)::numeric) OR (abs((total_miles - (loaded_miles + deadhead_miles))) <= (2)::numeric)))))',
+   loads_user_id_fkey:'FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE',
+  };
+  const constraints=(await fin(c,"SELECT conname name,pg_get_constraintdef(oid) definition,convalidated validated FROM pg_constraint WHERE conrelid='public.loads'::regclass AND contype IN ('p','f','c') ORDER BY conname")).rows;
+  expect(Object.fromEntries(constraints.map(r=>[r.name,r.definition]))).toEqual(expectedConstraints);
+  expect(constraints.every(r=>r.validated===true)).toBe(true);
+  console.log('FINANCIAL_SCHEMA_PARITY',JSON.stringify({columns:columns.length,constraints,validated:true}));
   const rows=(await fin(c,"SELECT proname,md5(prosrc) hash FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=ANY($1::text[]) ORDER BY proname",[Object.keys(FIN_MD5)])).rows;
   const map=Object.fromEntries(rows.map(r=>[r.proname,r.hash]));
   console.log('FINANCIAL_FUNCTION_MD5',JSON.stringify(map));
@@ -723,7 +760,7 @@ describe('TG-G1 financial trigger parity',()=>{
  async function seedFinancials(c:pg.PoolClient){
   await fin(c,"INSERT INTO brokers(id,user_id,name) VALUES($1,$2,'Oracle Broker')",[BROKER,D]);
   // A: target en_route load (existing harness row AB-123), sentinel raw values preserved.
-  await fin(c,"UPDATE loads SET loaded_miles=100,deadhead_miles=20,total_miles=120,estimated_pay=300,actual_pay_received=288,short_paid_amount=12,payment_status='short_paid',load_date=CURRENT_DATE,dropoff_date=CURRENT_DATE,pickup_location='Alpha, AA',dropoff_location='Beta, BB',broker_id=$1,rate_per_mile=2.5,flat_rate_amount=7.77,wait_fee=1.01,detention_fee=2.02,other_fees=3.03,gross_revenue=300 WHERE id=$2",[BROKER,LOAD]);
+  await fin(c,"UPDATE loads SET loaded_miles=100,deadhead_miles=20,total_miles=120,estimated_pay=300,actual_pay_received=288,short_paid_amount=12,payment_status='short_paid',load_date=CURRENT_DATE,dropoff_date=CURRENT_DATE,pickup_location='Alpha, AA',dropoff_location='Beta, BB',broker_id=$1,rate_per_mile=2.5,flat_rate_amount=7.77,wait_fee=1.01,detention_fee=2.02,other_fees=3.03,gross_revenue=300,pay_model='cpm',deadhead_rate_per_mile=0.75,deadhead_pay_status='per_mile',deadhead_pay_amount=15 WHERE id=$2",[BROKER,LOAD]);
   // B: completed, nullable actual pay falls back to estimate.
   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,payment_status,load_date,dropoff_date,pickup_location,dropoff_location,broker_id) VALUES($1,$2,'completed','BB-456',$3,80,20,100,250,NULL,'unpaid',CURRENT_DATE,CURRENT_DATE,'Alpha, AA','Beta, BB',$4)",[LOAD_B,D,REL,BROKER]);
   // C: already cancelled, valid 500+50=550 components, must never count.
@@ -747,11 +784,17 @@ describe('TG-G1 financial trigger parity',()=>{
    await c.query('SET LOCAL ROLE service_role');
    await fn(c);
   }finally{
-   try{await c.query('ROLLBACK');}finally{c.release();}
+   try{
+    await c.query('ROLLBACK');
+    expect((await c.query("SELECT to_regclass('public.lane_stats') lane,to_regclass('public.expenses') expenses,to_regclass('public.fuel_logs') fuel,to_regprocedure('public.test_forced_event_failure()') failure")).rows[0]).toEqual({lane:null,expenses:null,fuel:null,failure:null});
+    expect((await c.query("SELECT count(*)::int n FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid() AND state IN ('active','idle in transaction','idle in transaction (aborted)')")).rows[0].n).toBe(0);
+    console.log('FINANCIAL_CLEANUP','rollback: no fixture DDL or active/transactional peers');
+   }finally{c.release();}
   }
  }
  it('authorized completion preserves every financial field byte-identical and summaries match the independent oracle',async()=>{
   await withFinFixture(async c=>{
+   const recordedBefore=await finLoadRecorded(c,LOAD);
    const moneyBefore=(await fin(c,'SELECT loaded_miles,deadhead_miles,rate_per_mile,total_miles,estimated_pay,actual_pay_received,gross_revenue,flat_rate_amount,wait_fee,detention_fee,other_fees,short_paid_amount,payment_status,broker_id FROM loads WHERE id=$1',[LOAD])).rows[0];
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
    expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
@@ -760,6 +803,7 @@ describe('TG-G1 financial trigger parity',()=>{
    expect(row.updated_by_user_id).toBe(STAFF);
    const {status:_,updated_by_user_id:__,...moneyAfter}=row;
    expect(moneyAfter).toEqual(moneyBefore);
+   expect(await finLoadRecorded(c,LOAD)).toBe(recordedBefore);
    const lane=(await fin(c,'SELECT * FROM lane_stats WHERE user_id=$1',[D])).rows[0];
    expect(lane.load_count).toBe(2);close(lane.avg_loaded_miles,90);close(lane.avg_deadhead_miles,20);
    close(lane.avg_rpm,2.45);close(lane.avg_net_profit,229);close(lane.avg_margin_pct,85.425);
@@ -775,11 +819,13 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('authorized cancellation excludes the load from lane/broker/revenue inputs while all costs stay intact',async()=>{
   await withFinFixture(async c=>{
+   const recordedBefore=await finLoadRecorded(c,LOAD);
    const expensesBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM expenses t ORDER BY t.id')).rows.map(r=>r.row);
    const fuelBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t ORDER BY t.id')).rows.map(r=>r.row);
    const id=(await finIntake(c,10,'AB-123','cancelled')).rows[0].proposal_id as string;
    expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
    expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[LOAD])).rows[0].status).toBe('cancelled');
+   expect(await finLoadRecorded(c,LOAD)).toBe(recordedBefore);
    const lane=(await fin(c,'SELECT * FROM lane_stats WHERE user_id=$1',[D])).rows[0];
    expect(lane.load_count).toBe(1);close(lane.avg_rpm,2.5);close(lane.avg_net_profit,224);close(lane.avg_margin_pct,89.6);
    close(lane.avg_loaded_miles,80);close(lane.avg_deadhead_miles,20);
@@ -800,28 +846,39 @@ describe('TG-G1 financial trigger parity',()=>{
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
    expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
    const summaries=await finSummaries(c,D),countsBefore=await finCounts(c);
+   expect(countsBefore.canonical).toBe(1);expect(countsBefore.e).toBe(1);
    const replay=(await finReview(c,id,30,'accept')).rows[0];
    expect(replay).toEqual({is_new:false,result_code:'dispatch_review_accepted'});
+   expect((await finCounts(c)).canonical).toBe(1);expect((await finCounts(c)).e).toBe(1);
    const repeat=(await finReview(c,id,31,'accept')).rows[0];
    expect(repeat).toEqual({is_new:true,result_code:'dispatch_review_already_handled'});
    // Complete summary rows including UUIDs prove no hidden delete/reinsert recomputation.
    expect(await finSummaries(c,D)).toEqual(summaries);
    const countsAfter=await finCounts(c);
    expect(countsAfter.e).toBe(1);
+   expect(countsAfter.canonical).toBe(1);
    expect(countsAfter.r).toBe(countsBefore.r+1);
    expect(countsAfter.p).toBe(countsBefore.p);
    expect(countsAfter.o).toBe(countsBefore.o);
   });
  },20000);
- it('rejected review leaves loads and every financial summary row untouched',async()=>{
+ it.each(['reject','denied'] as const)('%s review leaves loads and every financial summary row untouched',async outcome=>{
   await withFinFixture(async c=>{
    const loadsBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM loads t ORDER BY t.id')).rows.map(r=>r.row);
    const summaries=await finSummaries(c,D);
+   const snapshot=await finSnapshot(c);
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
-   expect((await finReview(c,id,30,'reject')).rows[0].result_code).toBe('dispatch_review_rejected');
+   if(outcome==='denied'){
+    await c.query('RESET ROLE');
+    await fin(c,"UPDATE recruiter_members SET permissions=permissions-'loads_update_status' WHERE recruiter_id=$1 AND member_user_id=$2",[R,STAFF]);
+    await c.query('SET LOCAL ROLE service_role');
+   }
+   expect((await finReview(c,id,30,outcome==='reject'?'reject':'accept')).rows[0].result_code).toBe(outcome==='reject'?'dispatch_review_rejected':'dispatch_review_denied');
    expect((await fin(c,'SELECT row_to_json(t)::text row FROM loads t ORDER BY t.id')).rows.map(r=>r.row)).toEqual(loadsBefore);
    expect(await finSummaries(c,D)).toEqual(summaries);
+   expect(await finSnapshot(c)).toEqual(snapshot);
    expect((await finCounts(c)).e).toBe(0);
+   expect((await finCounts(c)).canonical).toBe(0);
   });
  },20000);
  it('canonical event-write failure rolls back load, summaries, receipt and event; valid retry succeeds',async()=>{
@@ -865,22 +922,42 @@ describe('TG-G1 financial trigger parity',()=>{
  it('zero, null and total-only mileage survive, decimals stay raw, and the real validated constraint rejects contradictory totals',async()=>{
   await withFinFixture(async c=>{
    // Zero-mileage and NULL total are legitimate.
-   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','ZERO-1',0,0,NULL,0,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(305),D]);
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','ZERO-1',0,0,NULL,0,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(305),D]);
    // Legitimate total-only historical load: components zero, explicit total drives RPM fallback.
-   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','TOTAL-ONLY',0,0,120,240,240,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(306),D]);
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,load_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','TOTAL-ONLY',0,0,120,240,240,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(306),D]);
+   for(const [index,ref] of ['ZERO-1','TOTAL-ONLY'].entries()){
+    const loadId=uid(305+index);
+    await fin(c,'UPDATE loads SET carrier_driver_relationship_id=$1 WHERE id=$2',[REL,loadId]);
+    const before=await finLoadRecorded(c,loadId);
+    const intakeResult=(await finIntake(c,100+index,ref,'completed')).rows[0];
+    expect(intakeResult.result_code).toBe('dispatch_review_proposed');
+    expect((await finReview(c,intakeResult.proposal_id,130+index,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
+    expect(await finLoadRecorded(c,loadId)).toBe(before);
+    expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[loadId])).rows[0].status).toBe('completed');
+   }
    const lane=(await fin(c,"SELECT * FROM lane_stats WHERE user_id=$1 AND lane_key='Solo, EE -> Solo, FF'",[D])).rows[0];
    expect(lane.load_count).toBe(2);
    // Zero-mile load contributes a NULL rpm that AVG ignores; total-only load
    // uses the explicit total fallback: 240/120 = 2.
    close(lane.avg_rpm,2);
    // Decimal and fee raw preservation: no rounding or rewriting.
-   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,wait_fee,detention_fee,other_fees,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','DEC-1',100,20,120,288.01,0.01,2.02,3.03,CURRENT_DATE,'Dec, GG','Dec, HH')",[uid(307),D]);
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,wait_fee,detention_fee,other_fees,load_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','DEC-1',100,20,120,288.01,0.01,2.02,3.03,CURRENT_DATE,'Dec, GG','Dec, HH')",[uid(307),D]);
+   await fin(c,'UPDATE loads SET carrier_driver_relationship_id=$1,actual_pay_received=288.01 WHERE id=$2',[REL,uid(307)]);
+   const decBefore=await finLoadRecorded(c,uid(307));
+   const decIntake=(await finIntake(c,102,'DEC-1','completed')).rows[0];
+   expect(decIntake.result_code).toBe('dispatch_review_proposed');
+   expect((await finReview(c,decIntake.proposal_id,132,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
+   expect(await finLoadRecorded(c,uid(307))).toBe(decBefore);
+   expect((await fin(c,'SELECT actual_pay_received,status FROM loads WHERE id=$1',[uid(307)])).rows[0]).toEqual({actual_pay_received:'288.01',status:'completed'});
    const dec=(await fin(c,'SELECT estimated_pay,wait_fee,detention_fee,other_fees FROM loads WHERE id=$1',[uid(307)])).rows[0];
    expect(dec).toEqual({estimated_pay:'288.01',wait_fee:'0.01',detention_fee:'2.02',other_fees:'3.03'});
    // Real validated constraint rejects contradictory overlarge and too-small totals and negatives.
    for(const [ref,loaded,deadhead,total] of [['OVER-1',100,20,1000],['UNDER-1',500,50,10],['NEG-1',100,20,-5]] as const){
+    const snapshot=await finSnapshot(c);
     const error=await finExpectError(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed',$3,$4,$5,$6,CURRENT_DATE,'X, II','Y, JJ')",[uid(308),D,ref,loaded,deadhead,total]);
     expect((error as {code?:string}).code).toBe('23514');
+    expect((error as {constraint?:string}).constraint).toBe('loads_total_miles_component_consistency_check');
+    expect(await finSnapshot(c)).toEqual(snapshot);
    }
    expect((await fin(c,"SELECT count(*)::int n FROM loads WHERE load_reference IN('OVER-1','UNDER-1','NEG-1')")).rows[0].n).toBe(0);
   });
