@@ -444,6 +444,85 @@ async function historicalSnapshot() {
  result.receipts=await q('SELECT row_to_json(t)::text row FROM telegram_update_receipts t WHERE update_id IN (100,130) ORDER BY update_id');
  return result;
 }
+describe('TG-G1 general lock-deadline verification',()=>{
+ beforeAll(async()=>{
+  const expected:Record<string,string>={telegram_process_dispatch_review_action:'834d89f6186a920b3805e32bd42e8fef',telegram_claim_dispatch_review_delivery:'5e38139dad516002d11804e8753c2e83'};
+  for(const [name,md5] of Object.entries(expected)){
+   const installed=await q("SELECT md5(prosrc) hash FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=$1",[name]);
+   console.log('GENERAL_INSTALLED_MD5',name,JSON.stringify(installed));
+   expect(installed, 'STOP: installed generic function body differs from reviewed production').toEqual([{hash:md5}]);
+  }
+ });
+ async function lockAndDeadline(name:string,id:string,blockerPid:number){
+  await waitForGenLock(name);
+  const evidence=await q("SELECT pid,wait_event_type,wait_event,pg_blocking_pids(pid) blockers FROM pg_stat_activity WHERE wait_event_type='Lock' AND query LIKE $1",['SELECT * FROM '+name+'%']);
+  console.log('GENERAL_LOCK_EVIDENCE',name,JSON.stringify(evidence));
+  expect(evidence.some(row=>(row.blockers as number[]).includes(blockerPid))).toBe(true);
+  let deadline:Record<string,unknown>|undefined;
+  for(let n=0;n<200;n++){
+   deadline=(await q('SELECT clock_timestamp() db_clock,expires_at,clock_timestamp()>=expires_at elapsed FROM telegram_dispatch_review_proposals WHERE id=$1',[id]))[0];
+   if(deadline?.elapsed)break;
+   await q('SELECT pg_sleep(0.02)');
+  }
+  console.log('GENERAL_DB_DEADLINE',name,JSON.stringify(deadline));
+  expect(deadline?.elapsed).toBe(true);
+ }
+ it.each(['accept','reject'])('generic review %s must expire after genuine load-lock wait',async(action)=>{
+  const id=await proposal();
+  const before=await q('SELECT row_to_json(l)::text row FROM loads l WHERE id=$1',[LOAD]);
+  const c=await pool.connect();
+  let pending:Promise<{rows:pg.QueryResultRow[]}|{error:unknown}>|undefined;
+  try{
+   await c.query('BEGIN');
+   await c.query('SELECT id FROM loads WHERE id=$1 FOR KEY SHARE',[LOAD]);
+   const blockerPid=(await c.query('SELECT pg_backend_pid() pid')).rows[0].pid as number;
+   await q("UPDATE telegram_dispatch_review_proposals SET expires_at=clock_timestamp()+interval '1 second' WHERE id=$1",[id]);
+   pending=review(id,30,501,-100,action).then(rows=>({rows}),error=>({error}));
+   await lockAndDeadline('telegram_process_dispatch_review_action',id,blockerPid);
+   await c.query('COMMIT');
+   const outcome=await pending;
+   if('error' in outcome)throw outcome.error;
+   const load=await q('SELECT row_to_json(l)::text row FROM loads l WHERE id=$1',[LOAD]);
+   const status=(await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status;
+   const events=(await counts()).e;
+   const proposalStatus=(await q('SELECT status FROM telegram_dispatch_review_proposals WHERE id=$1',[id]))[0].status;
+   console.log('GENERAL_REVIEW_OBSERVED',JSON.stringify({action,result:outcome.rows,loadStatus:status,loadUnchanged:JSON.stringify(load)===JSON.stringify(before),events,proposalStatus}));
+   expect.soft(outcome.rows[0]?.result_code).toBe('dispatch_review_expired');
+   expect.soft(load).toEqual(before);
+   expect.soft(status).toBe('en_route');
+   expect.soft(events).toBe(0);
+   expect.soft(proposalStatus).toBe('expired');
+  }finally{
+   try{await c.query('ROLLBACK');}finally{c.release();if(pending)await pending;}
+  }
+ },15000);
+ it('generic claim must return zero after genuine closed-outbox cleanup wait crosses pending expiry',async()=>{
+  const closed=await proposal();
+  expect((await review(closed,30,501,-100,'reject'))[0].result_code).toBe('dispatch_review_rejected');
+  const id=(await intake(11))[0].proposal_id as string;
+  expect(id).toBeTruthy();
+  const c=await pool.connect();
+  let pending:Promise<{rows:pg.QueryResultRow[]}|{error:unknown}>|undefined;
+  try{
+   await c.query('BEGIN');
+   await c.query('SELECT id FROM telegram_dispatch_review_outbox WHERE proposal_id=$1 FOR UPDATE',[closed]);
+   const blockerPid=(await c.query('SELECT pg_backend_pid() pid')).rows[0].pid as number;
+   await q("UPDATE telegram_dispatch_review_proposals SET expires_at=clock_timestamp()+interval '1 second' WHERE id=$1",[id]);
+   pending=claim().then(rows=>({rows}),error=>({error}));
+   await lockAndDeadline('telegram_claim_dispatch_review_delivery',id,blockerPid);
+   await c.query('COMMIT');
+   const outcome=await pending;
+   if('error' in outcome)throw outcome.error;
+   const state=(await q('SELECT p.status,p.expires_at,clock_timestamp() db_clock,o.delivery_state FROM telegram_dispatch_review_proposals p JOIN telegram_dispatch_review_outbox o ON o.proposal_id=p.id WHERE p.id=$1',[id]))[0];
+   console.log('GENERAL_CLAIM_OBSERVED',JSON.stringify({claimCount:outcome.rows.length,claims:outcome.rows,state}));
+   expect.soft(outcome.rows).toHaveLength(0);
+   expect.soft(state.delivery_state).not.toBe('sending');
+  }finally{
+   try{await c.query('ROLLBACK');}finally{c.release();if(pending)await pending;}
+  }
+ },15000);
+});
+
 describe('TG-G1 GEN1 terminal replay, lock-deadline and financial preservation regressions',()=>{
  beforeEach(seedGenFixture);
  it.each(['accepted','rejected','already_handled','expired','stale'])('exact terminal %s replay returns old result with no extra writes; wrong locator/action denied',async(kind)=>{
