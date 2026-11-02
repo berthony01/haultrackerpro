@@ -37,6 +37,24 @@ const claim=()=>rpc('SELECT * FROM telegram_claim_dispatch_review_delivery()');
 const ack=(c: Record<string,unknown>,token=c.claim_token)=>rpc('SELECT telegram_ack_dispatch_review_delivery($1,$2,123) ok',[c.outbox_id,token]);
 const fail=(c: Record<string,unknown>)=>rpc("SELECT telegram_fail_dispatch_review_delivery($1,$2,'network') ok",[c.outbox_id,c.claim_token]);
 async function counts() { return (await q(`SELECT (SELECT count(*)::int FROM telegram_dispatch_review_proposals) p,(SELECT count(*)::int FROM telegram_dispatch_review_outbox) o,(SELECT count(*)::int FROM telegram_update_receipts) r,(SELECT count(*)::int FROM load_events) e`))[0]; }
+const DEADLINE_REPAIR='supabase/migration-candidates/20261102_general_dispatch_deadline_repair.sql';
+const DEADLINE_RESTORE='supabase/migration-candidates/20261102_general_dispatch_deadline_restore.sql';
+const BASELINE_DEADLINE_HASHES:Record<string,string>={telegram_process_dispatch_review_action:'834d89f6186a920b3805e32bd42e8fef',telegram_claim_dispatch_review_delivery:'5e38139dad516002d11804e8753c2e83'};
+const REPAIRED_DEADLINE_HASHES:Record<string,string>={telegram_process_dispatch_review_action:'df914d4a72536fb05a33301ecc72701b',telegram_claim_dispatch_review_delivery:'f249d3b36ee6a33ecd1b239ec9fb383d'};
+let baselineDeadlineDefinitions:pg.QueryResultRow[]=[];
+async function deadlineDefinitions(){return q("SELECT proname,md5(prosrc) hash,pg_get_functiondef(oid) def,proowner,proacl,proconfig,prosecdef FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=ANY($1::text[]) ORDER BY proname",[Object.keys(BASELINE_DEADLINE_HASHES)]);}
+async function qaDefinitions(){return q("SELECT proname,pg_get_functiondef(oid) def,proowner,proacl FROM pg_proc WHERE pronamespace='public'::regnamespace AND (proname LIKE 'telegram_qa_%' OR proname LIKE '_telegram_qa_%' OR proname LIKE 'telegram_genqa_%' OR proname LIKE '_telegram_genqa_%') ORDER BY proname");}
+async function assertDeadlineHashes(expected:Record<string,string>,label:string){
+ for(const [name,md5] of Object.entries(expected)){
+  const installed=await q("SELECT md5(prosrc) hash FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=$1",[name]);
+  console.log(label,name,JSON.stringify(installed));
+  expect(installed, 'STOP: installed generic function body differs from reviewed version').toEqual([{hash:md5}]);
+ }
+}
+async function applyDeadlineCandidate(path:string){
+ const c=await pool.connect();
+ try{await c.query(read(path));}catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}
 
 beforeAll(async()=>{
  dir=mkdtempSync(join(tmpdir(),'tgg1b-local-')); execFileSync('chown',['1000:1000',dir]);
@@ -83,6 +101,13 @@ beforeAll(async()=>{
  await q(read(GEN_CANDIDATE));
  // Production numeric/nullability/default projection; no invented recompute trigger.
  await q(`ALTER TABLE loads ADD COLUMN loaded_miles numeric NOT NULL DEFAULT 0, ADD COLUMN deadhead_miles numeric NOT NULL DEFAULT 0, ADD COLUMN rate_per_mile numeric NOT NULL DEFAULT 0, ADD COLUMN total_miles numeric, ADD COLUMN estimated_pay numeric, ADD COLUMN actual_pay_received numeric, ADD COLUMN gross_revenue numeric, ADD COLUMN flat_rate_amount numeric, ADD COLUMN wait_fee numeric NOT NULL DEFAULT 0, ADD COLUMN detention_fee numeric NOT NULL DEFAULT 0, ADD COLUMN other_fees numeric NOT NULL DEFAULT 0;`);
+ // Strict baseline gate AFTER all existing candidates; repair ONLY this disposable socket DB.
+ await assertDeadlineHashes(BASELINE_DEADLINE_HASHES,'GENERAL_BASELINE_MD5');
+ baselineDeadlineDefinitions=await deadlineDefinitions();
+ const qaBefore=await qaDefinitions();
+ await applyDeadlineCandidate(DEADLINE_REPAIR);
+ await assertDeadlineHashes(REPAIRED_DEADLINE_HASHES,'GENERAL_REPAIRED_MD5');
+ expect(await qaDefinitions()).toEqual(qaBefore);
 },60000);
 async function seedFixture() {
  await q('TRUNCATE auth.users,telegram_update_receipts CASCADE');
@@ -347,7 +372,7 @@ async function genOtherState(){return q(`SELECT row_to_json(o) row FROM telegram
 describe('TG-G1 GEN1 hash-pinned one-group acceptance, disposable PostgreSQL only',()=>{
  beforeEach(seedGenFixture);
  it('candidate version and provenance guards compile without changing canonical definitions',async()=>{
-  for(const [name,expected] of [['telegram_process_dispatch_group_update','5fc195e441b15004bb7d1f7b67b95f3a'],['telegram_process_dispatch_review_action','834d89f6186a920b3805e32bd42e8fef'],['telegram_claim_dispatch_review_delivery','5e38139dad516002d11804e8753c2e83']])
+  for(const [name,expected] of [['telegram_process_dispatch_group_update','5fc195e441b15004bb7d1f7b67b95f3a'],...Object.entries(REPAIRED_DEADLINE_HASHES)])
    expect((await q('SELECT md5(prosrc) hash FROM pg_proc WHERE pronamespace=\'public\'::regnamespace AND proname=$1',[name]))[0].hash).toBe(expected);
  });
  it('authorized intake creates only one proposal/outbox/receipt and no load/event mutation',async()=>{
@@ -446,12 +471,7 @@ async function historicalSnapshot() {
 }
 describe('TG-G1 general lock-deadline verification',()=>{
  beforeAll(async()=>{
-  const expected:Record<string,string>={telegram_process_dispatch_review_action:'834d89f6186a920b3805e32bd42e8fef',telegram_claim_dispatch_review_delivery:'5e38139dad516002d11804e8753c2e83'};
-  for(const [name,md5] of Object.entries(expected)){
-   const installed=await q("SELECT md5(prosrc) hash FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=$1",[name]);
-   console.log('GENERAL_INSTALLED_MD5',name,JSON.stringify(installed));
-   expect(installed, 'STOP: installed generic function body differs from reviewed production').toEqual([{hash:md5}]);
-  }
+  await assertDeadlineHashes(REPAIRED_DEADLINE_HASHES,'GENERAL_INSTALLED_REPAIRED_MD5');
  });
  async function lockAndDeadline(name:string,id:string,blockerPid:number){
   await waitForGenLock(name);
@@ -521,6 +541,59 @@ describe('TG-G1 general lock-deadline verification',()=>{
    try{await c.query('ROLLBACK');}finally{c.release();if(pending)await pending;}
   }
  },15000);
+ it('generic claim must return zero when proposal FOR SHARE waits past expiry',async()=>{
+  const id=await proposal(),c=await pool.connect();
+  let pending:Promise<{rows:pg.QueryResultRow[]}|{error:unknown}>|undefined;
+  try{
+   await q("UPDATE telegram_dispatch_review_proposals SET expires_at=clock_timestamp()+interval '1 second' WHERE id=$1",[id]);
+   await c.query('BEGIN');
+   // Non-key UPDATE conflicts with FOR SHARE, but does not block plain SELECT.
+   await c.query('UPDATE telegram_dispatch_review_proposals SET load_reference=load_reference WHERE id=$1',[id]);
+   const blockerPid=(await c.query('SELECT pg_backend_pid() pid')).rows[0].pid as number;
+   pending=claim().then(rows=>({rows}),error=>({error}));
+   await lockAndDeadline('telegram_claim_dispatch_review_delivery',id,blockerPid);
+   await c.query('COMMIT');
+   const outcome=await pending;
+   if('error' in outcome)throw outcome.error;
+   const state=(await q('SELECT p.status,p.expires_at,clock_timestamp() db_clock,o.delivery_state,o.claim_token,o.lease_expires_at,o.last_failure_code FROM telegram_dispatch_review_proposals p JOIN telegram_dispatch_review_outbox o ON o.proposal_id=p.id WHERE p.id=$1',[id]))[0];
+   console.log('GENERAL_PROPOSAL_LOCK_CLAIM_OBSERVED',JSON.stringify({claimCount:outcome.rows.length,state}));
+   expect(outcome.rows).toHaveLength(0);
+   expect(state.delivery_state).toBe('cancelled');
+   expect(state.claim_token).toBeNull();
+   expect(state.lease_expires_at).toBeNull();
+   expect(state.last_failure_code).toBe('proposal_closed');
+   expect((await q('SELECT status FROM loads WHERE id=$1',[LOAD]))[0].status).toBe('en_route');
+   expect((await counts()).e).toBe(0);
+  }finally{
+   try{await c.query('ROLLBACK');}finally{c.release();if(pending)await pending;}
+  }
+ },15000);
+ it('repair candidate rejects repaired bodies and leaves definitions and data unchanged',async()=>{
+  const before=await deadlineDefinitions(),qaBefore=await qaDefinitions(),data=await counts();
+  await expect(applyDeadlineCandidate(DEADLINE_REPAIR)).rejects.toThrow('general_deadline_version_mismatch');
+  expect(await deadlineDefinitions()).toEqual(before);
+  expect(await qaDefinitions()).toEqual(qaBefore);
+  expect(await counts()).toEqual(data);
+ });
+ it('transactional restore is exact, rejects baseline bodies, and reapply preserves QA copies and data',async()=>{
+  const repaired=await deadlineDefinitions(),qaBefore=await qaDefinitions(),data=await counts();
+  let restored=false;
+  try{
+   await applyDeadlineCandidate(DEADLINE_RESTORE);restored=true;
+   await assertDeadlineHashes(BASELINE_DEADLINE_HASHES,'GENERAL_RESTORED_MD5');
+   expect(await deadlineDefinitions()).toEqual(baselineDeadlineDefinitions);
+   await expect(applyDeadlineCandidate(DEADLINE_RESTORE)).rejects.toThrow('general_deadline_version_mismatch');
+   expect(await deadlineDefinitions()).toEqual(baselineDeadlineDefinitions);
+   expect(await qaDefinitions()).toEqual(qaBefore);
+   expect(await counts()).toEqual(data);
+  }finally{
+   if(restored)await applyDeadlineCandidate(DEADLINE_REPAIR);
+  }
+  expect(await deadlineDefinitions()).toEqual(repaired);
+  await assertDeadlineHashes(REPAIRED_DEADLINE_HASHES,'GENERAL_REAPPLIED_MD5');
+  expect(await qaDefinitions()).toEqual(qaBefore);
+  expect(await counts()).toEqual(data);
+ });
 });
 
 describe('TG-G1 GEN1 terminal replay, lock-deadline and financial preservation regressions',()=>{
