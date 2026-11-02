@@ -662,3 +662,255 @@ describe('TG-G1 GEN1 terminal replay, lock-deadline and financial preservation r
   expect((await q('SELECT status FROM loads WHERE id=$1',[QA_LOAD]))[0].status).toBe('cancelled');
  });
 });
+
+// DISPOSABLE LOCAL TRANSACTION ONLY: the parity fixture is installed inside an
+// uncommitted transaction on a dedicated socket connection and always rolled
+// back. Never a production migration; DB-only parity, not UI/CSV/weekly proof.
+describe('TG-G1 financial trigger parity',()=>{
+ const FIN_FIXTURE='src/test/fixtures/telegramDispatchFinancialParity.sql';
+ const FIN_MD5:Record<string,string>={
+  build_lane_key:'eb8b935c1506580ca4825da758dd66fe',
+  dispatch_update_driver_load_status:'4ff8b99be0a9499b2a774dea5f4e2107',
+  recompute_broker_stats:'50abbe7eaed5ec21d696aa4a11e71f04',
+  recompute_lane_stats:'6fa217461ed0837509e3cfa841dff24a',
+  recompute_operating_metrics:'4f9bd233bbcb5e591f7c1fc2ad39bf40',
+  telegram_dispatch_update_driver_load_status:'5aa31914e9aa122500dd0c47f3b9fa37',
+  tg_assistant_audit_and_metadata:'be046c485e854cf580490cb0b178d5e0',
+  trg_recompute_on_load_change:'d9ea9401afa78d171e8bdb37199f0baa',
+  update_updated_at_column:'301a884953d37769916294bb60562e05',
+  trg_recompute_on_expense_change:'9cf9ec1e7de6caa3361b74237297c5c2',
+  trg_recompute_on_fuel_change:'9cf9ec1e7de6caa3361b74237297c5c2',
+ };
+ const FIN_TRIGGERS:Record<string,string[]>={
+  loads:['CREATE TRIGGER recompute_pi_on_load AFTER INSERT OR DELETE OR UPDATE ON public.loads FOR EACH ROW EXECUTE FUNCTION trg_recompute_on_load_change()','CREATE TRIGGER tg_assistant_audit_loads BEFORE INSERT OR UPDATE ON public.loads FOR EACH ROW EXECUTE FUNCTION tg_assistant_audit_and_metadata()','CREATE TRIGGER update_loads_updated_at BEFORE UPDATE ON public.loads FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()'],
+  expenses:['CREATE TRIGGER recompute_pi_on_expense AFTER INSERT OR DELETE OR UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION trg_recompute_on_expense_change()','CREATE TRIGGER tg_assistant_audit_expenses BEFORE INSERT OR UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION tg_assistant_audit_and_metadata()','CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON public.expenses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()'],
+  fuel_logs:['CREATE TRIGGER recompute_pi_on_fuel AFTER INSERT OR DELETE OR UPDATE ON public.fuel_logs FOR EACH ROW EXECUTE FUNCTION trg_recompute_on_fuel_change()','CREATE TRIGGER tg_assistant_audit_fuel_logs BEFORE INSERT OR UPDATE ON public.fuel_logs FOR EACH ROW EXECUTE FUNCTION tg_assistant_audit_and_metadata()','CREATE TRIGGER update_fuel_logs_updated_at BEFORE UPDATE ON public.fuel_logs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()'],
+  lane_stats:['CREATE TRIGGER trg_lane_stats_updated_at BEFORE UPDATE ON public.lane_stats FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()'],
+  broker_stats:['CREATE TRIGGER trg_broker_stats_updated_at BEFORE UPDATE ON public.broker_stats FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()'],
+  operating_metrics:['CREATE TRIGGER trg_operating_metrics_updated_at BEFORE UPDATE ON public.operating_metrics FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()'],
+ };
+ const BROKER=uid(601),LOAD_B=uid(303),LOAD_C=uid(304),OTHER_LOAD=uid(302),OTHER=uid(5);
+ const close=(actual:unknown,expected:number,eps=1e-9)=>expect(Math.abs(Number(actual)-expected)).toBeLessThan(eps);
+ const fin=(c:pg.PoolClient,sql:string,params:unknown[]=[])=>c.query(sql,params);
+ async function finCounts(c:pg.PoolClient){return (await fin(c,`SELECT (SELECT count(*)::int FROM telegram_dispatch_review_proposals) p,(SELECT count(*)::int FROM telegram_dispatch_review_outbox) o,(SELECT count(*)::int FROM telegram_update_receipts) r,(SELECT count(*)::int FROM load_events) e`)).rows[0];}
+ const finIntake=(c:pg.PoolClient,n:number,ref:string,status:string)=>fin(c,"SELECT * FROM telegram_process_dispatch_group_update($1,$2,$3,900,-100,'group',$4,$5)",[LEASE,n,hash(n),ref,status]);
+ const finReview=(c:pg.PoolClient,id:string,n:number,action:string)=>fin(c,"SELECT * FROM telegram_process_dispatch_review_action($1,$2,$3,501,-100,'group',$4,$5)",[LEASE,n,hash(n),action,id]);
+ const finGenIntake=(c:pg.PoolClient,n:number)=>fin(c,"SELECT * FROM telegram_genqa_process_dispatch_group_update($1,$2,$3,501,$4,'group','HTP-QA-GEN1','cancelled')",[LEASE,n,hash(n),GEN_CHAT]);
+ const finGenReview=(c:pg.PoolClient,id:string,n:number,action='accept')=>fin(c,"SELECT * FROM telegram_genqa_process_dispatch_review_action($1,$2,$3,501,$4,'group',$5,$6)",[LEASE,n,hash(n),GEN_CHAT,action,id]);
+ async function finExpectError(c:pg.PoolClient,sql:string,params:unknown[]=[]){
+  await fin(c,'SAVEPOINT fin_err');
+  try{await fin(c,sql,params);await fin(c,'ROLLBACK TO SAVEPOINT fin_err');throw new Error('expected error, got success');}
+  catch(e){await fin(c,'ROLLBACK TO SAVEPOINT fin_err');return e;}
+ }
+ async function finSummaries(c:pg.PoolClient,user:string){
+  return {
+   lane:(await fin(c,'SELECT row_to_json(t)::text row FROM lane_stats t WHERE user_id=$1 ORDER BY t.id',[user])).rows.map(r=>r.row),
+   broker:(await fin(c,'SELECT row_to_json(t)::text row FROM broker_stats t WHERE user_id=$1 ORDER BY t.id',[user])).rows.map(r=>r.row),
+   operating:(await fin(c,'SELECT row_to_json(t)::text row FROM operating_metrics t WHERE user_id=$1 ORDER BY t.id',[user])).rows.map(r=>r.row),
+  };
+ }
+ async function verifyFinParity(c:pg.PoolClient){
+  const rows=(await fin(c,"SELECT proname,md5(prosrc) hash FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=ANY($1::text[]) ORDER BY proname",[Object.keys(FIN_MD5)])).rows;
+  const map=Object.fromEntries(rows.map(r=>[r.proname,r.hash]));
+  console.log('FINANCIAL_FUNCTION_MD5',JSON.stringify(map));
+  expect(map).toEqual(FIN_MD5);
+  for(const [table,expected] of Object.entries(FIN_TRIGGERS)){
+   const defs=(await fin(c,'SELECT pg_get_triggerdef(t.oid) def FROM pg_trigger t JOIN pg_class rel ON rel.oid=t.tgrelid JOIN pg_namespace n ON n.oid=rel.relnamespace WHERE n.nspname=$1 AND rel.relname=$2 AND NOT t.tgisinternal ORDER BY t.tgname',['public',table])).rows.map(r=>r.def);
+   console.log('FINANCIAL_TRIGGER_PARITY',table,JSON.stringify(defs));
+   expect(defs).toEqual(expected);
+  }
+ }
+ async function seedFinancials(c:pg.PoolClient){
+  await fin(c,"INSERT INTO brokers(id,user_id,name) VALUES($1,$2,'Oracle Broker')",[BROKER,D]);
+  // A: target en_route load (existing harness row AB-123), sentinel raw values preserved.
+  await fin(c,"UPDATE loads SET loaded_miles=100,deadhead_miles=20,total_miles=120,estimated_pay=300,actual_pay_received=288,short_paid_amount=12,payment_status='short_paid',load_date=CURRENT_DATE,dropoff_date=CURRENT_DATE,pickup_location='Alpha, AA',dropoff_location='Beta, BB',broker_id=$1,rate_per_mile=2.5,flat_rate_amount=7.77,wait_fee=1.01,detention_fee=2.02,other_fees=3.03,gross_revenue=300 WHERE id=$2",[BROKER,LOAD]);
+  // B: completed, nullable actual pay falls back to estimate.
+  await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,payment_status,load_date,dropoff_date,pickup_location,dropoff_location,broker_id) VALUES($1,$2,'completed','BB-456',$3,80,20,100,250,NULL,'unpaid',CURRENT_DATE,CURRENT_DATE,'Alpha, AA','Beta, BB',$4)",[LOAD_B,D,REL,BROKER]);
+  // C: already cancelled, valid 500+50=550 components, must never count.
+  await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,payment_status,load_date,dropoff_date,pickup_location,dropoff_location,broker_id) VALUES($1,$2,'cancelled','CC-789',$3,500,50,550,99999,99999,'paid',CURRENT_DATE,CURRENT_DATE,'Alpha, AA','Beta, BB',$4)",[LOAD_C,D,REL,BROKER]);
+  await fin(c,"INSERT INTO expenses(user_id,expense_date,category,amount,expense_type,linked_load_id) VALUES ($1,CURRENT_DATE,'tolls',30,'variable',$2),($1,CURRENT_DATE,'tolls',10,'variable',$3),($1,CURRENT_DATE,'tolls',5,'variable',NULL),($1,CURRENT_DATE,'insurance',20,'fixed',NULL)",[D,LOAD,LOAD_B]);
+  await fin(c,"INSERT INTO fuel_logs(user_id,date,station,gallons,price_per_gallon,total_cost,linked_load_id) VALUES ($1,CURRENT_DATE,'S',10,2.4,24,$2),($1,CURRENT_DATE,'S',8,2,16,$3),($1,CURRENT_DATE,'S',5,2,10,NULL)",[D,LOAD,LOAD_B]);
+  // Separate second driver/workspace with its own complete financial state.
+  await fin(c,"UPDATE loads SET status='completed',loaded_miles=50,deadhead_miles=10,total_miles=60,estimated_pay=100,load_date=CURRENT_DATE,dropoff_date=CURRENT_DATE,pickup_location='Gamma, CC',dropoff_location='Delta, DD' WHERE id=$1",[OTHER_LOAD]);
+  await fin(c,"INSERT INTO expenses(user_id,expense_date,category,amount,expense_type) VALUES($1,CURRENT_DATE,'tolls',7,'variable')",[OTHER]);
+  await fin(c,"INSERT INTO fuel_logs(user_id,date,gallons,price_per_gallon,total_cost) VALUES($1,CURRENT_DATE,4,2,8)",[OTHER]);
+ }
+ async function withFinFixture(fn:(c:pg.PoolClient)=>Promise<void>){
+  const c=await pool.connect();
+  try{
+   await c.query('BEGIN');
+   // Fixture DDL and synthetic seeds run as the table owner; only the actual
+   // RPC calls execute under SET LOCAL ROLE service_role.
+   await c.query(read(FIN_FIXTURE));
+   await verifyFinParity(c);
+   await seedFinancials(c);
+   await c.query('SET LOCAL ROLE service_role');
+   await fn(c);
+  }finally{
+   try{await c.query('ROLLBACK');}finally{c.release();}
+  }
+ }
+ it('authorized completion preserves every financial field byte-identical and summaries match the independent oracle',async()=>{
+  await withFinFixture(async c=>{
+   const moneyBefore=(await fin(c,'SELECT loaded_miles,deadhead_miles,rate_per_mile,total_miles,estimated_pay,actual_pay_received,gross_revenue,flat_rate_amount,wait_fee,detention_fee,other_fees,short_paid_amount,payment_status,broker_id FROM loads WHERE id=$1',[LOAD])).rows[0];
+   const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
+   expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
+   const row=(await fin(c,'SELECT status,updated_by_user_id,loaded_miles,deadhead_miles,rate_per_mile,total_miles,estimated_pay,actual_pay_received,gross_revenue,flat_rate_amount,wait_fee,detention_fee,other_fees,short_paid_amount,payment_status,broker_id FROM loads WHERE id=$1',[LOAD])).rows[0];
+   expect(row.status).toBe('completed');
+   expect(row.updated_by_user_id).toBe(STAFF);
+   const {status:_,updated_by_user_id:__,...moneyAfter}=row;
+   expect(moneyAfter).toEqual(moneyBefore);
+   const lane=(await fin(c,'SELECT * FROM lane_stats WHERE user_id=$1',[D])).rows[0];
+   expect(lane.load_count).toBe(2);close(lane.avg_loaded_miles,90);close(lane.avg_deadhead_miles,20);
+   close(lane.avg_rpm,2.45);close(lane.avg_net_profit,229);close(lane.avg_margin_pct,85.425);
+   const broker=(await fin(c,'SELECT * FROM broker_stats WHERE user_id=$1',[D])).rows[0];
+   expect(broker.load_count).toBe(2);close(broker.avg_estimated_pay,275);close(broker.avg_actual_pay,288);
+   close(broker.avg_variance_amount,-131);expect(broker.short_pay_count).toBe(1);expect(broker.unpaid_count).toBe(1);
+   const ops=(await fin(c,'SELECT * FROM operating_metrics WHERE user_id=$1',[D])).rows[0];
+   close(ops.rolling_cost_per_mile,95/220);close(ops.rolling_fuel_cost_per_mile,50/220);
+   close(ops.rolling_deadhead_pct,40/220*100);close(ops.rolling_margin_pct,(538-95)/538*100);
+   expect((await finCounts(c)).e).toBe(1);
+   console.log('FINANCIAL_ORACLE_COMPLETION',JSON.stringify({lane,broker,ops}));
+  });
+ },20000);
+ it('authorized cancellation excludes the load from lane/broker/revenue inputs while all costs stay intact',async()=>{
+  await withFinFixture(async c=>{
+   const expensesBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM expenses t ORDER BY t.id')).rows.map(r=>r.row);
+   const fuelBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t ORDER BY t.id')).rows.map(r=>r.row);
+   const id=(await finIntake(c,10,'AB-123','cancelled')).rows[0].proposal_id as string;
+   expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
+   expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[LOAD])).rows[0].status).toBe('cancelled');
+   const lane=(await fin(c,'SELECT * FROM lane_stats WHERE user_id=$1',[D])).rows[0];
+   expect(lane.load_count).toBe(1);close(lane.avg_rpm,2.5);close(lane.avg_net_profit,224);close(lane.avg_margin_pct,89.6);
+   close(lane.avg_loaded_miles,80);close(lane.avg_deadhead_miles,20);
+   const broker=(await fin(c,'SELECT * FROM broker_stats WHERE user_id=$1',[D])).rows[0];
+   expect(broker.load_count).toBe(1);close(broker.avg_estimated_pay,250);close(broker.avg_actual_pay,0);
+   close(broker.avg_variance_amount,-250);expect(broker.short_pay_count).toBe(0);expect(broker.unpaid_count).toBe(1);
+   const ops=(await fin(c,'SELECT * FROM operating_metrics WHERE user_id=$1',[D])).rows[0];
+   close(ops.rolling_cost_per_mile,0.95);close(ops.rolling_fuel_cost_per_mile,0.5);
+   close(ops.rolling_deadhead_pct,20);close(ops.rolling_margin_pct,62);
+   // Existing rule preserved: 60-day variable expenses and fuel stay counted even when linked to the cancelled load.
+   expect((await fin(c,'SELECT row_to_json(t)::text row FROM expenses t ORDER BY t.id')).rows.map(r=>r.row)).toEqual(expensesBefore);
+   expect((await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t ORDER BY t.id')).rows.map(r=>r.row)).toEqual(fuelBefore);
+   console.log('FINANCIAL_ORACLE_CANCELLATION',JSON.stringify({lane,broker,ops}));
+  });
+ },20000);
+ it('exact replay and fresh-update already-handled repeat never duplicate event, receipt or summary rows',async()=>{
+  await withFinFixture(async c=>{
+   const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
+   expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
+   const summaries=await finSummaries(c,D),countsBefore=await finCounts(c);
+   const replay=(await finReview(c,id,30,'accept')).rows[0];
+   expect(replay).toEqual({is_new:false,result_code:'dispatch_review_accepted'});
+   const repeat=(await finReview(c,id,31,'accept')).rows[0];
+   expect(repeat).toEqual({is_new:true,result_code:'dispatch_review_already_handled'});
+   // Complete summary rows including UUIDs prove no hidden delete/reinsert recomputation.
+   expect(await finSummaries(c,D)).toEqual(summaries);
+   const countsAfter=await finCounts(c);
+   expect(countsAfter.e).toBe(1);
+   expect(countsAfter.r).toBe(countsBefore.r+1);
+   expect(countsAfter.p).toBe(countsBefore.p);
+   expect(countsAfter.o).toBe(countsBefore.o);
+  });
+ },20000);
+ it('rejected review leaves loads and every financial summary row untouched',async()=>{
+  await withFinFixture(async c=>{
+   const loadsBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM loads t ORDER BY t.id')).rows.map(r=>r.row);
+   const summaries=await finSummaries(c,D);
+   const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
+   expect((await finReview(c,id,30,'reject')).rows[0].result_code).toBe('dispatch_review_rejected');
+   expect((await fin(c,'SELECT row_to_json(t)::text row FROM loads t ORDER BY t.id')).rows.map(r=>r.row)).toEqual(loadsBefore);
+   expect(await finSummaries(c,D)).toEqual(summaries);
+   expect((await finCounts(c)).e).toBe(0);
+  });
+ },20000);
+ it('canonical event-write failure rolls back load, summaries, receipt and event; valid retry succeeds',async()=>{
+  await withFinFixture(async c=>{
+   const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
+   const summaries=await finSummaries(c,D),countsBefore=await finCounts(c);
+   // Test-only failure trigger, created and dropped as the table owner inside
+   // the rolled-back transaction; RPC calls stay under service_role.
+   await c.query('RESET ROLE');
+   await fin(c,"CREATE FUNCTION public.test_forced_event_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test_forced_event_failure'; END $$");
+   await fin(c,'CREATE TRIGGER test_forced_event_failure BEFORE INSERT ON public.load_events FOR EACH ROW EXECUTE FUNCTION test_forced_event_failure()');
+   await c.query('SET LOCAL ROLE service_role');
+   const error=await finExpectError(c,"SELECT * FROM telegram_process_dispatch_review_action($1,$2,$3,501,-100,'group','accept',$4)",[LEASE,30,hash(30),id]);
+   expect(String(error)).toContain('test_forced_event_failure');
+   expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[LOAD])).rows[0].status).toBe('en_route');
+   expect(await finSummaries(c,D)).toEqual(summaries);
+   expect(await finCounts(c)).toEqual(countsBefore);
+   await c.query('RESET ROLE');
+   await fin(c,'DROP TRIGGER test_forced_event_failure ON public.load_events');
+   await fin(c,'DROP FUNCTION public.test_forced_event_failure()');
+   await c.query('SET LOCAL ROLE service_role');
+   expect((await finReview(c,id,31,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
+   expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[LOAD])).rows[0].status).toBe('completed');
+   expect((await finCounts(c)).e).toBe(1);
+  });
+ },20000);
+ it('second driver workspace load, expenses, fuel and all summary rows stay byte-identical',async()=>{
+  await withFinFixture(async c=>{
+   const otherLoads=(await fin(c,'SELECT row_to_json(t)::text row FROM loads t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
+   const otherExpenses=(await fin(c,'SELECT row_to_json(t)::text row FROM expenses t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
+   const otherFuel=(await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
+   const otherSummaries=await finSummaries(c,OTHER);
+   const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
+   expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
+   expect((await fin(c,'SELECT row_to_json(t)::text row FROM loads t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row)).toEqual(otherLoads);
+   expect((await fin(c,'SELECT row_to_json(t)::text row FROM expenses t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row)).toEqual(otherExpenses);
+   expect((await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row)).toEqual(otherFuel);
+   expect(await finSummaries(c,OTHER)).toEqual(otherSummaries);
+  });
+ },20000);
+ it('zero, null and total-only mileage survive, decimals stay raw, and the real validated constraint rejects contradictory totals',async()=>{
+  await withFinFixture(async c=>{
+   // Zero-mileage and NULL total are legitimate.
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','ZERO-1',0,0,NULL,0,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(305),D]);
+   // Legitimate total-only historical load: components zero, explicit total drives RPM fallback.
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','TOTAL-ONLY',0,0,120,240,240,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(306),D]);
+   const lane=(await fin(c,"SELECT * FROM lane_stats WHERE user_id=$1 AND lane_key='Solo, EE -> Solo, FF'",[D])).rows[0];
+   expect(lane.load_count).toBe(2);
+   // Zero-mile load contributes a NULL rpm that AVG ignores; total-only load
+   // uses the explicit total fallback: 240/120 = 2.
+   close(lane.avg_rpm,2);
+   // Decimal and fee raw preservation: no rounding or rewriting.
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,wait_fee,detention_fee,other_fees,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','DEC-1',100,20,120,288.01,0.01,2.02,3.03,CURRENT_DATE,'Dec, GG','Dec, HH')",[uid(307),D]);
+   const dec=(await fin(c,'SELECT estimated_pay,wait_fee,detention_fee,other_fees FROM loads WHERE id=$1',[uid(307)])).rows[0];
+   expect(dec).toEqual({estimated_pay:'288.01',wait_fee:'0.01',detention_fee:'2.02',other_fees:'3.03'});
+   // Real validated constraint rejects contradictory overlarge and too-small totals and negatives.
+   for(const [ref,loaded,deadhead,total] of [['OVER-1',100,20,1000],['UNDER-1',500,50,10],['NEG-1',100,20,-5]] as const){
+    const error=await finExpectError(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed',$3,$4,$5,$6,CURRENT_DATE,'X, II','Y, JJ')",[uid(308),D,ref,loaded,deadhead,total]);
+    expect((error as {code?:string}).code).toBe('23514');
+   }
+   expect((await fin(c,"SELECT count(*)::int n FROM loads WHERE load_reference IN('OVER-1','UNDER-1','NEG-1')")).rows[0].n).toBe(0);
+  });
+ },20000);
+ it('GENQA cancellation runs the same real trigger chain and leaves other workspaces byte-identical',async()=>{
+  await withFinFixture(async c=>{
+   // Synthetic equivalents of the existing seedGenFixture provenance; identity
+   // rows are inserted as the table owner, then the role is restored for RPCs.
+   await c.query('RESET ROLE');
+   await fin(c,'INSERT INTO auth.users VALUES($1)',[GEN_DRIVER]);
+   await fin(c,"INSERT INTO recruiter_profiles(id,user_id,recruiter_name,company_name,status,company_type,posting_terms_accepted_at) VALUES($1,$2,'QA','QA','active','carrier',now())",[GEN_RECRUITER,OTHER]);
+   await fin(c,"INSERT INTO user_capabilities VALUES($1,'recruiter','active')",[OTHER]);
+   await fin(c,"INSERT INTO recruiter_billing_profiles VALUES($1,$2,'growth','active')",[GEN_RECRUITER,OTHER]);
+   await fin(c,"INSERT INTO recruiter_members(recruiter_id,member_user_id,status,role,permissions) VALUES($1,$2,'active','recruiter_staff','{\"loads_update_status\":true}')",[GEN_RECRUITER,STAFF]);
+   await fin(c,"INSERT INTO carrier_driver_relationships(id,recruiter_id,driver_user_id,status,created_by_user_id) VALUES($1,$2,$3,'active',$4)",[GEN_REL,GEN_RECRUITER,GEN_DRIVER,OTHER]);
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,dropoff_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','HTP-QA-GEN1',$3,60,0,60,150,CURRENT_DATE,CURRENT_DATE,'Gen, KK','Gen, LL')",[GEN_LOAD,GEN_DRIVER,GEN_REL]);
+   await fin(c,"INSERT INTO telegram_chat_bindings(id,telegram_chat_id,recruiter_id,chat_type,bound_by_user_id) VALUES($1,$2,$3,'group',$4)",[GEN_BINDING,GEN_CHAT,GEN_RECRUITER,OTHER]);
+   await c.query('SET LOCAL ROLE service_role');
+   const before=await finSummaries(c,D);
+   const genLaneBefore=(await fin(c,'SELECT load_count FROM lane_stats WHERE user_id=$1',[GEN_DRIVER])).rows[0];
+   expect(genLaneBefore.load_count).toBe(1);
+   const id=(await finGenIntake(c,400)).rows[0].proposal_id as string;
+   expect((await finGenReview(c,id,430)).rows[0].result_code).toBe('dispatch_review_accepted');
+   expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[GEN_LOAD])).rows[0].status).toBe('cancelled');
+   // Real trigger chain removed the cancelled load from every summary input.
+   expect((await fin(c,'SELECT count(*)::int n FROM lane_stats WHERE user_id=$1',[GEN_DRIVER])).rows[0].n).toBe(0);
+   expect((await fin(c,'SELECT count(*)::int n FROM broker_stats WHERE user_id=$1',[GEN_DRIVER])).rows[0].n).toBe(0);
+   const genOps=(await fin(c,'SELECT * FROM operating_metrics WHERE user_id=$1',[GEN_DRIVER])).rows[0];
+   close(genOps.rolling_cost_per_mile,0);close(genOps.rolling_margin_pct,0);
+   expect(await finSummaries(c,D)).toEqual(before);
+  });
+ },20000);
+});
