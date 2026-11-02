@@ -40,12 +40,18 @@ UPDATE public.loads
        dropoff_location = 'Fixture Destination, BB'
  WHERE load_date IS NULL OR pickup_location IS NULL OR dropoff_location IS NULL;
 ALTER TABLE public.loads
+  ALTER COLUMN status SET NOT NULL,
+  ALTER COLUMN status SET DEFAULT 'completed',
   ALTER COLUMN load_date SET NOT NULL,
   ALTER COLUMN pickup_location SET NOT NULL,
   ALTER COLUMN dropoff_location SET NOT NULL;
 
 -- Verified production checks/foreign keys (validated).
 ALTER TABLE public.loads
+  DROP CONSTRAINT loads_user_id_fkey,
+  ADD CONSTRAINT loads_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE,
+  DROP CONSTRAINT loads_carrier_driver_relationship_id_fkey,
+  ADD CONSTRAINT loads_carrier_driver_relationship_id_fkey FOREIGN KEY (carrier_driver_relationship_id) REFERENCES public.carrier_driver_relationships(id) ON DELETE SET NULL,
   ADD CONSTRAINT loads_total_miles_component_consistency_check CHECK (((total_miles IS NULL) OR ((total_miles >= (0)::numeric) AND (((loaded_miles + deadhead_miles) = (0)::numeric) OR (abs((total_miles - (loaded_miles + deadhead_miles))) <= (2)::numeric))))),
   ADD CONSTRAINT loads_deadhead_pay_status_check CHECK (((deadhead_pay_status IS NULL) OR (deadhead_pay_status = ANY (ARRAY['unpaid'::text, 'per_mile'::text, 'flat'::text])))),
   ADD CONSTRAINT loads_load_reference_length_check CHECK (((load_reference IS NULL) OR (char_length(load_reference) <= 200))),
