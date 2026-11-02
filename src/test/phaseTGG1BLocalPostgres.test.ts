@@ -768,7 +768,8 @@ describe('TG-G1 financial trigger parity',()=>{
   await fin(c,"INSERT INTO expenses(user_id,expense_date,category,amount,expense_type,linked_load_id) VALUES ($1,CURRENT_DATE,'tolls',30,'variable',$2),($1,CURRENT_DATE,'tolls',10,'variable',$3),($1,CURRENT_DATE,'tolls',5,'variable',NULL),($1,CURRENT_DATE,'insurance',20,'fixed',NULL)",[D,LOAD,LOAD_B]);
   await fin(c,"INSERT INTO fuel_logs(user_id,date,station,gallons,price_per_gallon,total_cost,linked_load_id) VALUES ($1,CURRENT_DATE,'S',10,2.4,24,$2),($1,CURRENT_DATE,'S',8,2,16,$3),($1,CURRENT_DATE,'S',5,2,10,NULL)",[D,LOAD,LOAD_B]);
   // Separate second driver/workspace with its own complete financial state.
-  await fin(c,"UPDATE loads SET status='completed',loaded_miles=50,deadhead_miles=10,total_miles=60,estimated_pay=100,load_date=CURRENT_DATE,dropoff_date=CURRENT_DATE,pickup_location='Gamma, CC',dropoff_location='Delta, DD' WHERE id=$1",[OTHER_LOAD]);
+  await fin(c,"INSERT INTO brokers(id,user_id,name) VALUES($1,$2,'Other Broker')",[uid(602),OTHER]);
+  await fin(c,"UPDATE loads SET status='completed',loaded_miles=50,deadhead_miles=10,total_miles=60,estimated_pay=100,load_date=CURRENT_DATE,dropoff_date=CURRENT_DATE,pickup_location='Gamma, CC',dropoff_location='Delta, DD',broker_id=$2 WHERE id=$1",[OTHER_LOAD,uid(602)]);
   await fin(c,"INSERT INTO expenses(user_id,expense_date,category,amount,expense_type) VALUES($1,CURRENT_DATE,'tolls',7,'variable')",[OTHER]);
   await fin(c,"INSERT INTO fuel_logs(user_id,date,gallons,price_per_gallon,total_cost) VALUES($1,CURRENT_DATE,4,2,8)",[OTHER]);
  }
@@ -907,6 +908,7 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('second driver workspace load, expenses, fuel and all summary rows stay byte-identical',async()=>{
   await withFinFixture(async c=>{
+   expect((await fin(c,'SELECT count(*)::int n FROM broker_stats WHERE user_id=$1',[OTHER])).rows[0].n).toBe(1);
    const otherLoads=(await fin(c,'SELECT row_to_json(t)::text row FROM loads t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
    const otherExpenses=(await fin(c,'SELECT row_to_json(t)::text row FROM expenses t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
    const otherFuel=(await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
@@ -924,8 +926,8 @@ describe('TG-G1 financial trigger parity',()=>{
    // Zero-mileage and NULL total are legitimate.
    await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','ZERO-1',0,0,NULL,0,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(305),D]);
    // Legitimate total-only historical load: components zero, explicit total drives RPM fallback.
-   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,load_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','TOTAL-ONLY',0,0,120,240,240,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(306),D]);
-   for(const [index,ref] of ['ZERO-1','TOTAL-ONLY'].entries()){
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,load_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','TOTAL-ONLY-1',0,0,120,240,240,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(306),D]);
+   for(const [index,ref] of ['ZERO-1','TOTAL-ONLY-1'].entries()){
     const loadId=uid(305+index);
     await fin(c,'UPDATE loads SET carrier_driver_relationship_id=$1 WHERE id=$2',[REL,loadId]);
     const before=await finLoadRecorded(c,loadId);
@@ -973,12 +975,14 @@ describe('TG-G1 financial trigger parity',()=>{
    await fin(c,"INSERT INTO recruiter_billing_profiles VALUES($1,$2,'growth','active')",[GEN_RECRUITER,OTHER]);
    await fin(c,"INSERT INTO recruiter_members(recruiter_id,member_user_id,status,role,permissions) VALUES($1,$2,'active','recruiter_staff','{\"loads_update_status\":true}')",[GEN_RECRUITER,STAFF]);
    await fin(c,"INSERT INTO carrier_driver_relationships(id,recruiter_id,driver_user_id,status,created_by_user_id) VALUES($1,$2,$3,'active',$4)",[GEN_REL,GEN_RECRUITER,GEN_DRIVER,OTHER]);
-   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,dropoff_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','HTP-QA-GEN1',$3,60,0,60,150,CURRENT_DATE,CURRENT_DATE,'Gen, KK','Gen, LL')",[GEN_LOAD,GEN_DRIVER,GEN_REL]);
+   await fin(c,"INSERT INTO brokers(id,user_id,name) VALUES($1,$2,'GENQA Broker')",[uid(603),GEN_DRIVER]);
+   await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,dropoff_date,pickup_location,dropoff_location,broker_id) VALUES($1,$2,'pending','HTP-QA-GEN1',$3,60,0,60,150,CURRENT_DATE,CURRENT_DATE,'Gen, KK','Gen, LL',$4)",[GEN_LOAD,GEN_DRIVER,GEN_REL,uid(603)]);
    await fin(c,"INSERT INTO telegram_chat_bindings(id,telegram_chat_id,recruiter_id,chat_type,bound_by_user_id) VALUES($1,$2,$3,'group',$4)",[GEN_BINDING,GEN_CHAT,GEN_RECRUITER,OTHER]);
    await c.query('SET LOCAL ROLE service_role');
    const before=await finSummaries(c,D);
    const genLaneBefore=(await fin(c,'SELECT load_count FROM lane_stats WHERE user_id=$1',[GEN_DRIVER])).rows[0];
    expect(genLaneBefore.load_count).toBe(1);
+   expect((await fin(c,'SELECT count(*)::int n FROM broker_stats WHERE user_id=$1',[GEN_DRIVER])).rows[0].n).toBe(1);
    const id=(await finGenIntake(c,400)).rows[0].proposal_id as string;
    expect((await finGenReview(c,id,430)).rows[0].result_code).toBe('dispatch_review_accepted');
    expect((await fin(c,'SELECT status FROM loads WHERE id=$1',[GEN_LOAD])).rows[0].status).toBe('cancelled');
