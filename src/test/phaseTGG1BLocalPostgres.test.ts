@@ -880,7 +880,9 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('GENQA cancellation runs the same real trigger chain and leaves other workspaces byte-identical',async()=>{
   await withFinFixture(async c=>{
-   // Synthetic equivalents of the existing seedGenFixture provenance.
+   // Synthetic equivalents of the existing seedGenFixture provenance; identity
+   // rows are inserted as the table owner, then the role is restored for RPCs.
+   await c.query('RESET ROLE');
    await fin(c,'INSERT INTO auth.users VALUES($1)',[GEN_DRIVER]);
    await fin(c,"INSERT INTO recruiter_profiles(id,user_id,recruiter_name,company_name,status,company_type,posting_terms_accepted_at) VALUES($1,$2,'QA','QA','active','carrier',now())",[GEN_RECRUITER,OTHER]);
    await fin(c,"INSERT INTO user_capabilities VALUES($1,'recruiter','active')",[OTHER]);
