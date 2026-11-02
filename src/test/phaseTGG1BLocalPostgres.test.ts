@@ -1,5 +1,5 @@
 // @vitest-environment node
-// Disposable PostgreSQL 17.9, NEVER a configured/database URL. No network listener.
+// Disposable PostgreSQL 17.11, NEVER a configured/database URL. No network listener.
 // Real candidate and production-used authorization/status/wrapper bodies; schema
 // projections reuse the accepted local fixture. Synthetic rows only. Connections
 // execute RPCs as service_role, denial probes as anon/authenticated, not owner.
@@ -44,7 +44,7 @@ beforeAll(async()=>{
  run('pg_ctl',['-D',join(dir,'data'),'-l',join(dir,'postgres.log'),'-o',`-k ${dir} -h '' -p 55439`,'-w','start']);
  // Explicit socket/user/db/port: no production PG environment is consulted.
  pool=new pg.Pool({host:dir,port:55439,user:'local_owner',database:'postgres',password:'',options:'',ssl:false,max:8,statement_timeout:10000});
- expect((await q('SHOW server_version'))[0].server_version).toContain('17.9');
+ expect((await q('SHOW server_version'))[0].server_version).toContain('17.11');
  await q(read('src/test/fixtures/phase3AssistantCanonical.sql'));
  for(const [path,names] of SOURCES) for(const name of names) await q(exactFunction(mig(path),name));
  // Exact relationship schema and Telegram identity/binding DDL from migrations.
