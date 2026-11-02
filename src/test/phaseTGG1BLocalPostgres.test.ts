@@ -752,7 +752,6 @@ describe('TG-G1 financial trigger parity',()=>{
  }
  it('authorized completion preserves every financial field byte-identical and summaries match the independent oracle',async()=>{
   await withFinFixture(async c=>{
-   await seedFinancials(c);
    const moneyBefore=(await fin(c,'SELECT loaded_miles,deadhead_miles,rate_per_mile,total_miles,estimated_pay,actual_pay_received,gross_revenue,flat_rate_amount,wait_fee,detention_fee,other_fees,short_paid_amount,payment_status,broker_id FROM loads WHERE id=$1',[LOAD])).rows[0];
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
    expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
@@ -776,7 +775,6 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('authorized cancellation excludes the load from lane/broker/revenue inputs while all costs stay intact',async()=>{
   await withFinFixture(async c=>{
-   await seedFinancials(c);
    const expensesBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM expenses t ORDER BY t.id')).rows.map(r=>r.row);
    const fuelBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t ORDER BY t.id')).rows.map(r=>r.row);
    const id=(await finIntake(c,10,'AB-123','cancelled')).rows[0].proposal_id as string;
@@ -799,7 +797,6 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('exact replay and fresh-update already-handled repeat never duplicate event, receipt or summary rows',async()=>{
   await withFinFixture(async c=>{
-   await seedFinancials(c);
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
    expect((await finReview(c,id,30,'accept')).rows[0].result_code).toBe('dispatch_review_accepted');
    const summaries=await finSummaries(c,D),countsBefore=await finCounts(c);
@@ -818,7 +815,6 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('rejected review leaves loads and every financial summary row untouched',async()=>{
   await withFinFixture(async c=>{
-   await seedFinancials(c);
    const loadsBefore=(await fin(c,'SELECT row_to_json(t)::text row FROM loads t ORDER BY t.id')).rows.map(r=>r.row);
    const summaries=await finSummaries(c,D);
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
@@ -830,7 +826,6 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('canonical event-write failure rolls back load, summaries, receipt and event; valid retry succeeds',async()=>{
   await withFinFixture(async c=>{
-   await seedFinancials(c);
    const id=(await finIntake(c,10,'AB-123','completed')).rows[0].proposal_id as string;
    const summaries=await finSummaries(c,D),countsBefore=await finCounts(c);
    // Test-only failure trigger, created and dropped inside the rolled-back transaction.
@@ -850,7 +845,6 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('second driver workspace load, expenses, fuel and all summary rows stay byte-identical',async()=>{
   await withFinFixture(async c=>{
-   await seedFinancials(c);
    const otherLoads=(await fin(c,'SELECT row_to_json(t)::text row FROM loads t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
    const otherExpenses=(await fin(c,'SELECT row_to_json(t)::text row FROM expenses t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
    const otherFuel=(await fin(c,'SELECT row_to_json(t)::text row FROM fuel_logs t WHERE user_id=$1 ORDER BY t.id',[OTHER])).rows.map(r=>r.row);
@@ -886,7 +880,6 @@ describe('TG-G1 financial trigger parity',()=>{
  },20000);
  it('GENQA cancellation runs the same real trigger chain and leaves other workspaces byte-identical',async()=>{
   await withFinFixture(async c=>{
-   await seedFinancials(c);
    // Synthetic equivalents of the existing seedGenFixture provenance.
    await fin(c,'INSERT INTO auth.users VALUES($1)',[GEN_DRIVER]);
    await fin(c,"INSERT INTO recruiter_profiles(id,user_id,recruiter_name,company_name,status,company_type,posting_terms_accepted_at) VALUES($1,$2,'QA','QA','active','carrier',now())",[GEN_RECRUITER,OTHER]);
