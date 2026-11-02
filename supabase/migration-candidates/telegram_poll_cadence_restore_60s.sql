@@ -13,14 +13,16 @@
 -- Live response time must be measured after separately approved application.
 -- Restore with the companion candidate; both scripts reject unexpected state.
 
-BEGIN;
+-- Serializable isolation rejects a concurrent change to the target job.
+-- Use the supported cron API; this managed role cannot lock cron.job directly.
+BEGIN ISOLATION LEVEL SERIALIZABLE;
 DO $cadence$
 DECLARE
   _apply constant boolean := true;
   _from constant text := '10 seconds';
   _to constant text := '* * * * *';
   _before cron.job%ROWTYPE;
-  _locked cron.job%ROWTYPE;
+  _checked cron.job%ROWTYPE;
   _after cron.job%ROWTYPE;
 BEGIN
   IF current_database() IS DISTINCT FROM 'postgres'
@@ -54,8 +56,8 @@ BEGIN
     RETURN;
   END IF;
 
-  SELECT * INTO STRICT _locked FROM cron.job WHERE jobid=68 FOR UPDATE;
-  IF to_jsonb(_locked) IS DISTINCT FROM to_jsonb(_before)
+  SELECT * INTO STRICT _checked FROM cron.job WHERE jobid=68;
+  IF to_jsonb(_checked) IS DISTINCT FROM to_jsonb(_before)
   THEN RAISE EXCEPTION 'telegram_poll_cadence_concurrent_change'; END IF;
 
   PERFORM cron.alter_job(job_id => 68, schedule => _to);
