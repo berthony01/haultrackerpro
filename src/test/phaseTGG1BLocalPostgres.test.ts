@@ -739,9 +739,12 @@ describe('TG-G1 financial trigger parity',()=>{
   const c=await pool.connect();
   try{
    await c.query('BEGIN');
-   await c.query('SET LOCAL ROLE service_role');
+   // Fixture DDL and synthetic seeds run as the table owner; only the actual
+   // RPC calls execute under SET LOCAL ROLE service_role.
    await c.query(read(FIN_FIXTURE));
    await verifyFinParity(c);
+   await seedFinancials(c);
+   await c.query('SET LOCAL ROLE service_role');
    await fn(c);
   }finally{
    try{await c.query('ROLLBACK');}finally{c.release();}
