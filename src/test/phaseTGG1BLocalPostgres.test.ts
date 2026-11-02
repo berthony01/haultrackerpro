@@ -870,7 +870,9 @@ describe('TG-G1 financial trigger parity',()=>{
    await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,actual_pay_received,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','TOTAL-ONLY',0,0,120,240,240,CURRENT_DATE,'Solo, EE','Solo, FF')",[uid(306),D]);
    const lane=(await fin(c,"SELECT * FROM lane_stats WHERE user_id=$1 AND lane_key='Solo, EE -> Solo, FF'",[D])).rows[0];
    expect(lane.load_count).toBe(2);
-   close(lane.avg_rpm,1);
+   // Zero-mile load contributes a NULL rpm that AVG ignores; total-only load
+   // uses the explicit total fallback: 240/120 = 2.
+   close(lane.avg_rpm,2);
    // Decimal and fee raw preservation: no rounding or rewriting.
    await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,loaded_miles,deadhead_miles,total_miles,estimated_pay,wait_fee,detention_fee,other_fees,load_date,pickup_location,dropoff_location) VALUES($1,$2,'completed','DEC-1',100,20,120,288.01,0.01,2.02,3.03,CURRENT_DATE,'Dec, GG','Dec, HH')",[uid(307),D]);
    const dec=(await fin(c,'SELECT estimated_pay,wait_fee,detention_fee,other_fees FROM loads WHERE id=$1',[uid(307)])).rows[0];
