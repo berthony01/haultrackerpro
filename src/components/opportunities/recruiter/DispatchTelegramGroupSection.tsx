@@ -91,9 +91,9 @@ export function DispatchTelegramGroupSection({ recruiterId }: Props) {
       </div>
 
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Connect a Telegram group to this recruiter workspace so dispatch can happen where your team
-        already talks. You finish the connection inside Telegram — nothing here connects a group on
-        its own.
+        Connect a Telegram group to your HaulTracker Pro workspace. Personal linking and group
+        linking are separate. Adding the bot alone does not connect the group; the connection
+        command below completes setup in Telegram. Connection alone does not enable load updates.
       </p>
 
       {isLoading ? (
@@ -110,7 +110,7 @@ export function DispatchTelegramGroupSection({ recruiterId }: Props) {
           {personalTelegramConnected && !canDispatchLoads && (
             <p className="text-xs text-destructive flex items-start gap-2" role="alert">
               <ShieldAlert className="h-3.5 w-3.5 mt-0.5 shrink-0" aria-hidden="true" />
-              You do not have dispatch permission in this recruiter workspace.
+              You do not have dispatch permission in this HaulTracker Pro workspace.
             </p>
           )}
 

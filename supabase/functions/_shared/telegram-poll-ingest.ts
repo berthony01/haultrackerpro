@@ -554,14 +554,14 @@ export const TELEGRAM_GET_UPDATES_TIMEOUT_SECONDS = 20;
 export const TELEGRAM_ALLOWED_UPDATES = ["message", "callback_query"] as const;
 
 export const TELEGRAM_LINK_SUCCESS_MESSAGE =
-  "Your Telegram account is now linked to HaulTracker Pro.";
+  "Your Telegram account is now linked to HaulTracker Pro. Send /menu to see your available tools.";
 export const TELEGRAM_LINK_FAILURE_MESSAGE =
   "That link is invalid or expired. Generate a new Telegram link in HaulTracker Pro and try again.";
 
 // TG-2F-C. Deliberately generic: no workspace name, no recruiter id, no
 // reason, no username, no echo of the submitted command.
 export const TELEGRAM_BIND_SUCCESS_MESSAGE =
-  "This Telegram group is now connected to your HaulTracker Pro recruiter workspace.";
+  "This Telegram group is now connected to your HaulTracker Pro workspace. Dispatch access follows workspace permissions. Connecting the group does not enable general Telegram load updates.";
 export const TELEGRAM_BIND_FAILURE_MESSAGE =
   "That connection code could not be accepted. Generate a new code in HaulTracker Pro and check that your Telegram account is connected there.";
 
@@ -573,7 +573,7 @@ export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
 // Independently authorized read-only guidance. Never enables dispatch processing or AI.
 export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = true as const;
 export const TELEGRAM_DISPATCH_GUIDANCE_TEXT =
-  "Dispatcher\nLoad updates not active. Status report commands are unavailable until live updates are approved. Group messages do not change loads. Open HaulTracker Pro to use your authorized workspace tools.";
+  "Dispatch access\nThis authorized account has dispatch access in a connected HaulTracker Pro workspace. General Telegram load updates are not active. Open HaulTracker Pro to use your permitted workspace tools. Recruiter tools are available in private /menu when your account has access.";
 
 /** Read-only guidance only. Exact transport command, never ordinary group text.
  * Missing/uninstalled RPC, denial, malformed output or errors all fail closed. */

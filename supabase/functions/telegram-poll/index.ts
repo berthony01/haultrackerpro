@@ -1026,6 +1026,9 @@ const URL_RESULTS = `${APP_BASE_URL}/dashboard?page=recruiter-access:reports`;
 const OPEN_APP_BUTTONS: TelegramInlineUrlButton[][] = [
   [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],
 ];
+const ONBOARDING_BUTTONS: TelegramInlineUrlButton[][] = [
+  [{ text: "Create account / Sign in", url: "https://haultrackerpro.com/" }],
+];
 const WORK_BUTTONS: TelegramInlineUrlButton[][] = [
   [{ text: "🔎 Find Work", url: URL_FIND_WORK }],
   [{ text: "👤 Work Profile", url: URL_WORK_PROFILE }],
@@ -1047,31 +1050,31 @@ const OPPORTUNITIES_BUTTONS: TelegramInlineButton[][] = [
 ];
 
 const MENU_UNLINKED_TEXT =
-  "Your Telegram account is not connected to HaulTracker Pro. Open HaulTracker Pro and generate a connection link in Settings to get started.";
+  "Welcome to HaulTracker Pro. Your Telegram account is not connected yet.\n\n1. Create an account or sign in at haultrackerpro.com.\n2. Open Settings > Connect Telegram.\n3. Open the secure link in Telegram and press Start if prompted.\n4. Send /menu.\n\nTools follow your connected account and workspace permissions. Dispatch access must be granted in HaulTracker Pro; adding the bot does not grant access.";
 const MENU_NO_WORKSPACE_TEXT =
-  "Your HaulTracker Pro account is connected. There is no recruiter workspace available for you yet — finish recruiter setup in HaulTracker Pro to unlock recruiter tools here.";
+  "Your HaulTracker Pro account is connected. No workspace is available for recruiter tools yet. Open HaulTracker Pro to finish setup or check your workspace access.";
 const MENU_UNSUPPORTED_TEXT =
   "Your HaulTracker Pro account is connected. There are no bot features available for this account yet.";
-const MENU_HEADER_TEXT = "HaulTracker Pro — recruiter status";
+const MENU_HEADER_TEXT = "HaulTracker Pro - recruiter status";
 
 const WORK_WELCOME_TEXT =
-  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to find work that matches your preferences, keep your Work Profile current, and manage your recruiter conversations in one place.\n\nThis bot is your companion for quick navigation and notifications as those features arrive.\n\nSend /menu for options, /status for your account status, or /help for a guide.";
+  "HaulTracker Pro - welcome\n\nYour account is connected. Use Find Work to browse matching opportunities and Work Profile to keep your details current. Tools follow your connected account permissions.\n\nSend /menu for options, /status for your account status, or /help for a guide.";
 const RECRUITER_WELCOME_TEXT =
-  "HaulTracker Pro — welcome\n\nYour account is connected. Use HaulTracker Pro to post and manage opportunities, work through qualified conversations, and review your results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options, /status for your workspace status, or /help for a guide.";
+  "HaulTracker Pro - welcome\n\nYour account is connected. Recruiter tools are private bot tools. Post Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro. Tools follow your workspace permissions.\n\nSend /menu privately for options, /status for your workspace status, or /help for a guide.";
 const COMBINED_WELCOME_TEXT =
-  "HaulTracker Pro — welcome\n\nYour account is connected with both work-seeking and recruiter access.\n\nWork: find work that matches your preferences and keep your Work Profile current.\nRecruiter: post and manage opportunities, work qualified conversations, and review results.\n\nThis bot is your fast companion for navigation and status checks.\n\nSend /menu for options, /status for your account status, or /help for a guide.";
+  "HaulTracker Pro - welcome\n\nYour account has driver and recruiter access.\n\nDriver: Find Work and Work Profile.\nRecruiter tools are private bot tools: Post Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro.\n\nTools follow your connected account and workspace permissions. Send /menu privately for both sets of tools, /status for account status, or /help for a guide.";
 
 // RB-1B. Each capability group gets its OWN menu copy. A recruiter must never
 // be shown work-seeking wording, and a multi-capability account must see both
 // groups named explicitly.
 const WORK_MENU_TEXT =
-  "HaulTracker Pro — menu\n\nWork:\nFind work that matches your preferences, or keep your Work Profile current.";
+  "HaulTracker Pro - menu\n\nWork:\nFind work that matches your preferences, or keep your Work Profile current.";
 const RECRUITER_MENU_TEXT =
-  "HaulTracker Pro — menu\n\nRecruiter:\nManage your opportunities, work through conversations, or review your results.";
+  "HaulTracker Pro - menu\n\nPrivate recruiter tools:\nPost Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro. Available tools follow your workspace permissions.";
 const COMBINED_MENU_TEXT =
-  "HaulTracker Pro — menu\n\nWork:\nFind work that matches your preferences, or keep your Work Profile current.\n\nRecruiter:\nManage your opportunities, work through conversations, or review your results.";
+  "HaulTracker Pro - menu\n\nDriver:\nFind Work and Work Profile.\n\nPrivate recruiter tools:\nPost Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro. Available tools follow your connected account and workspace permissions.";
 
-const WORK_STATUS_TEXT = "HaulTracker Pro — account status\n\nWork account connected.";
+const WORK_STATUS_TEXT = "HaulTracker Pro - account status\n\nWork account connected.";
 
 // UX-1. /help copy. Read-only guidance chosen by the SAME server-returned
 // result code as /menu; it never grants an action. Dispatch group updates are
@@ -1086,20 +1089,20 @@ const WORK_STATUS_TEXT = "HaulTracker Pro — account status\n\nWork account con
   //   private (staged OFF): dispatch; group (staged OFF): dispatch, help
   //   group:   bind
 const HELP_COMMANDS_TEXT =
-  "Commands:\n/menu — your buttons\n/status — account status\n/help — this guide";
+  "Commands:\n/menu - your buttons\n/status - account status\n/help - this guide";
 const DISPATCH_NOT_ACTIVE_TEXT =
   "Dispatch group updates: not active yet. Messages in a connected group do not change any load.";
 const HELP_UNLINKED_TEXT =
-  "HaulTracker Pro — help\n\nThis Telegram account is not connected yet. In HaulTracker Pro, open Settings and create a Telegram connection link, then open it on this device.\n\n" +
+  MENU_UNLINKED_TEXT + "\n\n" + DISPATCH_NOT_ACTIVE_TEXT + "\n\n" +
   HELP_COMMANDS_TEXT;
 const HELP_WORK_TEXT =
-  "HaulTracker Pro — help\n\nYou are connected as a driver.\n• Find Work — browse matching opportunities\n• Work Profile — keep your details current\n\n" +
+  "HaulTracker Pro - help\n\nYou are connected as a driver.\n• Find Work - browse matching opportunities\n• Work Profile - keep your details current\n\nTools follow your connected account permissions.\n\n" +
   HELP_COMMANDS_TEXT;
 const HELP_RECRUITER_TEXT =
-  "HaulTracker Pro — help\n\nYou are connected as a recruiter.\n• Post Opportunity — send a job description here to draft a post for review\n• My Opportunities, Conversations, Results — open in the app\n\n" +
+  "HaulTracker Pro - help\n\nPrivate recruiter tools:\n• Post Opportunity - send a job description privately to draft a job opportunity for review\n• My Opportunities, Conversations, Results - open HaulTracker Pro\n\nGroup setup is separate: connect your personal Telegram account first. An authorized workspace user adds @HaulTrackerBot to the group and sends the connection command from Settings. Adding the bot alone does not connect the group. Dispatch access follows workspace permissions granted in HaulTracker Pro.\n\n" +
   DISPATCH_NOT_ACTIVE_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
 const HELP_COMBINED_TEXT =
-  "HaulTracker Pro — help\n\nYou have driver and recruiter access.\n\nDriver:\n• Find Work, Work Profile\n\nRecruiter:\n• Post Opportunity, My Opportunities, Conversations, Results\n\n" +
+  "HaulTracker Pro - help\n\nYou have driver and recruiter access.\n\nDriver:\n• Find Work, Work Profile\n\nPrivate recruiter tools:\n• Post Opportunity - draft a job opportunity for review\n• My Opportunities, Conversations, Results - open HaulTracker Pro\n\nGroup setup is separate: connect your personal Telegram account first. An authorized workspace user adds @HaulTrackerBot to the group and sends the connection command from Settings. Adding the bot alone does not connect the group. Dispatch access follows workspace permissions granted in HaulTracker Pro.\n\n" +
   DISPATCH_NOT_ACTIVE_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
 
 interface MenuWorkspaceDescriptor {
@@ -1139,6 +1142,7 @@ function composeMenuButtons(
     case "menu_multi_role":
       return [...WORK_BUTTONS, ...RECRUITER_BUTTONS];
     case "menu_unlinked":
+      return ONBOARDING_BUTTONS;
     case "menu_linked_no_workspace":
     case "menu_linked_unsupported":
       return OPEN_APP_BUTTONS;
@@ -1270,9 +1274,9 @@ Deno.serve(async (req: Request) => {
       log,
       quickPostExtractor: buildQuickPostExtractor(supabase),
       dispatchGuidanceButtons: {
-        private: [[{ text: "Open App", url: URL_OPEN_APP }]],
+        private: [[{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }]],
         group: [
-          [{ text: "Open Dispatch Menu", url: "https://t.me/HaulTrackerBot" }],
+          [{ text: "Open Bot Privately", url: "https://t.me/HaulTrackerBot" }],
           [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],
         ],
       },
