@@ -891,6 +891,7 @@ describe('TG-G1 financial trigger parity',()=>{
    await fin(c,"INSERT INTO carrier_driver_relationships(id,recruiter_id,driver_user_id,status,created_by_user_id) VALUES($1,$2,$3,'active',$4)",[GEN_REL,GEN_RECRUITER,GEN_DRIVER,OTHER]);
    await fin(c,"INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id,loaded_miles,deadhead_miles,total_miles,estimated_pay,load_date,dropoff_date,pickup_location,dropoff_location) VALUES($1,$2,'pending','HTP-QA-GEN1',$3,60,0,60,150,CURRENT_DATE,CURRENT_DATE,'Gen, KK','Gen, LL')",[GEN_LOAD,GEN_DRIVER,GEN_REL]);
    await fin(c,"INSERT INTO telegram_chat_bindings(id,telegram_chat_id,recruiter_id,chat_type,bound_by_user_id) VALUES($1,$2,$3,'group',$4)",[GEN_BINDING,GEN_CHAT,GEN_RECRUITER,OTHER]);
+   await c.query('SET LOCAL ROLE service_role');
    const before=await finSummaries(c,D);
    const genLaneBefore=(await fin(c,'SELECT load_count FROM lane_stats WHERE user_id=$1',[GEN_DRIVER])).rows[0];
    expect(genLaneBefore.load_count).toBe(1);
