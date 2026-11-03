@@ -38,12 +38,13 @@ import {
   type TelegramMessageDeliveryOutbox,
   type TelegramPollLease,
   type TelegramPollLedger,
+  type TelegramPollDeps,
   type TelegramQuickPostExtractor,
   type TelegramResultCode,
   type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
-import { TGG1B_DISPATCH_GROUP_REVIEW_ENABLED, TELEGRAM_SINGLE_LOAD_QA_RPCS, TELEGRAM_GENQA_RPCS, buildGenQaDeliveryLedger } from "../_shared/telegram-dispatch-group-review.ts";
+import { TGG1B_DISPATCH_GROUP_REVIEW_ENABLED, TELEGRAM_SINGLE_LOAD_QA_RPCS, TELEGRAM_GENQA_RPCS, buildGenQaDeliveryLedger, parseDispatchReviewData } from "../_shared/telegram-dispatch-group-review.ts";
 import type {
   DispatchDeliveryClaim,
   DispatchDeliveryFailure,
@@ -179,12 +180,79 @@ function buildGateway(lovableApiKey: string, connectionKey: string): TelegramGat
 
 type RpcClient = ReturnType<typeof createClient>;
 
+// Staged, short-lived GENERAL-adapter pilot. Remove this block and its pilotOnly
+// wiring to revert; never selected when the global general flag is enabled.
+const GENERAL_PILOT = {
+  chatId: -5335739793,
+  reference: "HTP-QA-GEN2",
+  loadId: "cdbdbf47-410b-4197-80d1-da3f5cab9a4c",
+  cutoff: 1793763886000,
+  status: "cancelled",
+} as const;
+
+const generalPilotActive = () => Date.now() < GENERAL_PILOT.cutoff;
+const generalPilotTransport = (chatId: number | null, chatType: string | null) =>
+  generalPilotActive() && chatId === GENERAL_PILOT.chatId &&
+  (chatType === "group" || chatType === "supergroup");
+
+const generalPilotScope: NonNullable<TelegramPollDeps["dispatchReviewScope"]> = (identity) =>
+  generalPilotTransport(identity.telegramChatId, identity.chatType) &&
+  (identity.callbackQueryId
+    ? parseDispatchReviewData(identity.callbackData) !== null
+    : identity.text === "/cancelled@HaulTrackerBot HTP-QA-GEN2");
+
+function generalPilotOptions(pilotOnly: boolean) {
+  // Keep both older QA routes disabled even after pilot expiry. Do not drain
+  // general once expired; builds with general globally ON use existing modes.
+  return pilotOnly ? {
+    dispatchReviewEnabled: generalPilotActive(),
+    dispatchReviewScope: generalPilotScope,
+    singleLoadQaEnabled: false,
+    genQaEnabled: false,
+  } : {};
+}
+
+async function generalPilotProposalMatches(supabase: RpcClient, proposalId: string | null): Promise<boolean> {
+  if (!generalPilotActive() || proposalId === null) return false;
+  const { data, error } = await supabase.from("telegram_dispatch_review_proposals")
+    .select("id").eq("id", proposalId).eq("telegram_chat_id", GENERAL_PILOT.chatId)
+    .eq("load_id", GENERAL_PILOT.loadId).eq("load_reference", GENERAL_PILOT.reference)
+    .eq("proposed_status", GENERAL_PILOT.status).maybeSingle();
+  return !error && data?.id === proposalId && generalPilotActive();
+}
+
+async function generalPilotLoadMatches(supabase: RpcClient): Promise<boolean> {
+  if (!generalPilotActive()) return false;
+  const { data, error } = await supabase.from("loads").select("id")
+    .eq("load_reference", GENERAL_PILOT.reference).limit(2);
+  return !error && data?.length === 1 && data[0]?.id === GENERAL_PILOT.loadId && generalPilotActive();
+}
+
+// Guard again immediately before sending, including after a slow claim/read.
+// Existing delivery code owns failure/ack/lease handling and bounded logs.
+function generalPilotDeliveryGateway(supabase: RpcClient, gateway: TelegramGateway): TelegramGateway {
+  return {
+    ...gateway,
+    async sendMessage(input) {
+      const review = parseDispatchReviewData(input.buttons?.[0]?.[0] &&
+        "callbackData" in input.buttons[0][0] ? input.buttons[0][0].callbackData : null);
+      if (input.chatId !== GENERAL_PILOT.chatId || !review ||
+          !await generalPilotProposalMatches(supabase, review.proposalId)) {
+        log("general_pilot_delivery_denied");
+        return { ok: false, status: 0, errorCode: "general_pilot_scope_denied" };
+      }
+      return gateway.sendMessage(input);
+    },
+  };
+}
+
 // TG-G1C (gated). Durable dispatch review outbox over the TG-G1B candidate
 // RPCs. Constructing it performs no I/O; the drain never calls it while the
 // compile-time gate is false.
-function buildDispatchDeliveryLedger(supabase: RpcClient, qaOnly = false): DispatchDeliveryLedger {
+function buildDispatchDeliveryLedger(supabase: RpcClient, qaOnly = false, pilotOnly = false): DispatchDeliveryLedger {
   return {
     async claim(): Promise<DispatchDeliveryClaim | null> {
+      if (pilotOnly && !generalPilotActive()) return null;
       const { data, error } = qaOnly
         ? await supabase.rpc(TELEGRAM_SINGLE_LOAD_QA_RPCS.claim)
         : await supabase.rpc("telegram_claim_dispatch_review_delivery");
@@ -193,6 +261,12 @@ function buildDispatchDeliveryLedger(supabase: RpcClient, qaOnly = false): Dispa
         | { outbox_id?: string; claim_token?: string; proposal_id?: string; telegram_chat_id?: number | string; load_reference?: string; proposed_status?: string; expires_at?: string }
         | null;
       if (!row?.outbox_id || !row.claim_token || !row.proposal_id) return null;
+      if (pilotOnly && (Number(row.telegram_chat_id) !== GENERAL_PILOT.chatId ||
+          row.load_reference !== GENERAL_PILOT.reference || row.proposed_status !== GENERAL_PILOT.status ||
+          !await generalPilotProposalMatches(supabase, row.proposal_id))) {
+        log("general_pilot_claim_denied");
+        return null; // No send/ack of an unrelated claim; its canonical lease recovers.
+      }
       return {
         outboxId: row.outbox_id,
         claimToken: row.claim_token,
@@ -224,7 +298,7 @@ function buildDispatchDeliveryLedger(supabase: RpcClient, qaOnly = false): Dispa
   };
 }
 
-function buildLedger(supabase: RpcClient): TelegramPollLedger {
+function buildLedger(supabase: RpcClient, pilotOnly = false): TelegramPollLedger {
   const unwrapTerminal = (rows: unknown): TelegramTerminalResult => {
     const row = Array.isArray(rows) ? rows[0] : rows;
     const record = (row ?? {}) as { is_new?: boolean; result_code?: string };
@@ -618,6 +692,9 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       reference: string | null;
       proposedStatus: DispatchTargetStatus | null;
     }): Promise<TelegramTerminalResult> {
+      const pilotAllowed = !pilotOnly || (generalPilotTransport(input.telegramChatId, input.chatType) &&
+        input.reference === GENERAL_PILOT.reference && input.proposedStatus === GENERAL_PILOT.status &&
+        await generalPilotLoadMatches(supabase));
       const { data, error } = await supabase.rpc("telegram_process_dispatch_group_update", {
         _lease_token: input.leaseToken,
         _update_id: input.updateId,
@@ -625,8 +702,8 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
         _telegram_user_id: input.telegramUserId,
         _telegram_chat_id: input.telegramChatId,
         _chat_type: input.chatType,
-        _reference: input.reference,
-        _proposed_status: input.proposedStatus,
+        _reference: pilotAllowed ? input.reference : null,
+        _proposed_status: pilotAllowed ? input.proposedStatus : null,
       });
       if (error) throw new Error(boundedRpcErrorCode(error));
       return unwrapTerminal(data);
@@ -643,6 +720,8 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
       action: DispatchReviewAction | null;
       proposalId: string | null;
     }): Promise<TelegramTerminalResult> {
+      const pilotAllowed = !pilotOnly || (generalPilotTransport(input.telegramChatId, input.chatType) &&
+        await generalPilotProposalMatches(supabase, input.proposalId));
       const { data, error } = await supabase.rpc("telegram_process_dispatch_review_action", {
         _lease_token: input.leaseToken,
         _update_id: input.updateId,
@@ -650,8 +729,8 @@ function buildLedger(supabase: RpcClient): TelegramPollLedger {
         _telegram_user_id: input.telegramUserId,
         _telegram_chat_id: input.telegramChatId,
         _chat_type: input.chatType,
-        _action: input.action,
-        _proposal_id: input.proposalId,
+        _action: pilotAllowed ? input.action : null,
+        _proposal_id: pilotAllowed ? input.proposalId : null,
       });
       if (error) throw new Error(boundedRpcErrorCode(error));
       return unwrapTerminal(data);
@@ -1236,6 +1315,7 @@ Deno.serve(async (req: Request) => {
   });
 
   const gateway = buildGateway(lovableApiKey, telegramConnectionKey);
+  const pilotOnly = !TGG1B_DISPATCH_GROUP_REVIEW_ENABLED;
 
   // RB-2A. Outbound alerts are drained AFTER inbound polling has finished and
   // released its lease, in its own isolated scope. It cannot throw, cannot
@@ -1273,7 +1353,8 @@ Deno.serve(async (req: Request) => {
 
   try {
     const result = await runTelegramPoll({
-      ledger: buildLedger(supabase),
+      ...generalPilotOptions(pilotOnly),
+      ledger: buildLedger(supabase, pilotOnly),
       gateway,
       sha256: sha256Hex,
       log,
@@ -1304,14 +1385,18 @@ Deno.serve(async (req: Request) => {
     // TG-G1C. Isolated, AFTER inbound poll + lease release. Returns
     // "disabled" before any RPC/send while the compile-time gate is false.
     try {
+      const pilotOptions = generalPilotOptions(pilotOnly);
       await runDispatchReviewDeliveryDrain({
-        ledger: buildDispatchDeliveryLedger(supabase),
+        enabled: pilotOptions.dispatchReviewEnabled,
+        singleLoadQaEnabled: pilotOptions.singleLoadQaEnabled,
+        genQaEnabled: pilotOptions.genQaEnabled,
+        ledger: buildDispatchDeliveryLedger(supabase, false, pilotOnly),
         qaLedger: buildDispatchDeliveryLedger(supabase, true),
         genQaLedger: buildGenQaDeliveryLedger(async (name, args) => {
           const { data, error } = await supabase.rpc(name, args);
           return { data, error };
         }),
-        gateway,
+        gateway: pilotOnly ? generalPilotDeliveryGateway(supabase, gateway) : gateway,
         log,
       });
     } catch (error) {

@@ -518,10 +518,10 @@ export interface TelegramPollDeps {
   /** RB-3A. Absent = Quick Post extraction is unavailable and a reserved draft
    *  is marked failed rather than retried, so no model call is ever implied. */
   quickPostExtractor?: TelegramQuickPostExtractor;
-  /** TG-G1C. Synthetic-test injection ONLY. The Edge Function never sets it,
-   *  so the compile-time `TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false` applies.
-   *  Not an environment/runtime toggle. */
+  /** Defaults to the compile-time gate; a bounded pilot may supply scope. */
   dispatchReviewEnabled?: boolean;
+  /** Transport-only, synchronous narrowing; never grants dispatcher permission. */
+  dispatchReviewScope?: (identity: Pick<ParsedIdentity, "telegramChatId" | "chatType" | "text" | "callbackData" | "callbackQueryId">) => boolean;
   /** Synthetic injection exercises the same strict QA command and wrapper ports. */
   singleLoadQaEnabled?: boolean;
   genQaEnabled?: boolean;
@@ -1022,8 +1022,7 @@ export async function runTelegramPoll(
 ): Promise<TelegramPollRunResult> {
   const { ledger, gateway, sha256 } = deps;
   const log: TelegramPollLogger = deps.log ?? (() => {});
-  // TG-G1C. Production never sets this field, so the compile-time `false`
-  // constant governs. Only synthetic tests inject `true`.
+  // The global conflict check is unchanged; scope only narrows individual updates.
   const dispatchReviewEnabled =
     (deps.dispatchReviewEnabled ?? TGG1B_DISPATCH_GROUP_REVIEW_ENABLED) === true;
   if (dispatchModesConflict(dispatchReviewEnabled, deps.singleLoadQaEnabled ?? TELEGRAM_SINGLE_LOAD_QA_ENABLED, deps.genQaEnabled ?? TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED)) {
@@ -1083,7 +1082,9 @@ export async function runTelegramPoll(
     }
 
     const identity = parseIdentity(update, updateId);
-    const classification = classifyUpdate(identity, dispatchReviewEnabled, deps.singleLoadQaEnabled, deps.genQaEnabled);
+    const effectiveDispatchReviewEnabled = () => dispatchReviewEnabled &&
+      (!deps.dispatchReviewScope || deps.dispatchReviewScope(identity));
+    const classification = classifyUpdate(identity, effectiveDispatchReviewEnabled(), deps.singleLoadQaEnabled, deps.genQaEnabled);
 
     let terminal: TelegramTerminalResult;
     try {
@@ -1487,7 +1488,7 @@ export async function runTelegramPoll(
       // untrusted callback data; transport chat was passed to the same RPC.
       // One attempt after commit, never on replay or an unsuccessful decision.
       if (
-        dispatchReviewEnabled &&
+        effectiveDispatchReviewEnabled() &&
         classification.kind === "dispatch_review_action" &&
         classification.qaOnly !== true &&
         classification.genQaOnly !== true &&
@@ -1591,7 +1592,7 @@ export async function runTelegramPoll(
         try {
           await gateway.sendMessage({
             chatId: identity.telegramChatId,
-            text: dispatchReviewEnabled
+            text: effectiveDispatchReviewEnabled()
               ? "Dispatch access\nA connected dispatch group can report delivery or cancellation. Only an authorized dispatcher can confirm a load-status change.\n\n/delivered@HaulTrackerBot LOAD-REF\n/cancelled@HaulTrackerBot LOAD-REF\n\nOpen HaulTracker Pro to use your permitted workspace tools. Recruiter tools are available in private /menu when your account has access."
               : TELEGRAM_DISPATCH_GUIDANCE_TEXT,
             buttons: identity.chatType === "private"
