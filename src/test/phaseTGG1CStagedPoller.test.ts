@@ -150,11 +150,16 @@ async function poll(w: ReturnType<typeof makeWorld>, updates: unknown[], enabled
 }
 
 describe("TG-G1C gate", () => {
-  it("compile-time gate is false and the Edge Function never injects enabled", () => {
+  it("compile-time gate is false and the Edge Function only injects bounded pilot options", () => {
     expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
     const POLL = readFileSync(resolve(__dirname, "../../supabase/functions/telegram-poll/index.ts"), "utf8");
-    expect(POLL).not.toMatch(/dispatchReviewEnabled|enabled:\s*true/);
+    expect(POLL).not.toMatch(/\b(?:dispatchReviewEnabled|enabled)\s*:\s*true\b/);
     expect(POLL).not.toMatch(/Deno\.env\.get\(["'][^"']*(DISPATCH|TGG1)/i);
+    expect(POLL).toMatch(/const generalPilotActive = \(\) => Date\.now\(\) < GENERAL_PILOT\.cutoff;/);
+    expect(POLL).toMatch(/return pilotOnly \? \{\s*dispatchReviewEnabled: generalPilotActive\(\),\s*dispatchReviewScope: generalPilotScope,\s*singleLoadQaEnabled: false,\s*genQaEnabled: false,\s*\} : \{\};/);
+    expect(POLL).toMatch(/const pilotOnly = !TGG1B_DISPATCH_GROUP_REVIEW_ENABLED;/);
+    expect(POLL).toMatch(/runTelegramPoll\(\{\s*\.\.\.generalPilotOptions\(pilotOnly\),/);
+    expect(POLL).toMatch(/const pilotOptions = generalPilotOptions\(pilotOnly\);\s*await runDispatchReviewDeliveryDrain\(\{\s*enabled: pilotOptions\.dispatchReviewEnabled,\s*singleLoadQaEnabled: pilotOptions\.singleLoadQaEnabled,\s*genQaEnabled: pilotOptions\.genQaEnabled,/);
   });
 
   it("disabled (QA explicitly OFF): group text → non_private_message, g1 tap → c1 path, zero dispatch RPCs/sends", async () => {
