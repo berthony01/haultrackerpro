@@ -43,7 +43,7 @@ import {
   type TelegramSentMessage,
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
-import { TELEGRAM_SINGLE_LOAD_QA_RPCS, TELEGRAM_GENQA_RPCS, buildGenQaDeliveryLedger } from "../_shared/telegram-dispatch-group-review.ts";
+import { TGG1B_DISPATCH_GROUP_REVIEW_ENABLED, TELEGRAM_SINGLE_LOAD_QA_RPCS, TELEGRAM_GENQA_RPCS, buildGenQaDeliveryLedger } from "../_shared/telegram-dispatch-group-review.ts";
 import type {
   DispatchDeliveryClaim,
   DispatchDeliveryFailure,
@@ -1078,8 +1078,8 @@ const WORK_STATUS_TEXT = "HaulTracker Pro - account status\n\nWork account conne
 
 // UX-1. /help copy. Read-only guidance chosen by the SAME server-returned
 // result code as /menu; it never grants an action. Dispatch group updates are
-// described truthfully as not active: the menu RPC returns no load-status
-// capability, so no dispatch control is ever shown here.
+// described according to the general review gate; the menu RPC returns no
+// load-status capability, so no dispatch control is ever shown here.
 //
 // Proposed native command list (NOT registered; setMyCommands / BotFather is
 // a separate release step). Privacy caveat: in privacy-enabled groups the bot
@@ -1092,18 +1092,23 @@ const HELP_COMMANDS_TEXT =
   "Commands:\n/menu - your buttons\n/status - account status\n/help - this guide";
 const DISPATCH_NOT_ACTIVE_TEXT =
   "Dispatch group updates: not active yet. Messages in a connected group do not change any load.";
+const HELP_DISPATCH_TEXT = TGG1B_DISPATCH_GROUP_REVIEW_ENABLED
+  ? "In connected dispatch groups, an authorized dispatcher must confirm load-status changes."
+  : DISPATCH_NOT_ACTIVE_TEXT;
 const HELP_UNLINKED_TEXT =
-  MENU_UNLINKED_TEXT + "\n\n" + DISPATCH_NOT_ACTIVE_TEXT + "\n\n" +
+  MENU_UNLINKED_TEXT + "\n\n" + (TGG1B_DISPATCH_GROUP_REVIEW_ENABLED
+    ? "Connect your personal Telegram account first. In connected dispatch groups, an authorized dispatcher must confirm load-status changes."
+    : DISPATCH_NOT_ACTIVE_TEXT) + "\n\n" +
   HELP_COMMANDS_TEXT;
 const HELP_WORK_TEXT =
   "HaulTracker Pro - help\n\nYou are connected as a driver.\n• Find Work - browse matching opportunities\n• Work Profile - keep your details current\n\nTools follow your connected account permissions.\n\n" +
   HELP_COMMANDS_TEXT;
 const HELP_RECRUITER_TEXT =
   "HaulTracker Pro - help\n\nPrivate recruiter tools:\n• Post Opportunity - send a job description privately to draft a job opportunity for review\n• My Opportunities, Conversations, Results - open HaulTracker Pro\n\nGroup setup is separate: connect your personal Telegram account first. An authorized workspace user adds @HaulTrackerBot to the group and sends the connection command from Settings. Adding the bot alone does not connect the group. Dispatch access follows workspace permissions granted in HaulTracker Pro.\n\n" +
-  DISPATCH_NOT_ACTIVE_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
+  HELP_DISPATCH_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
 const HELP_COMBINED_TEXT =
   "HaulTracker Pro - help\n\nYou have driver and recruiter access.\n\nDriver:\n• Find Work, Work Profile\n\nPrivate recruiter tools:\n• Post Opportunity - draft a job opportunity for review\n• My Opportunities, Conversations, Results - open HaulTracker Pro\n\nGroup setup is separate: connect your personal Telegram account first. An authorized workspace user adds @HaulTrackerBot to the group and sends the connection command from Settings. Adding the bot alone does not connect the group. Dispatch access follows workspace permissions granted in HaulTracker Pro.\n\n" +
-  DISPATCH_NOT_ACTIVE_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
+  HELP_DISPATCH_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
 
 interface MenuWorkspaceDescriptor {
   workspace_name?: unknown;
