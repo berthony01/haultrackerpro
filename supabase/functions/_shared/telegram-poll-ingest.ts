@@ -1591,7 +1591,9 @@ export async function runTelegramPoll(
         try {
           await gateway.sendMessage({
             chatId: identity.telegramChatId,
-            text: TELEGRAM_DISPATCH_GUIDANCE_TEXT,
+            text: dispatchReviewEnabled
+              ? "Dispatch access\nA connected dispatch group can report delivery or cancellation. Only an authorized dispatcher can confirm a load-status change.\n\n/delivered@HaulTrackerBot LOAD-REF\n/cancelled@HaulTrackerBot LOAD-REF\n\nOpen HaulTracker Pro to use your permitted workspace tools. Recruiter tools are available in private /menu when your account has access."
+              : TELEGRAM_DISPATCH_GUIDANCE_TEXT,
             buttons: identity.chatType === "private"
               ? deps.dispatchGuidanceButtons?.private
               : deps.dispatchGuidanceButtons?.group,
