@@ -429,7 +429,7 @@ function buildLedger(supabase: RpcClient, pilotOnly = false): TelegramPollLedger
         isNew: row?.is_new === true,
         resultCode,
         menuText: composeMenuText(resultCode, row?.workspaces, input.command),
-        menuButtons: composeMenuButtons(resultCode),
+        menuButtons: composeMenuButtons(resultCode, row?.workspaces),
       };
     },
     // RB-2B. Private-chat Accept / Pass. The database derives the acting
@@ -879,7 +879,7 @@ function composeQuickPostReview(payload: unknown): string {
     "",
     ...lines,
     "",
-    "Nothing has been created yet. Confirm to create it as a draft in HaulTracker Pro.",
+    "Check pay, route, home time, equipment and qualifications above. Save Draft stores it in HaulTracker Pro. Review and publish it on the website.",
   ].join("\n");
 }
 
@@ -892,7 +892,7 @@ function composeQuickPostEditUrl(draftId: string): string {
 
 function composeQuickPostReviewButtons(draftId: string): TelegramInlineButton[][] {
   return [
-    [{ text: "✅ Confirm", callbackData: composeQuickPostActionData("confirm", draftId) }],
+    [{ text: "✅ Save Draft", callbackData: composeQuickPostActionData("confirm", draftId) }],
     [{ text: "✏️ Edit Details", url: composeQuickPostEditUrl(draftId) }],
     [{ text: "🔁 Refresh Review", callbackData: composeQuickPostActionData("refresh", draftId) }],
     [{ text: "🔄 Start Over", callbackData: composeQuickPostActionData("restart", draftId) }],
@@ -945,7 +945,7 @@ function buildQuickPostExtractor(
 
 
 const QUICK_POST_GUIDANCE_TEXT =
-  "Ready to post an opportunity.\n\nPaste the full job post here as one message. I'll extract the details and show you a review before anything is created.\n\nNothing is posted until you confirm.";
+  "Ready to draft an opportunity.\n\nPaste the full job description as one message. I'll show you the details to review. Use Save Draft to keep it, then open HaulTracker Pro to publish.";
 
 function composeQuickPostActionFollowUp(
   resultCode: TelegramResultCode,
@@ -1096,28 +1096,18 @@ function buildMessageDeliveryOutbox(
 const APP_BASE_URL = "https://haultrackerpro.com";
 
 const URL_OPEN_APP = `${APP_BASE_URL}/dashboard`;
-const URL_FIND_WORK = `${APP_BASE_URL}/find-work`;
-const URL_WORK_PROFILE = `${APP_BASE_URL}/professional-profile`;
+const URL_DISPATCH_WORKSPACE = `${APP_BASE_URL}/dashboard?page=recruiter-access`;
 const URL_OPPORTUNITIES = `${APP_BASE_URL}/dashboard?page=recruiter-access:manager`;
-const URL_CONVERSATIONS = `${APP_BASE_URL}/dashboard?page=recruiter-access:applications`;
+const URL_CONVERSATIONS = `${APP_BASE_URL}/conversations?workspace=recruiter`;
 const URL_RESULTS = `${APP_BASE_URL}/dashboard?page=recruiter-access:reports`;
 
 const OPEN_APP_BUTTONS: TelegramInlineUrlButton[][] = [
   [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],
 ];
 const ONBOARDING_BUTTONS: TelegramInlineUrlButton[][] = [
-  [{ text: "Create account / Sign in", url: "https://haultrackerpro.com/" }],
+  [{ text: "Create account / Sign in", url: APP_BASE_URL }],
 ];
-const WORK_BUTTONS: TelegramInlineUrlButton[][] = [
-  [{ text: "🔎 Find Work", url: URL_FIND_WORK }],
-  [{ text: "👤 Work Profile", url: URL_WORK_PROFILE }],
-];
-// RB-3A. The ONE Quick Post entry button, shown only on a recruiter menu. It
-// carries a versioned `q1` callback rather than a URL because no draft exists
-// yet; the payload is an intent, never authorization — the database re-derives
-// the actor and re-checks posting capability on every tap.
-const RECRUITER_BUTTONS: TelegramInlineButton[][] = [
-  [{ text: "➕ Post Opportunity", callbackData: composeQuickPostNewData() }],
+const RECRUITER_BUTTONS: TelegramInlineUrlButton[][] = [
   [{ text: "📋 My Opportunities", url: URL_OPPORTUNITIES }],
   [{ text: "💬 Conversations", url: URL_CONVERSATIONS }],
   [{ text: "📊 Results", url: URL_RESULTS }],
@@ -1129,65 +1119,10 @@ const OPPORTUNITIES_BUTTONS: TelegramInlineButton[][] = [
 ];
 
 const MENU_UNLINKED_TEXT =
-  "Welcome to HaulTracker Pro. Your Telegram account is not connected yet.\n\n1. Create an account or sign in at haultrackerpro.com.\n2. Open Settings > Connect Telegram.\n3. Open the secure link in Telegram and press Start if prompted.\n4. Send /menu.\n\nTools follow your connected account and workspace permissions. Dispatch access must be granted in HaulTracker Pro; adding the bot does not grant access.";
+  "Welcome to HaulTracker Pro. Connect Telegram to see the tools your workspace has granted.\n\n1. Sign in or create an account at haultrackerpro.com.\n2. Open Settings > Connect Telegram.\n3. Open the secure link and press Start if prompted.\n4. Send /menu here.";
 const MENU_NO_WORKSPACE_TEXT =
-  "Your HaulTracker Pro account is connected. No workspace is available for recruiter tools yet. Open HaulTracker Pro to finish setup or check your workspace access.";
-const MENU_UNSUPPORTED_TEXT =
-  "Your HaulTracker Pro account is connected. There are no bot features available for this account yet.";
-const MENU_HEADER_TEXT = "HaulTracker Pro - recruiter status";
-
-const WORK_WELCOME_TEXT =
-  "HaulTracker Pro - welcome\n\nYour account is connected. Use Find Work to browse matching opportunities and Work Profile to keep your details current. Tools follow your connected account permissions.\n\nSend /menu for options, /status for your account status, or /help for a guide.";
-const RECRUITER_WELCOME_TEXT =
-  "HaulTracker Pro - welcome\n\nYour account is connected. Recruiter tools are private bot tools. Post Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro. Tools follow your workspace permissions.\n\nSend /menu privately for options, /status for your workspace status, or /help for a guide.";
-const COMBINED_WELCOME_TEXT =
-  "HaulTracker Pro - welcome\n\nYour account has driver and recruiter access.\n\nDriver: Find Work and Work Profile.\nRecruiter tools are private bot tools: Post Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro.\n\nTools follow your connected account and workspace permissions. Send /menu privately for both sets of tools, /status for account status, or /help for a guide.";
-
-// RB-1B. Each capability group gets its OWN menu copy. A recruiter must never
-// be shown work-seeking wording, and a multi-capability account must see both
-// groups named explicitly.
-const WORK_MENU_TEXT =
-  "HaulTracker Pro - menu\n\nWork:\nFind work that matches your preferences, or keep your Work Profile current.";
-const RECRUITER_MENU_TEXT =
-  "HaulTracker Pro - menu\n\nPrivate recruiter tools:\nPost Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro. Available tools follow your workspace permissions.";
-const COMBINED_MENU_TEXT =
-  "HaulTracker Pro - menu\n\nDriver:\nFind Work and Work Profile.\n\nPrivate recruiter tools:\nPost Opportunity drafts a job opportunity for review. My Opportunities, Conversations and Results open HaulTracker Pro. Available tools follow your connected account and workspace permissions.";
-
-const WORK_STATUS_TEXT = "HaulTracker Pro - account status\n\nWork account connected.";
-
-// UX-1. /help copy. Read-only guidance chosen by the SAME server-returned
-// result code as /menu; it never grants an action. Dispatch group updates are
-// described according to the general review gate; the menu RPC returns no
-// load-status capability, so no dispatch control is ever shown here.
-//
-// Proposed native command list (NOT registered; setMyCommands / BotFather is
-// a separate release step). Privacy caveat: in privacy-enabled groups the bot
-// only receives commands addressed to it (e.g. /bind@HaulTrackerBot), not all
-// plain text.
-//   private: start, menu, status, help
-  //   private (staged OFF): dispatch; group (staged OFF): dispatch, help
-  //   group:   bind
-const HELP_COMMANDS_TEXT =
-  "Commands:\n/menu - your buttons\n/status - account status\n/help - this guide";
-const DISPATCH_NOT_ACTIVE_TEXT =
-  "Dispatch group updates: not active yet. Messages in a connected group do not change any load.";
-const HELP_DISPATCH_TEXT = TGG1B_DISPATCH_GROUP_REVIEW_ENABLED
-  ? "In connected dispatch groups, an authorized dispatcher must confirm load-status changes."
-  : DISPATCH_NOT_ACTIVE_TEXT;
-const HELP_UNLINKED_TEXT =
-  MENU_UNLINKED_TEXT + "\n\n" + (TGG1B_DISPATCH_GROUP_REVIEW_ENABLED
-    ? "Connect your personal Telegram account first. In connected dispatch groups, an authorized dispatcher must confirm load-status changes."
-    : DISPATCH_NOT_ACTIVE_TEXT) + "\n\n" +
-  HELP_COMMANDS_TEXT;
-const HELP_WORK_TEXT =
-  "HaulTracker Pro - help\n\nYou are connected as a driver.\n• Find Work - browse matching opportunities\n• Work Profile - keep your details current\n\nTools follow your connected account permissions.\n\n" +
-  HELP_COMMANDS_TEXT;
-const HELP_RECRUITER_TEXT =
-  "HaulTracker Pro - help\n\nPrivate recruiter tools:\n• Post Opportunity - send a job description privately to draft a job opportunity for review\n• My Opportunities, Conversations, Results - open HaulTracker Pro\n\nGroup setup is separate: connect your personal Telegram account first. An authorized workspace user adds @HaulTrackerBot to the group and sends the connection command from Settings. Adding the bot alone does not connect the group. Dispatch access follows workspace permissions granted in HaulTracker Pro.\n\n" +
-  HELP_DISPATCH_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
-const HELP_COMBINED_TEXT =
-  "HaulTracker Pro - help\n\nYou have driver and recruiter access.\n\nDriver:\n• Find Work, Work Profile\n\nPrivate recruiter tools:\n• Post Opportunity - draft a job opportunity for review\n• My Opportunities, Conversations, Results - open HaulTracker Pro\n\nGroup setup is separate: connect your personal Telegram account first. An authorized workspace user adds @HaulTrackerBot to the group and sends the connection command from Settings. Adding the bot alone does not connect the group. Dispatch access follows workspace permissions granted in HaulTracker Pro.\n\n" +
-  HELP_DISPATCH_TEXT + "\n\n" + HELP_COMMANDS_TEXT;
+  "Your HaulTracker Pro account is connected. Available bot tools follow your workspace permissions. Open HaulTracker Pro to manage your account or check your workspace access.";
+const MENU_HEADER_TEXT = "HaulTracker Pro recruiter status";
 
 interface MenuWorkspaceDescriptor {
   workspace_name?: unknown;
@@ -1196,8 +1131,18 @@ interface MenuWorkspaceDescriptor {
   active_opportunity_count?: unknown;
 }
 
+function menuWorkspaces(workspaces: unknown): MenuWorkspaceDescriptor[] {
+  return Array.isArray(workspaces) ? workspaces : [];
+}
+
+// Same exactly-one-eligible-workspace rule as the Quick Post RPC. The RPC
+// still re-checks this permission when a command or callback is received.
+function canQuickPost(workspaces: unknown): boolean {
+  return menuWorkspaces(workspaces).filter((row) => row?.can_manage_opportunities === true).length === 1;
+}
+
 function composeWorkspaceSummary(workspaces: unknown): string | null {
-  const rows = Array.isArray(workspaces) ? (workspaces as MenuWorkspaceDescriptor[]) : [];
+  const rows = menuWorkspaces(workspaces);
   const lines = rows.map((row) => {
     const name = typeof row?.workspace_name === "string" ? row.workspace_name : "Workspace";
     const role = typeof row?.role === "string" ? row.role : "member";
@@ -1215,18 +1160,18 @@ function composeWorkspaceSummary(workspaces: unknown): string | null {
 
 function composeMenuButtons(
   resultCode: TelegramResultCode,
-  // RB-3A. Widened from URL-only so the recruiter menu can carry its single
-  // Quick Post callback. Every Driver/work button remains URL-only.
+  workspaces: unknown,
 ): TelegramInlineButton[][] | null {
   switch (resultCode) {
-    case "menu_driver":
-      return WORK_BUTTONS;
     case "menu_recruiter":
-      return RECRUITER_BUTTONS;
     case "menu_multi_role":
-      return [...WORK_BUTTONS, ...RECRUITER_BUTTONS];
+      if (menuWorkspaces(workspaces).length === 0) return OPEN_APP_BUTTONS;
+      return canQuickPost(workspaces)
+        ? [[{ text: "➕ Post Opportunity", callbackData: composeQuickPostNewData() }], ...RECRUITER_BUTTONS]
+        : RECRUITER_BUTTONS;
     case "menu_unlinked":
       return ONBOARDING_BUTTONS;
+    case "menu_driver":
     case "menu_linked_no_workspace":
     case "menu_linked_unsupported":
       return OPEN_APP_BUTTONS;
@@ -1240,43 +1185,18 @@ function composeMenuText(
   workspaces: unknown,
   command: TelegramMenuCommand,
 ): string | null {
-  if (command === "help") {
-    if (resultCode === "menu_unlinked") return HELP_UNLINKED_TEXT;
-    if (resultCode === "menu_driver") return HELP_WORK_TEXT;
-    if (resultCode === "menu_recruiter") return HELP_RECRUITER_TEXT;
-    if (resultCode === "menu_multi_role") return HELP_COMBINED_TEXT;
-    if (resultCode === "menu_linked_no_workspace") return MENU_NO_WORKSPACE_TEXT;
-    if (resultCode === "menu_linked_unsupported") return MENU_UNSUPPORTED_TEXT;
-    return null;
-  }
   if (resultCode === "menu_unlinked") return MENU_UNLINKED_TEXT;
-  if (resultCode === "menu_linked_no_workspace") return MENU_NO_WORKSPACE_TEXT;
-  if (resultCode === "menu_linked_unsupported") return MENU_UNSUPPORTED_TEXT;
+  if (resultCode === "menu_driver" || resultCode === "menu_linked_no_workspace" ||
+      resultCode === "menu_linked_unsupported") return MENU_NO_WORKSPACE_TEXT;
+  if (resultCode !== "menu_recruiter" && resultCode !== "menu_multi_role") return null;
+  if (menuWorkspaces(workspaces).length === 0) return MENU_NO_WORKSPACE_TEXT;
+  if (command === "status") return composeWorkspaceSummary(workspaces);
 
-  if (resultCode === "menu_driver") {
-    if (command === "start") return WORK_WELCOME_TEXT;
-    if (command === "menu") return WORK_MENU_TEXT;
-    return WORK_STATUS_TEXT;
-  }
-
-  if (resultCode === "menu_recruiter") {
-    const summary = composeWorkspaceSummary(workspaces);
-    if (summary === null) return MENU_NO_WORKSPACE_TEXT;
-    if (command === "start") return RECRUITER_WELCOME_TEXT;
-    if (command === "menu") return RECRUITER_MENU_TEXT;
-    return summary;
-  }
-
-  if (resultCode === "menu_multi_role") {
-    const summary = composeWorkspaceSummary(workspaces);
-    if (command === "start") return COMBINED_WELCOME_TEXT;
-    if (command === "menu") return COMBINED_MENU_TEXT;
-    return summary === null
-      ? WORK_STATUS_TEXT
-      : `${WORK_STATUS_TEXT}\n\n${summary}`;
-  }
-
-  return null;
+  const heading = command === "start" ? "Welcome to HaulTracker Pro" : "HaulTracker Pro";
+  const posting = canQuickPost(workspaces)
+    ? "\nPost Opportunity prepares a draft. Publish it in HaulTracker Pro."
+    : "";
+  return `${heading}\n\nPrivate recruiter tools\nMy Opportunities, Conversations and Results open HaulTracker Pro.${posting}\n\nUse /menu for your tools, /status for your workspace access or /help for guidance.`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -1359,8 +1279,15 @@ Deno.serve(async (req: Request) => {
       sha256: sha256Hex,
       log,
       quickPostExtractor: buildQuickPostExtractor(supabase),
+      getDispatchGroupConnection: async (chatId, chatType) => {
+        const { data, error } = await supabase.rpc("telegram_dispatch_group_is_connected", {
+          _telegram_chat_id: chatId,
+          _chat_type: chatType,
+        });
+        return !error && typeof data === "boolean" ? data : null;
+      },
       dispatchGuidanceButtons: {
-        private: [[{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }]],
+        private: [[{ text: "Open Dispatch Workspace", url: URL_DISPATCH_WORKSPACE }]],
         group: [
           [{ text: "Open Bot Privately", url: "https://t.me/HaulTrackerBot" }],
           [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],

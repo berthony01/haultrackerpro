@@ -335,15 +335,16 @@ describe("RB-1A classification — menu only where authorised", () => {
   // RB-2B re-pin. RB-1A/RB-1B protected the menu surface from growing a
   // callback path. RB-2B adds a callback path for conversation ACTIONS only,
   // in the same poller. Re-pinned exactly: allowed_updates is the exact new
-  // two-entry tuple, the menu keyboards themselves stay URL-only, and no
+  // two-entry tuple, the recruiter menu allows one Quick Post callback, and no
   // webhook is introduced.
-  it("keeps the menu surface URL-only and adds no webhook", () => {
+  it("keeps Quick Post as the sole menu callback and adds no webhook", () => {
     expect([...TELEGRAM_ALLOWED_UPDATES]).toEqual(["message", "callback_query"]);
     expect(EDGE_CODE).not.toMatch(/setWebhook/i);
     const menuButtons = EDGE_CODE.split("function composeMenuButtons")[1]
       ?.split("\nfunction ")[0] ?? "";
     expect(menuButtons.length).toBeGreaterThan(0);
-    expect(menuButtons).not.toMatch(/callbackData|callback_data/i);
+    expect(menuButtons.match(/callbackData: composeQuickPostNewData\(\)/g)).toHaveLength(1);
+    expect(menuButtons).toContain("canQuickPost(workspaces)");
   });
 });
 

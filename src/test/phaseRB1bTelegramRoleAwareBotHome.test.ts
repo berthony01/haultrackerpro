@@ -503,9 +503,9 @@ describe("RB-1B D — every button points at a route that already exists", () =>
     }
   });
 
-  it("uses the production base URL and no hardcoded second host", () => {
+  it("uses the production base URL and the known Telegram entry link", () => {
     expect(EDGE_CODE).toContain('const APP_BASE_URL = "https://haultrackerpro.com"');
-    expect(EDGE_CODE).not.toMatch(/https:\/\/(?!haultrackerpro\.com|connector-gateway)/);
+    expect(EDGE_CODE.replace("https://t.me/HaulTrackerBot", "")).not.toMatch(/https:\/\/(?!haultrackerpro\.com|connector-gateway)/);
   });
 
   it("every destination path is declared in the app router", () => {
@@ -527,16 +527,10 @@ describe("RB-1B D — every button points at a route that already exists", () =>
     }
   });
 
-  it("gives each capability group its own menu copy", () => {
-    expect(EDGE_CODE).toContain("RECRUITER_MENU_TEXT");
-    expect(EDGE_CODE).toContain("COMBINED_MENU_TEXT");
-    // A recruiter-only account must never be shown the work-seeking menu.
-    expect(EDGE_CODE).toMatch(
-      /resultCode === "menu_recruiter"[\s\S]*?command === "menu"\) return RECRUITER_MENU_TEXT/,
-    );
-    expect(EDGE_CODE).toMatch(
-      /resultCode === "menu_multi_role"[\s\S]*?command === "menu"\) return COMBINED_MENU_TEXT/,
-    );
+  it("uses recruiter presentation for verified recruiter access and a web handoff for driver-only access", () => {
+    expect(EDGE_CODE).toContain("Private recruiter tools");
+    expect(EDGE_CODE).toMatch(/case "menu_driver":[\s\S]*?return OPEN_APP_BUTTONS;/);
+    expect(EDGE_CODE).not.toContain("WORK_BUTTONS");
   });
 
   it("calls only the menu RPC and never the resolvers directly", () => {

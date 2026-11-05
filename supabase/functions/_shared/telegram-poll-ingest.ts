@@ -527,6 +527,7 @@ export interface TelegramPollDeps {
   genQaEnabled?: boolean;
   /** Synthetic tests may force OFF; production uses the independent guidance gate. */
   dispatchGuidanceEnabled?: boolean;
+  getDispatchGroupConnection?: (chatId: number, chatType: string) => Promise<boolean | null>;
   dispatchGuidanceButtons?: { private: TelegramInlineUrlButton[][]; group: TelegramInlineUrlButton[][] };
   authorizeDispatchGuidance?: (input: { telegramUserId: number; telegramChatId: number | null; chatType: string }) => Promise<unknown>;
 }
@@ -561,7 +562,7 @@ export const TELEGRAM_LINK_FAILURE_MESSAGE =
 // TG-2F-C. Deliberately generic: no workspace name, no recruiter id, no
 // reason, no username, no echo of the submitted command.
 export const TELEGRAM_BIND_SUCCESS_MESSAGE =
-  "This Telegram group is now connected to your HaulTracker Pro workspace. Dispatch access follows workspace permissions. Connecting the group does not enable general Telegram load updates.";
+  "Connected · load updates off\nThis group is connected to HaulTracker Pro. Use /help@HaulTrackerBot for its current status.";
 export const TELEGRAM_BIND_FAILURE_MESSAGE =
   "That connection code could not be accepted. Generate a new code in HaulTracker Pro and check that your Telegram account is connected there.";
 
@@ -573,7 +574,7 @@ export const TELEGRAM_BOT_USERNAME = "HaulTrackerBot";
 // Independently authorized read-only guidance. Never enables dispatch processing or AI.
 export const TELEGRAM_DISPATCH_GUIDANCE_ENABLED = true as const;
 export const TELEGRAM_DISPATCH_GUIDANCE_TEXT =
-  "Dispatch access\nThis authorized account has dispatch access in a connected HaulTracker Pro workspace. General Telegram load updates are not active. Open HaulTracker Pro to use your permitted workspace tools. Recruiter tools are available in private /menu when your account has access.";
+  "Dispatch access\nOpen HaulTracker Pro to use your dispatch tools. To set up a group, ask your workspace admin to connect it from Recruiter Settings. General Telegram load updates are off. Use /help@HaulTrackerBot in the group to check its connection.";
 
 /** Read-only guidance only. Exact transport command, never ordinary group text.
  * Missing/uninstalled RPC, denial, malformed output or errors all fail closed. */
@@ -597,6 +598,30 @@ export async function getTelegramDispatchGuidance(
       chatType: input.chatType ?? "" }) === true;
   } catch { return false; }
 }
+function connectedDispatchGroupText(enabled: boolean): string {
+  return enabled
+    ? "Connected · load updates on\nAuthorized dispatchers can submit /delivered@HaulTrackerBot LOAD-REF or /cancelled@HaulTrackerBot LOAD-REF. An authorized dispatcher must confirm each review before the load changes."
+    : TELEGRAM_BIND_SUCCESS_MESSAGE;
+}
+
+async function getDispatchGroupFeedback(
+  identity: ParsedIdentity,
+  getConnection: TelegramPollDeps["getDispatchGroupConnection"],
+): Promise<string | null> {
+  const { telegramChatId, chatType, text, botJoinedGroup } = identity;
+  if (!getConnection || telegramChatId === null || telegramChatId >= 0 ||
+      (chatType !== "group" && chatType !== "supergroup") ||
+      (!botJoinedGroup && text !== `/help@${TELEGRAM_BOT_USERNAME}`)) return null;
+  try {
+    const connected = await getConnection(telegramChatId, chatType);
+    if (connected === true) return connectedDispatchGroupText(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED);
+    if (connected === false) {
+      return "Setup required\nA workspace admin can connect this group from Recruiter Settings in HaulTracker Pro. Use the connection command shown there, then send /help@HaulTrackerBot here.";
+    }
+  } catch { /* Connection lookup failure is never treated as a disconnected group. */ }
+  return "Open HaulTracker Pro to check this group's connection. Use /help@HaulTrackerBot to try again.";
+}
+
 const BIND_COMMAND_PATTERN = new RegExp(
   `^\\/bind(?:@${TELEGRAM_BOT_USERNAME})? ([0-9a-f]{64})$`,
 );
@@ -737,6 +762,8 @@ interface ParsedIdentity {
    *  locator: possession confers nothing and it is resolved server-side only
    *  against an alert actually delivered to the acting account. */
   replyToMessageId?: number | null;
+  botJoinedGroup?: boolean;
+  anonymousSender?: boolean;
 }
 
 function asFiniteInteger(value: unknown): number | null {
@@ -794,6 +821,10 @@ function parseIdentity(update: unknown, updateId: number): ParsedIdentity {
     telegramChatId: rawChatId !== null && rawChatId !== 0 ? rawChatId : null,
     chatType: typeof chat?.type === "string" ? chat.type : null,
     text: typeof message?.text === "string" ? message.text : null,
+    botJoinedGroup: Array.isArray(message?.new_chat_members) && message.new_chat_members.some((member) =>
+      member?.is_bot === true && typeof member.username === "string" &&
+      member.username.toLowerCase() === TELEGRAM_BOT_USERNAME.toLowerCase()),
+    anonymousSender: message?.sender_chat != null,
     callbackQueryId: null,
     callbackData: null,
     replyToMessageId: replyToId !== null && replyToId > 0 ? replyToId : null,
@@ -918,8 +949,8 @@ export function classifyUpdate(
     }
   }
   // TG-G1C (gated, default OFF). Strictly AFTER the exact `/bind` branch and
-  // BEFORE the `non_private_message` fallback. Only exact validated status
-  // report commands join natural text; /bind/help/dispatch remain unchanged.
+  // BEFORE the `non_private_message` fallback. Only explicitly addressed
+  // reports from an individual account can enter general dispatch intake.
   // Sender/chat come from the transport fields only. Gate stays OFF in live code.
   if (genQaActive(genQaEnabled) && identity.telegramChatId === TELEGRAM_GENQA_CHAT_ID && identity.text !== null &&
       (identity.chatType === "group" || identity.chatType === "supergroup") && isGenQaCommand(identity.text)) {
@@ -932,7 +963,9 @@ export function classifyUpdate(
   if (
     dispatchReviewEnabled === true &&
     identity.text !== null &&
-    (!identity.text.startsWith("/") || parseDispatchStatusReportCommand(identity.text) !== null) &&
+    !identity.anonymousSender &&
+    /^\/(delivered|cancelled)@HaulTrackerBot /.test(identity.text) &&
+    parseDispatchStatusReportCommand(identity.text) !== null &&
     (identity.chatType === "group" || identity.chatType === "supergroup")
   ) {
     return { kind: "dispatch_group_message", text: identity.text, chatType: identity.chatType };
@@ -1517,7 +1550,8 @@ export async function runTelegramPoll(
     } else if (terminal.isNew && identity.telegramChatId !== null) {
       // Guidance uses the existing terminal receipt, so retries never send
       // twice. Read-only authorization failure cannot stall existing traffic.
-      const dispatchGuidance = await getTelegramDispatchGuidance(identity,
+      const groupFeedback = await getDispatchGroupFeedback(identity, deps.getDispatchGroupConnection);
+      const dispatchGuidance = !groupFeedback && await getTelegramDispatchGuidance(identity,
         deps.authorizeDispatchGuidance, deps.dispatchGuidanceEnabled);
       const feedback = terminal.resultCode === "link_success"
         ? TELEGRAM_LINK_SUCCESS_MESSAGE
@@ -1525,7 +1559,7 @@ export async function runTelegramPoll(
             terminal.resultCode === "invalid_start_command"
         ? TELEGRAM_LINK_FAILURE_MESSAGE
         : terminal.resultCode === "bind_success"
-        ? TELEGRAM_BIND_SUCCESS_MESSAGE
+        ? connectedDispatchGroupText(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED)
         : terminal.resultCode === "bind_rejected"
         ? TELEGRAM_BIND_FAILURE_MESSAGE
         // RB-2C. One fixed, bounded acknowledgement per reply outcome. Sent
@@ -1552,7 +1586,7 @@ export async function runTelegramPoll(
             typeof terminal.menuText === "string" &&
             terminal.menuText.length > 0
         ? terminal.menuText
-        : null;
+        : groupFeedback;
 
       const feedbackButtons =
         feedback === null
@@ -1592,8 +1626,10 @@ export async function runTelegramPoll(
         try {
           await gateway.sendMessage({
             chatId: identity.telegramChatId,
-            text: effectiveDispatchReviewEnabled()
-              ? "Dispatch access\nA connected dispatch group can report delivery or cancellation. Only an authorized dispatcher can confirm a load-status change.\n\n/delivered@HaulTrackerBot LOAD-REF\n/cancelled@HaulTrackerBot LOAD-REF\n\nOpen HaulTracker Pro to use your permitted workspace tools. Recruiter tools are available in private /menu when your account has access."
+            text: identity.chatType !== "private"
+              ? connectedDispatchGroupText(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED)
+              : TGG1B_DISPATCH_GROUP_REVIEW_ENABLED
+              ? "Dispatch access\nOpen HaulTracker Pro to use your dispatch tools. Use /help@HaulTrackerBot in your connected dispatch group for report commands."
               : TELEGRAM_DISPATCH_GUIDANCE_TEXT,
             buttons: identity.chatType === "private"
               ? deps.dispatchGuidanceButtons?.private
