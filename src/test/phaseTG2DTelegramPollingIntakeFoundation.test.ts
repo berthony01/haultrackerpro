@@ -880,6 +880,7 @@ describe("TG-2D edge function shell", () => {
       "telegram_claim_dispatch_review_delivery",
       "telegram_claim_poll_lease",
       "telegram_complete_quick_post_extraction",
+      "telegram_dispatch_group_is_connected",
       "telegram_fail_dispatch_review_delivery",
       "telegram_get_dispatch_guidance",
       "telegram_mark_conversation_alert_failed",
@@ -910,16 +911,16 @@ describe("TG-2D edge function shell", () => {
   // TG-2C dispatch and load prohibitions are unchanged and still exhaustive;
   // the callback surface is now pinned to precisely one answer API and one
   // action RPC, so any other callback behaviour fails by design.
-  it("implements no chat-binding, load, or TG-2C dispatch behaviour", () => {
+  it("keeps load mutations and dispatch authority inside their RPCs", () => {
     for (const forbidden of [
       "telegram_bind_dispatch_chat",
       "telegram_dispatch_create_driver_load",
       "telegram_dispatch_update_driver_load_status",
       "dispatch_create_driver_load",
-      "loads",
     ]) {
       expect(EDGE_SOURCE).not.toContain(forbidden);
     }
+    expect(EDGE_SOURCE).not.toMatch(/\.from\(["']loads["']\)\s*\.(insert|update|delete|upsert)\s*\(/);
     expect(
       [...EDGE_SOURCE.matchAll(/answerCallbackQuery/g)].length,
     ).toBe(2);

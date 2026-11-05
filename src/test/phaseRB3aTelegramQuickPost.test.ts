@@ -492,21 +492,17 @@ describe("RB-3A C — the review shows approved fields only, nothing inferred", 
     expect(ORCHESTRATOR_CODE).not.toContain("raw_source_text");
   });
 
-  it("offers exactly Confirm, Start Over and Cancel on a review", () => {
-    expect(EDGE_CODE).toContain('text: "✅ Confirm"');
+  it("offers Save Draft, Start Over and Cancel on a review", () => {
+    expect(EDGE_CODE).toContain('text: "✅ Save Draft"');
     expect(EDGE_CODE).toContain('text: "🔄 Start Over"');
     expect(EDGE_CODE).toContain('text: "✖️ Cancel"');
   });
 
-  it("adds exactly ONE recruiter Quick Post button and leaves Driver buttons URL-only", () => {
+  it("offers Quick Post for exactly one eligible recruiter workspace", () => {
     expect(EDGE_CODE.split("composeQuickPostNewData()").length - 1).toBe(1);
-    const workButtons = EDGE_CODE.slice(
-      EDGE_CODE.indexOf("const WORK_BUTTONS"),
-      EDGE_CODE.indexOf("const RECRUITER_BUTTONS"),
-    );
-    expect(workButtons).not.toContain("callback_data");
-    expect(workButtons).toContain("URL_FIND_WORK");
-    expect(workButtons).toContain("URL_WORK_PROFILE");
+    expect(EDGE_CODE).toContain("can_manage_opportunities === true).length === 1");
+    expect(EDGE_CODE).toContain('case "menu_driver":');
+    expect(EDGE_CODE).not.toContain("URL_FIND_WORK");
   });
 });
 

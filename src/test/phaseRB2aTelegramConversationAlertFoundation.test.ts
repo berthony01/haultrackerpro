@@ -402,7 +402,7 @@ describe("RB-2A C — runtime wiring stays inside the RB-2A cone", () => {
   it("4) the alert destination is the proven recruiter conversations inbox", () => {
     expect(EDGE_CODE).toContain("conversationsUrl: URL_CONVERSATIONS");
     expect(EDGE_CODE).toContain(
-      "const URL_CONVERSATIONS = `${APP_BASE_URL}/dashboard?page=recruiter-access:applications`",
+      "const URL_CONVERSATIONS = `${APP_BASE_URL}/conversations?workspace=recruiter`",
     );
   });
 

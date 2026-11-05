@@ -375,14 +375,14 @@ describe("TG-2F-C D — bot feedback discloses nothing", () => {
     expect(message).not.toMatch(
       /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
     );
-    expect(message).not.toContain("@");
+    expect(message.replace("@HaulTrackerBot", "")).not.toContain("@");
     expect(message).not.toContain("telegram_");
     expect(message).not.toContain("recruiter_id");
   });
 
-  it("keeps the link messages byte-identical to TG-2D", () => {
+  it("tells newly linked users where to find their tools", () => {
     expect(TELEGRAM_LINK_SUCCESS_MESSAGE).toBe(
-      "Your Telegram account is now linked to HaulTracker Pro.",
+      "Your Telegram account is now linked to HaulTracker Pro. Send /menu to see your available tools.",
     );
     expect(TELEGRAM_LINK_FAILURE_MESSAGE).toBe(
       "That link is invalid or expired. Generate a new Telegram link in HaulTracker Pro and try again.",
@@ -400,7 +400,7 @@ describe("TG-2F-C E — edge adapter delegates to the atomic RPC only", () => {
   // RB-2A.1 re-pin: RB-2A legitimately added the three outbound alert outbox
   // RPCs below. The list stays exhaustive — any further unauthorised RPC still
   // fails this assertion by design.
-  it("calls telegram_process_bind_update and nothing else new", () => {
+  it("calls only the listed Telegram service RPCs", () => {
     const rpcs = [...EDGE_SOURCE.matchAll(/supabase\.rpc\("(\w+)"/g)].map((m) => m[1]);
     expect([...new Set(rpcs)].sort()).toEqual([
       "telegram_ack_dispatch_review_delivery",
@@ -408,6 +408,7 @@ describe("TG-2F-C E — edge adapter delegates to the atomic RPC only", () => {
       "telegram_claim_conversation_alerts",
       "telegram_claim_dispatch_review_delivery",
       "telegram_claim_poll_lease",
+      "telegram_dispatch_group_is_connected",
       "telegram_fail_dispatch_review_delivery",
       "telegram_get_dispatch_guidance",
       "telegram_mark_conversation_alert_failed",

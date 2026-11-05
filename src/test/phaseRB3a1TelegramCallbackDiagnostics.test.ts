@@ -89,8 +89,8 @@ describe("RB-3A.1 — bounded callback RPC error codes", () => {
     expect(ORCHESTRATOR_CODE).toContain("/^[a-z0-9_]{3,64}$/");
   });
 
-  it("applies the bounded wrapper to both callback adapters and the five TG-G1C dispatch adapters only", () => {
-    expect(EDGE_CODE.split("boundedRpcErrorCode(error)").length - 1).toBe(7);
+  it("applies the bounded wrapper to callback adapters and general or QA dispatch adapters", () => {
+    expect(EDGE_CODE.split("boundedRpcErrorCode(error)").length - 1).toBe(11);
     for (const rpc of [
       "telegram_claim_dispatch_review_delivery",
       "telegram_ack_dispatch_review_delivery",

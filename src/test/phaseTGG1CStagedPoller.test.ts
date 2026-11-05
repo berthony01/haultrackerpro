@@ -164,7 +164,7 @@ describe("TG-G1C gate", () => {
 
   it("disabled (QA explicitly OFF): group text → non_private_message, g1 tap → c1 path, zero dispatch RPCs/sends", async () => {
     const w = makeWorld();
-    const g = makeGateway([groupMsg(1, "Load #AB-123 delivered"), tap(2, composeDispatchReviewData("accept", uuid())!)]);
+    const g = makeGateway([groupMsg(1, "/delivered@HaulTrackerBot AB-123"), tap(2, composeDispatchReviewData("accept", uuid())!)]);
     const r = await runTelegramPoll({ genQaEnabled: false, ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false });
     expect(r.kind).toBe("ok");
     expect(w.calls).toContain("ignored:non_private_message");
@@ -177,12 +177,15 @@ describe("TG-G1C gate", () => {
     expect(w.loads.get("AB-123")!.status).toBe("en_route");
   });
 
-  it("classification: /bind, c1, q1 unchanged with gate on; slash commands in groups stay non_private_message", () => {
+  it("classification: /bind, c1 and q1 unchanged with gate on; unrelated group messages are ignored", () => {
     const base = { updateId: 1, telegramUserId: 1, telegramChatId: GROUP, chatType: "group", callbackQueryId: null, callbackData: null, replyToMessageId: null };
     expect(classifyUpdate({ ...base, text: `/bind ${"a".repeat(64)}` } as never, true, false, false).kind).toBe("bind");
     expect(classifyUpdate({ ...base, text: "/start" } as never, true, false, false)).toEqual({ kind: "ignored", resultCode: "non_private_message" });
-    expect(classifyUpdate({ ...base, text: "hello" } as never, true, false, false).kind).toBe("dispatch_group_message");
+    expect(classifyUpdate({ ...base, text: "hello" } as never, true, false, false).kind).toBe("ignored");
     expect(classifyUpdate({ ...base, chatType: "private", text: "hello" } as never, true, false, false).kind).toBe("quick_post_source");
+    expect(classifyUpdate({
+      ...base, text: "/delivered@HaulTrackerBot AB-123", anonymousSender: true,
+    }, true, false, false).kind).toBe("ignored");
     const cb = { ...base, text: null, callbackQueryId: "q" };
     expect(classifyUpdate({ ...cb, callbackData: `c1:a:${uuid()}` } as never, true, false, false).kind).toBe("conversation_action");
     expect(classifyUpdate({ ...cb, callbackData: "q1:n" } as never, true, false, false).kind).toBe("quick_post_action");
@@ -193,8 +196,35 @@ describe("TG-G1C gate", () => {
   });
 });
 
+describe("dispatch group welcome", () => {
+  it("shows connection status on the bot's own join and addressed help, once per update", async () => {
+    const w = makeWorld();
+    const joined = (updateId: number, username: string, chatId = GROUP) => {
+      const update = groupMsg(updateId, "", chatId);
+      return { ...update, message: { ...update.message, new_chat_members: [{ username, is_bot: true }] } };
+    };
+    const g = makeGateway([
+      joined(1, "OtherBot"),
+      joined(2, "HaulTrackerBot", OTHER_GROUP),
+      groupMsg(3, "/help@HaulTrackerBot"),
+      groupMsg(4, "/help@OtherBot"),
+      joined(2, "HaulTrackerBot", OTHER_GROUP),
+    ]);
+    await runTelegramPoll({
+      ledger: w.ledger, gateway: g.gateway, sha256, dispatchReviewEnabled: false,
+      async getDispatchGroupConnection(chatId) { return w.bound.has(chatId); },
+      async authorizeDispatchGuidance() { return true; },
+    });
+    expect(g.sent.map(({ chatId, text }) => [chatId, text.split("\n")[0]])).toEqual([
+      [OTHER_GROUP, "Setup required"],
+      [GROUP, "Connected · load updates off"],
+    ]);
+    expect(w.calls).not.toContain("dispatch_intake");
+  });
+});
+
 describe("TG-G1C intake (enabled synthetic)", () => {
-  it.each(["/delivered@HaulTrackerBot AB-123", "/cancelled@HaulTrackerBot AB-123", "/delivered AB-123", "/cancelled AB-123"])("%s creates only one uncommitted proposal and replay is harmless", async text => {
+  it.each(["/delivered@HaulTrackerBot AB-123", "/cancelled@HaulTrackerBot AB-123"])("%s creates only one uncommitted proposal and replay is harmless", async text => {
     const w = makeWorld();
     await poll(w,[groupMsg(1,text)]);
     expect(w.proposals.size).toBe(1);
@@ -212,7 +242,7 @@ describe("TG-G1C intake (enabled synthetic)", () => {
     expect(w.proposals.size).toBe(0); expect(w.outbox).toHaveLength(0);
     expect(w.calls).not.toContain('dispatch_intake');
     const base={updateId:1,telegramUserId:SENDER,telegramChatId:GROUP,chatType:'supergroup',callbackQueryId:null,callbackData:null,replyToMessageId:null};
-    for(const text of ['/help','/help@HaulTrackerBot','/dispatch','/menu','/delivered@OtherBot AB-123','/delivered AB-123 extra'])
+    for(const text of ['/help','/help@HaulTrackerBot','/dispatch','/menu','/delivered@OtherBot AB-123','/delivered AB-123 extra','/delivered AB-123','Load #AB-123 delivered'])
       expect(classifyUpdate({...base,text},true,false,false)).toEqual({kind:'ignored',resultCode:'non_private_message'});
   });
   it('addressed status report requires independent authorized review before changing a load',async()=>{
@@ -225,7 +255,7 @@ describe("TG-G1C intake (enabled synthetic)", () => {
   });
   it("delivered and cancelled create proposals + outbox, never change loads, never send on intake", async () => {
     const w = makeWorld();
-    const { r, sent } = await poll(w, [groupMsg(1, "Load #AB-123 delivered"), groupMsg(2, "Load #AB-124 cancelled")]);
+    const { r, sent } = await poll(w, [groupMsg(1, "/delivered@HaulTrackerBot AB-123"), groupMsg(2, "/cancelled@HaulTrackerBot AB-124")]);
     expect(r).toMatchObject({ kind: "ok", processed: 2, advancedTo: 2 });
     expect([...w.proposals.values()].map((p) => [p.loadRef, p.target])).toEqual([["AB-123", "completed"], ["AB-124", "cancelled"]]);
     expect(w.outbox).toHaveLength(2);
@@ -234,30 +264,33 @@ describe("TG-G1C intake (enabled synthetic)", () => {
     expect(w.loads.get("AB-124")!.status).toBe("pending");
   });
 
-  it("chatter, unknown ref, duplicate ref, inactive relationship, unbound group → no_action receipt, no proposal", async () => {
+  it("chatter and questions are ignored; unmatched reports leave no proposal", async () => {
     const w = makeWorld();
     const { r } = await poll(w, [
       groupMsg(1, "morning all, traffic is bad"),
-      groupMsg(2, "Load #ZZ-404 delivered"),
-      groupMsg(3, "Load #DUP-1 delivered"),
-      groupMsg(4, "Load #CD-900 delivered"),
-      groupMsg(5, "Load #AB-123 delivered", OTHER_GROUP),
+      groupMsg(2, "/delivered@HaulTrackerBot ZZ-404"),
+      groupMsg(3, "/delivered@HaulTrackerBot DUP-1"),
+      groupMsg(4, "/delivered@HaulTrackerBot CD-900"),
+      groupMsg(5, "/delivered@HaulTrackerBot AB-123", OTHER_GROUP),
       groupMsg(6, "can we cancel Load #AB-124?"),
     ]);
-    expect(r.kind === "ok" && r.resultCodes.every((c) => c === "dispatch_review_no_action")).toBe(true);
+    expect(r).toMatchObject({ kind: "ok", resultCodes: [
+      "non_private_message", "dispatch_review_no_action", "dispatch_review_no_action",
+      "dispatch_review_no_action", "dispatch_review_no_action", "non_private_message",
+    ] });
     expect(w.proposals.size).toBe(0);
     expect(w.getCursor()).toBe(6);
   });
 
   it("replay of the same update is idempotent; conflicting payload fails closed without advancing", async () => {
     const w = makeWorld();
-    await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
+    await poll(w, [groupMsg(1, "/delivered@HaulTrackerBot AB-123")]);
     expect(w.proposals.size).toBe(1);
-    const { r } = await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
+    const { r } = await poll(w, [groupMsg(1, "/delivered@HaulTrackerBot AB-123")]);
     expect(w.proposals.size).toBe(1);
     expect(r.kind).toBe("ok");
     const before = w.getCursor();
-    const c = await poll(w, [groupMsg(1, "Load #AB-124 cancelled")]);
+    const c = await poll(w, [groupMsg(1, "/cancelled@HaulTrackerBot AB-124")]);
     expect(c.r.kind).toBe("failed");
     expect(w.getCursor()).toBe(before);
   });
@@ -265,7 +298,7 @@ describe("TG-G1C intake (enabled synthetic)", () => {
   it("missing dispatch processor fails closed: no receipt, no cursor advance", async () => {
     const w = makeWorld();
     const ledger = { ...w.ledger, processDispatchGroupUpdate: undefined };
-    const g = makeGateway([groupMsg(1, "Load #AB-123 delivered")]);
+    const g = makeGateway([groupMsg(1, "/delivered@HaulTrackerBot AB-123")]);
     const r = await runTelegramPoll({ genQaEnabled: false, ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: true });
     expect(r.kind).toBe("failed");
     expect(w.receipts.size).toBe(0);
@@ -276,7 +309,7 @@ describe("TG-G1C intake (enabled synthetic)", () => {
 describe("TG-G1C outbox drain + review", () => {
   it("full flow: getUpdates → proposal/outbox → drain sendMessage → g1 Confirm → accepted status", async () => {
     const w = makeWorld();
-    await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
+    await poll(w, [groupMsg(1, "/delivered@HaulTrackerBot AB-123")]);
     const g = makeGateway([]);
     const d = await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true });
     expect(d).toMatchObject({ status: "ok", sent: 1, retried: 0 });
@@ -297,7 +330,7 @@ describe("TG-G1C outbox drain + review", () => {
 
   it("drain failure is bounded and retried, then acked", async () => {
     const w = makeWorld();
-    await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
+    await poll(w, [groupMsg(1, "/delivered@HaulTrackerBot AB-123")]);
     const g = makeGateway([], { sendStatus: [429] });
     const d1 = await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway, enabled: true, limit: 1 });
     expect(d1).toMatchObject({ retried: 1, sent: 0 });
@@ -313,7 +346,7 @@ describe("TG-G1C outbox drain + review", () => {
 
   it("unauthorized, revoked binding, wrong chat, stale, expired, double tap, reject — no unauthorized load change", async () => {
     const w = makeWorld();
-    await poll(w, [groupMsg(1, "Load #AB-123 delivered"), groupMsg(2, "Load #AB-124 cancelled")]);
+    await poll(w, [groupMsg(1, "/delivered@HaulTrackerBot AB-123"), groupMsg(2, "/cancelled@HaulTrackerBot AB-124")]);
     const [p1, p2] = [...w.proposals.values()];
     const a1 = composeDispatchReviewData("accept", p1.id)!;
     let res = await poll(w, [tap(10, a1, UNAUTH)]);
@@ -339,7 +372,7 @@ describe("TG-G1C outbox drain + review", () => {
 
   it("reject leaves load unchanged; replayed tap answers again without re-applying", async () => {
     const w = makeWorld();
-    await poll(w, [groupMsg(1, "Load #AB-124 cancelled")]);
+    await poll(w, [groupMsg(1, "/cancelled@HaulTrackerBot AB-124")]);
     const [p] = [...w.proposals.values()];
     const rj = composeDispatchReviewData("reject", p.id)!;
     let res = await poll(w, [tap(20, rj)]);
@@ -355,7 +388,7 @@ describe("TG-G1C outbox drain + review", () => {
 
   it("drain logs carry no raw text or chat ids", async () => {
     const w = makeWorld();
-    await poll(w, [groupMsg(1, "Load #AB-123 delivered")]);
+    await poll(w, [groupMsg(1, "/delivered@HaulTrackerBot AB-123")]);
     const logs: string[] = [];
     await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: makeGateway([]).gateway, enabled: true, log: (e, d) => logs.push(e + JSON.stringify(d ?? {})) });
     expect(logs.join()).not.toMatch(/AB-123|delivered|-100777/);

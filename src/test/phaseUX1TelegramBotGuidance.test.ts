@@ -7,6 +7,7 @@ import {
   DISPATCH_REJECT_LABEL,
 } from "../../supabase/functions/_shared/telegram-dispatch-group-review";
 
+const INGEST = readFileSync("supabase/functions/_shared/telegram-poll-ingest.ts", "utf8");
 const EDGE = readFileSync("supabase/functions/telegram-poll/index.ts", "utf8");
 const id = (text: string, chatType = "private") => ({
   updateId: 1, telegramUserId: 7, telegramChatId: chatType === "private" ? 7 : -100,
@@ -32,7 +33,7 @@ describe("UX-1 Telegram bot guidance", () => {
     expect(classifyUpdate(id(`/bind@HaulTrackerBot ${tok}`, "supergroup")).kind).toBe("bind");
   });
   it("help copy says dispatch is not active and offers no dispatch control", () => {
-    expect(EDGE).toContain("Dispatch group updates: not active yet.");
+    expect(INGEST).toContain("Connected · load updates off");
     // Independent guidance authorization remains separate from existing help.
     expect(EDGE).toContain("authorizeDispatchGuidance: TELEGRAM_DISPATCH_GUIDANCE_ENABLED");
     expect(EDGE).not.toContain("setMyCommands(");
