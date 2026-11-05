@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Truck, Briefcase, Users, Building2, ArrowRight, ArrowLeft } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
+import { useActingContext } from '@/hooks/useActingContext';
 
 const AMBER = 'hsl(25, 95%, 53%)';
 const NAVY_BG = 'hsl(220, 20%, 8%)';
@@ -65,6 +66,7 @@ function recordWorkspaceIntent(id: Tile['id']) {
 
 export default function CapabilityLauncher() {
   const navigate = useNavigate();
+  const { exitActingAs } = useActingContext();
   return (
     <div className="min-h-screen px-4 py-10" style={{ background: NAVY_BG }}>
 
@@ -97,6 +99,7 @@ export default function CapabilityLauncher() {
               key={t.id}
               data-capability={t.id}
               onClick={() => {
+                if (t.id === 'driver' || t.id === 'recruiter') exitActingAs();
                 recordWorkspaceIntent(t.id);
                 navigate(t.to);
               }}

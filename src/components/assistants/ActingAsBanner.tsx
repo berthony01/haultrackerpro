@@ -19,15 +19,15 @@ export function ActingAsBanner() {
   const multi = managedDrivers.length > 1;
   return (
     <div className="sticky top-0 z-50 w-full bg-amber-500/95 text-amber-950 border-b border-amber-700/40">
-      <div className="container mx-auto flex items-center justify-between gap-3 px-3 py-2 text-sm">
-        <div className="flex items-center gap-2 min-w-0">
+      <div className="container mx-auto flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2 text-sm">
+        <div className="flex min-w-0 basis-full items-center gap-2 sm:basis-auto">
           <UserCog className="h-4 w-4 shrink-0" />
           <span className="truncate">
             Acting for <strong>{actingDriver.driver_name ?? actingDriver.driver_email}</strong>.
             All changes save to their account.
           </span>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex flex-wrap items-center gap-1">
           {multi && <AssistantDriverSwitcher compact />}
           {canLimitedSettings && (
             <Button

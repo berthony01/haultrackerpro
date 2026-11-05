@@ -42,7 +42,7 @@ describe('Capability dashboards — recruiter + assistant first-class UX', () =>
 
   it('Assistant dashboard empty state offers Dashboard + Agency CTAs', () => {
     expect(assistant).toMatch(/No approved drivers yet/);
-    expect(assistant).toMatch(/Go to my Dashboard/);
+    expect(assistant).toMatch(/Open Driver Dashboard/);
     expect(assistant).toMatch(/Create Agency Workspace/);
   });
 

@@ -20,6 +20,8 @@ const state = vi.hoisted(() => ({
   calls: [] as { table: string; filters: [string, unknown][] }[],
   deferred: null as null | { table: string; promise: Promise<{ data: unknown; error: unknown }> },
   applications: [] as Record<string, unknown>[],
+  contractReadiness: new Map<string, { readiness: string; label: string; badgeClass: string }>(),
+  completeHire: vi.fn(),
   rpc: vi.fn(async (_fn: string, _args: Record<string, unknown>) => ({ data: 'ok', error: null })),
 }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: state.user, loading: state.loading, signOut: vi.fn() }) }));
@@ -57,10 +59,11 @@ vi.mock('@/hooks/opportunities/useOpportunityApplications', () => ({ useOpportun
   driverApplications: state.applications, recruiterApplications: state.applications,
   isLoadingDriver: false, isErrorDriver: false, isLoadingRecruiter: false, isErrorRecruiter: false,
   withdrawApplication: { mutate: vi.fn() }, recordDriverResponse: { mutate: vi.fn() }, updateApplicationStatus: { mutate: vi.fn() },
+  completeHire: { mutate: state.completeHire, isPending: false },
 }) }));
 vi.mock('@/hooks/opportunities/useRecruiterContactRequests', () => ({ useRecruiterContactRequests: () => ({ requests: [], respond: { mutate: vi.fn() }, requestContact: { mutate: vi.fn() } }), latestRequestForApp: () => null }));
 vi.mock('@/hooks/opportunities/useRecruiterBilling', () => ({ useRecruiterBilling: () => ({ canUseContractWorkflowTools: false }) }));
-vi.mock('@/hooks/contracts/useContractReadinessMap', () => ({ useContractReadinessMap: () => ({ readinessMap: new Map() }) }));
+vi.mock('@/hooks/contracts/useContractReadinessMap', () => ({ useContractReadinessMap: () => ({ readinessMap: state.contractReadiness }) }));
 vi.mock('@/components/contracts/ContractAttachment', () => ({ ContractAttachment: () => null }));
 vi.mock('@/components/opportunities/ApplicationTimeline', () => ({ ApplicationTimeline: () => null }));
 import { DriverApplicationsPanel } from '@/components/opportunities/DriverApplicationsPanel';
@@ -101,6 +104,8 @@ beforeEach(() => {
   state.profile = { id: 'recruiter-a', user_id: 'driver-a' };
   state.profileLoading = false; state.profileSuspended = false; state.canPost = true; state.profileCalls = 0;
   state.applications = [];
+  state.contractReadiness.clear();
+  state.completeHire.mockReset();
   state.threads = []; state.messages = []; state.errorTable = ''; state.calls = []; state.deferred = null; state.rpc.mockClear();
   HTMLElement.prototype.scrollIntoView = vi.fn();
 });
@@ -339,6 +344,19 @@ describe('rendered application handoffs', () => {
     await waitFor(() => expect(screen.getAllByRole('link', { name: 'View Conversation' })).toHaveLength(2));
     expect(screen.getAllByRole('link', { name: 'View Conversation' }).map(a => a.getAttribute('href'))).toEqual([conversationUrl('recruiter', T1), conversationUrl('recruiter', T2)]);
     expect(state.calls.filter(c => c.table === 'conversation_threads')).toHaveLength(1); expect(state.rpc).not.toHaveBeenCalled();
+  });
+  it('offers hire completion only on a formal offer with an approved contract', () => {
+    state.applications = [
+      { ...application('driver-a', 'app-a'), application_type: 'apply', status: 'offer_sent' },
+      { ...application('driver-b', 'app-b'), application_type: 'apply', status: 'offer_sent' },
+      { ...application('driver-c', 'app-c'), application_type: 'apply', status: 'hired' },
+    ];
+    const approved = { readiness: 'driver_approved', label: 'Driver approved', badgeClass: '' };
+    state.contractReadiness.set('app-a', approved);
+    state.contractReadiness.set('app-c', approved);
+    render(<MemoryRouter><RecruiterApplicationsDashboard onBack={vi.fn()} /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('button', { name: 'Complete hire' }));
+    expect(state.completeHire).toHaveBeenCalledExactlyOnceWith('app-a', expect.any(Object));
   });
   it('no thread yields no link and never creates a thread', async () => {
     state.applications = [application('driver-a', 'app-a')];
