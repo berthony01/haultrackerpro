@@ -6041,6 +6041,10 @@ export type Database = {
         Args: { _thread_id: string }
         Returns: string
       }
+      complete_approved_contract_hire: {
+        Args: { _application_id: string }
+        Returns: string
+      }
       complete_business_checkout_claim: {
         Args: {
           _checkout_expires_at: string

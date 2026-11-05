@@ -3,6 +3,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { PageNav } from '@/components/layout/PageNav';
 import { useActingContext } from '@/hooks/useActingContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useViewMode } from '@/hooks/useViewMode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import {
   PERMISSION_LABELS,
+  firstAllowedAssistantPage,
   hasPerm,
   type AssistantPermissionKey,
 } from '@/lib/assistantPermissions';
@@ -36,12 +38,17 @@ import { MyProfessionalProfileCard } from '@/components/profiles/ProfessionalPro
 export default function AssistantDashboard() {
   const { user } = useAuth();
   const { managedDrivers, isLoadingManagedDrivers, beginActingAs } = useActingContext();
+  const { driverWorkspaceAllowed, isLoading: workspaceLoading, setViewMode } = useViewMode();
   const navigate = useNavigate();
   const { data: invites } = useMyPendingAssistantInvites();
   const { data: activity } = useMyAssistantAudit(20);
   const { data: agency } = useMyAgency();
 
-  function enter(driverUserId: string, path = '/dashboard') {
+  const canEnterDriver = !workspaceLoading && driverWorkspaceAllowed;
+
+  function enter(driverUserId: string, path: string) {
+    if (!canEnterDriver) return;
+    setViewMode('driver');
     beginActingAs(driverUserId);
     navigate(path);
   }
@@ -200,8 +207,8 @@ export default function AssistantDashboard() {
                         )}
                       </div>
                     )}
-                    <div className="flex flex-wrap gap-2">
-                      <Button size="sm" onClick={() => enter(d.driver_user_id)}>
+                    <fieldset className="flex min-w-0 flex-wrap gap-2" disabled={!canEnterDriver}>
+                      <Button size="sm" onClick={() => enter(d.driver_user_id, `/dashboard?page=${firstAllowedAssistantPage(d.permissions)}`)}>
                         Start managing
                         <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
                       </Button>
@@ -216,7 +223,7 @@ export default function AssistantDashboard() {
                         <QuickAction
                           icon={<Truck className="h-3.5 w-3.5" />}
                           label="Add load"
-                          onClick={() => enter(d.driver_user_id, '/dashboard?page=loads&new=1')}
+                          onClick={() => enter(d.driver_user_id, '/dashboard?page=add')}
                         />
                       )}
                       {hasPerm(d.permissions, 'manage_expenses') && (
@@ -224,7 +231,7 @@ export default function AssistantDashboard() {
                           icon={<DollarSign className="h-3.5 w-3.5" />}
                           label="Add expense"
                           onClick={() =>
-                            enter(d.driver_user_id, '/dashboard?page=expenses&new=1')
+                            enter(d.driver_user_id, '/dashboard?page=add_expense')
                           }
                         />
                       )}
@@ -233,7 +240,7 @@ export default function AssistantDashboard() {
                           icon={<Fuel className="h-3.5 w-3.5" />}
                           label="Add fuel"
                           onClick={() =>
-                            enter(d.driver_user_id, '/dashboard?page=fuel&new=1')
+                            enter(d.driver_user_id, '/dashboard?page=add_fuel')
                           }
                         />
                       )}
@@ -251,7 +258,7 @@ export default function AssistantDashboard() {
                           onClick={() => enter(d.driver_user_id, '/assistant/settings')}
                         />
                       )}
-                    </div>
+                    </fieldset>
                   </CardContent>
                 </Card>
               );

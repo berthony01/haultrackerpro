@@ -405,6 +405,9 @@ const Index = () => {
         }
       }
       window.history.replaceState({}, '', window.location.pathname);
+    } else if (pageParam && isActingAsAssistant && effectiveRole === 'driver' && driverWorkspaceAllowed) {
+      if (isAssistantPageAllowed(pageParam, actingPermissions)) setPage(pageParam);
+      window.history.replaceState({}, '', window.location.pathname);
     } else if (pageParam === 'add') {
       if (driverWorkspaceAllowed && effectiveRole === 'driver') {
         setSuppressOnboardingForAddDeepLink(true);
@@ -442,6 +445,7 @@ const Index = () => {
     workspaceLoading,
     workspaceError,
     isActingAsAssistant,
+    actingPermissions,
     effectiveRole,
     recruiterHubAllowed,
     recruiterOperationsAllowed,
@@ -493,11 +497,12 @@ const Index = () => {
     if (workspaceError) return;
     if (effectiveRole !== 'driver') return;
     if (!driverWorkspaceAllowed) return;
+    if (isActingAsAssistant) return;
     if (settings && !settings.onboarding_completed && !allLoadsQuery.isLoading && allLoadsQuery.loads.length === 0) {
       if (suppressOnboardingForAddDeepLink) return;
       setShowOnboardingModal(true);
     }
-  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, workspaceLoading, workspaceError, effectiveRole, driverWorkspaceAllowed]);
+  }, [settings, allLoadsQuery.isLoading, allLoadsQuery.loads.length, suppressOnboardingForAddDeepLink, workspaceLoading, workspaceError, effectiveRole, driverWorkspaceAllowed, isActingAsAssistant]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboardingModal(false);
@@ -515,6 +520,7 @@ const Index = () => {
     !workspaceLoading &&
     effectiveRole === 'driver' &&
     driverWorkspaceAllowed &&
+    !isActingAsAssistant &&
     !allLoadsQuery.isLoading &&
     allLoadsQuery.loads.length === 0 &&
     page === 'dashboard';
@@ -1154,7 +1160,7 @@ const Index = () => {
                   />
                 )}
                 {/* Role path card for new / low-activity drivers only */}
-                {!roleCardDismissed && !isRecruiterView && allLoadsQuery.loads.length <= 3 && (
+                {!roleCardDismissed && !isRecruiterView && !isActingAsAssistant && allLoadsQuery.loads.length <= 3 && (
                   <div className="mb-4 p-4 rounded-2xl border relative" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                     <button
                       onClick={() => {
@@ -1411,7 +1417,7 @@ const Index = () => {
             />
             {effectiveRole === 'driver' && driverWorkspaceAllowed && (
               <OnboardingModal
-                open={showOnboardingModal}
+                open={showOnboardingModal && !isActingAsAssistant}
                 onComplete={handleOnboardingComplete}
                 onNavigateSettings={() => { setShowOnboardingModal(false); setPage('settings'); }}
               />

@@ -250,6 +250,27 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     },
   });
 
+  const completeHire = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const { data, error } = await supabase.rpc('complete_approved_contract_hire', {
+        _application_id: applicationId,
+      });
+      if (error) throw new Error(error.message);
+      if (data !== 'hiring_completed' && data !== 'already_hired') {
+        throw new Error('Unable to confirm that hiring was completed.');
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['opportunity_applications'] });
+      qc.invalidateQueries({ queryKey: ['application_events'] });
+      qc.invalidateQueries({ queryKey: ['driver_referrals'] });
+      qc.invalidateQueries({ queryKey: ['referral_status_events'] });
+    },
+    onError: () => {
+      qc.invalidateQueries({ queryKey: ['contract-readiness-map'] });
+    },
+  });
+
   // Driver records a structured response (does not change application status)
   const recordDriverResponse = useMutation({
     mutationFn: async (args: { applicationId: string; responseType: DriverResponseType; note?: string }) => {
@@ -283,6 +304,7 @@ export function useOpportunityApplications(opts: { recruiterId?: string } = {}) 
     submitRequestInfo,
     withdrawApplication,
     updateApplicationStatus,
+    completeHire,
     recordDriverResponse,
   };
 }

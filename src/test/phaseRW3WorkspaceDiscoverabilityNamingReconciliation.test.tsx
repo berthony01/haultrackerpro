@@ -30,6 +30,8 @@ vi.mock('@/hooks/useAuth', () => ({
 const managedDriversRef: { current: any[] } = { current: [] };
 const agencyRef: { current: any } = { current: null };
 const beginActingAsMock = vi.fn();
+const exitActingAsMock = vi.fn();
+const setViewModeMock = vi.fn();
 
 vi.mock('@/components/layout/AppShell', () => ({
   AppShell: ({ children }: any) => <div>{children}</div>,
@@ -42,6 +44,14 @@ vi.mock('@/hooks/useActingContext', () => ({
     managedDrivers: managedDriversRef.current,
     isLoadingManagedDrivers: false,
     beginActingAs: beginActingAsMock,
+    exitActingAs: exitActingAsMock,
+  }),
+}));
+vi.mock('@/hooks/useViewMode', () => ({
+  useViewMode: () => ({
+    driverWorkspaceAllowed: true,
+    isLoading: false,
+    setViewMode: setViewModeMock,
   }),
 }));
 vi.mock('@/hooks/useAssistantAudit', () => ({
@@ -76,6 +86,8 @@ function src(rel: string) {
 beforeEach(() => {
   navigateMock.mockReset();
   beginActingAsMock.mockReset();
+  exitActingAsMock.mockReset();
+  setViewModeMock.mockReset();
   managedDriversRef.current = [];
   agencyRef.current = null;
   sessionStorage.clear();
@@ -166,6 +178,7 @@ describe('RW-3 (2) — /start workspace directory', () => {
     sessionStorage.setItem('htp_workspace_intent', 'driver');
     fireEvent.click(container.querySelector('[data-capability="agency"]') as HTMLElement);
     expect(sessionStorage.getItem('htp_workspace_intent')).toBeNull();
+    expect(exitActingAsMock).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -199,6 +212,21 @@ describe('RW-3 (3-5) — Assistant Access Center discoverability', () => {
     const btn = screen.getByRole('button', { name: /Open Driver Dashboard/i });
     fireEvent.click(btn);
     expect(navigateMock).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('enters Driver view and opens the first page allowed by the selected driver', () => {
+    managedDriversRef.current = [{
+      delegate_id: 'delegate-1',
+      driver_user_id: 'driver-1',
+      driver_name: 'QA Driver',
+      driver_email: 'driver@example.invalid',
+      permissions: { manage_expenses: true },
+    }];
+    renderAssistant();
+    fireEvent.click(screen.getByRole('button', { name: 'Start managing' }));
+    expect(setViewModeMock).toHaveBeenCalledWith('driver');
+    expect(beginActingAsMock).toHaveBeenCalledWith('driver-1');
+    expect(navigateMock).toHaveBeenCalledWith('/dashboard?page=expenses');
   });
 
   it('agency CTA reads "Open Agency Console" when an agency exists and routes /agency', () => {

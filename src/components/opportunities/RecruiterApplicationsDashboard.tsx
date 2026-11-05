@@ -133,6 +133,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     isErrorRecruiter,
     refetchRecruiter,
     updateApplicationStatus,
+    completeHire,
   } = useOpportunityApplications({ recruiterId: profile?.id });
 
   const [statusFilter, setStatusFilter] = useState<string>(ANY);
@@ -198,9 +199,7 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
     };
   }, [recruiterApplications]);
 
-  // FIX 4: no direct-hire code path. Recruiter selects only RecruiterTransition
-  // values. Hired/onboarding/withdrawn are server-workflow-only and never
-  // reachable from this dashboard.
+  // Ordinary status updates stay separate from the approved-contract hire action.
   const handleUpdate = (id: string, status: RecruiterTransition) => {
     setPendingId(id);
     updateApplicationStatus.mutate(
@@ -275,6 +274,11 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
         : null;
     const conversation = matchingConversation(threads, a.opportunity_id, a.driver_user_id, profile?.id);
     const allowed = getAllowedRecruiterTransitions(a.status);
+    const canCompleteHire =
+      !isActingAsAssistant &&
+      a.application_type === 'apply' &&
+      (a.status === 'offer_sent' || a.status === 'onboarding') &&
+      readinessMap.get(a.id)?.readiness === 'driver_approved';
     const isOpen = !!expandedTimeline[a.id];
     return (
       <Card key={a.id} className="p-5 border-border/60">
@@ -364,6 +368,20 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
 
         {conversation && <Button asChild variant="outline" size="sm" className="mb-3"><Link to={conversationUrl('recruiter', conversation.id)}>View Conversation</Link></Button>}
 
+        {canCompleteHire && (
+          <Button
+            className="mb-3"
+            size="sm"
+            disabled={completeHire.isPending || pendingId === a.id}
+            onClick={() => completeHire.mutate(a.id, {
+              onSuccess: () => toast.success('Driver marked hired'),
+              onError: (error) => toast.error(error.message),
+            })}
+          >
+            {completeHire.isPending && completeHire.variables === a.id ? 'Completing hire…' : 'Complete hire'}
+          </Button>
+        )}
+
         {allowed.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
             {allowed.map((status) => (
@@ -372,7 +390,8 @@ export function RecruiterApplicationsDashboard({ onBack }: Props) {
                 variant={status === 'rejected' ? 'ghost' : 'outline'}
                 size="sm"
                 onClick={() => handleUpdate(a.id, status)}
-                disabled={pendingId === a.id || updateApplicationStatus.isPending}
+                disabled={pendingId === a.id || updateApplicationStatus.isPending ||
+                  (completeHire.isPending && completeHire.variables === a.id)}
               >
                 {RECRUITER_ACTION_LABEL[status]}
               </Button>

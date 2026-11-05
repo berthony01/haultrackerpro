@@ -293,7 +293,7 @@ describe('RC-1F — staff panel isolation', () => {
 
 describe('RC-1F — staff route entry', () => {
   it('adds a permission-gated referrals entry that fails closed', () => {
-    expect(ROUTE).toContain("'home' | 'opportunities' | 'applications' | 'referrals'");
+    expect(ROUTE).toMatch(/'home'\s*\|\s*'opportunities'\s*\|\s*'applications'\s*\|\s*'referrals'/);
     expect(ROUTE).toContain('const canOpenReferrals =');
     expect(ROUTE).toContain('!perms.isLoading &&');
     expect(ROUTE).toContain('(perms.canViewReferrals || perms.canManageReferralTerms)');
