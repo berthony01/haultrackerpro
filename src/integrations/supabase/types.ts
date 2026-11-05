@@ -8506,6 +8506,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      telegram_dispatch_group_is_connected: {
+        Args: { _chat_type: string; _telegram_chat_id: number }
+        Returns: boolean
+      }
       telegram_dispatch_update_driver_load_status: {
         Args: {
           _idempotency_key: string
