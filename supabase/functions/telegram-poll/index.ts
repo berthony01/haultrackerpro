@@ -184,13 +184,16 @@ type RpcClient = ReturnType<typeof createClient>;
 // wiring to revert; never selected when the global general flag is enabled.
 const GENERAL_PILOT = {
   chatId: -5335739793,
-  reference: "HTP-QA-GEN2",
-  loadId: "cdbdbf47-410b-4197-80d1-da3f5cab9a4c",
-  cutoff: 1793763886000,
-  status: "cancelled",
+  cutoff: Date.parse("2026-11-06T14:00:00Z"),
+  targets: [
+    { reference: "HTP-QA-GEN2", loadId: "cdbdbf47-410b-4197-80d1-da3f5cab9a4c", status: "cancelled" },
+    { reference: "HTP-QA-GEN3", loadId: "3833cb3a-e12a-43be-bc2a-2fdc778ae897", status: "completed" },
+  ],
 } as const;
 
 const generalPilotActive = () => Date.now() < GENERAL_PILOT.cutoff;
+const generalPilotTarget = (reference: string | null, status: string | null) =>
+  GENERAL_PILOT.targets.find(target => target.reference === reference && target.status === status);
 const generalPilotTransport = (chatId: number | null, chatType: string | null) =>
   generalPilotActive() && chatId === GENERAL_PILOT.chatId &&
   (chatType === "group" || chatType === "supergroup");
@@ -199,7 +202,8 @@ const generalPilotScope: NonNullable<TelegramPollDeps["dispatchReviewScope"]> = 
   generalPilotTransport(identity.telegramChatId, identity.chatType) &&
   (identity.callbackQueryId
     ? parseDispatchReviewData(identity.callbackData) !== null
-    : identity.text === "/cancelled@HaulTrackerBot HTP-QA-GEN2");
+    : GENERAL_PILOT.targets.some(target => identity.text ===
+      `/${target.status === "completed" ? "delivered" : "cancelled"}@HaulTrackerBot ${target.reference}`));
 
 function generalPilotOptions(pilotOnly: boolean) {
   // Keep both older QA routes disabled even after pilot expiry. Do not drain
@@ -215,17 +219,19 @@ function generalPilotOptions(pilotOnly: boolean) {
 async function generalPilotProposalMatches(supabase: RpcClient, proposalId: string | null): Promise<boolean> {
   if (!generalPilotActive() || proposalId === null) return false;
   const { data, error } = await supabase.from("telegram_dispatch_review_proposals")
-    .select("id").eq("id", proposalId).eq("telegram_chat_id", GENERAL_PILOT.chatId)
-    .eq("load_id", GENERAL_PILOT.loadId).eq("load_reference", GENERAL_PILOT.reference)
-    .eq("proposed_status", GENERAL_PILOT.status).maybeSingle();
-  return !error && data?.id === proposalId && generalPilotActive();
+    .select("id,load_id,load_reference,proposed_status").eq("id", proposalId)
+    .eq("telegram_chat_id", GENERAL_PILOT.chatId).maybeSingle();
+  const target = generalPilotTarget(data?.load_reference ?? null, data?.proposed_status ?? null);
+  return !error && data?.id === proposalId && target !== undefined &&
+    data?.load_id === target.loadId && generalPilotActive();
 }
 
-async function generalPilotLoadMatches(supabase: RpcClient): Promise<boolean> {
-  if (!generalPilotActive()) return false;
+async function generalPilotLoadMatches(supabase: RpcClient, reference: string | null, status: string | null): Promise<boolean> {
+  const target = generalPilotTarget(reference, status);
+  if (!generalPilotActive() || !target) return false;
   const { data, error } = await supabase.from("loads").select("id")
-    .eq("load_reference", GENERAL_PILOT.reference).limit(2);
-  return !error && data?.length === 1 && data[0]?.id === GENERAL_PILOT.loadId && generalPilotActive();
+    .eq("load_reference", target.reference).limit(2);
+  return !error && data?.length === 1 && data[0]?.id === target.loadId && generalPilotActive();
 }
 
 // Guard again immediately before sending, including after a slow claim/read.
@@ -262,7 +268,7 @@ function buildDispatchDeliveryLedger(supabase: RpcClient, qaOnly = false, pilotO
         | null;
       if (!row?.outbox_id || !row.claim_token || !row.proposal_id) return null;
       if (pilotOnly && (Number(row.telegram_chat_id) !== GENERAL_PILOT.chatId ||
-          row.load_reference !== GENERAL_PILOT.reference || row.proposed_status !== GENERAL_PILOT.status ||
+          !generalPilotTarget(row.load_reference ?? null, row.proposed_status ?? null) ||
           !await generalPilotProposalMatches(supabase, row.proposal_id))) {
         log("general_pilot_claim_denied");
         return null; // No send/ack of an unrelated claim; its canonical lease recovers.
@@ -693,8 +699,7 @@ function buildLedger(supabase: RpcClient, pilotOnly = false): TelegramPollLedger
       proposedStatus: DispatchTargetStatus | null;
     }): Promise<TelegramTerminalResult> {
       const pilotAllowed = !pilotOnly || (generalPilotTransport(input.telegramChatId, input.chatType) &&
-        input.reference === GENERAL_PILOT.reference && input.proposedStatus === GENERAL_PILOT.status &&
-        await generalPilotLoadMatches(supabase));
+        await generalPilotLoadMatches(supabase, input.reference, input.proposedStatus));
       const { data, error } = await supabase.rpc("telegram_process_dispatch_group_update", {
         _lease_token: input.leaseToken,
         _update_id: input.updateId,
