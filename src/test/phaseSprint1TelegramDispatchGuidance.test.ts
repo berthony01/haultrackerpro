@@ -5,9 +5,9 @@ import { getTelegramDispatchGuidance, runTelegramPoll, TELEGRAM_DISPATCH_GUIDANC
 import { TGG1B_DISPATCH_GROUP_REVIEW_ENABLED } from '../../supabase/functions/_shared/telegram-dispatch-group-review';
 const input = (text='/dispatch', chatType='group', telegramUserId=501, telegramChatId=-100) => ({text,chatType,telegramUserId,telegramChatId});
 describe('Sprint 1 dispatcher guidance production-used path',()=>{
- it('only read-only guidance is on; test-injected OFF never calls authorization',async()=>{
+ it('guidance and the reviewed general mode are on; test-injected OFF never calls authorization',async()=>{
    const auth=vi.fn(); expect(TELEGRAM_DISPATCH_GUIDANCE_ENABLED).toBe(true);
-   expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
+   expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(true);
    expect(await getTelegramDispatchGuidance(input(),auth,false)).toBe(false); expect(auth).not.toHaveBeenCalled();
  });
  it.each(['/dispatch','/dispatch@HaulTrackerBot','/help','/help@HaulTrackerBot'])('authorizes exact transport group command %s',async(text)=>{

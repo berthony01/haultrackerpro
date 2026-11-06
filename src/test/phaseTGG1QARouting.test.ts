@@ -60,7 +60,7 @@ function fixture(updates: unknown[]) {
     getUpdates: async () => ({ ok: true, status: 200, result: updates }), sendMessage: send,
     answerCallbackQuery: vi.fn(async () => ({ ok: true, status: 200 })),
   };
-  const poll = (enabled = true) => runTelegramPoll({ genQaEnabled: false, ledger, gateway,
+  const poll = (enabled = true) => runTelegramPoll({ dispatchReviewEnabled: false, genQaEnabled: false, ledger, gateway,
     sha256: async s => createHash("sha256").update(s).digest("hex"), singleLoadQaEnabled: enabled });
   return { ledger, gateway, intake, review, send, genericIntake, genericReview, poll,
     status: () => status, proposals: () => proposals };
@@ -69,9 +69,9 @@ function fixture(updates: unknown[]) {
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date("2026-10-31T12:00:00Z")); });
 afterEach(() => vi.useRealTimers());
 describe("Single-load QA route", () => {
-  it("staged QA and global review remain OFF and only QA service RPC names are selected", () => {
+  it("legacy QA remains OFF while general review is ON; archived QA uses only its service RPCs", () => {
     expect(TELEGRAM_SINGLE_LOAD_QA_ENABLED).toBe(false);
-    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
+    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(true);
     expect(TELEGRAM_SINGLE_LOAD_QA_RPCS).toEqual({ intake: "telegram_qa_process_dispatch_group_update",
       review: "telegram_qa_process_dispatch_review_action", claim: "telegram_qa_claim_dispatch_review_delivery" });
   });
@@ -174,7 +174,7 @@ describe("Single-load QA route", () => {
       if (failure === "throw") throw new Error("private chat/user details must not appear");
       return { ok: false, status: 403, errorCode: "private chat/user details must not appear" };
     });
-    const poll = () => runTelegramPoll({ genQaEnabled: false, ledger: f.ledger, gateway: f.gateway, log,
+    const poll = () => runTelegramPoll({ dispatchReviewEnabled: false, genQaEnabled: false, ledger: f.ledger, gateway: f.gateway, log,
       sha256: async s => createHash("sha256").update(s).digest("hex"), singleLoadQaEnabled: true });
     expect(await poll()).toMatchObject({ kind: "ok", processed: 1, advancedTo: 2 });
     expect(f.status()).toBe("cancelled");
@@ -194,32 +194,32 @@ describe("Single-load QA delivery isolation", () => {
   }
   it("OFF makes zero claims or sends", async () => {
     const f = fixture([]); const qa = delivery();
-    expect((await runDispatchReviewDeliveryDrain({ genQaEnabled: false, ledger: qa, qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: false })).status).toBe("disabled");
+    expect((await runDispatchReviewDeliveryDrain({ enabled: false, genQaEnabled: false, ledger: qa, qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: false })).status).toBe("disabled");
     expect(qa.claim).not.toHaveBeenCalled(); expect(f.send).not.toHaveBeenCalled();
   });
   it("ON only claims QA port and acknowledges its claim token", async () => {
     const f = fixture([]); const qa = delivery(); const generic = delivery();
-    expect(await runDispatchReviewDeliveryDrain({ genQaEnabled: false, ledger: generic, qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true, limit: 1 })).toMatchObject({ status: "ok", sent: 1 });
+    expect(await runDispatchReviewDeliveryDrain({ enabled: false, genQaEnabled: false, ledger: generic, qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true, limit: 1 })).toMatchObject({ status: "ok", sent: 1 });
     expect(generic.claim).not.toHaveBeenCalled(); expect(qa.ack).toHaveBeenCalledWith(ID, ID, 9);
     expect(f.send).toHaveBeenCalledWith(expect.objectContaining({ chatId: GROUP }));
   });
   it("missing QA claim port never claims generic outbox", async () => {
     const f = fixture([]); const generic = delivery();
-    expect((await runDispatchReviewDeliveryDrain({ genQaEnabled: false, ledger: generic, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("failed");
+    expect((await runDispatchReviewDeliveryDrain({ enabled: false, genQaEnabled: false, ledger: generic, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("failed");
     expect(generic.claim).not.toHaveBeenCalled(); expect(f.send).not.toHaveBeenCalled();
   });
   it.each([{ loadReference: "OTHER-1" }, { proposedStatus: "completed" }, { telegramChatId: 123 },
     { expiresAt: undefined }, { expiresAt: "bad" }, { expiresAt: "2026-10-30T00:00:00Z" }])("rejects injected unsafe claim %j before send/ack/fail", async overrides => {
     const f = fixture([]); const qa = delivery(overrides);
-    expect((await runDispatchReviewDeliveryDrain({ genQaEnabled: false, ledger: delivery(), qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("failed");
+    expect((await runDispatchReviewDeliveryDrain({ enabled: false, genQaEnabled: false, ledger: delivery(), qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("failed");
     expect(f.send).not.toHaveBeenCalled(); expect(qa.ack).not.toHaveBeenCalled(); expect(qa.fail).not.toHaveBeenCalled();
   });
   it("RPC missing or expiry error cannot send", async () => {
     const f = fixture([]); const qa = delivery(); qa.claim = vi.fn(async () => { throw new Error("rpc_missing"); });
-    expect((await runDispatchReviewDeliveryDrain({ genQaEnabled: false, ledger: delivery(), qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("failed");
+    expect((await runDispatchReviewDeliveryDrain({ enabled: false, genQaEnabled: false, ledger: delivery(), qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("failed");
     expect(f.send).not.toHaveBeenCalled();
     vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-02T23:59:59Z"));
-    expect((await runDispatchReviewDeliveryDrain({ genQaEnabled: false, ledger: delivery(), qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("disabled");
+    expect((await runDispatchReviewDeliveryDrain({ enabled: false, genQaEnabled: false, ledger: delivery(), qaLedger: qa, gateway: f.gateway, singleLoadQaEnabled: true })).status).toBe("disabled");
     expect(qa.claim).toHaveBeenCalledTimes(1);
   });
 });

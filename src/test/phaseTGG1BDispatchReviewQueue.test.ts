@@ -107,7 +107,7 @@ describe("TG-G1B pure durable delivery adapter", () => {
   }
   it("OFF means zero ledger and delivery calls", async () => {
     const { ledger, port } = world();
-    expect(await processDispatchDelivery(ledger, port)).toBe("disabled");
+    expect(await processDispatchDelivery(ledger, port, false)).toBe("disabled");
     expect(ledger.claim).not.toHaveBeenCalled(); expect(port.deliver).not.toHaveBeenCalled();
   });
   it("claims durable metadata, delivers bounded buttons and acks exact claim", async () => {
@@ -133,15 +133,17 @@ describe("TG-G1B pure durable delivery adapter", () => {
 });
 
 describe("TG-G1B gate and namespace", () => {
-  it("is a compile-time false literal with no env flag", () => {
-    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
+  it("is a compile-time release constant with an explicit disabled path", () => {
+    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(true);
     expect(ADAPTER).not.toMatch(/Deno\.env|process\.env|import\.meta\.env/);
-    expect(routeDispatchGroupUpdate({ chatType: "group", callbackData: null, text: "Load #AB-123 delivered" })).toBeNull();
+    expect(routeDispatchGroupUpdate({ chatType: "group", callbackData: null, text: "Load #AB-123 delivered" }, false)).toBeNull();
     expect(routeDispatchGroupUpdate({ chatType: "group", callbackData: null, text: "x" }, true)).toBe("group_message");
     expect(routeDispatchGroupUpdate({ chatType: "private", callbackData: null, text: "x" }, true)).toBeNull();
   });
-  it("TG-G1C: general dispatch stays gated with no environment toggle or unconditional enable", () => {
-    expect(ADAPTER).toMatch(/export const TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false as const;/);
+  it("general dispatch is enabled by the reviewed constant without an environment toggle", () => {
+    expect(ADAPTER).toMatch(/export const TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = true as const;/);
+    expect(ADAPTER).toMatch(/export const TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED = false as const;/);
+    expect(ADAPTER).toMatch(/export const TELEGRAM_SINGLE_LOAD_QA_ENABLED = false as const;/);
     for (const src of [INGEST, POLL]) {
       expect(src).not.toMatch(/TGG1B_DISPATCH_GROUP_REVIEW_ENABLED\s*=\s*true/);
       expect(src).not.toMatch(/Deno\.env\.get\(["'][^"']*(DISPATCH|TGG1)/i);
