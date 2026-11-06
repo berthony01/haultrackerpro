@@ -251,6 +251,7 @@ const Index = () => {
   const [pendingPurchaseTrack, setPendingPurchaseTrack] = useState(false);
   // Navigation transaction only; current capability/render gates remain authoritative.
   const driverProfileTransition = useRef<{ userId: string; phase: 'workspace' | 'target' } | null>(null);
+  const recruiterUrlTransition = useRef<string | null>(null);
   // Re-run URL hint handling on in-app navigation while Index stays mounted.
   // Params are still read from window.location: consumed hints are cleared
   // with history.replaceState, which Router state does not observe.
@@ -351,7 +352,9 @@ const Index = () => {
       const requestedSub = parseRecruiterSubviewFromPage(pageParam) ?? 'hub';
       if (recruiterHubAllowed && recruiterWorkspaceStatus &&
           recruiterWorkspaceStatus !== 'revoked') {
-        // Authorized: switch view mode + resolve safe subview via policy.
+        // Resolve the destination and switch workspace in the same transition.
+        // The policy effect must not reconcile against the previous workspace.
+        recruiterUrlTransition.current = user?.id ?? null;
         setViewMode('recruiter');
         const decision = resolveDashboardNavigation({
           requestedPage: 'recruiter-access',
@@ -745,6 +748,14 @@ const Index = () => {
   // through the pure dashboard policy. Replaces the exclusive-role guard
   // that used `useUserRole`.
   useEffect(() => {
+    const recruiterTransition = recruiterUrlTransition.current;
+    if (recruiterTransition && recruiterTransition === user?.id &&
+        !workspaceLoading && !workspaceError && recruiterHubAllowed &&
+        recruiterWorkspaceStatus && recruiterWorkspaceStatus !== 'revoked') {
+      if (effectiveRole === 'recruiter' && page === 'recruiter-access') recruiterUrlTransition.current = null;
+      return;
+    }
+    recruiterUrlTransition.current = null;
     const transition = driverProfileTransition.current;
     if (transition) {
       if (transition.phase === 'target') driverProfileTransition.current = null;
