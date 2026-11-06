@@ -89,8 +89,8 @@ vi.mock('@/components/opportunities/OpportunitiesPage', async (importOriginal) =
 });
 vi.mock('@/hooks/opportunities/useOpportunities', () => ({ useOpportunities: () => ({ opportunities: [], isLoading: false }) }));
 vi.mock('@/hooks/opportunities/useSavedOpportunities', () => ({ useSavedOpportunities: () => ({ saved: [], save: { mutate: state.mutation }, unsave: { mutate: state.mutation } }) }));
-vi.mock('@/components/opportunities/recruiter/RecruiterAccessRoute', () => ({ RecruiterAccessRoute: () => {
-  state.recruiterMount(); return <div data-testid="recruiter-hub" />;
+vi.mock('@/components/opportunities/recruiter/RecruiterAccessRoute', () => ({ RecruiterAccessRoute: ({ initialView }: { initialView?: string }) => {
+  state.recruiterMount(initialView); return <div data-testid="recruiter-hub" data-subview={initialView} />;
 } }));
 vi.mock('@/components/opportunities/recruiter/RecruiterSettingsView', () => ({ RecruiterSettingsView: () => null }));
 vi.mock('@/components/RecurringExpensesView', () => ({ RecurringExpensesView: () => null }));
@@ -634,5 +634,69 @@ describe('release repairs: Reports refresh, More sheet height, Find Work dark ch
     render(tree(<DriverWorkConversation />));
     const chip = screen.getByTestId('home-conversation-surface').querySelector<HTMLButtonElement>('button[data-testid^="home-conversation-chip-"]')!;
     expect(chip.style.background).toMatch(/255|100%|white/);
+  });
+});
+
+
+describe('recruiter dashboard deep links', () => {
+  const recruiterLinkTree = () => (
+    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <BrowserRouter><Location /><Index /></BrowserRouter>
+    </QueryClientProvider>
+  );
+
+  it.each([
+    ['driver', 'manager'], ['driver', 'applications'], ['driver', 'reports'],
+    ['recruiter', 'manager'], ['recruiter', 'applications'], ['recruiter', 'reports'],
+  ] as const)('preserves the %s workspace handoff into recruiter %s', async (workspace, subview) => {
+    capability('active', 'active'); state.realWorkspace = true;
+    localStorage.setItem('htp_view_mode:driver-a', workspace);
+    window.history.replaceState({}, '', `/dashboard?page=recruiter-access:${subview}`);
+    render(recruiterLinkTree());
+    await waitFor(() => expect(screen.getByTestId('recruiter-hub')).toHaveAttribute('data-subview', subview));
+    expect(screen.queryByTestId('existing-dashboard')).toBeNull();
+    expect(state.mutation).not.toHaveBeenCalled();
+    expect(state.model).not.toHaveBeenCalled();
+  });
+
+  it('settles the same destination when effects run twice in StrictMode', async () => {
+    capability('active', 'active'); state.realWorkspace = true;
+    localStorage.setItem('htp_view_mode:driver-a', 'driver');
+    window.history.replaceState({}, '', '/dashboard?page=recruiter-access:manager');
+    render(<React.StrictMode>{recruiterLinkTree()}</React.StrictMode>);
+    await waitFor(() => expect(screen.getByTestId('recruiter-hub')).toHaveAttribute('data-subview', 'manager'));
+  });
+
+  it('switches a mounted Driver dashboard to the requested recruiter view', async () => {
+    state.loads = [{ id: 'existing-load' }];
+    capability('active', 'active'); state.realWorkspace = true;
+    localStorage.setItem('htp_view_mode:driver-a', 'driver');
+    render(<QueryClientProvider client={new QueryClient()}>
+      <BrowserRouter><Link to="/dashboard?page=recruiter-access:manager">Open recruiter manager</Link><Index /></BrowserRouter>
+    </QueryClientProvider>);
+    expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
+    fireEvent.click(screen.getByRole('link', { name: 'Open recruiter manager' }));
+    await waitFor(() => expect(screen.getByTestId('recruiter-hub')).toHaveAttribute('data-subview', 'manager'));
+  });
+
+  it('retains the recruiter destination while account access resolves', async () => {
+    capability('active', 'active');
+    state.access.effectiveRole = 'recruiter'; state.access.isLoading = true;
+    window.history.replaceState({}, '', '/dashboard?page=recruiter-access:manager');
+    const view = render(recruiterLinkTree());
+    expect(window.location.search).toBe('?page=recruiter-access:manager');
+    expect(screen.queryByTestId('recruiter-hub')).toBeNull();
+    state.access.isLoading = false;
+    view.rerender(recruiterLinkTree());
+    await waitFor(() => expect(screen.getByTestId('recruiter-hub')).toHaveAttribute('data-subview', 'manager'));
+  });
+
+  it.each(['setup', 'suspended'] as const)('keeps a %s recruiter within the existing access policy', async status => {
+    capability('active', status); state.realWorkspace = true;
+    localStorage.setItem('htp_view_mode:driver-a', 'driver');
+    window.history.replaceState({}, '', '/dashboard?page=recruiter-access:manager');
+    render(recruiterLinkTree());
+    await waitFor(() => expect(screen.getByTestId('recruiter-hub')).toHaveAttribute('data-subview', status === 'setup' ? 'onboarding' : 'hub'));
+    expect(state.recruiterMount.mock.calls.flat()).not.toContain('manager');
   });
 });
