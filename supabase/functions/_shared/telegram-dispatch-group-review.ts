@@ -3,19 +3,10 @@
 // Bridges the TG-G1A deterministic parser to the TG-G1B candidate RPCs
 // (supabase/migration-candidates/20261029183000_tgg1b_dispatch_review_queue.sql).
 //
-// HARD-DISABLED. `TGG1B_DISPATCH_GROUP_REVIEW_ENABLED` is a compile-time
-// `false` literal — there is deliberately NO environment/runtime flag. TG-G1C
-// stages the poller wiring (telegram-poll-ingest.ts / telegram-poll/index.ts)
-// behind this constant, so with it off behaviour is bit-for-bit unchanged.
-//
-// Activation gates (each separately approved, in order):
-//   1. apply the candidate migration and verify receipts/RLS/grants live;
-//   2. obtain real sanitized group-message examples and widen tests;
-//   3. wire `routeDispatchGroupUpdate` into classifyUpdate AFTER the `/bind`
-//      branch and BEFORE the `non_private_message` fallback, and the `g1`
-//      callback namespace BEFORE the `c1` fallback;
-//   4. flip the constant below in a reviewed commit, set Telegram privacy
-//      mode, deploy, and run live E2E.
+// General review is enabled by an explicit release constant, with both older
+// acceptance lanes disabled. There is no environment/runtime toggle.
+// The database remains authoritative for linked identity, permission, active
+// binding/relationship, expected load status, expiry and idempotency.
 //
 // Never: AI parsing, raw text persistence/logging, identities from chat text
 // or callback payloads, automatic load status changes on intake.
@@ -25,7 +16,7 @@ import {
   type DispatchTargetStatus,
 } from "./telegram-dispatch-group-proposals.ts";
 
-export const TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = false as const;
+export const TGG1B_DISPATCH_GROUP_REVIEW_ENABLED = true as const;
 // Separately approved single-load QA release only. Never an environment flag.
 export const TELEGRAM_SINGLE_LOAD_QA_ENABLED = false as const;
 export const TELEGRAM_SINGLE_LOAD_QA_REFERENCE = "HTP-QA-L2";
@@ -37,7 +28,7 @@ export const TELEGRAM_SINGLE_LOAD_QA_RPCS = {
 } as const;
 
 // Separate acceptance lane. No environment or remote toggle.
-export const TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED = true as const;
+export const TELEGRAM_GENQA_GROUP_ACCEPTANCE_ENABLED = false as const;
 export const TELEGRAM_GENQA_REFERENCE = "HTP-QA-GEN1";
 export const TELEGRAM_GENQA_CHAT_ID = -5335739793;
 export const TELEGRAM_GENQA_EXPIRES_AT = Date.parse("2026-11-05T23:59:59Z");

@@ -290,7 +290,7 @@ describe("TG-2F-C C — orchestrator routes bind updates atomically", () => {
     await runTelegramPoll({ ledger, gateway, sha256 });
     expect(sendMessage).toHaveBeenCalledWith({
       chatId: -222,
-      text: TELEGRAM_BIND_SUCCESS_MESSAGE,
+      text: "Connected · load updates on\nAuthorized dispatchers can submit /delivered@HaulTrackerBot LOAD-REF or /cancelled@HaulTrackerBot LOAD-REF. An authorized dispatcher must confirm each review before the load changes.",
     });
   });
 
@@ -358,7 +358,7 @@ describe("TG-2F-C C — orchestrator routes bind updates atomically", () => {
     });
     expect(sendMessage).toHaveBeenNthCalledWith(2, {
       chatId: -222,
-      text: TELEGRAM_BIND_SUCCESS_MESSAGE,
+      text: "Connected · load updates on\nAuthorized dispatchers can submit /delivered@HaulTrackerBot LOAD-REF or /cancelled@HaulTrackerBot LOAD-REF. An authorized dispatcher must confirm each review before the load changes.",
     });
     expect(result).toMatchObject({
       kind: "ok",

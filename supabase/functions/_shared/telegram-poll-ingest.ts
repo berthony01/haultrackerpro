@@ -948,10 +948,10 @@ export function classifyUpdate(
       return { kind: "bind", rawToken: bindMatch[1], chatType: identity.chatType };
     }
   }
-  // TG-G1C (gated, default OFF). Strictly AFTER the exact `/bind` branch and
+  // TG-G1C. Strictly AFTER the exact `/bind` branch and
   // BEFORE the `non_private_message` fallback. Only explicitly addressed
   // reports from an individual account can enter general dispatch intake.
-  // Sender/chat come from the transport fields only. Gate stays OFF in live code.
+  // Sender/chat come from transport fields; the reviewed release constant selects this lane.
   if (genQaActive(genQaEnabled) && identity.telegramChatId === TELEGRAM_GENQA_CHAT_ID && identity.text !== null &&
       (identity.chatType === "group" || identity.chatType === "supergroup") && isGenQaCommand(identity.text)) {
     return { kind: "dispatch_group_message", text: identity.text, chatType: identity.chatType, genQaOnly: true };

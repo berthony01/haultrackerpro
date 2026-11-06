@@ -15,8 +15,8 @@ const id = (text: string, chatType = "private") => ({
 }) as never;
 
 describe("UX-1 Telegram bot guidance", () => {
-  it("keeps the dispatch gate compile-time false", () => {
-    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
+  it("uses the reviewed general dispatch release constant", () => {
+    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(true);
   });
   it("routes private /help through the read-only menu path", () => {
     expect(classifyUpdate(id("/help"))).toEqual({ kind: "menu", command: "help" });

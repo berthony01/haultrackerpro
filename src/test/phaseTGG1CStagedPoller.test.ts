@@ -150,8 +150,19 @@ async function poll(w: ReturnType<typeof makeWorld>, updates: unknown[], enabled
 }
 
 describe("TG-G1C gate", () => {
-  it("compile-time gate is false and the Edge Function only injects bounded pilot options", () => {
-    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(false);
+  it("production defaults select only general intake and delivery without a mode conflict", async () => {
+    const w = makeWorld();
+    const g = makeGateway([groupMsg(1, "/delivered@HaulTrackerBot AB-123")]);
+    expect((await runTelegramPoll({ ledger: w.ledger, gateway: g.gateway, sha256 })).kind).toBe("ok");
+    expect(w.calls).toContain("dispatch_intake");
+    expect(w.proposals.size).toBe(1);
+    expect(w.loads.get("AB-123")!.status).toBe("en_route");
+    const delivery = await runDispatchReviewDeliveryDrain({ ledger: w.delivery, gateway: g.gateway });
+    expect(delivery.sent).toBe(1);
+  });
+
+  it("reviewed gate is on and rollback retains bounded pilot options", () => {
+    expect(TGG1B_DISPATCH_GROUP_REVIEW_ENABLED).toBe(true);
     const POLL = readFileSync(resolve(__dirname, "../../supabase/functions/telegram-poll/index.ts"), "utf8");
     expect(POLL).not.toMatch(/\b(?:dispatchReviewEnabled|enabled)\s*:\s*true\b/);
     expect(POLL).not.toMatch(/Deno\.env\.get\(["'][^"']*(DISPATCH|TGG1)/i);
@@ -165,13 +176,13 @@ describe("TG-G1C gate", () => {
   it("disabled (QA explicitly OFF): group text → non_private_message, g1 tap → c1 path, zero dispatch RPCs/sends", async () => {
     const w = makeWorld();
     const g = makeGateway([groupMsg(1, "/delivered@HaulTrackerBot AB-123"), tap(2, composeDispatchReviewData("accept", uuid())!)]);
-    const r = await runTelegramPoll({ genQaEnabled: false, ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false });
+    const r = await runTelegramPoll({ genQaEnabled: false, ledger: w.ledger, gateway: g.gateway, sha256, singleLoadQaEnabled: false, dispatchReviewEnabled: false });
     expect(r.kind).toBe("ok");
     expect(w.calls).toContain("ignored:non_private_message");
     expect(w.calls).toContain("c1");
     expect(w.calls.some((c) => c.startsWith("dispatch"))).toBe(false);
     expect(g.sent).toHaveLength(0);
-    const d = await runDispatchReviewDeliveryDrain({ genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway });
+    const d = await runDispatchReviewDeliveryDrain({ enabled: false, genQaEnabled: false, singleLoadQaEnabled: false, ledger: w.delivery, gateway: g.gateway });
     expect(d.status).toBe("disabled");
     expect(w.calls).not.toContain("claim");
     expect(w.loads.get("AB-123")!.status).toBe("en_route");
@@ -217,7 +228,7 @@ describe("dispatch group welcome", () => {
     });
     expect(g.sent.map(({ chatId, text }) => [chatId, text.split("\n")[0]])).toEqual([
       [OTHER_GROUP, "Setup required"],
-      [GROUP, "Connected · load updates off"],
+      [GROUP, "Connected · load updates on"],
     ]);
     expect(w.calls).not.toContain("dispatch_intake");
   });
