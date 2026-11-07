@@ -15,6 +15,7 @@ import { ActingAsBanner } from "@/components/assistants/ActingAsBanner";
 import { PendingDelegationBanner } from "@/components/agency/PendingDelegationBanner";
 import { OwnerQaModeBanner } from "@/components/admin/OwnerQaModeBanner";
 import { HaulTrackerAssistantLauncher } from "@/components/assistant/HaulTrackerAssistantLauncher";
+import { isMiniAppLocation } from '@/lib/telegramMiniApp';
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
@@ -48,6 +49,7 @@ function lazyWithRetry<T extends React.ComponentType<any>>(
 
 // Everything else — lazy loaded
 const Conversations = lazyWithRetry(() => import("./pages/Conversations"), "Conversations");
+const TelegramMiniApp = lazyWithRetry(() => import('./pages/TelegramMiniApp'), 'TelegramMiniApp');
 const AiAssistant = lazyWithRetry(() => import("./pages/AiAssistant"), "AiAssistant");
 const Index = lazyWithRetry(() => import("./pages/Index"), "Index");
 const Terms = lazy(() => import("./pages/Terms"));
@@ -194,9 +196,15 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 function PageViewTracker() {
   const location = useLocation();
   useEffect(() => {
+    if (isMiniAppLocation(location.pathname, location.search)) return;
     trackPageView(location.pathname + location.search);
   }, [location]);
   return null;
+}
+
+function GlobalAssistantLauncher() {
+  const location = useLocation();
+  return isMiniAppLocation(location.pathname, location.search) ? null : <HaulTrackerAssistantLauncher />;
 }
 
 function RoleIntentReconcilerMount() {
@@ -233,6 +241,7 @@ const App = () => (
               <Route path="/index" element={<Navigate to="/" replace />} />
               <Route path="/index.html" element={<Navigate to="/" replace />} />
               <Route path="/auth" element={<AuthRoute><Auth /></AuthRoute>} />
+              <Route path="/telegram" element={<TelegramMiniApp />} />
               <Route path="/terms" element={<Terms />} />
               <Route path="/privacy" element={<Privacy />} />
               <Route path="/docs" element={<Docs />} />
@@ -334,7 +343,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
-            <HaulTrackerAssistantLauncher />
+            <GlobalAssistantLauncher />
             </AiAssistantProvider>
             </WorkConversationDraftProvider>
             </ActingContextProvider>

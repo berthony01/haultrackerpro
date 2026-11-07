@@ -36,6 +36,9 @@ vi.mock('@/hooks/opportunities/useRecruiterOpportunities', () => ({
 vi.mock('@/hooks/opportunities/useRecruiterBilling', () => ({
   useRecruiterBilling: vi.fn(() => ({ refresh: h.billingRefresh })),
 }));
+vi.mock('@/hooks/opportunities/useRecruiterQaPublicationContext', () => ({
+  useRecruiterQaPublicationContext: () => ({ context: 'unknown', isLoading: false, isError: false }),
+}));
 vi.mock('@/hooks/useUserRole', () => ({
   useUserRole: vi.fn(() => ({ intentRecruiter: true })),
 }));

@@ -1,0 +1,67 @@
+name: Telegram Mini App verification
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/telegram-mini-app.yml'
+      - 'index.html'
+      - 'src/App.tsx'
+      - 'src/components/telegram/**'
+      - 'src/components/opportunities/RecruiterOpportunityManager.tsx'
+      - 'src/hooks/useTelegramMiniAppConnection.ts'
+      - 'src/lib/telegramMiniApp.ts'
+      - 'src/lib/authNavigation.ts'
+      - 'src/lib/analytics.ts'
+      - 'src/pages/TelegramMiniApp.tsx'
+      - 'src/styles/telegram-mini-app.css'
+      - 'src/test/telegramMiniApp*'
+      - 'supabase/functions/telegram-mini-app/**'
+      - 'supabase/functions/_shared/telegram-mini-app-*'
+      - 'supabase/functions/telegram-poll/index.ts'
+      - 'supabase/config.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: https://pngptztxwbtozwxrtbwo.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: synthetic-unit-test-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - run: bun install --frozen-lockfile
+      - name: Typecheck app and build configuration
+        run: |
+          bunx tsc -p tsconfig.app.json --noEmit
+          bunx tsc -p tsconfig.node.json --noEmit
+      - name: Verify identity, role gates, posting, chat and dispatch regression
+        run: >-
+          bunx vitest run
+          src/test/telegramMiniApp src/test/phaseRB src/test/phaseTG
+          src/test/phaseSprint1TelegramDispatchGuidance.test.ts
+          src/test/phaseUX1TelegramBotGuidance.test.ts
+          src/test/authNavigation.test.ts
+          src/test/recruiterOpportunityFormConsolidation.test.tsx
+          src/test/phaseRC1DRecruiterStaffOpportunityAuthorization.test.tsx
+          src/test/phaseRC1ERecruiterStaffApplicationAuthorization.test.tsx
+          src/test/phaseRC1CRecruiterStaffWorkspaceResolution.test.tsx
+          src/test/phaseCF1BConversationUi.test.tsx
+          --exclude '**/*LocalPostgres*'
+      - name: Lint Mini App production screens
+        run: >-
+          bunx eslint src/components/telegram src/hooks/useTelegramMiniAppConnection.ts
+          src/lib/telegramMiniApp.ts src/pages/TelegramMiniApp.tsx
+      - name: Build production frontend with public deployment defaults
+        env:
+          VITE_SUPABASE_PUBLISHABLE_KEY: ''
+        run: bun run build
