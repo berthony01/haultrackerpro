@@ -7,6 +7,7 @@
 
 import { execFileSync } from "node:child_process";
 import type { Plugin } from "vite";
+import { injectMiniAppPrivacyGuard } from './htpMiniAppPrivacy';
 
 export const HTP_SHA_REGEX = /^[0-9a-f]{40}$/i;
 export const HTP_APP_NAME = "haultrackerpro";
@@ -101,7 +102,7 @@ export function htpBuildShaPlugin(): Plugin {
       handler(html) {
         if (!active) return html;
         const { metaHtml } = createVersionArtifact(sha, builtAt);
-        return injectBuildShaMeta(html, metaHtml);
+        return injectMiniAppPrivacyGuard(injectBuildShaMeta(html, metaHtml));
       },
     },
     generateBundle() {
