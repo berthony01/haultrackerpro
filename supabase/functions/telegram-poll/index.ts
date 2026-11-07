@@ -1118,7 +1118,7 @@ const OPPORTUNITIES_BUTTONS: TelegramInlineButton[][] = [
 ];
 
 const MENU_UNLINKED_TEXT =
-  "Welcome to HaulTracker Pro.\n\nTap Create account / Sign in to open HaulTracker Pro inside Telegram. Sign in with your existing account, or create a recruiter account and confirm your email. Then tap Connect this Telegram account. Tools follow your company and team permissions.\n\nYou can also connect from haultrackerpro.com: Settings > Connect Telegram. After connecting, send /menu here.";
+  "Welcome to HaulTracker Pro.\n\nTap Create account / Sign in to open HaulTracker Pro inside Telegram. Sign in with your existing account or create a recruiter account. Follow the account setup steps, then tap Connect this Telegram account. Tools follow your company and team permissions.\n\nYou can also connect from haultrackerpro.com: Settings > Connect Telegram. After connecting, send /menu here.";
 const MENU_NO_WORKSPACE_TEXT =
   "Your HaulTracker Pro account is connected. Available bot tools follow your workspace permissions. Open HaulTracker Pro to manage your account or check your workspace access.";
 const MENU_HEADER_TEXT = "HaulTracker Pro recruiter status";
