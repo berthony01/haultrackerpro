@@ -15,6 +15,8 @@ on:
       - 'src/pages/TelegramMiniApp.tsx'
       - 'src/styles/telegram-mini-app.css'
       - 'src/test/telegramMiniApp*'
+      - 'vite/htpBuildShaPlugin.ts'
+      - 'vite/htpMiniAppPrivacy.ts'
       - 'supabase/functions/telegram-mini-app/**'
       - 'supabase/functions/_shared/telegram-mini-app-*'
       - 'supabase/functions/telegram-poll/index.ts'

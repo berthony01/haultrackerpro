@@ -67,11 +67,19 @@ or query-cache keys. The Telegram SDK manages its own launch state.
 Application Google Analytics initialization and events are suppressed on Mini App
 routes and their auth continuation. Existing font requests are not analytics.
 
+Live hosting inspection found additional injected analytics scripts, including
+`/~flock.js`, whose page-hit payload includes the full URL. Production builds now
+install a route-scoped script Content Security Policy before other scripts run.
+Telegram launch pages allow bundled app assets, the official Telegram SDK and
+content hashes of reviewed inline bootstraps. Hosting analytics cannot execute
+on those pages. Ordinary website pages retain their existing analytics behavior.
+
 ## Validation evidence
 
 | Check | Candidate result |
 | --- | --- |
-| Selected regression suite | PASS, 1,412 tests, including 76 new Mini App tests |
+| Original release regression suite | PASS, 1,412 tests, including 76 new Mini App tests |
+| Hosting privacy follow-up | PASS, 10 policy tests and isolated browser checks with injected trackers |
 | Real Ed25519 signature, wrong bot, tampering, age and malformed identities | PASS with synthetic signing keys |
 | Deployed Edge adapter, user JWT vs service RPC context | PASS with synthetic Supabase transports |
 | Owner/staff gates, revoked permissions, suspended/acting contexts | PASS in component tests |
