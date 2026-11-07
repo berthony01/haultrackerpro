@@ -339,7 +339,7 @@ describe('getLoadPaidMiles — Phase 6C.2 companion metric consistency', () => {
     expect(getLoadPaidMiles(load as any)).toBe(150);
   });
 
-  it('total_miles remains total miles (no extra logic)', () => {
+  it('total_miles rejects a stored total that contradicts itemized operating miles', () => {
     const load = {
       ...base,
       pay_model: 'total_miles',
@@ -347,7 +347,9 @@ describe('getLoadPaidMiles — Phase 6C.2 companion metric consistency', () => {
       deadhead_pay_status: 'per_mile',
       deadhead_rate_per_mile: 1,
     };
-    expect(getLoadPaidMiles(load as any)).toBe(175);
+    // 100 loaded + 50 deadhead = 150. The stale summary of 175 exceeds
+    // the canonical two-mile tolerance and must not inflate paid mileage.
+    expect(getLoadPaidMiles(load as any)).toBe(150);
   });
 
   it('flat_rate remains total operating miles', () => {

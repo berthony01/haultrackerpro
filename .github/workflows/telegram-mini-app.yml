@@ -6,6 +6,7 @@ on:
       - '.github/workflows/telegram-mini-app.yml'
       - 'index.html'
       - 'src/App.tsx'
+      - 'src/pages/Index.tsx'
       - 'src/components/telegram/**'
       - 'src/components/opportunities/RecruiterOpportunityManager.tsx'
       - 'src/hooks/useTelegramMiniAppConnection.ts'
@@ -15,6 +16,7 @@ on:
       - 'src/pages/TelegramMiniApp.tsx'
       - 'src/styles/telegram-mini-app.css'
       - 'src/test/telegramMiniApp*'
+      - 'src/test/authenticatedWorkChat.test.tsx'
       - 'vite/htpBuildShaPlugin.ts'
       - 'vite/htpMiniAppPrivacy.ts'
       - 'supabase/functions/telegram-mini-app/**'
@@ -55,6 +57,7 @@ jobs:
           src/test/phaseSprint1TelegramDispatchGuidance.test.ts
           src/test/phaseUX1TelegramBotGuidance.test.ts
           src/test/authNavigation.test.ts
+          src/test/authenticatedWorkChat.test.tsx
           src/test/recruiterOpportunityFormConsolidation.test.tsx
           src/test/phaseRC1DRecruiterStaffOpportunityAuthorization.test.tsx
           src/test/phaseRC1ERecruiterStaffApplicationAuthorization.test.tsx

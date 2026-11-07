@@ -20,7 +20,8 @@ const EXCLUDE_PATHS = [
   '.next',
   'coverage',
   'src/integrations/supabase/types.ts',
-  'src/test/noTrialLanguage.test.ts',
+  // Fixtures and database-status assertions are not user-facing product copy.
+  'src/test',
   // Dead component scheduled for deletion; explicitly excluded if it lingers.
   'src/components/TrialBanner.tsx',
   'supabase/migrations',

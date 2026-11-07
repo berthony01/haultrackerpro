@@ -871,6 +871,17 @@ const Index = () => {
     });
     if (decision.unresolved) return;
 
+    // Commit explicit navigation out of Reports with the URL change. Leaving
+    // the old hint until a later effect lets the URL reader reopen Reports.
+    if (page === 'reports' && decision.page !== 'reports') {
+      const nextSearch = new URLSearchParams(window.location.search);
+      if (nextSearch.get('page') === 'reports') {
+        nextSearch.delete('page');
+        const search = nextSearch.toString();
+        navigate({ pathname: location.pathname, search: search ? `?${search}` : '', hash: location.hash }, { replace: true, state: location.state });
+      }
+    }
+
     if (decision.page === 'opportunity-preferences') {
       openOpportunitiesView('driver-profile');
       return;

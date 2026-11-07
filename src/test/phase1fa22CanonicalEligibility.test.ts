@@ -138,13 +138,11 @@ describe('Source integrity — one canonical completeness rule', () => {
     });
 
     it(`${rel} does not gate posting on verification === 'approved'`, () => {
-      const gated =
-        /(canPost|postDisabled|allowPost|eligible)[^;\n]{0,80}verification_status\s*===?\s*['"]approved['"]/.test(
-          body,
-        ) ||
-        /verification_status\s*===?\s*['"]approved['"][^;\n]{0,80}(canPost|allowPost|postDisabled|eligible)/.test(
-          body,
-        );
+      // Inspect posting decisions, not JSX for separately verified features
+      // such as driver discovery. Rendered pending/rejected-profile tests
+      // independently assert that the actual Post button remains available.
+      const decisions = body.match(/\b(?:const|let|var)\s+(?:canPost|postDisabled|allowPost|eligible)\b[^;]{0,500};/g) ?? [];
+      const gated = decisions.some(decision => /verification_status\s*===?\s*['"]approved['"]/.test(decision));
       expect(gated).toBe(false);
     });
   }
