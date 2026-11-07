@@ -1,4 +1,4 @@
-import { useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -54,11 +54,13 @@ import { useRecruiterQaPublicationContext } from '@/hooks/opportunities/useRecru
 
 interface Props {
   onBack: () => void;
+  initialAction?: 'create';
+  onCreationFinished?: () => void;
 }
 
 type View = 'list' | 'form' | 'referrals';
 
-export function RecruiterOpportunityManager({ onBack }: Props) {
+export function RecruiterOpportunityManager({ onBack, initialAction, onCreationFinished }: Props) {
   const { profile, isLoading: profileLoading, refetchProfile } = useRecruiterProfile();
   const { intentRecruiter } = useUserRole();
   const { opportunities, isLoading, setStatus, deleteOpportunity, refetch } =
@@ -85,6 +87,14 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
     typeof window === 'undefined' ? null : readTelegramDraftLocator(window.location.search),
   );
   const telegramDraft = useTelegramOpportunityDraft(telegramDraftId);
+  const initialCreateHandled = useRef(false);
+  useEffect(() => {
+    if (initialAction !== 'create' || initialCreateHandled.current || profileLoading || isLoading || telegramDraftId ||
+        describeRecruiterBlock(profile, { intentRecruiter }).reason === 'suspended') return;
+    initialCreateHandled.current = true;
+    // Uses the same live readiness check as the existing Post Opportunity CTA.
+    void gateOrRun({ kind: 'create' });
+  }, [initialAction, profileLoading, isLoading, profile?.id, telegramDraftId]);
 
   const closeTelegramDraft = () => {
     setTelegramDraftId(null);
@@ -168,8 +178,8 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
         activeOpportunityLimit={billing.effectiveActiveOpportunityLimit}
         isAtActiveOpportunityLimit={billing.isAtActiveOpportunityLimit}
         activeOpportunityLimitMessage={billing.activeOpportunityLimitMessage}
-        onBack={() => { setView('list'); setEditing(null); }}
-        onSaved={() => { setView('list'); setEditing(null); refetch(); }}
+        onBack={() => { setView('list'); setEditing(null); if (initialAction === 'create') onCreationFinished?.(); }}
+        onSaved={() => { setView('list'); setEditing(null); refetch(); if (initialAction === 'create') onCreationFinished?.(); }}
       />
     );
   }
@@ -248,11 +258,11 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
   return (
     <div className="space-y-6 animate-fade-in">
       <Card className="p-6 border-border/60 bg-gradient-to-br from-card via-card to-primary/5">
-        <div className="flex items-start gap-4">
+        <div className="flex flex-wrap items-start gap-4 sm:flex-nowrap">
           <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="rounded-2xl bg-primary p-3 shadow-primary shrink-0">
+          <div className="hidden shrink-0 rounded-2xl bg-primary p-3 shadow-primary sm:block">
             <Briefcase className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="min-w-0 flex-1">
@@ -286,7 +296,7 @@ export function RecruiterOpportunityManager({ onBack }: Props) {
               </p>
             )}
           </div>
-          <Button onClick={openCreate} className="shrink-0" data-testid="post-opportunity-cta">
+          <Button onClick={openCreate} className="w-full shrink-0 sm:w-auto" data-testid="post-opportunity-cta">
             <Plus className="h-4 w-4" /> Post Opportunity
           </Button>
 
@@ -556,6 +566,8 @@ export interface RecruiterStaffOpportunityManagerProps {
   companyName: string | null;
   permissions: RecruiterStaffOpportunityPermissions;
   onBack: () => void;
+  initialAction?: 'create';
+  onCreationFinished?: () => void;
 }
 
 export function RecruiterStaffOpportunityManager({
@@ -563,6 +575,8 @@ export function RecruiterStaffOpportunityManager({
   companyName,
   permissions,
   onBack,
+  initialAction,
+  onCreationFinished,
 }: RecruiterStaffOpportunityManagerProps) {
   const store = useRecruiterStaffOpportunities({ recruiterId, permissions });
   const publicationContext = useRecruiterQaPublicationContext(
@@ -571,6 +585,13 @@ export function RecruiterStaffOpportunityManager({
   const [view, setView] = useState<'list' | 'form'>('list');
   const [editing, setEditing] = useState<Opportunity | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Opportunity | null>(null);
+  const initialCreateHandled = useRef(false);
+  useEffect(() => {
+    if (initialAction !== 'create' || initialCreateHandled.current || store.isLoading ||
+        !permissions.canViewOpportunities || !permissions.canCreateOpportunities) return;
+    initialCreateHandled.current = true;
+    setEditing(null); setView('form');
+  }, [initialAction, store.isLoading, permissions.canViewOpportunities, permissions.canCreateOpportunities]);
 
   const deletionPending = store.deleteOpportunity.isPending;
   const busy =
@@ -594,8 +615,8 @@ export function RecruiterStaffOpportunityManager({
     return (
       <RecruiterOpportunityForm
         initial={editing}
-        onBack={() => { setView('list'); setEditing(null); }}
-        onSaved={() => { setView('list'); setEditing(null); void store.refetch(); }}
+        onBack={() => { setView('list'); setEditing(null); if (initialAction === 'create') onCreationFinished?.(); }}
+        onSaved={() => { setView('list'); setEditing(null); void store.refetch(); if (initialAction === 'create') onCreationFinished?.(); }}
         staffController={{
           recruiterId,
           companyName,

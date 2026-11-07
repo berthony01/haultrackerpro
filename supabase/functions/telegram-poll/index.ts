@@ -45,6 +45,7 @@ import {
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
 import { TGG1B_DISPATCH_GROUP_REVIEW_ENABLED, TELEGRAM_SINGLE_LOAD_QA_RPCS, TELEGRAM_GENQA_RPCS, buildGenQaDeliveryLedger, parseDispatchReviewData } from "../_shared/telegram-dispatch-group-review.ts";
+import { telegramMiniAppKeyboard } from '../_shared/telegram-mini-app-buttons.ts';
 import type {
   DispatchDeliveryClaim,
   DispatchDeliveryFailure,
@@ -143,16 +144,9 @@ function buildGateway(lovableApiKey: string, connectionKey: string): TelegramGat
     return { ok: true, status: response.status, result: body.result };
   };
 
-  // RB-2B. URL rows keep their exact previous wire shape; callback rows emit
-  // Telegram's `callback_data`. The payload carries no other new field.
-  const toInlineKeyboard = (rows: TelegramInlineButton[][]) =>
-    rows.map((row) =>
-      row.map((button) =>
-        "url" in button
-          ? { text: button.text, url: button.url }
-          : { text: button.text, callback_data: button.callbackData }
-      )
-    );
+  // Private recruiter entry points launch the Mini App. Group review and
+  // existing chat draft callbacks retain their original wire shape.
+  const toInlineKeyboard = telegramMiniAppKeyboard;
 
   return {
     getUpdates: (options) => call<unknown[]>("getUpdates", { ...options }),
@@ -165,7 +159,7 @@ function buildGateway(lovableApiKey: string, connectionKey: string): TelegramGat
         chat_id: chatId,
         text,
         ...(buttons && buttons.length > 0
-          ? { reply_markup: { inline_keyboard: toInlineKeyboard(buttons) } }
+          ? { reply_markup: { inline_keyboard: toInlineKeyboard(buttons, chatId) } }
           : {}),
       }),
     // RB-2B. Resolves the tap spinner. Non-mutating and best-effort: the
@@ -1124,7 +1118,7 @@ const OPPORTUNITIES_BUTTONS: TelegramInlineButton[][] = [
 ];
 
 const MENU_UNLINKED_TEXT =
-  "Welcome to HaulTracker Pro. Connect Telegram to see the tools your workspace has granted.\n\n1. Sign in or create an account at haultrackerpro.com.\n2. Open Settings > Connect Telegram.\n3. Open the secure link and press Start if prompted.\n4. Send /menu here.";
+  "Welcome to HaulTracker Pro.\n\nTap Create account / Sign in to open HaulTracker Pro inside Telegram. Sign in with your existing account or create a recruiter account. Follow the account setup steps, then tap Connect this Telegram account. Tools follow your company and team permissions.\n\nYou can also connect from haultrackerpro.com: Settings > Connect Telegram. After connecting, send /menu here.";
 const MENU_NO_WORKSPACE_TEXT =
   "Your HaulTracker Pro account is connected. Available bot tools follow your workspace permissions. Open HaulTracker Pro to manage your account or check your workspace access.";
 const MENU_HEADER_TEXT = "HaulTracker Pro recruiter status";
@@ -1199,9 +1193,9 @@ function composeMenuText(
 
   const heading = command === "start" ? "Welcome to HaulTracker Pro" : "HaulTracker Pro";
   const posting = canQuickPost(workspaces)
-    ? "\nPost Opportunity prepares a draft. Publish it in HaulTracker Pro."
+    ? "\nPost Opportunity opens a form inside Telegram. Review the details, then save a draft or publish. Use /post for the chat-based draft workflow."
     : "";
-  return `${heading}\n\nPrivate recruiter tools\nMy Opportunities, Conversations and Results open HaulTracker Pro.${posting}\n\nUse /menu for your tools, /status for your workspace access or /help for guidance.`;
+  return `${heading}\n\nPrivate recruiter tools\nMy Opportunities and Conversations open your HaulTracker Mini App inside Telegram. Results opens the full website.${posting}\n\nSign in with your existing HaulTracker account, or create one in the Mini App. Use /menu for your tools, /status for your workspace access or /help for guidance.`;
 }
 
 Deno.serve(async (req: Request) => {

@@ -62,7 +62,7 @@ export function getCapabilityFromNext(nextPath: string | null | undefined): Capa
   if (safe === '/agency' || safe.startsWith('/agency/') || safe.startsWith('/agency?') || safe.startsWith('/a/')) {
     return 'agency';
   }
-  if (safe.startsWith('/dashboard?page=recruiter') || safe.startsWith('/recruiter')) {
+  if (safe === '/telegram' || safe.startsWith('/telegram?') || safe.startsWith('/dashboard?page=recruiter') || safe.startsWith('/recruiter')) {
     return 'recruiter';
   }
   if (safe.startsWith('/driver/') || safe === '/dashboard' || safe.startsWith('/dashboard')) {

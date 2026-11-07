@@ -1,5 +1,10 @@
 project_id = "pngptztxwbtozwxrtbwo"
 
+  [functions.telegram-mini-app]
+    # The handler verifies the bearer with auth.getUser and verifies signed
+    # Telegram initData before any account lookup or explicit connection.
+    verify_jwt = false
+
 [functions]
   [functions.admin-api]
     verify_jwt = false

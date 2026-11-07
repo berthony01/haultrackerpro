@@ -63,12 +63,23 @@
     <meta name="twitter:description" content="Find trucking opportunities, track loads and expenses, manage recruiter workflows, and support driver clients through approved assistant and agency access.">
     <meta name="twitter:image" content="https://haultrackerpro.com/og-image.png">
     <!-- Google Analytics 4 -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VTDZSSY5Q6"></script>
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-VTDZSSY5Q6');
+      (function () {
+        // Telegram launch data can contain signed identity information.
+        // Do not initialize third-party page tracking on this surface.
+        var path = window.location.pathname;
+        var next = new URLSearchParams(window.location.search).get('next') || '';
+        if (path === '/telegram' || path.indexOf('/telegram/') === 0 ||
+            (path === '/auth' && (next === '/telegram' || next.indexOf('/telegram?') === 0))) return;
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', 'G-VTDZSSY5Q6');
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=G-VTDZSSY5Q6';
+        document.head.appendChild(script);
+      })();
     </script>
   </head>
 

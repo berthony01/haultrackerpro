@@ -1,11 +1,13 @@
 // Google Analytics 4 helper utilities
 // All functions are safe to call even if GA is not loaded (SSR, ad blockers, etc.)
+import { isMiniAppLocation, readMiniAppRuntime } from './telegramMiniApp';
 
 export const GA_MEASUREMENT_ID = 'G-VTDZSSY5Q6'; // Replace with your real GA4 Measurement ID
 
 // Type-safe gtag wrapper
 function gtag(...args: any[]) {
   try {
+    if (typeof window !== 'undefined' && (isMiniAppLocation(window.location.pathname, window.location.search) || readMiniAppRuntime()?.initData)) return;
     if (typeof window !== 'undefined' && (window as any).gtag) {
       (window as any).gtag(...args);
     }
