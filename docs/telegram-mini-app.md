@@ -231,6 +231,11 @@ cleans up only a started cluster. The workflow selects installed server binaries
 and runs the full Telegram transaction suite before the broader checks. It still
 accepts no database URL, opens no TCP listener and uses synthetic data only. All
 authorization, replay, expiry, rollback and financial-trigger assertions remain.
+The retired L2/GEN1 candidate windows are projected into one fixed seven-day
+window only in the disposable cluster's in-memory SQL. Their checked-in SQL,
+production expiry dates, generic function hash pins and the PostgreSQL clock
+are unchanged. The expiry-denial probes explicitly force that fixture window
+into the past and still assert atomic denial across the QA operations.
 
 The billing browser fixtures now supply the canonical recruiter capability and a
 carrier company type, preserve Fleet's preview-only lock, and exercise the actual

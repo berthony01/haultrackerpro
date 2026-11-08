@@ -33,6 +33,16 @@ async function rpc(sql: string, params: unknown[] = [], role='service_role') {
 }
 const QA_LOAD='cb3d3a90-ac48-4d20-af52-d6710d854e81';
 const QA_CANDIDATE='supabase/migration-candidates/20261031040000_qa_single_load_dispatch_review.sql';
+// The retired production QA windows must stay expired in checked-in SQL.
+// Project only their window literals into this disposable cluster, once per
+// run. Generic function bodies/hash pins and the real PostgreSQL clock remain
+// unchanged; expiry probes below force this same fixed window into the past.
+const FIXTURE_QA_DEADLINE=new Date(Date.now()+7*24*60*60*1000).toISOString();
+function fixtureQaWindow(sql:string,retiredDeadline:string,expectedOccurrences:number){
+ const pieces=sql.split(retiredDeadline);
+ expect(pieces.length-1,'Retired QA window fixture shape drifted').toBe(expectedOccurrences);
+ return pieces.join(FIXTURE_QA_DEADLINE);
+}
 const hash=(n: number)=>n.toString(16).padStart(64,'0');
 function intake(n=10, ref: string|null='AB-123', chat=-100, h=hash(n)) {
  return rpc('SELECT * FROM telegram_process_dispatch_group_update($1,$2,$3,900,$4,\'group\',$5,$6)',[LEASE,n,h,chat,ref,ref ? 'completed':null]);
@@ -60,8 +70,11 @@ async function assertDeadlineHashes(expected:Record<string,string>,label:string)
  }
 }
 async function applyDeadlineCandidate(path:string){
+ return applyCandidateSql(read(path));
+}
+async function applyCandidateSql(sql:string){
  const c=await pool.connect();
- try{await c.query(read(path));}catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+ try{await c.query(sql);}catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 }
 
 beforeAll(async()=>{
@@ -107,10 +120,10 @@ beforeAll(async()=>{
  // Candidate validation uses exact production prosrc, not a simplified mock.
  await seedFixture();
  await q("INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id) VALUES($1,$2,'pending','HTP-QA-L2',$3)",[QA_LOAD,D,REL]);
- await q(read(QA_CANDIDATE));
+ await applyCandidateSql(fixtureQaWindow(read(QA_CANDIDATE),'2026-11-02 23:59:59+00',2));
  // New candidate is compiled byte-for-byte against canonical function hashes.
  await seedGenFixture();
- await q(read(GEN_CANDIDATE));
+ await applyCandidateSql(fixtureQaWindow(read(GEN_CANDIDATE),'2026-11-05 23:59:59+00',5));
  // Production numeric/nullability/default projection; no invented recompute trigger.
  await q(`ALTER TABLE loads ADD COLUMN loaded_miles numeric NOT NULL DEFAULT 0, ADD COLUMN deadhead_miles numeric NOT NULL DEFAULT 0, ADD COLUMN rate_per_mile numeric NOT NULL DEFAULT 0, ADD COLUMN total_miles numeric, ADD COLUMN estimated_pay numeric, ADD COLUMN actual_pay_received numeric, ADD COLUMN gross_revenue numeric, ADD COLUMN flat_rate_amount numeric, ADD COLUMN wait_fee numeric NOT NULL DEFAULT 0, ADD COLUMN detention_fee numeric NOT NULL DEFAULT 0, ADD COLUMN other_fees numeric NOT NULL DEFAULT 0;`);
  // Strict baseline gate AFTER all existing candidates; repair ONLY this disposable socket DB.
@@ -336,7 +349,8 @@ describe('TG-G1 QA exact single-load disposable transactions',()=>{
  it('absolute expiry rolls back intake, callback and all cleanup',async()=>{
   const id=await qaProposal();await proposal();const before=await counts(),other=await unrelatedState();
   const def=(await q("SELECT pg_get_functiondef('public._telegram_qa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
-  try{await q(def.split('2026-11-02 23:59:59+00').join('2000-01-01 00:00:00+00'));
+  expect(def).toContain(FIXTURE_QA_DEADLINE);
+  try{await q(def.split(FIXTURE_QA_DEADLINE).join('2000-01-01 00:00:00+00'));
    await expect(qaIntake(101)).rejects.toThrow('qa_dispatch_expired');await expect(qaReview(id)).rejects.toThrow('qa_dispatch_expired');await expect(qaClaim()).rejects.toThrow('qa_dispatch_expired');
    expect(await counts()).toEqual(before);expect(await unrelatedState()).toEqual(other);
   }finally{await q(def);}
@@ -441,7 +455,8 @@ describe('TG-G1 GEN1 hash-pinned one-group acceptance, disposable PostgreSQL onl
  it('absolute expiry blocks intake/callback/claim/cleanup/ack/fail atomically',async()=>{
   const id=await genProposal(),c=(await genClaim())[0],before=await counts();
   const def=(await q("SELECT pg_get_functiondef('public._telegram_genqa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
-  try {await q(def.split('2026-11-05 23:59:59+00').join('2000-01-01 00:00:00+00'));
+  expect(def).toContain(FIXTURE_QA_DEADLINE);
+  try {await q(def.split(FIXTURE_QA_DEADLINE).join('2000-01-01 00:00:00+00'));
    for(const action of [()=>genIntake(401),()=>genReview(id),genClaim,()=>genAck(c),()=>genFail(c)]) await expect(action()).rejects.toThrow('qa_dispatch_expired');expect(await counts()).toEqual(before);
   }finally{await q(def);}
  });
