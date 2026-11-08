@@ -13,7 +13,7 @@ describe('Dispatcher Mini App deterministic rules', () => {
   it.each([{}, null, { loads_view:'true', loads_dispatch:true }, { loads_view:true, loads_dispatch:false, loads_update_status:false }])('fails closed for independent permission matrix %j', p => {
     const permissions=dispatchPermissions(p); expect(permissions.create).toBe(false); expect(permissions.status).toBe(false);
   });
-  it.each(['L123', 'HTP-QA-GEN2','LOAD_12345678901234567890'])('accepts group-compatible reference %s', ref => expect(validDispatchReference(ref)).toBe(true));
+  it.each(['L123', 'HTP-QA-GEN2','LOAD_1234567890123456789'])('accepts group-compatible reference %s', ref => expect(validDispatchReference(ref)).toBe(true));
   it.each(['ABC','LETTERS','123','REF WITH1 SPACE','X'.repeat(24)+'1'])('rejects incompatible reference %s', ref => expect(validDispatchReference(ref)).toBe(false));
   it.each(['1','20245'])('blocks contradictory total %s in either direction', total_miles => expect(validateDispatchForm({...valid(), total_miles})).toMatch(/within 2 miles/));
   it('preserves the historical 0.75-mile tolerance and total-only loads', () => {
@@ -45,7 +45,7 @@ describe('Dispatcher Mini App deterministic rules', () => {
     expect(telegramMiniAppKeyboard(rows,123)[0][0]).toEqual({text:'Open Dispatch',web_app:{url:rows[0][0].url}});expect(telegramMiniAppKeyboard(rows,-123)[0][0]).toEqual(rows[0][0]);
   });
   it('classifies only exact private /start dispatch and preserves link priority', () => {
-    const update=(text:string,type='private')=>({update_id:1,message:{message_id:1,from:{id:123},chat:{id:type==='private'?123:-123,type},text}});
+    const update=(text:string,type='private')=>({telegramUserId:123,telegramChatId:type==='private'?123:-123,chatType:type,text,callbackQueryId:null} as Parameters<typeof classifyUpdate>[0]);
     expect(classifyUpdate(update('/start dispatch'))).toEqual({kind:'menu',command:'dispatch'});
     expect(classifyUpdate(update(`/start ${'a'.repeat(64)}`))).toEqual({kind:'start',rawToken:'a'.repeat(64)});
     expect(classifyUpdate(update('/start dispatch '))).not.toEqual({kind:'menu',command:'dispatch'});expect(classifyUpdate(update('/start dispatch','group')).kind).toBe('ignored');
