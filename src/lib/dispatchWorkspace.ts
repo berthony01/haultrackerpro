@@ -68,6 +68,7 @@ export function parseDispatchForm(source: string, current: DispatchForm): { form
   // Paste replaces pay evidence, never inherits a previously typed/default rate.
   form.rate_per_mile = parsed.rate_per_mile ?? ''; form.deadhead_rate_per_mile = parsed.deadhead_rate_per_mile ?? '';
   form.flat_rate_amount = parsed.flat_rate ?? ''; form.manual_amount = parsed.gross_revenue ?? '';
+  form.wait_fee = parsed.wait_fee ?? ''; form.detention_fee = parsed.detention_fee ?? ''; form.other_fees = '';
   form.pay_model = parsed.pay_model_suggestion ?? (parsed.gross_revenue ? 'manual' : 'loaded_miles_only');
   const warnings = [...(parsed.review_warnings ?? [])];
   if (!parsed.rate_per_mile && !parsed.flat_rate && !parsed.gross_revenue) warnings.push('No explicit agreed pay extracted. Enter it before saving.');

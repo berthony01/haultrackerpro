@@ -28,7 +28,7 @@ describe('Dispatcher Mini App deterministic rules', () => {
   it('rounds a decimal 1.005 flat amount to 1.01 without rewriting the original input', () => {const p=dispatchPayload({...valid(),pay_model:'flat_rate',flat_rate_amount:'1.005'});expect(p.estimated_pay).toBe(1.01);expect(p.flat_rate_amount).toBe(1.005);});
   it('does not inherit pay after a paste with only conditional penalties', () => {
     const source='TRIP# 84B8233\nNEED EMPTY TRAILER\nLate fee $100 penalty\nPickup: Dallas, TX\nDelivery: Austin, TX';
-    const p=parseDispatchForm(source,valid()); expect(p.form.rate_per_mile).toBe(''); expect(p.form.manual_amount).toBe(''); expect(p.form.notes).toContain(source);expect(p.warnings.join(' ')).toMatch(/No explicit agreed pay/);
+    const p=parseDispatchForm(source,{...valid(),wait_fee:'100',detention_fee:'200',other_fees:'300'}); expect(p.form.rate_per_mile).toBe(''); expect(p.form.manual_amount).toBe(''); expect(p.form.wait_fee).toBe(''); expect(p.form.detention_fee).toBe(''); expect(p.form.other_fees).toBe(''); expect(p.form.notes).toContain(source);expect(p.warnings.join(' ')).toMatch(/No explicit agreed pay/);
   });
   it('keeps every multi-stop source, appointment and requirement available for review', () => {
     const source='TRIP# AB1234\nPickup: Dallas, TX\nStop 2: Waco, TX\nDelivery: Austin, TX\nMULTI STOP\nAppointment window 08:00-10:00\nNEED EMPTY TRAILER';
