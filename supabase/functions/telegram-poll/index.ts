@@ -45,7 +45,7 @@ import {
   type TelegramTerminalResult,
 } from "../_shared/telegram-poll-ingest.ts";
 import { TGG1B_DISPATCH_GROUP_REVIEW_ENABLED, TELEGRAM_SINGLE_LOAD_QA_RPCS, TELEGRAM_GENQA_RPCS, buildGenQaDeliveryLedger, parseDispatchReviewData } from "../_shared/telegram-dispatch-group-review.ts";
-import { telegramMiniAppKeyboard } from '../_shared/telegram-mini-app-buttons.ts';
+import { telegramMiniAppKeyboard, telegramDispatchEntry } from '../_shared/telegram-mini-app-buttons.ts';
 import type {
   DispatchDeliveryClaim,
   DispatchDeliveryFailure,
@@ -1163,7 +1163,8 @@ function composeMenuButtons(
   workspaces: unknown,
   command?: TelegramMenuCommand,
 ): TelegramInlineButton[][] | null {
-  if (command === 'dispatch' && (resultCode === 'menu_recruiter' || resultCode === 'menu_multi_role') && menuWorkspaces(workspaces).length > 0) return [[{ text: 'Open Dispatch', url: `${APP_BASE_URL}/telegram?view=dispatch` }], ...OPEN_APP_BUTTONS];
+  const dispatch = telegramDispatchEntry(command);
+  if (dispatch) return dispatch.buttons;
   switch (resultCode) {
     case "menu_recruiter":
     case "menu_multi_role":
@@ -1187,6 +1188,8 @@ function composeMenuText(
   workspaces: unknown,
   command: TelegramMenuCommand,
 ): string | null {
+  const dispatch = telegramDispatchEntry(command);
+  if (dispatch) return dispatch.text;
   if (resultCode === "menu_unlinked") return MENU_UNLINKED_TEXT;
   if (resultCode === "menu_driver" || resultCode === "menu_linked_no_workspace" ||
       resultCode === "menu_linked_unsupported") return MENU_NO_WORKSPACE_TEXT;

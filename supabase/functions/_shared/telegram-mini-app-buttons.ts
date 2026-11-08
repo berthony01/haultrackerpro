@@ -3,6 +3,17 @@ import type { TelegramInlineButton } from './telegram-poll-ingest.ts';
 const BASE = 'https://haultrackerpro.com';
 const mini = (view: string) => `${BASE}/telegram?view=${view}`;
 
+/** The entry itself is a sign-in surface. Dispatch-only staff can reach it
+ * even when the older recruiting-menu resolver finds no opportunity workspace.
+ * The signed Mini App, canonical membership and load permissions authorize data.
+ */
+export function telegramDispatchEntry(command: string | undefined) {
+  return command === 'dispatch' ? {
+    text: 'Dispatch\nOpen your HaulTracker workspace to sign in and check your dispatch access.',
+    buttons: [[{ text: 'Open Dispatch', url: mini('dispatch') }], [{ text: 'Open HaulTracker Pro', url: `${BASE}/dashboard?page=recruiter-access` }]],
+  } : null;
+}
+
 /** Only private recruiter entry points change. Group reviews, Quick Post
  * save/edit/cancel callbacks, driver handoffs and external URLs retain their
  * wire shape. A Mini App entry never starts or replaces a chat draft. */

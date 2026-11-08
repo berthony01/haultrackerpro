@@ -34,20 +34,58 @@ export function localDispatchDate(date = new Date()): string {
 }
 export const emptyDispatchForm = (): DispatchForm => ({ relationship_id: '', load_reference: '', pickup_location: '', dropoff_location: '', load_date: localDispatchDate(), dropoff_date: '', loaded_miles: '', deadhead_miles: '', total_miles: '', pay_model: 'loaded_miles_only', rate_per_mile: '', deadhead_rate_per_mile: '', flat_rate_amount: '', manual_amount: '', wait_fee: '', detention_fee: '', other_fees: '', notes: '' });
 const number = (s: string) => s === '' ? 0 : Number(s);
-export const validDispatchReference = (s: string) => /^(?=.*\d)[A-Z0-9][A-Z0-9_-]{3,23}$/.test(s.trim().toUpperCase());
+export const validDispatchReference = (s: string) => /^(?=[A-Z0-9-]*\d)[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$/.test(s.trim().toUpperCase());
 export function dispatchPay(form: DispatchForm) {
   return computeLoadPay({ payModel: form.pay_model, loadedMiles: number(form.loaded_miles), deadheadMiles: number(form.deadhead_miles), totalMiles: form.total_miles === '' ? null : number(form.total_miles), loadedRpm: number(form.rate_per_mile), dhRpm: number(form.deadhead_rate_per_mile), flatRate: number(form.flat_rate_amount), manualGross: number(form.manual_amount), fees: number(form.wait_fee) + number(form.detention_fee) + number(form.other_fees) });
 }
+
+// Calculate recognized cents from decimal components, before binary floating
+// point multiplication can turn a halfway value such as 14.5 * 2.01 into
+// 29.144999999999996. Raw input values still go to the canonical load record.
+type Decimal = { units: bigint; scale: number };
+function decimal(raw: string): Decimal {
+  const value = Number(raw || '0');
+  if (!Number.isFinite(value) || value < 0) throw new Error('Check the agreed pay values.');
+  const match = /^(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/i.exec(String(value));
+  if (!match) throw new Error('Check the agreed pay values.');
+  const fraction = match[2] ?? '';
+  const scale = fraction.length - Number(match[3] ?? 0);
+  const units = BigInt(match[1] + fraction);
+  return scale < 0 ? { units: units * 10n ** BigInt(-scale), scale: 0 } : { units, scale };
+}
+function addDecimal(a: Decimal, b: Decimal): Decimal {
+  const scale = Math.max(a.scale, b.scale);
+  return { units: a.units * 10n ** BigInt(scale - a.scale) + b.units * 10n ** BigInt(scale - b.scale), scale };
+}
+const multiplyDecimal = (a: Decimal, b: Decimal): Decimal => ({ units: a.units * b.units, scale: a.scale + b.scale });
+export function dispatchAgreedCents(form: DispatchForm): number {
+  const loaded = decimal(form.loaded_miles), deadhead = decimal(form.deadhead_miles);
+  const componentMiles = addDecimal(loaded, deadhead);
+  const total = Number(form.total_miles);
+  const miles = total > 0 && !hasMileageContradiction({ loadedMiles: number(form.loaded_miles), deadheadMiles: number(form.deadhead_miles), totalMiles: total }) ? decimal(form.total_miles) : componentMiles;
+  let pay: Decimal;
+  switch (form.pay_model) {
+    case 'loaded_miles_only': pay = multiplyDecimal(loaded, decimal(form.rate_per_mile)); break;
+    case 'loaded_plus_deadhead': pay = addDecimal(multiplyDecimal(loaded, decimal(form.rate_per_mile)), multiplyDecimal(deadhead, decimal(form.deadhead_rate_per_mile))); break;
+    case 'total_miles': pay = multiplyDecimal(miles, decimal(form.rate_per_mile)); break;
+    case 'flat_rate': pay = decimal(form.flat_rate_amount); break;
+    case 'manual': pay = decimal(form.manual_amount); break;
+  }
+  for (const fee of [form.wait_fee, form.detention_fee, form.other_fees]) pay = addDecimal(pay, decimal(fee));
+  return toCents(`${pay.units}e-${pay.scale}`);
+}
 export function validateDispatchForm(form: DispatchForm): string | null {
   if (!form.relationship_id) return 'Select an active connected driver.';
-  if (!validDispatchReference(form.load_reference)) return 'Use a 4–24 character reference containing a digit, letters, hyphens or underscores.';
+  if (!validDispatchReference(form.load_reference)) return 'Use a 4–24 character reference with a digit, letters or hyphens, starting and ending with a letter or digit.';
   if (!form.pickup_location.trim() || !form.dropoff_location.trim()) return 'Enter pickup and delivery locations.';
   if (!validDate(form.load_date) || (form.dropoff_date && (!validDate(form.dropoff_date) || form.dropoff_date < form.load_date))) return 'Check pickup and scheduled delivery dates.';
   const numeric = ['loaded_miles', 'deadhead_miles', 'total_miles', 'rate_per_mile', 'deadhead_rate_per_mile', 'flat_rate_amount', 'manual_amount', 'wait_fee', 'detention_fee', 'other_fees'] as const;
   if (numeric.some(k => form[k] !== '' && (!Number.isFinite(Number(form[k])) || Number(form[k]) < 0))) return 'Miles, rates and agreed fees must be nonnegative numbers.';
+  if (numeric.some(k => Number(form[k]) > (k.endsWith('_miles') ? 100000 : k.includes('rate_per_mile') ? 1000 : 1000000))) return 'Check the miles, rates and agreed amounts; a value exceeds the supported limit.';
   if (hasMileageContradiction({ loadedMiles: number(form.loaded_miles), deadheadMiles: number(form.deadhead_miles), totalMiles: form.total_miles === '' ? null : number(form.total_miles) })) return 'Correct total miles to agree with loaded plus deadhead within 2 miles.';
   const required = form.pay_model === 'manual' ? form.manual_amount : form.pay_model === 'flat_rate' ? form.flat_rate_amount : form.rate_per_mile;
   if (required === '' || (form.pay_model === 'loaded_plus_deadhead' && form.deadhead_rate_per_mile === '')) return 'Enter the explicit agreed pay amount or rates; no saved default is assumed.';
+  if (dispatchAgreedCents(form) > 100000000) return 'The total agreed pay exceeds the supported limit.';
   if (form.notes.length > 5000 || form.pickup_location.length > 200 || form.dropoff_location.length > 200) return 'Location or notes are too long.';
   return null;
 }
@@ -57,12 +95,12 @@ export function dispatchPayload(form: DispatchForm) {
   const payload: Record<string, unknown> = { ...form, load_reference: form.load_reference.trim().toUpperCase(), pickup_location: form.pickup_location.trim(), dropoff_location: form.dropoff_location.trim(), dropoff_date: form.dropoff_date || null, notes: form.notes.trim() || null };
   for (const key of ['loaded_miles', 'deadhead_miles', 'rate_per_mile', 'wait_fee', 'detention_fee', 'other_fees'] as const) payload[key] = number(form[key]);
   for (const key of ['total_miles', 'flat_rate_amount', 'deadhead_rate_per_mile', 'manual_amount'] as const) payload[key] = form[key] === '' ? null : Number(form[key]);
-  payload.estimated_pay = toCents(dispatchPay(form).expectedGrossPay) / 100;
+  payload.estimated_pay = dispatchAgreedCents(form) / 100;
   return payload;
 }
 export function parseDispatchForm(source: string, current: DispatchForm): { form: DispatchForm; parsed: ParsedLoadData; warnings: string[] } {
   const parsed = parseLoadText(source);
-  const form = { ...current };
+  const form = { ...emptyDispatchForm(), relationship_id: current.relationship_id, load_date: '' };
   const mappings = { load_reference: 'load_reference', pickup_location: 'pickup_location', dropoff_location: 'dropoff_location', load_date: 'load_date', dropoff_date: 'dropoff_date', loaded_miles: 'loaded_miles', deadhead_miles: 'deadhead_miles', total_miles: 'total_miles', rate_per_mile: 'rate_per_mile', deadhead_rate_per_mile: 'deadhead_rate_per_mile', flat_rate: 'flat_rate_amount', gross_revenue: 'manual_amount', wait_fee: 'wait_fee', detention_fee: 'detention_fee' } as const;
   for (const [from, to] of Object.entries(mappings)) { const v = parsed[from as keyof ParsedLoadData]; if (typeof v === 'string') Object.assign(form, { [to]: v }); }
   // Paste replaces pay evidence, never inherits a previously typed/default rate.
@@ -74,7 +112,9 @@ export function parseDispatchForm(source: string, current: DispatchForm): { form
   if (!parsed.rate_per_mile && !parsed.flat_rate && !parsed.gross_revenue) warnings.push('No explicit agreed pay extracted. Enter it before saving.');
   if (parsed.multiStopDetected || parsed.stop_details?.length || parsed.stops?.length) warnings.push('Stop-by-stop tracking is not part of this view; full source and stop details are retained in notes.');
   // Preserve source verbatim for conditional penalties, appointments, requirements and every stop.
-  form.notes = [current.notes, 'Dispatch source — review only (conditional penalties are not earnings):', source].filter(Boolean).join('\n');
+  const marker = 'Dispatch source — review only (conditional penalties are not earnings):';
+  const manualNotes = current.notes.split(marker)[0].trim();
+  form.notes = [manualNotes, marker, source].filter(Boolean).join('\n');
   return { form, parsed, warnings };
 }
 export const dispatchMiles = (load: DispatchLoad) => resolveOperatingMiles({ loadedMiles: Number(load.loaded_miles), deadheadMiles: Number(load.deadhead_miles), totalMiles: load.total_miles == null ? null : Number(load.total_miles) });

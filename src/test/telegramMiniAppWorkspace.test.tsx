@@ -6,6 +6,7 @@ import type { MiniAppView } from '@/lib/telegramMiniApp';
 const h = vi.hoisted(() => ({
   access: {} as any, acting: {} as any, profile: {} as any, perms: {} as any,
   ownerHook: vi.fn(), ownerManager: vi.fn(), staffManager: vi.fn(), ownerApps: vi.fn(), staffApps: vi.fn(), inbox: vi.fn(), onboarding: vi.fn(), navigate: vi.fn(),
+  dispatch: vi.fn(),
 }));
 const uid = '10000000-0000-4000-8000-000000000001';
 const thread = '20000000-0000-4000-8000-000000000001';
@@ -14,6 +15,7 @@ vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => h.access }));
 vi.mock('@/hooks/useActingContext', () => ({ useActingContext: () => h.acting }));
 vi.mock('@/hooks/opportunities/useRecruiterProfile', () => ({ useRecruiterProfile: () => { h.ownerHook(); return h.profile; } }));
 vi.mock('@/hooks/recruiter/useRecruiterStaffPermissions', () => ({ useRecruiterStaffPermissions: () => h.perms }));
+vi.mock('@/components/telegram/DispatchWorkspace', () => ({ DispatchWorkspace: (props: any) => { h.dispatch(props); return <div data-testid="dispatch-workspace" />; } }));
 vi.mock('@/components/opportunities/RecruiterOpportunityManager', () => ({
   RecruiterOpportunityManager: (props: any) => { h.ownerManager(props); return <div data-testid="owner-manager" />; },
   RecruiterStaffOpportunityManager: (props: any) => { h.staffManager(props); return <div data-testid="staff-manager" />; },
@@ -39,6 +41,14 @@ function staff() {
 }
 
 describe('Mini App workspace permissions', () => {
+  it('opens Dispatch for staff with load access and no opportunity access', () => {
+    staff(); h.perms.canViewLoads=true; h.perms.canViewOpportunities=false; h.perms.canCreateOpportunities=false;
+    open('dispatch'); expect(screen.getByTestId('dispatch-workspace')).toBeInTheDocument();
+    expect(h.dispatch).toHaveBeenCalledWith(expect.objectContaining({recruiterId:'recruiter-qa'}));expect(h.ownerHook).not.toHaveBeenCalled();
+  });
+  it('does not mount Dispatch without explicit load-view access', () => {
+    staff(); h.perms.canViewLoads=false;open('dispatch');expect(h.dispatch).not.toHaveBeenCalled();
+  });
   it('shows owner tasks and opens the selected destination directly', () => {
     open(); expect(screen.getByText('Synthetic QA Carrier')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Post opportunity Start/ })); expect(h.navigate).toHaveBeenCalledWith('post');

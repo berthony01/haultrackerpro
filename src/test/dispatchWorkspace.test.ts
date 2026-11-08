@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { DispatchIntent, dispatchPermissions, dispatchPayload, dispatchPay, emptyDispatchForm, localDispatchDate, parseDispatchForm, validDeliveryDate, validDispatchReference, validateDispatchForm } from '@/lib/dispatchWorkspace';
+import { DispatchIntent, dispatchAgreedCents, dispatchPermissions, dispatchPayload, dispatchPay, emptyDispatchForm, localDispatchDate, parseDispatchForm, validDeliveryDate, validDispatchReference, validateDispatchForm } from '@/lib/dispatchWorkspace';
+import { parseDispatchStatusReportCommand } from '../../supabase/functions/_shared/telegram-dispatch-group-proposals';
 import { computeLoadPay } from '@/lib/computeLoadPay';
-import { telegramMiniAppKeyboard } from '../../supabase/functions/_shared/telegram-mini-app-buttons';
+import { telegramMiniAppKeyboard, telegramDispatchEntry } from '../../supabase/functions/_shared/telegram-mini-app-buttons';
 import { classifyUpdate } from '../../supabase/functions/_shared/telegram-poll-ingest';
 import { miniAppView } from '@/lib/telegramMiniApp';
 
@@ -13,8 +14,11 @@ describe('Dispatcher Mini App deterministic rules', () => {
   it.each([{}, null, { loads_view:'true', loads_dispatch:true }, { loads_view:true, loads_dispatch:false, loads_update_status:false }])('fails closed for independent permission matrix %j', p => {
     const permissions=dispatchPermissions(p); expect(permissions.create).toBe(false); expect(permissions.status).toBe(false);
   });
-  it.each(['L123', 'HTP-QA-GEN2','LOAD_1234567890123456789'])('accepts group-compatible reference %s', ref => expect(validDispatchReference(ref)).toBe(true));
-  it.each(['ABC','LETTERS','123','REF WITH1 SPACE','X'.repeat(24)+'1'])('rejects incompatible reference %s', ref => expect(validDispatchReference(ref)).toBe(false));
+  it.each(['L123', 'HTP-QA-GEN2','LOAD-1234567890123456789'])('accepts group-compatible reference %s', ref => {
+    expect(validDispatchReference(ref)).toBe(true);
+    expect(parseDispatchStatusReportCommand(`/delivered@HaulTrackerBot ${ref}`)?.reference).toBe(ref);
+  });
+  it.each(['ABC','LETTERS','123','REF WITH1 SPACE','X'.repeat(24)+'1','AB1_','AB1-','A_12'])('rejects incompatible reference %s', ref => expect(validDispatchReference(ref)).toBe(false));
   it.each(['1','20245'])('blocks contradictory total %s in either direction', total_miles => expect(validateDispatchForm({...valid(), total_miles})).toMatch(/within 2 miles/));
   it('preserves the historical 0.75-mile tolerance and total-only loads', () => {
     expect(validateDispatchForm({...valid(),total_miles:'211.2'})).toBeNull();
@@ -26,6 +30,20 @@ describe('Dispatcher Mini App deterministic rules', () => {
     expect(dispatchPay(form)).toEqual(oracle); expect(dispatchPayload(form).loaded_miles).toBe(200.45); expect(dispatchPayload(form).rate_per_mile).toBe(2.015);
   });
   it('rounds a decimal 1.005 flat amount to 1.01 without rewriting the original input', () => {const p=dispatchPayload({...valid(),pay_model:'flat_rate',flat_rate_amount:'1.005'});expect(p.estimated_pay).toBe(1.01);expect(p.flat_rate_amount).toBe(1.005);});
+  it.each([['14.5','2.01',2915],['1.15','0.1',12],['201.05','0.1',2011]])('recognizes exact decimal miles %s × rate %s in cents', (loaded_miles,rate_per_mile,cents) => {
+    const form={...valid(),loaded_miles,rate_per_mile,deadhead_miles:'',total_miles:''};
+    expect(dispatchAgreedCents(form)).toBe(cents);
+    expect(dispatchPayload(form).estimated_pay).toBe(cents/100);
+  });
+  it('replacing pasted source clears route, dates and mileage absent from the new source', () => {
+    const prior={...valid(),dropoff_date:'2026-11-07',notes:'Dispatcher instruction'};
+    const first=parseDispatchForm('LOAD# OLD123\nPickup: Miami, FL\nDelivery: Tampa, FL\nFlat rate $500',prior);
+    const next=parseDispatchForm('LOAD# NEW123\nFlat rate $400',first.form);
+    expect(next.form).toMatchObject({relationship_id:prior.relationship_id,load_reference:'NEW123',pickup_location:'',dropoff_location:'',load_date:'',dropoff_date:'',loaded_miles:'',deadhead_miles:'',total_miles:''});
+    expect(next.form.notes).toContain('Dispatcher instruction');
+    expect(next.form.notes).not.toContain('OLD123');
+    expect(validateDispatchForm(next.form)).toMatch(/locations/);
+  });
   it('does not inherit pay after a paste with only conditional penalties', () => {
     const source='TRIP# 84B8233\nNEED EMPTY TRAILER\nLate fee $100 penalty\nPickup: Dallas, TX\nDelivery: Austin, TX';
     const p=parseDispatchForm(source,{...valid(),wait_fee:'100',detention_fee:'200',other_fees:'300'}); expect(p.form.rate_per_mile).toBe(''); expect(p.form.manual_amount).toBe(''); expect(p.form.wait_fee).toBe(''); expect(p.form.detention_fee).toBe(''); expect(p.form.other_fees).toBe(''); expect(p.form.notes).toContain(source);expect(p.warnings.join(' ')).toMatch(/No explicit agreed pay/);
@@ -43,6 +61,12 @@ describe('Dispatcher Mini App deterministic rules', () => {
   it('opens the Dispatch destination and restricts web_app keyboard to private chat', () => {
     expect(miniAppView('?view=dispatch')).toBe('dispatch');const rows=[[{text:'Open Dispatch',url:'https://haultrackerpro.com/telegram?view=dispatch'}]];
     expect(telegramMiniAppKeyboard(rows,123)[0][0]).toEqual({text:'Open Dispatch',web_app:{url:rows[0][0].url}});expect(telegramMiniAppKeyboard(rows,-123)[0][0]).toEqual(rows[0][0]);
+  });
+  it('offers a sign-in entry without depending on opportunity-viewing authority', () => {
+    const entry=telegramDispatchEntry('dispatch');
+    expect(entry?.text).toContain('check your dispatch access');
+    expect(entry?.buttons[0][0].url).toBe('https://haultrackerpro.com/telegram?view=dispatch');
+    expect(telegramDispatchEntry('menu')).toBeNull();
   });
   it('classifies only exact private /start dispatch and preserves link priority', () => {
     const update=(text:string,type='private')=>({telegramUserId:123,telegramChatId:type==='private'?123:-123,chatType:type,text,callbackQueryId:null} as Parameters<typeof classifyUpdate>[0]);

@@ -1599,6 +1599,8 @@ export async function runTelegramPoll(
               Array.isArray(terminal.followUpButtons) &&
               terminal.followUpButtons.length > 0
           ? terminal.followUpButtons
+          : feedback === groupFeedback && groupFeedback?.startsWith('Connected ·')
+          ? deps.dispatchGuidanceButtons?.group ?? null
           : null;
 
       if (feedback !== null) {
