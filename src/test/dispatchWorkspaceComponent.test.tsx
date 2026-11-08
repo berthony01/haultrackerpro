@@ -7,13 +7,19 @@ vi.mock('@/hooks/useDispatchWorkspace',()=>({useDispatchWorkspace:()=>h.state,di
 const driver={relationship_id:'rel-1',display_name:'QA Driver'};
 const load={id:'load-1',relationship_id:'rel-1',display_name:'QA Driver',load_reference:'QA1234',pickup_location:'Dallas, TX',dropoff_location:'Austin, TX',load_date:'2026-11-01',dropoff_date:'2026-11-03',status:'pending',loaded_miles:200,deadhead_miles:10,total_miles:210,estimated_pay:400,actual_delivery_date:null};
 beforeEach(()=>{vi.clearAllMocks();h.state={scope:'user:company',permissions:{view:true,create:true,status:true},page:{loads:[load],drivers:[driver],total:51,driver_total:1,summaries:[],week_start:'2026-11-01'},verified:true,loading:false,error:null,refresh:h.refresh};});
+beforeEach(()=>{
+  HTMLElement.prototype.hasPointerCapture=()=>false;
+  HTMLElement.prototype.setPointerCapture=()=>{};
+  HTMLElement.prototype.releasePointerCapture=()=>{};
+  HTMLElement.prototype.scrollIntoView=()=>{};
+});
 describe('Dispatch forms and confirmations',()=>{
   it('keeps failed creation open and retries exact same payload/key',async()=>{
     const save=vi.fn().mockRejectedValueOnce(new Error('Ambiguous network result')).mockResolvedValueOnce(undefined),close=vi.fn();
     render(<DispatchLoadForm drivers={[driver]} enabled save={save} close={close}/>);
     fireEvent.change(screen.getByLabelText('Paste dispatch details'),{target:{value:'LOAD# QA1234\nPickup: Dallas, TX\nDelivery: Austin, TX\nFlat rate $400'}});fireEvent.click(screen.getByRole('button',{name:'Extract for review'}));
     // Select from the real Radix control.
-    fireEvent.pointerDown(screen.getByRole('combobox',{name:'Connected driver'}),{button:0,ctrlKey:false});
+    fireEvent.keyDown(screen.getByRole('combobox',{name:'Connected driver'}),{key:'ArrowDown'});
     fireEvent.click(await screen.findByRole('option',{name:'QA Driver'}));
     fireEvent.click(screen.getByRole('button',{name:'Review load'}));
     fireEvent.click(await screen.findByRole('button',{name:'Confirm & save pending load'}));await screen.findByText('Ambiguous network result');expect(close).not.toHaveBeenCalled();

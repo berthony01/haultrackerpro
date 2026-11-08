@@ -81,7 +81,7 @@ export const dispatchMiles = (load: DispatchLoad) => resolveOperatingMiles({ loa
 /** One intent survives ambiguous failures. A changed payload must be explicitly abandoned. */
 export class DispatchIntent {
   private pending: { key: string; fingerprint: string } | null = null;
-  constructor(private key = () => crypto.randomUUID()) {}
+  constructor(private key: () => string = () => crypto.randomUUID()) {}
   begin(payload: unknown): string {
     const fingerprint = JSON.stringify(payload);
     if (this.pending && this.pending.fingerprint !== fingerprint) throw new Error('Resolve or abandon the previous attempt before submitting changed details.');

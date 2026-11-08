@@ -35,7 +35,8 @@ async function scenario(fn:(c:pg.PoolClient,call:(sql:string,args?:unknown[],act
   await c.query(`INSERT INTO recruiter_billing_profiles(recruiter_id,user_id,plan,status) VALUES($1,$2,'fleet','active');`,[R,OWNER]);
   await c.query(`INSERT INTO recruiter_members(recruiter_id,member_user_id,status,permissions) VALUES($1,$2,'active','{"loads_view":true,"loads_dispatch":true,"loads_update_status":true}');`,[R,STAFF]);
   await c.query(`INSERT INTO carrier_driver_relationships(id,recruiter_id,driver_user_id,status,created_by_user_id) VALUES($1,$2,$3,'active',$4),($5,$6,$3,'active',$7);`,[REL,R,DRIVER,OWNER,OTHER_REL,OTHER,OTHER_OWNER]);
-  await c.query(`INSERT INTO profiles(user_id,display_name) VALUES($1,'Connected QA Driver');INSERT INTO loads(id,user_id,carrier_driver_relationship_id,load_reference,status,load_date,pickup_location,dropoff_location,loaded_miles,deadhead_miles,total_miles,estimated_pay) VALUES($2,$1,$3,'QA1234','pending',CURRENT_DATE-4,'A','B',200.45,10,210.45,400);`,[DRIVER,LOAD,REL]);
+  await c.query(`INSERT INTO profiles(user_id,display_name) VALUES($1,'Connected QA Driver')`,[DRIVER]);
+  await c.query(`INSERT INTO loads(id,user_id,carrier_driver_relationship_id,load_reference,status,load_date,pickup_location,dropoff_location,loaded_miles,deadhead_miles,total_miles,estimated_pay) VALUES($2,$1,$3,'QA1234','pending',CURRENT_DATE-4,'A','B',200.45,10,210.45,400);`,[DRIVER,LOAD,REL]);
   const call=async(sql:string,args:unknown[]=[],actor=OWNER,role='authenticated')=>{
    await c.query('SAVEPOINT probe');try{await c.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[actor]);await c.query(`SET LOCAL ROLE ${role}`);const rows=(await c.query(sql,args)).rows;await c.query('RESET ROLE');await c.query('RELEASE SAVEPOINT probe');return rows;}catch(e){await c.query('ROLLBACK TO SAVEPOINT probe');await c.query('RELEASE SAVEPOINT probe');throw e;}
   };
