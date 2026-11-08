@@ -14,6 +14,17 @@ beforeEach(()=>{
   HTMLElement.prototype.scrollIntoView=()=>{};
 });
 describe('Dispatch forms and confirmations',()=>{
+  it('keeps the visible load and unfinished form in place during a background refresh',()=>{
+    const view=render(<DispatchWorkspace recruiterId="company"/>);
+    fireEvent.click(screen.getByRole('button',{name:'Add Load'}));
+    fireEvent.change(screen.getByLabelText('Load reference'),{target:{value:'DRAFT123'}});
+    h.state={...h.state,loading:true,verified:false};
+    view.rerender(<DispatchWorkspace recruiterId="company"/>);
+    expect(screen.getByRole('heading',{name:'QA1234'})).toBeVisible();
+    expect(screen.getByLabelText('Load reference')).toHaveValue('DRAFT123');
+    expect(screen.getByRole('button',{name:'Mark Delivered'})).toBeDisabled();
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
   it('keeps failed creation open and retries exact same payload/key',async()=>{
     const save=vi.fn().mockRejectedValueOnce(new Error('Ambiguous network result')).mockResolvedValueOnce(undefined),close=vi.fn();
     render(<DispatchLoadForm drivers={[driver]} enabled save={save} close={close}/>);

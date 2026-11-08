@@ -56,7 +56,7 @@ export default function TelegramMiniApp() {
   return <main className="app-shell telegram-mini-app bg-background text-foreground">
     <header className="mini-app-header">
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-4 py-3">
-        <button type="button" onClick={() => navigate('home')} aria-label="HaulTracker Pro home" className="flex min-h-11 min-w-0 items-center gap-2 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Truck className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-extrabold">HaulTracker Pro</span><span className="block text-[11px] text-muted-foreground">Recruiting inside Telegram</span></span></button>
+        <button type="button" onClick={() => navigate('home')} aria-label="HaulTracker Pro home" className="flex min-h-11 min-w-0 items-center gap-2 text-left"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Truck className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-sm font-extrabold">HaulTracker Pro</span><span className="block text-[11px] text-muted-foreground">{view === 'dispatch' ? 'Dispatch inside Telegram' : 'Recruiting inside Telegram'}</span></span></button>
         <div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" aria-label="Open HaulTrackerPro.com" onClick={() => openMiniAppWebsite(view)}><ExternalLink className="h-5 w-5" /></Button>{user && <Button variant="ghost" size="icon" aria-label="Sign out" onClick={() => { void signOut(); }}><LogOut className="h-5 w-5" /></Button>}</div>
       </div>
     </header>
