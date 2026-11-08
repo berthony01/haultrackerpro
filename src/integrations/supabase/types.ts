@@ -6444,6 +6444,49 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      dispatch_mini_assert_scope: {
+        Args: {
+          _permission?: Database["public"]["Enums"]["recruiter_workspace_permission"]
+          _recruiter_id: string
+          _relationship_id?: string
+        }
+        Returns: string
+      }
+      dispatch_mini_create: {
+        Args: {
+          _idempotency_key: string
+          _payload: Json
+          _recruiter_id: string
+          _relationship_id: string
+        }
+        Returns: Json
+      }
+      dispatch_mini_read: {
+        Args: {
+          _as_of?: string
+          _bucket?: string
+          _driver_offset?: number
+          _limit?: number
+          _offset?: number
+          _recruiter_id: string
+          _relationship_id?: string
+          _status?: string
+        }
+        Returns: Json
+      }
+      dispatch_mini_status: {
+        Args: {
+          _actual_delivery_date: string
+          _expected_status: string
+          _idempotency_key: string
+          _load_id: string
+          _local_today: string
+          _new_status: string
+          _recruiter_id: string
+          _relationship_id: string
+        }
+        Returns: Json
+      }
       dispatch_update_driver_load_status: {
         Args: {
           _driver_user_id: string
