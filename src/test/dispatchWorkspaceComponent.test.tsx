@@ -17,7 +17,7 @@ describe('Dispatch forms and confirmations',()=>{
   it('keeps failed creation open and retries exact same payload/key',async()=>{
     const save=vi.fn().mockRejectedValueOnce(new Error('Ambiguous network result')).mockResolvedValueOnce(undefined),close=vi.fn();
     render(<DispatchLoadForm drivers={[driver]} enabled save={save} close={close}/>);
-    fireEvent.change(screen.getByLabelText('Paste dispatch details'),{target:{value:'LOAD# QA1234\nPickup: Dallas, TX\nDelivery: Austin, TX\nFlat rate $400'}});fireEvent.click(screen.getByRole('button',{name:'Extract for review'}));
+    fireEvent.change(screen.getByLabelText('Paste dispatch details'),{target:{value:'LOAD# QA1234\nfrom Dallas, TX to Austin, TX\nFlat rate $400'}});fireEvent.click(screen.getByRole('button',{name:'Extract for review'}));
     // Select from the real Radix control.
     fireEvent.keyDown(screen.getByRole('combobox',{name:'Connected driver'}),{key:'ArrowDown'});
     fireEvent.click(await screen.findByRole('option',{name:'QA Driver'}));
