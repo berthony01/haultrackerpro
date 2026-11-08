@@ -1,10 +1,10 @@
 // @vitest-environment node
-// Disposable PostgreSQL 17.11, NEVER a configured/database URL. No network listener.
+// Disposable PostgreSQL 16/17, NEVER a configured/database URL. No network listener.
 // Real candidate and production-used authorization/status/wrapper bodies; schema
 // projections reuse the accepted local fixture. Synthetic rows only. Connections
 // execute RPCs as service_role, denial probes as anon/authenticated, not owner.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
@@ -13,7 +13,15 @@ import { SOURCES, exactFunction, uid } from './fixtures/phase3AssistantBootstrap
 
 let dir = '', pool: pg.Pool;
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('PG') && k !== 'DATABASE_URL'));
-const run = (bin: string, args: string[]) => execFileSync('setpriv', ['--reuid=1000','--regid=1000','--clear-groups',bin,...args], { env, stdio: 'pipe' });
+const runningAsRoot = process.getuid?.() === 0;
+const run = (bin: string, args: string[]) => {
+ const executable = process.env.HTP_TEST_POSTGRES_BINDIR ? join(process.env.HTP_TEST_POSTGRES_BINDIR, bin) : bin;
+ // Ordinary CI runners already have an unprivileged identity. Only a root
+ // executor needs the existing privilege drop; no production URL is accepted.
+ return runningAsRoot
+  ? execFileSync('setpriv', ['--reuid=1000','--regid=1000','--clear-groups',executable,...args], { env, stdio:'pipe' })
+  : execFileSync(executable,args,{env,stdio:'pipe'});
+};
 const read = (p: string) => readFileSync(p,'utf8');
 const mig = (p: string) => read('supabase/migrations/'+p);
 const R=uid(101), D=uid(2), OWNER=uid(1), STAFF=uid(3), REL=uid(201), LOAD=uid(301), LEASE=uid(901);
@@ -57,12 +65,16 @@ async function applyDeadlineCandidate(path:string){
 }
 
 beforeAll(async()=>{
- dir=mkdtempSync(join(tmpdir(),'tgg1b-local-')); execFileSync('chown',['1000:1000',dir]);
+ dir=mkdtempSync(join(tmpdir(),'tgg1b-local-'));
+ if(runningAsRoot) execFileSync('chown',['1000:1000',dir]);
+ const binaryVersion=run('postgres',['--version']).toString();
+ const binaryMajor=Number(binaryVersion.match(/\b(\d+)\./)?.[1]);
+ expect([16,17], `Unsupported disposable PostgreSQL binary: ${binaryVersion}`).toContain(binaryMajor);
  run('initdb',['-D',join(dir,'data'),'-U','local_owner','-A','trust','--no-locale']);
  run('pg_ctl',['-D',join(dir,'data'),'-l',join(dir,'postgres.log'),'-o',`-k ${dir} -h '' -p 55439`,'-w','start']);
  // Explicit socket/user/db/port: no production PG environment is consulted.
  pool=new pg.Pool({host:dir,port:55439,user:'local_owner',database:'postgres',password:'',options:'',ssl:false,max:8,statement_timeout:10000});
- expect((await q('SHOW server_version'))[0].server_version).toContain('17.11');
+ expect(Math.floor(Number((await q('SHOW server_version_num'))[0].server_version_num)/10000)).toBe(binaryMajor);
  await q(read('src/test/fixtures/phase3AssistantCanonical.sql'));
  for(const [path,names] of SOURCES) for(const name of names) await q(exactFunction(mig(path),name));
  // Exact relationship schema and Telegram identity/binding DDL from migrations.
@@ -123,7 +135,7 @@ async function seedFixture() {
  UPDATE telegram_poll_state SET lease_token='${LEASE}',lease_expires_at=now()+interval '1 hour';`);
 }
 beforeEach(seedFixture);
-afterAll(async()=>{ await pool?.end(); if(dir) { try { run('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop']); } finally { rmSync(dir,{recursive:true,force:true}); } } });
+afterAll(async()=>{ await pool?.end(); if(dir) { try { if(existsSync(join(dir,'data','postmaster.pid'))) run('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop']); } finally { rmSync(dir,{recursive:true,force:true}); } } });
 
 describe('TG-G1B real disposable PostgreSQL transactions',()=>{
  it('guidance checks explicit permission, exact bound workspace and restores caller identity',async()=>{

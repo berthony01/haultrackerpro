@@ -115,9 +115,9 @@ Production function hashes were read only:
 | `consume_telegram_link_token(text,bigint)` | `6b565c953d642cc011ca5f16806dc892` |
 | `revoke_my_telegram_link()` | `ef1fc082ef10edd9319e765a7233c3df` |
 
-The broad regression command excludes the unrelated LocalPostgres harness, which
-cannot start `initdb` under this executor's restricted `setgroups`. That harness
-is not a passing check. Hosted PostgreSQL supplies the linking evidence above.
+The broad local regression command excludes the LocalPostgres harness because
+native PostgreSQL binaries are unavailable in this executor. Its hosted gate
+must pass separately. Hosted PostgreSQL supplies the linking evidence above.
 The Vite build retains its existing large-chunk warning.
 
 ## Release order and acceptance
@@ -222,3 +222,19 @@ assertions were disabled, and missing git evidence now fails these audits.
 The final hosted gate outcomes and production frontend/poller/menu readbacks
 are maintained in the [release ledger](https://github.com/berthony01/haultrackerpro/pull/52).
 Local checks alone do not establish deployment or complete platform readiness.
+
+The first hosted rerun reached a launcher defect in the disposable PostgreSQL
+harness: unconditional chown/setpriv assumed a root executor. The launcher now
+uses the existing unprivileged identity, retaining privilege drop only for root,
+checks that its socket server matches the selected PostgreSQL 16/17 binary, and
+cleans up only a started cluster. The workflow selects installed server binaries
+and runs the full Telegram transaction suite before the broader checks. It still
+accepts no database URL, opens no TCP listener and uses synthetic data only. All
+authorization, replay, expiry, rollback and financial-trigger assertions remain.
+
+The billing browser fixtures now supply the canonical recruiter capability and a
+carrier company type, preserve Fleet's preview-only lock, and exercise the actual
+readiness dialog for suspended/incomplete profiles. Checkout/portal destinations
+are intercepted locally while real popup navigation and opener isolation remain
+asserted. The initial browser run passed 24 cases; the four corrected cases then
+passed a focused rerun. A complete hosted rerun remains the final release gate.
