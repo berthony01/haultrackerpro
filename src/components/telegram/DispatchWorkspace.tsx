@@ -18,8 +18,8 @@ function DriverSummary({ summary: s, weekStart }: { summary: DispatchPage['summa
   return <section className="dispatch-surface space-y-3" aria-label={`${s.display_name} delivery summary`}>
     <div className="flex items-center gap-2"><span className="dispatch-icon"><Truck className="h-4 w-4" /></span><h2 className="min-w-0 break-words font-semibold">{s.display_name}</h2></div>
     <div className="grid min-w-0 grid-cols-2 gap-3">
-      <div className="dispatch-stat"><p className="dispatch-caption">Delivered today</p><p className="dispatch-stat-number">{s.daily_count}<span>{loadWord(s.daily_count)}</span></p><p className="dispatch-stat-detail">{number(s.daily_miles)} mi</p></div>
-      <div className="dispatch-stat"><p className="dispatch-caption">This week</p><p className="dispatch-stat-number">{s.weekly_count}<span>{loadWord(s.weekly_count)}</span></p><p className="dispatch-stat-detail">{number(s.weekly_miles)} mi</p></div>
+      <div className="dispatch-stat"><p className="dispatch-caption">Daily deliveries</p><p className="dispatch-stat-number">{s.daily_count}<span>{loadWord(s.daily_count)}</span></p><p className="dispatch-stat-detail">{number(s.daily_miles)} mi</p></div>
+      <div className="dispatch-stat"><p className="dispatch-caption">Weekly deliveries</p><p className="dispatch-stat-number">{s.weekly_count}<span>{loadWord(s.weekly_count)}</span></p><p className="dispatch-stat-detail">{number(s.weekly_miles)} mi</p></div>
     </div>
     <details className="dispatch-other-totals"><summary>Other load totals<span className="dispatch-caption">Week of {dateLabel(weekStart)}</span></summary>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
