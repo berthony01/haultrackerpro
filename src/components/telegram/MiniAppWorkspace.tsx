@@ -53,9 +53,9 @@ function WorkspaceFrame({ title, subtitle, children, allowed, ...props }: MiniAp
     props.navigate('conversations', url.searchParams.get('thread'));
   };
   return <section onClickCapture={interceptConversation} className="min-w-0 space-y-5">
-    <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border/60 bg-card/60 p-4">
+    <div className={`flex flex-wrap items-start justify-between gap-3 rounded-2xl border border-border/60 bg-card/60 ${props.view === 'dispatch' ? 'px-4 py-3' : 'p-4'}`}>
       <div className="min-w-0"><p className="break-words text-base font-bold">{title}</p><p className="mt-1 text-xs text-muted-foreground">{subtitle}</p></div>
-      {allowed.includes('post') && props.view !== 'post' && <Button size="sm" onClick={() => props.navigate('post')}><Plus className="mr-1 h-4 w-4" />New job</Button>}
+      {allowed.includes('post') && props.view !== 'post' && props.view !== 'dispatch' && <Button size="sm" onClick={() => props.navigate('post')}><Plus className="mr-1 h-4 w-4" />New job</Button>}
     </div>
     {children}
     <MiniAppNavigation view={props.view} allowed={allowed} navigate={props.navigate} />

@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDispatchWorkspace, type DispatchQuery } from '@/hooks/useDispatchWorkspace';
 import { RECRUITER_STAFF_PERMISSION_KEYS } from '@/lib/recruiterStaffPermissions';
 const h=vi.hoisted(()=>({userId:'user-a',rpc:vi.fn()}));
@@ -9,7 +9,65 @@ const permissions=Object.fromEntries(RECRUITER_STAFF_PERMISSION_KEYS.map(key=>[k
 const query:DispatchQuery={relationship:'',bucket:'active',status:'',offset:0,date:'2026-11-08',driverOffset:0};
 const page=(id='a')=>({loads:[{id}],drivers:[],summaries:[],total:1,driver_total:0,week_start:'2026-11-08'});
 beforeEach(()=>{h.rpc.mockReset();h.userId='user-a';});
+afterEach(()=>{vi.restoreAllMocks();vi.useRealTimers();});
 describe('Dispatch permission and query lifetime',()=>{
+  it('forces a fresh read after a mutation and ignores an older in-flight response',async()=>{
+    let finish!:(value:unknown)=>void;
+    const deferred=new Promise(resolve=>{finish=resolve;});let reads=0;
+    h.rpc.mockImplementation((name:string)=>name==='get_my_recruiter_permissions'
+      ? Promise.resolve({data:permissions,error:null})
+      : ++reads===2?deferred:Promise.resolve({data:page(reads===1?'before':'after'),error:null}));
+    const {result}=renderHook(()=>useDispatchWorkspace('company',query));
+    await waitFor(()=>expect(result.current.verified).toBe(true));
+    let old!:Promise<void>;
+    act(()=>{old=result.current.refresh();});
+    await waitFor(()=>expect(reads).toBe(2));
+    await act(()=>result.current.refresh(true));
+    expect(result.current.page?.loads[0].id).toBe('after');
+    await act(async()=>{finish({data:page('stale'),error:null});await old;});
+    expect(result.current.page?.loads[0].id).toBe('after');
+  });
+  it('clears results immediately when filters change, without labelling old loads as the new filter',async()=>{
+    let finish!:(value:unknown)=>void;
+    const deferred=new Promise(resolve=>{finish=resolve;});let reads=0;
+    h.rpc.mockImplementation((name:string)=>name==='get_my_recruiter_permissions'
+      ? Promise.resolve({data:permissions,error:null})
+      : ++reads===1?Promise.resolve({data:page('active'),error:null}):deferred);
+    const {result,rerender}=renderHook(({q})=>useDispatchWorkspace('company',q),{initialProps:{q:query}});
+    await waitFor(()=>expect(result.current.verified).toBe(true));
+    rerender({q:{...query,bucket:'history'}});
+    expect(result.current.page).toBeNull();expect(result.current.verified).toBe(false);
+    await act(async()=>{finish({data:page('history'),error:null});await deferred;});
+    expect(result.current.page?.loads[0].id).toBe('history');
+  });
+  it('pauses background polling while hidden and rechecks when the app becomes visible',async()=>{
+    vi.useFakeTimers();
+    const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('visible');
+    h.rpc.mockImplementation((name:string)=>Promise.resolve({data:name==='get_my_recruiter_permissions'?permissions:page(),error:null}));
+    const {result,unmount}=renderHook(()=>useDispatchWorkspace('company',query));
+    await act(async()=>{await Promise.resolve();});
+    expect(result.current.verified).toBe(true);expect(h.rpc).toHaveBeenCalledTimes(2);
+    visibility.mockReturnValue('hidden');
+    await act(()=>vi.advanceTimersByTimeAsync(30000));
+    expect(h.rpc).toHaveBeenCalledTimes(2);
+    visibility.mockReturnValue('visible');
+    await act(async()=>{document.dispatchEvent(new Event('visibilitychange'));});
+    expect(h.rpc).toHaveBeenCalledTimes(4);expect(result.current.verified).toBe(true);
+    unmount();
+  });
+  it('coalesces overlapping focus and visibility checks instead of restarting the request',async()=>{
+    let finish!:(value:unknown)=>void;
+    const deferred=new Promise(resolve=>{finish=resolve;});let permissionReads=0;
+    h.rpc.mockImplementation((name:string)=>name==='get_my_recruiter_permissions'
+      ? ++permissionReads===1?Promise.resolve({data:permissions,error:null}):deferred
+      : Promise.resolve({data:page(),error:null}));
+    const {result}=renderHook(()=>useDispatchWorkspace('company',query));
+    await waitFor(()=>expect(result.current.verified).toBe(true));
+    act(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));});
+    expect(permissionReads).toBe(2);
+    await act(async()=>{finish({data:permissions,error:null});await deferred;});
+    await waitFor(()=>expect(result.current.verified).toBe(true));
+  });
   it('preserves only inactive form authority after a transient error, then clears it on explicit denial',async()=>{
     h.rpc.mockResolvedValueOnce({data:permissions,error:null}).mockResolvedValueOnce({data:page(),error:null})
       .mockResolvedValueOnce({data:permissions,error:null}).mockResolvedValueOnce({data:null,error:{code:'NETWORK'}})
