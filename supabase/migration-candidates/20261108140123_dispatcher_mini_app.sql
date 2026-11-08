@@ -87,7 +87,7 @@ BEGIN
   END IF;
  END LOOP;
  IF _payload->>'estimated_pay' IS NULL OR
-    CASE _payload->>'pay_model' WHEN 'manual' THEN _payload->>'manual_amount' IS NULL WHEN 'flat_rate' THEN _payload->>'flat_rate_amount' IS NULL ELSE _payload->>'rate_per_mile' IS NULL END OR
+    (CASE _payload->>'pay_model' WHEN 'manual' THEN _payload->>'manual_amount' IS NULL WHEN 'flat_rate' THEN _payload->>'flat_rate_amount' IS NULL ELSE _payload->>'rate_per_mile' IS NULL END) OR
     (_payload->>'pay_model'='loaded_plus_deadhead' AND _payload->>'deadhead_rate_per_mile' IS NULL) THEN RAISE EXCEPTION 'dispatch_explicit_pay_required'; END IF;
  IF coalesce((_payload->>'loaded_miles')::numeric,0)+coalesce((_payload->>'deadhead_miles')::numeric,0)>0 AND _payload->>'total_miles' IS NOT NULL AND abs((_payload->>'total_miles')::numeric-(coalesce((_payload->>'loaded_miles')::numeric,0)+coalesce((_payload->>'deadhead_miles')::numeric,0)))>2 THEN RAISE EXCEPTION 'dispatch_mileage_conflict'; END IF;
  _loaded:=coalesce((_payload->>'loaded_miles')::numeric,0); _deadhead:=coalesce((_payload->>'deadhead_miles')::numeric,0); _total:=coalesce((_payload->>'total_miles')::numeric,0);
