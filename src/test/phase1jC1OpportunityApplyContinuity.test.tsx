@@ -236,7 +236,7 @@ async function openDetail(id: 'opp-A' | 'opp-B') {
 }
 
 async function openApplyDialog() {
-  await userEvent.click(screen.getByRole('button', { name: /^Apply Now$/ }));
+  await userEvent.click(screen.getByRole('button', { name: /^(Apply Now|Complete Preferences to Apply)$/ }));
   await screen.findByRole('dialog');
 }
 
@@ -261,14 +261,12 @@ async function clickSaveIncomplete() {
 
 // ==========================================================================
 describe('Phase 1J-C1 — Opportunity Apply continuity (integration)', () => {
-  it('1. Apply Now on A → Preferences preserves A (Back returns to A detail); detail exposes exactly one dominant Apply Now action', async () => {
+  it('1. application entry on A preserves A through Preferences and exposes one primary action for an incomplete profile', async () => {
     renderPage();
     await openDetail('opp-A');
-    // Phase 1O-B contract: the detail surface exposes exactly one
-    // dominant Apply Now action (the sticky action bar) — no duplicate
-    // top-of-summary button. Any Referral secondary button that carries
-    // the word "Apply" (e.g. "Applied?") is excluded via an exact match.
-    const applyButtons = screen.getAllByRole('button', { name: /^Apply Now$/i });
+    // The sticky application action describes the next required step.
+    // An incomplete profile must still have one application entry point.
+    const applyButtons = screen.getAllByRole('button', { name: /^Complete Preferences to Apply$/i });
     expect(applyButtons).toHaveLength(1);
     await openApplyDialog();
     await enterPrefsFromApply();

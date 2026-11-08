@@ -191,3 +191,19 @@ navigation race was also reproduced: leaving Reports could reapply its stale
 query hint. Explicit page navigation now removes that hint through Router in the
 same event, preserving other query parameters, the fragment and location state.
 Final test counts and the production release SHA are recorded in the PR ledger.
+
+### Broader release hold
+
+The complete local inventory, excluding the unavailable LocalPostgres harness,
+finished with 7,923 assertions passed and 28 failed, across 7,951 assertions.
+Fifteen test files reported failures. This is not a full-suite PASS. It includes
+historical file-change envelopes, agency/settlement integration source guards,
+older security/migration shape checks and two missing-provider fixtures. The
+historical and security assertions have not been removed or disabled to make
+the suite green. Subsequent focused fixture repairs do not establish a passing
+complete inventory without a full rerun.
+
+The final poller/default-menu rollout remains held. The owner-only Mini App
+continues to use the already published frontend and deployed endpoint. The
+release-verification PR preserves the Reports fix, fixture corrections and live
+acceptance evidence for review; it does not claim general platform readiness.
