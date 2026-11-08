@@ -653,9 +653,12 @@ describe('RC-1H — report output privacy compatibility', () => {
 });
 
 describe('RC-1H — frozen files', () => {
+  // Audit the completed RC-1H phase through its normalizer correction. Later
+  // releases have their own scope and remain covered by the live contracts above.
   const changed = execFileSync(
     'git',
-    ['diff', '--name-only', 'fc79efd7100216edc1ad4caf4378059a9408df89'],
+    ['diff', '--name-only', 'fc79efd7100216edc1ad4caf4378059a9408df89',
+      '8a5768f7728f353fd6bf88677b62795902916bd2'],
     { encoding: 'utf8' },
   )
     .split('\n')

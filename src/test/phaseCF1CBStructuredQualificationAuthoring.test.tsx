@@ -591,11 +591,16 @@ describe('CF-1C-B 12) ai-insight parse_opportunity extraction contract', () => {
     expect(values).not.toContain('S');
   });
 
-  it('12d) min_years_experience is a non-negative number', () => {
+  it('12d) min_years_experience is optional and cannot use zero as a missing-value default', () => {
     const m = edge.match(/min_years_experience:\s*\{([\s\S]*?)\},/);
     expect(m).not.toBeNull();
     expect((m as RegExpMatchArray)[1]).toMatch(/type:\s*"number"/);
-    expect((m as RegExpMatchArray)[1]).toMatch(/minimum:\s*0/);
+    expect((m as RegExpMatchArray)[1]).toContain('Omit entirely when not stated');
+    expect((m as RegExpMatchArray)[1]).toContain('NEVER emit 0');
+    // RB-3B-A removed the model-schema minimum to avoid fabricated zero defaults.
+    // The canonical persistence normalizer still rejects negative experience.
+    expect((m as RegExpMatchArray)[1]).not.toMatch(/default:\s*0/);
+    expect(readSource(CANONICAL_SRC)).toContain('if (!Number.isFinite(n) || n < 0) return null;');
   });
 
   it('12e) the prompt requires explicit statements and forbids inference', () => {
@@ -634,10 +639,13 @@ describe('CF-1C-B 12) ai-insight parse_opportunity extraction contract', () => {
 describe('CF-1C-B 13) scope guard', () => {
   const clientFiles = [CANONICAL_SRC, PASTE_SRC, FORM_SRC];
 
-  it.each(clientFiles)('13a) %s introduces no billing/Stripe/Telegram coupling', (rel) => {
+  it.each(clientFiles)('13a) %s introduces no billing or Telegram transport/identity coupling', (rel) => {
     const src = readSource(rel);
     expect(src).not.toMatch(/stripe/i);
-    expect(src).not.toMatch(/telegram/i);
+    // The reviewed Quick Post adapter supplies draft callbacks to the shared
+    // form. Transport, bot credentials and Telegram identity stay outside it.
+    expect(src).not.toMatch(/api\.telegram\.org|Telegram\.WebApp|initData|bot_token/i);
+    expect(src).not.toMatch(/from\s+['"][^'"]*telegram[^'"]*['"]/i);
     expect(src).not.toMatch(/checkout_intent/i);
   });
 

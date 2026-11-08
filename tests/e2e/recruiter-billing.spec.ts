@@ -62,6 +62,7 @@ function baseProfile(overrides: Record<string, unknown> = {}) {
     user_id: USER_ID,
     recruiter_name: 'Pat Recruiter',
     company_name: 'Acme Logistics',
+    company_type: 'carrier',
     recruiter_email: 'pat@acme.example',
     recruiter_phone: null,
     dot_number: '1234567',
@@ -199,6 +200,11 @@ async function setup(context: BrowserContext, opts: SetupOpts = {}): Promise<Moc
     if (p.startsWith('/auth/')) return json(route, {});
 
     // Role / identity RPCs.
+    // Workspace entry is now determined by canonical account capabilities,
+    // independently of this suite's billing/profile scenarios.
+    if (p === '/rest/v1/rpc/get_my_user_capabilities') return json(route, [
+      { capability: 'recruiter', status: 'active', activated_at: '2026-01-01T00:00:00Z' },
+    ]);
     if (p.includes('/rest/v1/rpc/is_current_user_recruiter')) return json(route, true);
     if (p.includes('/rest/v1/rpc/get_my_recruiter_profile_safe'))
       return json(route, state.profile ? [state.profile] : []);
@@ -255,6 +261,14 @@ async function setup(context: BrowserContext, opts: SetupOpts = {}): Promise<Moc
 
   // Hard guard: NOTHING may reach the real Supabase project host.
   await context.route(`**/${REAL_SUPA_HOST}/**`, (route) => route.abort('failed'));
+  // Genuine popup navigation is exercised, but synthetic checkout/portal
+  // destinations must never depend on Stripe's network or create a live visit.
+  for (const host of ['checkout.stripe.com', 'billing.stripe.com']) {
+    await context.route(`https://${host}/**`, route => route.fulfill({
+      status: 200, contentType: 'text/html',
+      body: '<!doctype html><title>Synthetic billing destination</title><p>QA fixture</p>',
+    }));
+  }
 
   // Swallow realtime websockets without connecting to any real server.
   try {
@@ -295,7 +309,7 @@ async function tabUntil(page: Page, testId: string, max = 60): Promise<number> {
 }
 
 test.describe('Recruiter billing surface — R1c', () => {
-  test('eligible-idle renders the real panel with three enabled plan buttons and no error surfaces', async ({
+  test('eligible-idle enables Starter/Growth checkout and keeps Fleet preview-only', async ({
     page,
   }) => {
     await setup(page.context(), { billing: null });
@@ -306,10 +320,13 @@ test.describe('Recruiter billing surface — R1c', () => {
     await expect(fallbackLink(page)).toHaveCount(0);
     await expect(manageBillingBtn(page)).toHaveCount(0);
 
-    for (const key of ['starter', 'growth', 'fleet'] as const) {
+    for (const key of ['starter', 'growth'] as const) {
       await expect(planBtn(page, key)).toBeVisible();
       await expect(planBtn(page, key)).toBeEnabled();
     }
+    await expect(planBtn(page, 'fleet')).toBeVisible();
+    await expect(planBtn(page, 'fleet')).toBeDisabled();
+    await expect(planBtn(page, 'fleet')).toHaveText('Fleet Preview');
 
     // Standard-access copy is present regardless of billing.
     await expect(panel(page)).toContainText('Standard Recruiter Access');
@@ -545,8 +562,8 @@ test.describe('Recruiter billing surface — R1c', () => {
   }) => {
     // The real RecruiterAccessPage only mounts RecruiterBillingPanel for an
     // eligible (canPost) recruiter. A suspended recruiter therefore never
-    // reaches the panel — the correct blocking behavior is the suspended
-    // StateCard + disabled "Post an Opportunity". (The panel's internal
+    // reaches the panel. The Post action explains the suspended state in a
+    // readiness dialog and must never mount an opportunity form. (The panel's internal
     // 'suspended' branch is defensive/unreachable via this route.)
     await setup(page.context(), {
       profile: baseProfile({ status: 'suspended', verification_status: 'suspended' }),
@@ -556,7 +573,11 @@ test.describe('Recruiter billing surface — R1c', () => {
 
     await expect(page.getByText('Recruiter Access Suspended', { exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(heading(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Post an Opportunity/ })).toBeDisabled();
+    await page.getByTestId('post-opportunity-button').click();
+    await expect(page.getByTestId('recruiter-readiness-dialog')).toHaveAttribute('data-state-suspended', 'true');
+    await expect(page.getByTestId('readiness-suspended-notice')).toBeVisible();
+    await expect(page.getByTestId('readiness-dialog-primary')).toHaveCount(0);
+    await expect(page.getByTestId('recruiter-opportunity-form')).toHaveCount(0);
   });
 
   test('premium-ineligible (incomplete profile): panel gated out, profile-completion prompt blocks posting', async ({
@@ -573,7 +594,11 @@ test.describe('Recruiter billing surface — R1c', () => {
       timeout: 20_000,
     });
     await expect(heading(page)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Post an Opportunity/ })).toBeDisabled();
+    await page.getByTestId('post-opportunity-button').click();
+    await expect(page.getByTestId('recruiter-readiness-dialog')).toHaveAttribute('data-state-ready', 'false');
+    await expect(page.getByTestId('rr-dot-number')).toBeVisible();
+    await expect(page.getByTestId('rr-mc-number')).toBeVisible();
+    await expect(page.getByTestId('recruiter-opportunity-form')).toHaveCount(0);
   });
 
   test('Manage Billing portal flow opens a real popup auto-navigated to the validated billing URL', async ({

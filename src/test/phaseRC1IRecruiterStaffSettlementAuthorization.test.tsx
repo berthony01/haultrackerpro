@@ -600,19 +600,10 @@ describe('RC-1I — manager effective permission formulas', () => {
 const git = (...args: string[]) =>
   execFileSync('git', args, { cwd: process.cwd(), encoding: 'utf8' });
 
-const hasRef = (ref: string) => {
-  try {
-    git('cat-file', '-e', `${ref}^{commit}`);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-/** Commit immediately preceding all RC-1I work (RC-1H generated baseline). */
-const RC1I_BASELINE = 'ae98371382db217408ec74313a9a9076fecbcf36';
 /** Rejected RC-1I candidate — accepted route/permission wiring lives here. */
 const RC1I_REJECTED_CANDIDATE = '31e6806e959528bbc9fe25aaf8bb0bc30a198749';
+/** Final RC-1I correction, before subsequent agency and recruiter phases. */
+const RC1I_ACCEPTED_CORRECTION = 'b0b98a7a01d288c4e0137039bda8f2b4ef0c2e0a';
 
 const RC1I_ALLOWLIST = [
   'src/components/opportunities/recruiter/RecruiterAccessRoute.tsx',
@@ -626,12 +617,11 @@ const RC1I_ALLOWLIST = [
 
 describe('RC-1I — change scope', () => {
   it('leaves the accepted route and permission wiring untouched by the correction', () => {
-    if (!hasRef(RC1I_REJECTED_CANDIDATE)) return;
     const changed = git(
       'diff',
       '--name-only',
       RC1I_REJECTED_CANDIDATE,
-      'HEAD',
+      RC1I_ACCEPTED_CORRECTION,
       '--',
       'src/components/opportunities/recruiter/RecruiterAccessRoute.tsx',
       'src/hooks/recruiter/useRecruiterStaffPermissions.ts',
@@ -641,9 +631,8 @@ describe('RC-1I — change scope', () => {
     expect(changed).toEqual([]);
   });
 
-  it('keeps the functional RC-1I diff inside the original seven files', () => {
-    if (!hasRef(RC1I_BASELINE)) return;
-    const changed = git('diff', '--name-only', RC1I_BASELINE, 'HEAD')
+  it('keeps the accepted RC-1I correction inside the original seven files', () => {
+    const changed = git('diff', '--name-only', RC1I_REJECTED_CANDIDATE, RC1I_ACCEPTED_CORRECTION)
       .split('\n')
       .filter(Boolean);
     expect(changed.length).toBeGreaterThan(0);

@@ -11,6 +11,9 @@ import { resolve } from 'node:path';
  * regressions in either the migration or the client hook code paths.
  */
 function loadMigrationContaining(token: string): string {
+  // A function-name prefix must not resolve to a different suffixed function.
+  const exactToken = /^CREATE OR REPLACE FUNCTION public\.\w+$/.test(token)
+    ? `${token}(` : token;
   const migrationsDir = resolve(__dirname, '../../supabase/migrations');
   const files = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
@@ -18,15 +21,20 @@ function loadMigrationContaining(token: string): string {
     .reverse();
   for (const f of files) {
     const text = readFileSync(resolve(migrationsDir, f), 'utf8');
-    if (text.includes(token)) return text;
+    if (text.includes(exactToken)) return text;
   }
   throw new Error(`No migration contains token ${token}`);
 }
 
 function extractFunctionBody(sql: string, fnName: string): string {
-  const marker = `CREATE OR REPLACE FUNCTION public.${fnName}`;
-  const start = sql.indexOf(marker);
-  if (start < 0) throw new Error(`Function ${fnName} not found`);
+  // Exported migrations add casts to DEFAULT NULL and reformat signatures.
+  // Match the exact function name, rejecting ambiguous overloads rather than
+  // silently inspecting the wrong implementation.
+  const name = fnName.split('(')[0];
+  const declarations = [...sql.matchAll(new RegExp(
+    `CREATE\\s+OR\\s+REPLACE\\s+FUNCTION\\s+public\\.${name}\\s*\\(`, 'gi'))];
+  if (declarations.length !== 1) throw new Error(`Expected one definition of ${name}, found ${declarations.length}`);
+  const start = declarations[0].index!;
   // Take everything up to the closing dollar-quoted terminator of the body.
   // Migrations use `$$;` or named tags like `$function$;` / `$body$;`.
   const tail = sql.slice(start);
@@ -225,18 +233,24 @@ describe('Phase 28 PII access control hardening', () => {
     expect(src).toMatch(/list_recruiter_applications_safe/);
   });
 
-  it('OpportunityDetail only sends contact snapshots when driver consent is on', () => {
-    const src = readFileSync(
-      resolve(__dirname, '../components/opportunities/OpportunityDetail.tsx'),
-      'utf8',
-    );
-    // Phase 28C: snapshots are computed via local `phoneSnap`/`emailSnap` that
-    // gate on consent + matching contact_preference.
-    expect(src).toMatch(/allow_verified_recruiter_contact/);
-    expect(src).toMatch(/pref === 'phone'/);
-    expect(src).toMatch(/pref === 'email'/);
-    expect(src).toMatch(/driver_phone_snapshot:\s*phoneSnap/);
-    expect(src).toMatch(/driver_email_snapshot:\s*emailSnap/);
+  it('application contact snapshots are server-derived behind explicit per-submission consent', () => {
+    const read = (file: string) => readFileSync(resolve(__dirname, file), 'utf8');
+    const detail = read('../components/opportunities/OpportunityDetail.tsx');
+    const dialog = read('../components/opportunities/ApplyNowDialog.tsx');
+    const hook = read('../hooks/opportunities/useOpportunityApplications.ts');
+    expect(detail).toContain('<ApplyNowDialog');
+    expect(dialog).toContain('const [consent, setConsent] = useState(false)');
+    expect(dialog).toContain('const consentValid = !externalMethod || consent');
+    expect(dialog).toContain('contact_sharing_consent: consent');
+    expect(hook).toContain("rpc('submit_opportunity_application'");
+    expect(hook).toContain('_contact_sharing_consent: args.contact_sharing_consent');
+    for (const src of [detail, dialog, hook]) {
+      expect(src).not.toMatch(/driver_(?:phone|email)_snapshot\s*:/);
+    }
+    const sql = loadMigrationContaining('CREATE OR REPLACE FUNCTION public.submit_opportunity_application');
+    const body = extractFunctionBody(sql, 'submit_opportunity_application');
+    expect(body).toMatch(/IF _contact_sharing_consent THEN\s+v_email_snap := v_profile\.email; v_phone_snap := v_profile\.phone; v_consent_at := now\(\);\s+END IF/);
+    expect(sql).toMatch(/contact_sharing_consent = false\s+AND contact_sharing_consent_at IS NULL\s+AND driver_email_snapshot IS NULL\s+AND driver_phone_snapshot IS NULL/);
   });
 });
 
@@ -328,7 +342,7 @@ describe('Phase 28C final scanner cleanup + write-path hardening', () => {
 describe('Phase 28A direct base-table PII access closures', () => {
   function loadPhase28A(): string {
     return loadMigrationContaining(
-      'CREATE OR REPLACE FUNCTION public.get_application_contract_summary',
+      'DROP POLICY IF EXISTS "Recruiter views own profile"',
     );
   }
 
@@ -347,26 +361,29 @@ describe('Phase 28A direct base-table PII access closures', () => {
   });
 
   it('exposes is_current_user_recruiter() with SECURITY DEFINER', () => {
-    const sql = loadPhase28A();
+    const sql = loadMigrationContaining('CREATE OR REPLACE FUNCTION public.is_current_user_recruiter');
     const body = extractFunctionBody(sql, 'is_current_user_recruiter()');
     expect(body).toMatch(/SECURITY DEFINER/);
     expect(body).toMatch(/auth\.uid\(\)/);
   });
 
   it('list_recruiter_application_summaries returns non-PII fields only', () => {
-    const sql = loadPhase28A();
+    const sql = loadMigrationContaining('CREATE OR REPLACE FUNCTION public.list_recruiter_application_summaries');
     const body = extractFunctionBody(sql, 'list_recruiter_application_summaries(_recruiter_id uuid)');
     expect(body).toMatch(/SECURITY DEFINER/);
     // Must not select driver phone/email snapshots or message.
     expect(body).not.toMatch(/driver_phone_snapshot/);
     expect(body).not.toMatch(/driver_email_snapshot/);
     expect(body).not.toMatch(/oa\.message/);
-    // Caller must own recruiter profile.
+    // Canonical owner or explicitly permitted staff, with no contact PII.
     expect(body).toMatch(/rp\.user_id = _uid/);
+    expect(body).toContain('recruiter_profile_can_manage_opportunities(_recruiter_id)');
+    expect(body).toContain("'applications_view'::public.recruiter_workspace_permission");
+    expect(body).toContain("RAISE EXCEPTION 'Not authorized'");
   });
 
   it('get_application_contract_summary excludes PII + admin fields and is party-gated', () => {
-    const sql = loadPhase28A();
+    const sql = loadMigrationContaining('CREATE OR REPLACE FUNCTION public.get_application_contract_summary');
     const body = extractFunctionBody(sql, 'get_application_contract_summary(_application_id uuid)');
     expect(body).toMatch(/SECURITY DEFINER/);
     expect(body).toMatch(/is_application_party/);
@@ -489,7 +506,7 @@ describe('Phase 28B scanner reconciliation + opportunity board hardening', () =>
 
     // Returns SETOF opportunities (base table) — recruiter PII columns are not
     // on opportunities, so no recruiter contact / admin fields can leak.
-    expect(body).toMatch(/RETURNS SETOF public\.opportunities/);
+    expect(body).toMatch(/RETURNS SETOF (?:public\.)?opportunities/i);
     expect(body).not.toMatch(/admin_notes/);
     expect(body).not.toMatch(/verified_by/);
     expect(body).not.toMatch(/contact_email/);

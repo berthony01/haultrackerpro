@@ -449,12 +449,14 @@ describe('Phase 1N-D · source-level integration and security contracts', () => 
 
   it('batch-loads and renders agency-member, assistant, and pending-delegation summaries', () => {
     const agency = read('pages/AgencyDashboard.tsx');
+    const team = read('components/agency/AgencyTeamPanel.tsx');
     const assistants = read('components/assistants/AssistantsPanel.tsx');
     const approvals = read('pages/DriverDelegationApprovals.tsx');
 
-    expect(agency).toContain('useAuthorizedProfessionalProfiles(memberUserIds)');
-    expect(agency).toContain('<ProfessionalProfileSummaryCard');
-    expect(agency).toContain('m.member_user_id');
+    expect(agency).toContain('<AgencyTeamPanel');
+    expect(team).toContain('useAuthorizedProfessionalProfiles(memberUserIds)');
+    expect(team).toContain('<ProfessionalProfileSummaryCard');
+    expect(team).toContain('m.member_user_id');
 
     expect(assistants).toContain(
       'useAuthorizedProfessionalProfiles(assistantProfileIds)',

@@ -538,6 +538,8 @@ describe('release repairs: Reports refresh, More sheet height, Find Work dark ch
     </QueryClientProvider>
   );
   it('browser Back dismisses Reports and Forward restores it without rewriting either history entry', async () => {
+    // These assertions target Dashboard, not the zero-load onboarding surface.
+    state.loads = [{ id: 'qa-reports-navigation-load' }];
     render(reportsNavigationTree());
     expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
     fireEvent.click(screen.getByRole('link', { name: 'Open Reports route' }));
@@ -558,7 +560,8 @@ describe('release repairs: Reports refresh, More sheet height, Find Work dark ch
     expect(state.model).not.toHaveBeenCalled();
   });
   it('Reports survives leaving the route and browser Back; local Dashboard navigation clears the Reports hint through Router', async () => {
-    window.history.replaceState({}, '', '/dashboard?page=reports');
+    state.loads = [{ id: 'qa-reports-navigation-load' }];
+    window.history.replaceState({ usr: { qaRetention: 'keep' } }, '', '/dashboard?page=reports&keep=qa#summary');
     render(reportsNavigationTree());
     expect(await screen.findByTestId('reports-view')).toBeTruthy();
     fireEvent.click(screen.getByRole('link', { name: 'Leave dashboard route' }));
@@ -568,8 +571,10 @@ describe('release repairs: Reports refresh, More sheet height, Find Work dark ch
     expect(await screen.findByTestId('reports-view')).toBeTruthy();
     fireEvent.click(screen.getAllByRole('button', { name: /^Dashboard$/ })[0]);
     expect(await screen.findByTestId('existing-dashboard')).toBeTruthy();
-    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/dashboard'));
-    expect(window.location.search).toBe('');
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/dashboard?keep=qa'));
+    expect(window.location.search).toBe('?keep=qa');
+    expect(window.location.hash).toBe('#summary');
+    expect(window.history.state.usr).toEqual({ qaRetention: 'keep' });
   });
   it('refresh retains the Reports query while the trusted workspace resolves, then mounts Reports', async () => {
     window.history.replaceState({}, '', '/dashboard?page=reports');

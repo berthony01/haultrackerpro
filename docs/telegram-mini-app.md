@@ -1,8 +1,9 @@
 # Recruiter Telegram Mini App, first release
 
-Status: implemented and tested as a release candidate. Production frontend,
-new Edge endpoint, poller buttons and Telegram menu are not activated by this PR.
-General dispatch stays enabled. No schema migration is required.
+Owner acceptance checkpoint: the frontend, new Edge endpoint and owner-only
+Telegram menu are active. The default menu and new poller buttons remain staged
+until final release verification. General dispatch stays enabled. No schema
+migration is required. Final deployment readbacks belong in the PR release ledger.
 
 ## User experience
 
@@ -91,7 +92,11 @@ on those pages. Ordinary website pages retain their existing analytics behavior.
 | Sign-in, registration and unlinked screens | PASS at 320 px |
 | Real PostgreSQL canonical linking, replay/conflict denial and own revoke | PASS in separate hosted QA transaction, fully rolled back |
 | Production linker permissions and signatures | Read-only verified, backend-only consumer |
-| Actual Telegram WebView launch and signed production identity | Pending deployment and live acceptance |
+| Actual Telegram Web launch and signed production owner identity | PASS, existing owner link and normal account sign-in |
+| Live shared draft create, reopen and website handoff | PASS, one unpublished QA opportunity; all prior opportunities/drafts unchanged |
+| Live applicants, inbox and company profile | PASS read-only; four applicants and existing closed QA conversation loaded |
+| Live close/reopen and keyboard Tab focus | PASS, session restored without sign-in; focus moved to the next field |
+| Live Telegram Web layouts | PASS at 320/375 px, no document horizontal overflow; desktop iframe also exercised |
 | Actual email confirmation, Google continuation and device keyboard/safe areas | Pending real-client checks |
 
 The isolated browser uses local production-build assets and synthetic API/SDK
@@ -110,14 +115,15 @@ Production function hashes were read only:
 | `consume_telegram_link_token(text,bigint)` | `6b565c953d642cc011ca5f16806dc892` |
 | `revoke_my_telegram_link()` | `ef1fc082ef10edd9319e765a7233c3df` |
 
-The broad regression command excludes the unrelated LocalPostgres harness, which
-cannot start `initdb` under this executor's restricted `setgroups`. That harness
-is not a passing check. Hosted PostgreSQL supplies the linking evidence above.
+The broad local regression command excludes the LocalPostgres harness because
+native PostgreSQL binaries are unavailable in this executor. Its hosted gate
+must pass separately. Hosted PostgreSQL supplies the linking evidence above.
 The Vite build retains its existing large-chunk warning.
 
 ## Release order and acceptance
 
-Production release remains subject to the owner's publication approval.
+The owner approved publication and owner-only acceptance. The live owner checks
+are complete; the release ledger records the final CI and rollout decision.
 
 1. Confirm the exact branch head passes the new GitHub verification workflow.
    Merge only that reviewed tree. Deploy `telegram-mini-app` with its checked-in
@@ -146,3 +152,94 @@ Later scope: dispatcher Mini App, guided group selection, notification-to-thread
 Mini App links, richer Results screens and BotFather profile launch configuration.
 No new AI activation, billing checkout, driver or driver-assistant bot tools are
 part of this first release.
+
+## Owner acceptance evidence and limits
+
+The live acceptance used production frontend `393c3258a33b148b8d56d1f2a8a485a91988353c`
+inside Telegram Web in connected Chrome. The existing owner account and canonical
+Telegram link were verified without relinking or changing roles.
+
+The only business write was one opportunity, `HTP-QA-MINIAPP-01 - DO NOT PUBLISH`
+(`de9126ee-d953-4f19-8314-b9ba51159ba5`), saved as `draft` with null `published_at`.
+Its title, company, Dallas/TX coverage, W-2/Solo arrangement, Regional/Dry Van
+selection, home-time note, $1,500 flat weekly test value and QA-only description
+survived reopening. The website displayed the same record as Draft, not visible.
+The transparency confirmation was left unchecked, and Publish was disabled on
+the authoring review screen. The draft is retained for owner review.
+
+All nine pre-existing opportunity records retained fingerprint
+`c42c75ea22783f9ea02798a680f3e872`; all six legacy bot drafts retained fingerprint
+`aa8016f82a27df3e8a7f1b8eb01cd48d`. No applicant status, contract, referral, account
+profile, staff permission or group binding was changed. No new message was sent;
+the existing closed QA thread displayed its prior message in each direction and
+offered no reply composer.
+
+One temporary connection-verification warning was observed. The following
+automatic verification restored the open form without a reset. Its root cause
+was not established, and this is not evidence of a platform-wide outage.
+
+Live staff/driver-denial identities, new-account email confirmation, Google
+continuation and physical phone keyboard/safe-area behavior were not exercised.
+Existing automated tests cover role boundaries; responsive Chrome layouts do
+not establish native-device keyboard behavior.
+
+The pre-existing broad-suite failures were investigated before the default-menu
+rollout: missing Router/QueryClient providers, an empty-load onboarding fixture
+incorrectly expecting Dashboard, an overbroad copy/source guard and a mileage
+assertion predating the canonical stored-total sanity rule. One existing Reports
+navigation race was also reproduced: leaving Reports could reapply its stale
+query hint. Explicit page navigation now removes that hint through Router in the
+same event, preserving other query parameters, the fragment and location state.
+Final test counts and the production release SHA are recorded in the PR ledger.
+
+### Broader verification repair
+
+The initial local inventory found 28 failures in 7,951 assertions. After triage,
+the complete local rerun, excluding the unavailable LocalPostgres harness,
+passed all 7,951 assertions across 278 files, with zero failed or skipped
+assertions. The hosted workflow must exercise the PostgreSQL harness before
+the release is approved. Application and Node typechecks, Mini App lint and the
+production build also passed locally. The build retains its chunk-size warning.
+
+The remaining source guards now follow the actual integrations: professional
+summaries in AgencyTeamPanel, permission-aware package controls, the settlement
+page allowlist, and server-derived application contact snapshots behind explicit
+per-submission consent. SQL lookup includes the function-name boundary and
+accepts exported DEFAULT casts without matching another function. Contact PII,
+caller authority and canonical eligibility assertions remain enabled. The
+optional experience extraction check follows RB-3B-A's no-fabricated-zero
+contract and retains the canonical negative-value rejection check. Product AI,
+billing, permissions, SQL and extraction behavior were not changed.
+
+Historical change envelopes audit their verified phase endpoints rather than
+all subsequent releases: AM-1A ends at `2af28b50d875a24c44d4521530e290874ee48b7c`,
+RC-1H at `8a5768f7728f353fd6bf88677b62795902916bd2`, and the RC-1I correction
+compares `31e6806e959528bbc9fe25aaf8bb0bc30a198749` with
+`b0b98a7a01d288c4e0137039bda8f2b4ef0c2e0a`. The unavailable old RC-1I baseline
+was replaced with that verifiable correction range. No historical or security
+assertions were disabled, and missing git evidence now fails these audits.
+
+The final hosted gate outcomes and production frontend/poller/menu readbacks
+are maintained in the [release ledger](https://github.com/berthony01/haultrackerpro/pull/52).
+Local checks alone do not establish deployment or complete platform readiness.
+
+The first hosted rerun reached a launcher defect in the disposable PostgreSQL
+harness: unconditional chown/setpriv assumed a root executor. The launcher now
+uses the existing unprivileged identity, retaining privilege drop only for root,
+checks that its socket server matches the selected PostgreSQL 16/17 binary, and
+cleans up only a started cluster. The workflow selects installed server binaries
+and runs the full Telegram transaction suite before the broader checks. It still
+accepts no database URL, opens no TCP listener and uses synthetic data only. All
+authorization, replay, expiry, rollback and financial-trigger assertions remain.
+The retired L2/GEN1 candidate windows are projected into one fixed seven-day
+window only in the disposable cluster's in-memory SQL. Their checked-in SQL,
+production expiry dates, generic function hash pins and the PostgreSQL clock
+are unchanged. The expiry-denial probes explicitly force that fixture window
+into the past and still assert atomic denial across the QA operations.
+
+The billing browser fixtures now supply the canonical recruiter capability and a
+carrier company type, preserve Fleet's preview-only lock, and exercise the actual
+readiness dialog for suspended/incomplete profiles. Checkout/portal destinations
+are intercepted locally while real popup navigation and opener isolation remain
+asserted. The initial browser run passed 24 cases; the four corrected cases then
+passed a focused rerun. A complete hosted rerun remains the final release gate.

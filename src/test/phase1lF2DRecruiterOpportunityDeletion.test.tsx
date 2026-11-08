@@ -96,7 +96,12 @@ vi.mock('@/integrations/supabase/client', () => {
       }),
     }),
   }));
-  return { supabase: { from, rpc: h.rpc } };
+  // Publication display metadata must not consume queued deletion responses
+  // or be counted as an attempted destructive RPC.
+  const rpc = (name: string, args: unknown) => name === 'get_recruiter_qa_publication_context'
+    ? Promise.resolve({ data: [{ recruiter_id: 'r-1', is_qa_fixture: false }], error: null })
+    : h.rpc(name, args);
+  return { supabase: { from, rpc } };
 });
 
 import { RecruiterOpportunityManager } from '@/components/opportunities/RecruiterOpportunityManager';
@@ -118,6 +123,7 @@ async function waitForList() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  h.rpc.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -179,7 +185,7 @@ describe('Phase 1L-F2D — confirmation dialog', () => {
       ),
     ).toBeInTheDocument();
   });
-  it('cancel closes and calls no RPC', async () => {
+  it('cancel closes and does not call the deletion RPC', async () => {
     const dlg = await openDeleteDialog();
     fireEvent.click(dlg.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('alertdialog')).toBeNull();

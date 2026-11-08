@@ -1,10 +1,10 @@
 // @vitest-environment node
-// Disposable PostgreSQL 17.11, NEVER a configured/database URL. No network listener.
+// Disposable PostgreSQL 16/17, NEVER a configured/database URL. No network listener.
 // Real candidate and production-used authorization/status/wrapper bodies; schema
 // projections reuse the accepted local fixture. Synthetic rows only. Connections
 // execute RPCs as service_role, denial probes as anon/authenticated, not owner.
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import pg from 'pg';
@@ -13,7 +13,15 @@ import { SOURCES, exactFunction, uid } from './fixtures/phase3AssistantBootstrap
 
 let dir = '', pool: pg.Pool;
 const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('PG') && k !== 'DATABASE_URL'));
-const run = (bin: string, args: string[]) => execFileSync('setpriv', ['--reuid=1000','--regid=1000','--clear-groups',bin,...args], { env, stdio: 'pipe' });
+const runningAsRoot = process.getuid?.() === 0;
+const run = (bin: string, args: string[]) => {
+ const executable = process.env.HTP_TEST_POSTGRES_BINDIR ? join(process.env.HTP_TEST_POSTGRES_BINDIR, bin) : bin;
+ // Ordinary CI runners already have an unprivileged identity. Only a root
+ // executor needs the existing privilege drop; no production URL is accepted.
+ return runningAsRoot
+  ? execFileSync('setpriv', ['--reuid=1000','--regid=1000','--clear-groups',executable,...args], { env, stdio:'pipe' })
+  : execFileSync(executable,args,{env,stdio:'pipe'});
+};
 const read = (p: string) => readFileSync(p,'utf8');
 const mig = (p: string) => read('supabase/migrations/'+p);
 const R=uid(101), D=uid(2), OWNER=uid(1), STAFF=uid(3), REL=uid(201), LOAD=uid(301), LEASE=uid(901);
@@ -25,6 +33,16 @@ async function rpc(sql: string, params: unknown[] = [], role='service_role') {
 }
 const QA_LOAD='cb3d3a90-ac48-4d20-af52-d6710d854e81';
 const QA_CANDIDATE='supabase/migration-candidates/20261031040000_qa_single_load_dispatch_review.sql';
+// The retired production QA windows must stay expired in checked-in SQL.
+// Project only their window literals into this disposable cluster, once per
+// run. Generic function bodies/hash pins and the real PostgreSQL clock remain
+// unchanged; expiry probes below force this same fixed window into the past.
+const FIXTURE_QA_DEADLINE=new Date(Date.now()+7*24*60*60*1000).toISOString();
+function fixtureQaWindow(sql:string,retiredDeadline:string,expectedOccurrences:number){
+ const pieces=sql.split(retiredDeadline);
+ expect(pieces.length-1,'Retired QA window fixture shape drifted').toBe(expectedOccurrences);
+ return pieces.join(FIXTURE_QA_DEADLINE);
+}
 const hash=(n: number)=>n.toString(16).padStart(64,'0');
 function intake(n=10, ref: string|null='AB-123', chat=-100, h=hash(n)) {
  return rpc('SELECT * FROM telegram_process_dispatch_group_update($1,$2,$3,900,$4,\'group\',$5,$6)',[LEASE,n,h,chat,ref,ref ? 'completed':null]);
@@ -52,17 +70,24 @@ async function assertDeadlineHashes(expected:Record<string,string>,label:string)
  }
 }
 async function applyDeadlineCandidate(path:string){
+ return applyCandidateSql(read(path));
+}
+async function applyCandidateSql(sql:string){
  const c=await pool.connect();
- try{await c.query(read(path));}catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+ try{await c.query(sql);}catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 }
 
 beforeAll(async()=>{
- dir=mkdtempSync(join(tmpdir(),'tgg1b-local-')); execFileSync('chown',['1000:1000',dir]);
+ dir=mkdtempSync(join(tmpdir(),'tgg1b-local-'));
+ if(runningAsRoot) execFileSync('chown',['1000:1000',dir]);
+ const binaryVersion=run('postgres',['--version']).toString();
+ const binaryMajor=Number(binaryVersion.match(/\b(\d+)\./)?.[1]);
+ expect([16,17], `Unsupported disposable PostgreSQL binary: ${binaryVersion}`).toContain(binaryMajor);
  run('initdb',['-D',join(dir,'data'),'-U','local_owner','-A','trust','--no-locale']);
  run('pg_ctl',['-D',join(dir,'data'),'-l',join(dir,'postgres.log'),'-o',`-k ${dir} -h '' -p 55439`,'-w','start']);
  // Explicit socket/user/db/port: no production PG environment is consulted.
  pool=new pg.Pool({host:dir,port:55439,user:'local_owner',database:'postgres',password:'',options:'',ssl:false,max:8,statement_timeout:10000});
- expect((await q('SHOW server_version'))[0].server_version).toContain('17.11');
+ expect(Math.floor(Number((await q('SHOW server_version_num'))[0].server_version_num)/10000)).toBe(binaryMajor);
  await q(read('src/test/fixtures/phase3AssistantCanonical.sql'));
  for(const [path,names] of SOURCES) for(const name of names) await q(exactFunction(mig(path),name));
  // Exact relationship schema and Telegram identity/binding DDL from migrations.
@@ -95,10 +120,10 @@ beforeAll(async()=>{
  // Candidate validation uses exact production prosrc, not a simplified mock.
  await seedFixture();
  await q("INSERT INTO loads(id,user_id,status,load_reference,carrier_driver_relationship_id) VALUES($1,$2,'pending','HTP-QA-L2',$3)",[QA_LOAD,D,REL]);
- await q(read(QA_CANDIDATE));
+ await applyCandidateSql(fixtureQaWindow(read(QA_CANDIDATE),'2026-11-02 23:59:59+00',2));
  // New candidate is compiled byte-for-byte against canonical function hashes.
  await seedGenFixture();
- await q(read(GEN_CANDIDATE));
+ await applyCandidateSql(fixtureQaWindow(read(GEN_CANDIDATE),'2026-11-05 23:59:59+00',5));
  // Production numeric/nullability/default projection; no invented recompute trigger.
  await q(`ALTER TABLE loads ADD COLUMN loaded_miles numeric NOT NULL DEFAULT 0, ADD COLUMN deadhead_miles numeric NOT NULL DEFAULT 0, ADD COLUMN rate_per_mile numeric NOT NULL DEFAULT 0, ADD COLUMN total_miles numeric, ADD COLUMN estimated_pay numeric, ADD COLUMN actual_pay_received numeric, ADD COLUMN gross_revenue numeric, ADD COLUMN flat_rate_amount numeric, ADD COLUMN wait_fee numeric NOT NULL DEFAULT 0, ADD COLUMN detention_fee numeric NOT NULL DEFAULT 0, ADD COLUMN other_fees numeric NOT NULL DEFAULT 0;`);
  // Strict baseline gate AFTER all existing candidates; repair ONLY this disposable socket DB.
@@ -123,7 +148,7 @@ async function seedFixture() {
  UPDATE telegram_poll_state SET lease_token='${LEASE}',lease_expires_at=now()+interval '1 hour';`);
 }
 beforeEach(seedFixture);
-afterAll(async()=>{ await pool?.end(); if(dir) { try { run('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop']); } finally { rmSync(dir,{recursive:true,force:true}); } } });
+afterAll(async()=>{ await pool?.end(); if(dir) { try { if(existsSync(join(dir,'data','postmaster.pid'))) run('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop']); } finally { rmSync(dir,{recursive:true,force:true}); } } });
 
 describe('TG-G1B real disposable PostgreSQL transactions',()=>{
  it('guidance checks explicit permission, exact bound workspace and restores caller identity',async()=>{
@@ -324,7 +349,8 @@ describe('TG-G1 QA exact single-load disposable transactions',()=>{
  it('absolute expiry rolls back intake, callback and all cleanup',async()=>{
   const id=await qaProposal();await proposal();const before=await counts(),other=await unrelatedState();
   const def=(await q("SELECT pg_get_functiondef('public._telegram_qa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
-  try{await q(def.split('2026-11-02 23:59:59+00').join('2000-01-01 00:00:00+00'));
+  expect(def).toContain(FIXTURE_QA_DEADLINE);
+  try{await q(def.split(FIXTURE_QA_DEADLINE).join('2000-01-01 00:00:00+00'));
    await expect(qaIntake(101)).rejects.toThrow('qa_dispatch_expired');await expect(qaReview(id)).rejects.toThrow('qa_dispatch_expired');await expect(qaClaim()).rejects.toThrow('qa_dispatch_expired');
    expect(await counts()).toEqual(before);expect(await unrelatedState()).toEqual(other);
   }finally{await q(def);}
@@ -429,7 +455,8 @@ describe('TG-G1 GEN1 hash-pinned one-group acceptance, disposable PostgreSQL onl
  it('absolute expiry blocks intake/callback/claim/cleanup/ack/fail atomically',async()=>{
   const id=await genProposal(),c=(await genClaim())[0],before=await counts();
   const def=(await q("SELECT pg_get_functiondef('public._telegram_genqa_dispatch_assert(bigint,text)'::regprocedure) d"))[0].d as string;
-  try {await q(def.split('2026-11-05 23:59:59+00').join('2000-01-01 00:00:00+00'));
+  expect(def).toContain(FIXTURE_QA_DEADLINE);
+  try {await q(def.split(FIXTURE_QA_DEADLINE).join('2000-01-01 00:00:00+00'));
    for(const action of [()=>genIntake(401),()=>genReview(id),genClaim,()=>genAck(c),()=>genFail(c)]) await expect(action()).rejects.toThrow('qa_dispatch_expired');expect(await counts()).toEqual(before);
   }finally{await q(def);}
  });

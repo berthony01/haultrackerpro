@@ -12,6 +12,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, cleanup } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@testing-library/jest-dom/vitest';
 
 import type { RecruiterProfile } from '@/hooks/opportunities/useRecruiterProfile';
@@ -91,7 +92,7 @@ function renderWithQueryClient(ui: React.ReactElement) {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   return render(
-    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+    <QueryClientProvider client={client}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>,
   );
 }
 
@@ -376,7 +377,7 @@ describe('RecruiterAccessPage (production-mounted) — visible trust + real Post
   const noop = vi.fn();
 
   function renderPage() {
-    return render(
+    return renderWithQueryClient(
       <RecruiterAccessPage
         onBack={noop}
         onOpenOnboarding={noop}
@@ -643,7 +644,7 @@ function expectNoForbidden(container: HTMLElement) {
 describe('Phase 1J-C2 — RecruiterAccessPage rendered copy (production-mounted)', () => {
   const noop = vi.fn();
   function renderPage() {
-    return render(
+    return renderWithQueryClient(
       <RecruiterAccessPage
         onBack={noop}
         onOpenOnboarding={noop}

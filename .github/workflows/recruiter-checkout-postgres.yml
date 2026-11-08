@@ -132,6 +132,26 @@ jobs:
           echo "PostgreSQL did not become ready"
           exit 1
 
+      - name: Select disposable PostgreSQL binaries
+        run: |
+          set -euo pipefail
+          htp_test_pg_bin=''
+          for candidate in /usr/lib/postgresql/17/bin /usr/lib/postgresql/16/bin; do
+            if [ -x "$candidate/initdb" ] && [ -x "$candidate/pg_ctl" ]; then
+              htp_test_pg_bin="$candidate"
+              break
+            fi
+          done
+          if [ -z "$htp_test_pg_bin" ]; then
+            echo 'PostgreSQL 16 or 17 server binaries are required for the disposable socket-only suite.'
+            exit 1
+          fi
+          "$htp_test_pg_bin/postgres" --version
+          echo "HTP_TEST_POSTGRES_BINDIR=$htp_test_pg_bin" >> "$GITHUB_ENV"
+
+      - name: Verify disposable Telegram PostgreSQL harness
+        run: bunx vitest run src/test/phaseTGG1BLocalPostgres.test.ts
+
       - name: Run real-PostgreSQL Recruiter Checkout suite
         id: postgres_suite
         continue-on-error: true
