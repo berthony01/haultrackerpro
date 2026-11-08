@@ -4,6 +4,7 @@ Status: **STAGED. Production rollout has not been performed.**
 
 Starting production source: `8938880087a7e4ec3ed9527003b49dfc29fd8b05`.
 Initial implementation: `149158282b410e08fa0cfd38ec84d3148d68f9b5`.
+Independently tested source: `d231ee3d0e87fb54a63bba3e72fd70a757ddae5e`.
 Independent corrections and evidence are on `codex/dispatcher-mini-app`.
 The exact resulting commit is the review branch head shown in GitHub.
 
@@ -28,7 +29,7 @@ The exact resulting commit is the review branch head shown in GitHub.
 | --- | --- | --- | --- |
 | Workspace owner | Existing canonical permission resolution | Existing resolution | Existing resolution |
 | Active staff | `loads_view` | `loads_view` and `loads_dispatch` | `loads_view` and `loads_update_status` |
-| Unlinked, unrelated or revoked account | Denied | Denied | Denied |
+| Mini App entry with an unlinked Telegram account, unrelated or revoked account | Denied | Denied | Denied |
 | Driver or delegated-driver context without recruiter membership | Denied | Denied | Denied |
 
 The current signed Telegram launch, HaulTracker sign-in, account link and
@@ -67,13 +68,14 @@ Actual delivery dates and exact retry intents are appended to load events.
 | --- | --- |
 | Focused Dispatch, Mini App, parser/pay and group suites | PASS: 476 tests in 20 files |
 | Existing recruiter bot and guidance regression | PASS: 235 tests in 8 files |
-| Total distinct tested files | 20 + 8 = 28 files; 476 + 235 = 711 passed tests |
+| Distinct source checks including native concurrency | 20 + 8 = 28 files; 476 + 235 + 5 additional concurrent cases = 716 passed tests |
 | Production frontend build | PASS; existing large-chunk warning retained |
 | App and build-config TypeScript checks | PASS |
 | Targeted production-screen lint | PASS |
 | Independent live-schema PostgreSQL/WASM fixture | PASS: canonical create, exact cents, retries, duplicate references, actor/tenant denial, atomic date audit, stale status, all-page summaries and permission revocation |
 | Isolated browser: 320, 375, 1280 px | PASS: save after simulated lost response, delivery, close-without-cancel, confirmed cancellation, history, view-only/denied access; no horizontal overflow or page errors |
-| Native PostgreSQL concurrency cases | PENDING separate native executor run |
+| Native PostgreSQL 17.11 | PASS: 26/26, zero skipped; 21 SQL cases repeated plus five additional concurrent transaction cases |
+| GitHub verification | PASS: Telegram Mini App verification and Recruiter Paid Entitlement Postgres gate on tested source revision |
 | Production SQL, poller/site rollout, live owner/staff/group journey | NOT RUN |
 
 The browser served local production-build assets with synthetic API and Telegram
@@ -104,8 +106,8 @@ concurrency probes are explicitly skipped. Unset it on an isolated native Postgr
 
 ## Remaining release gate
 
-Finish the native concurrency gate, then review approval for applying this exact
-candidate, deploying the affected Telegram poller and publishing the frontend.
+Source acceptance is complete. Review approval for applying this exact candidate,
+deploying the affected Telegram poller and publishing the frontend.
 Rollout must include authenticated owner/staff/denied-account checks and one
 clearly labeled QA load in the existing QA workspace/group, with live persistence
 readbacks. No additional group, paid AI, billing change, general-dispatch activation,
@@ -116,5 +118,33 @@ Legacy completed loads without confirmed delivery dates are not backfilled.
 The existing driver financial/export workflows still need scoped live parity checks
 for a newly created dispatch load before production acceptance.
 
-One Lovable implementation run reported 14.518 credits. Independent review changes
-were made directly in the review branch; no duplicate implementation run was sent.
+Reported implementation/test-only credits: 14.518 + 0.500 + 1.300 = 16.318.
+The 0.500 test attempt stopped at an environment restriction and ran no tests; the
+final native gate used a private disposable fixture with verified public source
+hashes and no Git operations. Independent corrections were made directly in the
+review branch; no duplicate implementation run was sent. These are API-reported
+costs, not an independently reconciled billing statement.
+
+## Native and production readback evidence
+
+The native run verified SHA-256 for its exact input files before execution:
+
+| Input | SHA-256 |
+| --- | --- |
+| `src/lib/dispatchWorkspace.ts` | `15d5725a8c1d9a667f3e4516be3a5e205f8a86155fff2ad3c65e6c7deb4d70a8` |
+| `src/test/dispatchWorkspacePostgres.test.ts` | `75227c67cf0149ba73fafb39a5bb8229e3502a2bf105e8bc4825259dacd681ca` |
+| Candidate SQL | `9c71f7bafb473d8a5f51ffa46ec57deae669ee1cc55cf44d016ffb3e90a688fb` |
+
+All 26 native cases passed, including exact and conflicting duplicate creation,
+fresh-key/same-reference creation, duplicate status confirmation and competing
+terminal statuses. The disposable cluster and temporary fixture were removed.
+The source inputs and canonical authorization bodies match those reviewed here.
+
+Read-only production checks after implementation confirmed:
+
+- `/version.json` still identifies frontend `8938880087a7e4ec3ed9527003b49dfc29fd8b05`.
+- All four inspected canonical dispatch/mileage function definitions match the baseline.
+- None of the four new `dispatch_mini_*` functions are installed in production.
+- Lovable source main remains `149158282b410e08fa0cfd38ec84d3148d68f9b5`; review corrections are in PR #53.
+
+No production acceptance is inferred from these preservation checks.
