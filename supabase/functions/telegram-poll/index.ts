@@ -429,7 +429,7 @@ function buildLedger(supabase: RpcClient, pilotOnly = false): TelegramPollLedger
         isNew: row?.is_new === true,
         resultCode,
         menuText: composeMenuText(resultCode, row?.workspaces, input.command),
-        menuButtons: composeMenuButtons(resultCode, row?.workspaces),
+        menuButtons: composeMenuButtons(resultCode, row?.workspaces, input.command),
       };
     },
     // RB-2B. Private-chat Accept / Pass. The database derives the acting
@@ -1107,6 +1107,7 @@ const ONBOARDING_BUTTONS: TelegramInlineUrlButton[][] = [
   [{ text: "Create account / Sign in", url: APP_BASE_URL }],
 ];
 const RECRUITER_BUTTONS: TelegramInlineUrlButton[][] = [
+  [{ text: "Open Dispatch", url: `${APP_BASE_URL}/telegram?view=dispatch` }],
   [{ text: "📋 My Opportunities", url: URL_OPPORTUNITIES }],
   [{ text: "💬 Conversations", url: URL_CONVERSATIONS }],
   [{ text: "📊 Results", url: URL_RESULTS }],
@@ -1160,7 +1161,9 @@ function composeWorkspaceSummary(workspaces: unknown): string | null {
 function composeMenuButtons(
   resultCode: TelegramResultCode,
   workspaces: unknown,
+  command?: TelegramMenuCommand,
 ): TelegramInlineButton[][] | null {
+  if (command === 'dispatch' && (resultCode === 'menu_recruiter' || resultCode === 'menu_multi_role') && menuWorkspaces(workspaces).length > 0) return [[{ text: 'Open Dispatch', url: `${APP_BASE_URL}/telegram?view=dispatch` }], ...OPEN_APP_BUTTONS];
   switch (resultCode) {
     case "menu_recruiter":
     case "menu_multi_role":
@@ -1286,9 +1289,9 @@ Deno.serve(async (req: Request) => {
         return !error && typeof data === "boolean" ? data : null;
       },
       dispatchGuidanceButtons: {
-        private: [[{ text: "Open Dispatch Workspace", url: URL_DISPATCH_WORKSPACE }]],
+        private: [[{ text: "Open Dispatch", url: `${APP_BASE_URL}/telegram?view=dispatch` }], [{ text: "Open HaulTracker Pro", url: URL_DISPATCH_WORKSPACE }]],
         group: [
-          [{ text: "Open Bot Privately", url: "https://t.me/HaulTrackerBot" }],
+          [{ text: "Open Dispatch", url: "https://t.me/HaulTrackerBot?start=dispatch" }],
           [{ text: "Open HaulTracker Pro", url: URL_OPEN_APP }],
         ],
       },

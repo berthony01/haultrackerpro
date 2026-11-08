@@ -78,7 +78,7 @@ export function isMenuResultCode(code: TelegramResultCode): code is TelegramMenu
 
 /** RB-1B. Which bare private command produced a menu update. Used ONLY to
  *  choose copy in the adapter — never to widen data access or authority. */
-export type TelegramMenuCommand = "start" | "menu" | "status" | "help";
+export type TelegramMenuCommand = "start" | "menu" | "status" | "help" | "dispatch";
 
 /** Phase RB-2B — private-chat Accept / Pass button terminal outcomes. The
  *  database owns every one of these; the orchestrator only transports them. */
@@ -980,6 +980,7 @@ export function classifyUpdate(
   if (match) {
     return { kind: "start", rawToken: match[1] };
   }
+  if (identity.text === "/start dispatch") return { kind: "menu", command: "dispatch" };
   // RB-1A. Strictly AFTER the link-token pattern, so `/start <64hex>` keeps
   // its TG-2B/TG-2D meaning, and strictly exact, so `/start ` prefixes and
   // `/start@…` variants keep their existing `invalid_start_command` outcome.
