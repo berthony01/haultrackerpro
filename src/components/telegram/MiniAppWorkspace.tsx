@@ -1,5 +1,5 @@
 import { useEffect, type MouseEvent } from 'react';
-import { BriefcaseBusiness, ClipboardList, Home, MessageSquare, Plus, Settings } from 'lucide-react';
+import { BriefcaseBusiness, ClipboardList, Home, MessageSquare, Plus, Settings, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useViewMode } from '@/hooks/useViewMode';
@@ -15,6 +15,7 @@ import { validThreadId } from '@/lib/conversations/conversationNavigation';
 import type { RecruiterStaffWorkspace } from '@/lib/recruiterStaffWorkspaceResolution';
 import type { MiniAppView } from '@/lib/telegramMiniApp';
 import { MiniAppNotice } from './MiniAppNotice';
+import { DispatchWorkspace } from './DispatchWorkspace';
 
 export type MiniAppNavigate = (view: MiniAppView, thread?: string | null) => void;
 export type MiniAppWorkspaceProps = { view: MiniAppView; thread: string | null; navigate: MiniAppNavigate };
@@ -67,6 +68,7 @@ function HomeTiles({ allowed, navigate }: { allowed: MiniAppView[]; navigate: Mi
     { view: 'opportunities' as const, title: 'My opportunities', body: 'Resume saved drafts and manage your listings.', Icon: BriefcaseBusiness },
     { view: 'applications' as const, title: 'Applications', body: 'Review applicants and keep your hiring pipeline moving.', Icon: ClipboardList },
     { view: 'conversations' as const, title: 'Conversations', body: 'Read and reply to your HaulTracker conversations.', Icon: MessageSquare },
+    { view: 'dispatch' as const, title: 'Dispatch', body: 'Connected drivers, assigned loads and confirmed deliveries.', Icon: Truck },
   ];
   return <div className="grid min-w-0 gap-3 sm:grid-cols-2">
     {tiles.filter(tile => allowed.includes(tile.view)).map(({ view, title, body, Icon }) => <button type="button" key={view} onClick={() => navigate(view)} className="group min-w-0 rounded-2xl border border-border/60 bg-card p-5 text-left transition-colors hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
@@ -80,12 +82,15 @@ function HomeTiles({ allowed, navigate }: { allowed: MiniAppView[]; navigate: Mi
 function OwnerWorkspace(props: MiniAppWorkspaceProps) {
   const { user } = useAuth();
   const { profile, isLoading, isSuspended, canPost } = useRecruiterProfile();
+  const dispatchPerms = useRecruiterStaffPermissions(profile?.user_id === user?.id ? profile?.id : null);
   if (isLoading) return <MiniAppNotice title="Loading your workspace…" />;
   if (isSuspended || (profile && profile.user_id !== user?.id)) return <MiniAppNotice title="Workspace unavailable">Your recruiter workspace cannot be opened right now.</MiniAppNotice>;
   const allowed: MiniAppView[] = ['home', 'post', 'opportunities', 'account', ...(canPost ? ['applications', 'conversations'] as const : [])];
+  if (!dispatchPerms.isLoading && !dispatchPerms.error && dispatchPerms.canViewLoads) allowed.push('dispatch');
   const home = () => props.navigate('home');
   let content: React.ReactNode;
-  if (!allowed.includes(props.view)) content = <MiniAppNotice title="Complete your recruiter profile"><Button onClick={() => props.navigate('account')}>Open company profile</Button></MiniAppNotice>;
+  if (props.view === 'dispatch') content = dispatchPerms.isLoading ? <MiniAppNotice title="Loading your dispatch permissions…" /> : allowed.includes('dispatch') && profile ? <DispatchWorkspace key={`${user?.id}:${profile.id}`} recruiterId={profile.id} /> : <MiniAppNotice title="Dispatch permission required"><Button variant="outline" onClick={home}>Return home</Button></MiniAppNotice>;
+  else if (!allowed.includes(props.view)) content = <MiniAppNotice title="Complete your recruiter profile"><Button onClick={() => props.navigate('account')}>Open company profile</Button></MiniAppNotice>;
   else if (props.view === 'post' || props.view === 'opportunities') content = <RecruiterOpportunityManager key={`${user?.id}:${props.view}`} initialAction={props.view === 'post' ? 'create' : undefined} onCreationFinished={() => props.navigate('opportunities')} onBack={home} />;
   else if (props.view === 'applications') content = <RecruiterApplicationsDashboard onBack={home} />;
   else if (props.view === 'conversations') content = profile ? <RecruiterConversationInbox key={`${user?.id}:${profile.id}`} recruiterId={profile.id} canView canReply includeHistory selectedThreadId={validThreadId(props.thread) ? props.thread : null} onSelectedThreadChange={id => props.navigate('conversations', id)} /> : null;
@@ -105,9 +110,11 @@ function StaffWorkspace({ workspace, changeWorkspace, ...props }: MiniAppWorkspa
   if (perms.canViewOpportunities && perms.canCreateOpportunities) allowed.push('post');
   if (perms.canViewApplications) allowed.push('applications');
   if (perms.canViewConversations) allowed.push('conversations');
+  if (perms.canViewLoads) allowed.push('dispatch');
   const home = () => props.navigate('home');
   let content: React.ReactNode;
   if (!allowed.includes(props.view)) content = <MiniAppNotice title="Permission required">This action has not been assigned to you in this workspace. <Button variant="outline" className="mt-3" onClick={home}>Return home</Button></MiniAppNotice>;
+  else if (props.view === 'dispatch') content = <DispatchWorkspace key={`${workspace.membershipId}:${workspace.recruiterId}`} recruiterId={workspace.recruiterId} />;
   else if (props.view === 'post' || props.view === 'opportunities') content = <RecruiterStaffOpportunityManager key={`${workspace.membershipId}:${props.view}`} recruiterId={workspace.recruiterId} companyName={workspace.companyName} initialAction={props.view === 'post' ? 'create' : undefined} onCreationFinished={() => props.navigate('opportunities')} onBack={home} permissions={perms} />;
   else if (props.view === 'applications') content = <RecruiterStaffApplicationsDashboard recruiterId={workspace.recruiterId} companyName={workspace.companyName} canViewApplications={perms.canViewApplications} canManageApplicationStatus={perms.canManageApplicationStatus} canRequestApplicationContact={perms.canRequestApplicationContact} onBack={home} />;
   else if (props.view === 'conversations') content = <RecruiterConversationInbox key={workspace.membershipId} recruiterId={workspace.recruiterId} canView={perms.canViewConversations} canReply={perms.canReplyConversations} includeHistory={false} selectedThreadId={validThreadId(props.thread) ? props.thread : null} onSelectedThreadChange={id => props.navigate('conversations', id)} />;

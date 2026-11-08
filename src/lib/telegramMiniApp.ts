@@ -1,4 +1,4 @@
-export const MINI_APP_VIEWS = ['home', 'post', 'opportunities', 'applications', 'conversations', 'account'] as const;
+export const MINI_APP_VIEWS = ['home', 'post', 'opportunities', 'applications', 'conversations', 'dispatch', 'account'] as const;
 export type MiniAppView = typeof MINI_APP_VIEWS[number];
 export const MINI_APP_BOT_URL = 'https://t.me/HaulTrackerBot';
 
