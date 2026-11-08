@@ -211,6 +211,7 @@ The run created exactly one canonical driver load using the signed Mini App.
 | Scheduled dates and money preserved | PASS: pickup/scheduled delivery both remain `2026-11-08`; miles/rate/pay unchanged |
 | Active and History | PASS: load leaves Active and appears Completed in History with actual date and `$29.15` |
 | Daily and weekly summaries | PASS: each changes from 0 delivered / 0 mi to 1 delivered / 14.5 mi |
+| Live 320 and 375 px | PASS: signed Mini App summaries/history fit; document clientWidth equals scrollWidth at each width |
 | Legacy completion handling | PASS: older completion remains Date unconfirmed; no backfill |
 | Existing QA rows | PASS: all five older QA rows retain status/update-time fingerprint `315f4714b088dd699fd4594c3d86811e` |
 | Driver data access | PASS: production authenticated-role SQL context can read its own new load through existing RLS |
@@ -224,16 +225,20 @@ locally with the production QA row read through the driver's RLS. It was not a
 browser report-download test. Only QA data was used in the parity calculation.
 
 The signed Mini App was reopened in another normal Telegram browser tab and returned
-the persisted summary. Its actual iframe width was 320 px, with document clientWidth
-and scrollWidth both 320 px. The crop below contains only the QA dispatch view.
+the persisted summary. At actual iframe widths of 320 and 375 px, document
+clientWidth and scrollWidth matched each width. The 375 px History view also showed
+the completed QA load, actual delivery date and agreed pay. The temporary browser
+viewport override was reset. These crops contain only the QA dispatch view.
 
 ![Production QA delivered summary at 320 px](dispatcher-mini-app-evidence/dispatch-live-summary-320.jpg)
 
+![Production QA completed load and summary at 375 px](dispatcher-mini-app-evidence/dispatch-live-history-375.jpg)
+
 Live cancellation commitment was not repeated on a second fixture; one terminal
 delivery was used for this one-load acceptance run. Cancellation writes and retries
-already passed the isolated browser and native PostgreSQL gates above. Staff,
-revoked-account browser launches and live 375 px layouts were not repeated in
-this rollout; the earlier isolated tests remain the evidence for those cases.
+already passed the isolated browser and native PostgreSQL gates above. Separate
+staff and revoked-account browser launches were not repeated in this rollout;
+the earlier isolated tests remain the evidence for those cases.
 
 A website tab already open before publication encountered a dynamic-import fetch
 failure when opening Assistant Access Center. Its normal Reload App action recovered
