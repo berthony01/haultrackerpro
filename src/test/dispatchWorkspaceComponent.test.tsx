@@ -17,7 +17,7 @@ describe('Dispatch forms and confirmations',()=>{
   it('keeps failed creation open and retries exact same payload/key',async()=>{
     const save=vi.fn().mockRejectedValueOnce(new Error('Ambiguous network result')).mockResolvedValueOnce(undefined),close=vi.fn();
     render(<DispatchLoadForm drivers={[driver]} enabled save={save} close={close}/>);
-    fireEvent.change(screen.getByLabelText('Paste dispatch details'),{target:{value:'LOAD# QA1234\nfrom Dallas, TX to Austin, TX\nFlat rate $400'}});fireEvent.click(screen.getByRole('button',{name:'Extract for review'}));
+    fireEvent.change(screen.getByLabelText('Paste dispatch details'),{target:{value:'LOAD# QA1234\nfrom Dallas, TX to Austin, TX\nPickup date: 2026-11-01\nFlat rate $400'}});fireEvent.click(screen.getByRole('button',{name:'Extract for review'}));
     // Select from the real Radix control.
     fireEvent.keyDown(screen.getByRole('combobox',{name:'Connected driver'}),{key:'ArrowDown'});
     fireEvent.click(await screen.findByRole('option',{name:'QA Driver'}));
@@ -40,4 +40,17 @@ describe('Dispatch forms and confirmations',()=>{
   });
   it('blocks create and status independently for view-only staff',()=>{h.state.permissions={view:true,create:false,status:false};render(<DispatchWorkspace recruiterId="company"/>);expect(screen.getByText('QA1234')).toBeInTheDocument();expect(screen.queryByRole('button',{name:'Add Load'})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Mark Delivered'})).not.toBeInTheDocument();});
   it('uses total matching rows, not page length, for pagination',()=>{render(<DispatchWorkspace recruiterId="company"/>);expect(screen.getByText('1–25 of 51')).toBeInTheDocument();expect(screen.getByRole('button',{name:'Next loads'})).toBeEnabled();});
+  it('hides and preserves typed form details through a transient refresh error',()=>{
+    const view=render(<DispatchWorkspace recruiterId="company"/>);
+    fireEvent.click(screen.getByRole('button',{name:'Add Load'}));
+    fireEvent.change(screen.getByLabelText('Load reference'),{target:{value:'TYPED123'}});
+    h.state={...h.state,verified:false,page:null,error:'Connection unavailable'};
+    view.rerender(<DispatchWorkspace recruiterId="company"/>);
+    expect(screen.getByLabelText('Load reference')).not.toBeVisible();
+    expect(h.rpc).not.toHaveBeenCalled();
+    h.state={...h.state,verified:true,page:{loads:[load],drivers:[driver],total:1,driver_total:1,summaries:[],week_start:'2026-11-01'},error:null};
+    view.rerender(<DispatchWorkspace recruiterId="company"/>);
+    expect(screen.getByLabelText('Load reference')).toBeVisible();
+    expect(screen.getByLabelText('Load reference')).toHaveValue('TYPED123');
+  });
 });

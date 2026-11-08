@@ -76,7 +76,7 @@ BEGIN
  _driver:=public.dispatch_mini_assert_scope(_recruiter_id,_relationship_id,'loads_dispatch');
  IF _driver IS NULL OR _idempotency_key IS NULL OR _payload IS NULL OR jsonb_typeof(_payload)<>'object' OR _payload->>'relationship_id' IS DISTINCT FROM _relationship_id::text THEN RAISE EXCEPTION 'dispatch_invalid_payload'; END IF;
  IF EXISTS(SELECT 1 FROM jsonb_object_keys(_payload) k WHERE k NOT IN ('relationship_id','load_reference','pickup_location','dropoff_location','load_date','dropoff_date','loaded_miles','deadhead_miles','total_miles','pay_model','rate_per_mile','deadhead_rate_per_mile','flat_rate_amount','manual_amount','wait_fee','detention_fee','other_fees','estimated_pay','notes')) THEN RAISE EXCEPTION 'dispatch_invalid_payload'; END IF;
- IF coalesce(_payload->>'load_reference','') !~ '^[A-Z0-9][A-Z0-9_-]{3,23}$' OR _payload->>'load_reference' !~ '[0-9]' THEN RAISE EXCEPTION 'dispatch_invalid_load_reference'; END IF;
+ IF coalesce(_payload->>'load_reference','') !~ '^[A-Z0-9][A-Z0-9-]{2,22}[A-Z0-9]$' OR _payload->>'load_reference' !~ '[0-9]' THEN RAISE EXCEPTION 'dispatch_invalid_load_reference'; END IF;
  -- Never allow omission/null of explicit agreed pay to silently become zero.
  IF _payload->>'pay_model' IS NULL OR _payload->>'pay_model' NOT IN ('loaded_miles_only','total_miles','loaded_plus_deadhead','flat_rate','manual') THEN RAISE EXCEPTION 'dispatch_invalid_pay_model'; END IF;
  FOREACH _field IN ARRAY ARRAY['loaded_miles','deadhead_miles','total_miles','rate_per_mile','deadhead_rate_per_mile','flat_rate_amount','manual_amount','wait_fee','detention_fee','other_fees','estimated_pay'] LOOP
@@ -107,6 +107,10 @@ BEGIN
   IF _receipt.actor_user_id IS DISTINCT FROM _uid OR _receipt.action<>'create_load' OR _receipt.carrier_driver_relationship_id<>_relationship_id OR _receipt.driver_user_id<>_driver OR _receipt.source_channel<>'web' OR _prior IS DISTINCT FROM _payload THEN RAISE EXCEPTION 'dispatch_idempotency_conflict'; END IF;
   RETURN jsonb_build_object('id',_receipt.load_id,'status','pending','replayed',true);
  END IF;
+ -- A lost response followed by closing/reopening the form must not create
+ -- another load with a fresh intent key and the same group-visible reference.
+ PERFORM pg_advisory_xact_lock(hashtextextended(_recruiter_id::text||':reference:'||(_payload->>'load_reference'),0));
+ IF EXISTS(SELECT 1 FROM public.loads l JOIN public.carrier_driver_relationships r ON r.id=l.carrier_driver_relationship_id AND r.driver_user_id=l.user_id WHERE r.recruiter_id=_recruiter_id AND r.status='active' AND upper(btrim(l.load_reference))=_payload->>'load_reference') THEN RAISE EXCEPTION 'dispatch_reference_in_use'; END IF;
  _row:=public.dispatch_create_driver_load(_recruiter_id,_relationship_id,_driver,_key,'web',(_payload->>'load_date')::date,_payload->>'pickup_location',_payload->>'dropoff_location',_payload->>'load_reference',(_payload->>'dropoff_date')::date,(_payload->>'loaded_miles')::numeric,(_payload->>'deadhead_miles')::numeric,(_payload->>'total_miles')::numeric,(_payload->>'rate_per_mile')::numeric,_payload->>'pay_model',CASE WHEN _payload->>'pay_model'='manual' THEN (_payload->>'manual_amount')::numeric ELSE (_payload->>'flat_rate_amount')::numeric END,(_payload->>'deadhead_rate_per_mile')::numeric,(_payload->>'wait_fee')::numeric,(_payload->>'detention_fee')::numeric,(_payload->>'other_fees')::numeric,(_payload->>'estimated_pay')::numeric,_payload->>'notes');
  INSERT INTO public.load_events(load_id,driver_user_id,recruiter_id,carrier_driver_relationship_id,actor_user_id,event_type,source_channel,to_status,metadata) VALUES(_row.id,_driver,_recruiter_id,_relationship_id,_uid,'updated','web','pending',jsonb_build_object('dispatch_mini_version','1','action','create_load','intent_key',_key,'payload',_payload));
  RETURN jsonb_build_object('id',_row.id,'status',_row.status,'replayed',false);
