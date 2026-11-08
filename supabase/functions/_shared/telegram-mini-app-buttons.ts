@@ -16,6 +16,7 @@ export function telegramMiniAppKeyboard(rows: TelegramInlineButton[][], chatId: 
         if (button.url === `${BASE}/dashboard?page=recruiter-access:manager`) view = 'opportunities';
         if (button.url === `${BASE}/conversations?workspace=recruiter`) view = 'conversations';
         if (button.url === BASE && button.text === 'Create account / Sign in') view = 'home';
+        if (button.url === `${BASE}/telegram?view=dispatch`) view = 'dispatch';
       }
     }
     if (view) return { text: button.text, web_app: { url: mini(view) } };
