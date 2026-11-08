@@ -34,10 +34,12 @@ describe('Phase 1U-B — A: single truthful share-link UX', () => {
 });
 
 describe('Phase 1U-B — B: billing-aware presentation guards', () => {
-  it('ServicePackagesSection blocks New package only for cancelled', () => {
+  it('ServicePackagesSection combines the cancelled billing gate with management permission', () => {
     expect(PACKAGES).toContain('useAgencyEntitlement');
     expect(PACKAGES).toContain("entitlement.status === 'cancelled'");
-    expect(PACKAGES).toMatch(/disabled=\{billingCancelled\}/);
+    expect(PACKAGES).toContain('const createDisabled = billingCancelled || !canManagePackages');
+    expect(PACKAGES).toMatch(/disabled=\{createDisabled\}/);
+    expect(PACKAGES).toContain('!permissionsLoading && !permissionsError && canManagePackages');
     expect(PACKAGES).not.toMatch(/'past_due'|'trialing'|'manual_beta'/);
   });
 

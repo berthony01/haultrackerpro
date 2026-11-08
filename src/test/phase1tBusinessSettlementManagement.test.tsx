@@ -14,6 +14,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import ts from 'typescript';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import {
@@ -478,16 +479,25 @@ describe('E1 · workspace integration', () => {
     expect(agencyPageSrc).not.toMatch(/CarrierSettlementsPanel/);
   });
 
-  it('mounts the agency settlements tab content outside the owner/admin block', () => {
-    const ownerBlock = agencyPageSrc.slice(
-      agencyPageSrc.indexOf('{isOwnerOrAdmin && ('),
-      agencyPageSrc.indexOf('<TabsContent value="work">'),
-    );
-    const gatedEnd = ownerBlock.indexOf('</>');
-    expect(gatedEnd).toBeGreaterThan(-1);
-    // The settlements TabsContent must appear AFTER the gated fragment closes.
-    expect(ownerBlock.slice(0, gatedEnd)).not.toMatch(/value="settlements"/);
-    expect(ownerBlock.slice(gatedEnd)).toMatch(/value="settlements"/);
+  it('mounts agency settlements directly under Tabs without a role condition', () => {
+    const source = ts.createSourceFile('AgencyDashboard.tsx', agencyPageSrc,
+      ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const matches: ts.JsxElement[] = [];
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'TabsContent' &&
+          node.openingElement.attributes.properties.some((attribute) =>
+            ts.isJsxAttribute(attribute) && attribute.name.getText(source) === 'value' &&
+            attribute.initializer && ts.isStringLiteral(attribute.initializer) &&
+            attribute.initializer.text === 'settlements')) matches.push(node);
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+    expect(matches).toHaveLength(1);
+    const parent = matches[0].parent;
+    expect(ts.isJsxElement(parent)).toBe(true);
+    if (!ts.isJsxElement(parent)) throw new Error('Settlements must be a direct Tabs child');
+    expect(parent.openingElement.tagName.getText(source)).toBe('Tabs');
+    expect(matches[0].getText(source)).toContain('<AgencySettlementsPanel agencyId={agency.id} />');
   });
 
   it('carrier settlements mount on demand and receive scroll plus focus', () => {

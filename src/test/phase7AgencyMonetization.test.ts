@@ -230,7 +230,7 @@ describe('Phase 7 Cleanup — entitlement visibility', () => {
   // entitlement row so the dashboard cannot show a fake beta fallback
   // while a real entitlement exists.
   const migrations = fs
-    .readdirSync(path.join(process.cwd(), 'supabase/migrations'))
+    .readdirSync(path.join(process.cwd(), 'supabase/migrations')).sort()
     .map((f) => fs.readFileSync(path.join(process.cwd(), 'supabase/migrations', f), 'utf8'))
     .join('\n');
 
@@ -274,11 +274,22 @@ describe('Phase 7 Cleanup — server-side limit enforcement', () => {
     expect(body).toMatch(/assert_agency_limit\([^)]*'create_service_package'\)/);
   });
 
-  it('invite_agency_member calls assert_agency_limit for net-new invites', () => {
+  it('invite_agency_member enforces canonical seat limits after acquiring the agency lock', () => {
     const idx = migrations.lastIndexOf('CREATE OR REPLACE FUNCTION public.invite_agency_member');
     expect(idx).toBeGreaterThan(-1);
-    const body = migrations.slice(idx, idx + 2500);
-    expect(body).toMatch(/assert_agency_limit\([^)]*'invite_member'\)/);
+    const tail = migrations.slice(idx);
+    const body = tail.slice(0, tail.indexOf('END;$$;'));
+    const lock = body.indexOf('FOR UPDATE');
+    const recount = body.indexOf('SELECT count(*)::integer INTO _used');
+    const insert = body.indexOf('INSERT INTO public.agency_members');
+    expect(lock).toBeGreaterThan(-1);
+    expect(recount).toBeGreaterThan(lock);
+    expect(insert).toBeGreaterThan(recount);
+    expect(body).toContain('public.get_effective_agency_limits(_agency_id)');
+    expect(body).toContain("_lim.status = 'cancelled'");
+    expect(body).toContain('am.invite_expires_at > now()');
+    expect(body.slice(recount, insert).match(/_used >= _limit/g)).toHaveLength(2);
+    expect(body.slice(recount, insert)).toContain('_used > _limit');
   });
 
   it('driver_decide_delegation calls assert_agency_limit for new clients', () => {

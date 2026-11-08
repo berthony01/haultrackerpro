@@ -63,18 +63,14 @@ describe("AM-1A — scope + envelope", () => {
   it("changes exactly the two allowlisted files", () => {
     expect(existsSync(SQL_PATH)).toBe(true);
     expect(existsSync(path.resolve(process.cwd(), TEST_REL))).toBe(true);
-    let changed: string[] = [];
-    try {
-      changed = execSync(
-        "git diff --name-only 6ac2a9e78c4ff4dd1b6c882be0a4fb6b6075a753..HEAD && git status --porcelain",
-        { cwd: process.cwd(), encoding: "utf8" },
-      )
-        .split("\n")
-        .map((l) => l.replace(/^[ MARCU?]{1,3}/, "").trim())
-        .filter(Boolean);
-    } catch {
-      changed = [];
-    }
+    // This is the historical AM-1A authoring envelope, not a ban on later work.
+    // Pin the final AM-1A correction and fail if its git evidence is unavailable.
+    const changed = execSync(
+      "git diff --name-only 6ac2a9e78c4ff4dd1b6c882be0a4fb6b6075a753 2af28b50d875a24c44d4521530e290874ee48b7c",
+      { cwd: process.cwd(), encoding: "utf8" },
+    ).split("\n").filter(Boolean);
+    expect(changed).toContain(SQL_REL);
+    expect(changed).toContain(TEST_REL);
     // The platform auto-regenerates src/integrations/supabase/types.ts out-of-band;
     // it is a generated artifact off-limits to AM-1A, not an AM-1A-authored change.
     const KNOWN_AUTO_REGEN = ["src/integrations/supabase/types.ts"];

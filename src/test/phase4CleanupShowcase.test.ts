@@ -41,10 +41,11 @@ describe('Phase 4 cleanup — assistant/agency showcase wiring', () => {
     expect(landing).toMatch(/\/assistants-agencies/);
   });
 
-  it('Landing FAQ preserves driver approval, revocation, audit, and outside-payment safeguards', () => {
+  it('Landing trust statement and linked assistant page preserve access and payment safeguards', () => {
     expect(landing).toMatch(/driver approval|driver-approved|driver must approve/i);
-    expect(landing).toMatch(/revoke/i);
-    expect(landing).toMatch(/audit-logged|audit records|audit visibility/i);
+    expect(landing).toContain('/assistants-agencies');
+    expect(aaPage).toMatch(/revoke/i);
+    expect(aaPage).toMatch(/audit-logged|audit records|audit visibility/i);
     expect(landing).toMatch(/outside HaulTracker Pro|does not process service payments/i);
     expect(landing).not.toMatch(/side hustle/i);
   });

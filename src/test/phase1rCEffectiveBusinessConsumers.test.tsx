@@ -410,7 +410,8 @@ function readRepoFile(relative: string): string {
 describe('Phase 1R-C-R1 — authoritative get_my_agency SQL guard', () => {
   it('the latest get_my_agency definition joins agency_members with an active status filter', () => {
     const migrationsDir = path.join(REPO_ROOT, 'supabase/migrations');
-    const marker = 'CREATE OR REPLACE FUNCTION public.get_my_agency';
+    // Include the opening parenthesis so get_my_agency_permissions cannot match.
+    const marker = 'CREATE OR REPLACE FUNCTION public.get_my_agency(';
     const matching = fs
       .readdirSync(migrationsDir)
       .filter((f) => f.endsWith('.sql'))
@@ -479,7 +480,7 @@ describe('Phase 1R-C-R1 — production consumer source guards', () => {
     expect(src).toContain(
       "from '@/lib/billing/effectiveBusinessEntitlement'",
     );
-    expect(src).toContain('resolveEffectiveBusinessEntitlement({');
+    expect(src).toMatch(/resolveEffectiveBusinessEntitlement\(\s*applyBusinessQaOverlay\(/);
     for (const field of [
       'businessEntitlementState',
       'effectiveRecruiterTier',

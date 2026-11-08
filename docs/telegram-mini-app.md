@@ -192,18 +192,33 @@ query hint. Explicit page navigation now removes that hint through Router in the
 same event, preserving other query parameters, the fragment and location state.
 Final test counts and the production release SHA are recorded in the PR ledger.
 
-### Broader release hold
+### Broader verification repair
 
-The complete local inventory, excluding the unavailable LocalPostgres harness,
-finished with 7,923 assertions passed and 28 failed, across 7,951 assertions.
-Fifteen test files reported failures. This is not a full-suite PASS. It includes
-historical file-change envelopes, agency/settlement integration source guards,
-older security/migration shape checks and two missing-provider fixtures. The
-historical and security assertions have not been removed or disabled to make
-the suite green. Subsequent focused fixture repairs do not establish a passing
-complete inventory without a full rerun.
+The initial local inventory found 28 failures in 7,951 assertions. After triage,
+the complete local rerun, excluding the unavailable LocalPostgres harness,
+passed all 7,951 assertions across 278 files, with zero failed or skipped
+assertions. The hosted workflow must exercise the PostgreSQL harness before
+the release is approved. Application and Node typechecks, Mini App lint and the
+production build also passed locally. The build retains its chunk-size warning.
 
-The final poller/default-menu rollout remains held. The owner-only Mini App
-continues to use the already published frontend and deployed endpoint. The
-release-verification PR preserves the Reports fix, fixture corrections and live
-acceptance evidence for review; it does not claim general platform readiness.
+The remaining source guards now follow the actual integrations: professional
+summaries in AgencyTeamPanel, permission-aware package controls, the settlement
+page allowlist, and server-derived application contact snapshots behind explicit
+per-submission consent. SQL lookup includes the function-name boundary and
+accepts exported DEFAULT casts without matching another function. Contact PII,
+caller authority and canonical eligibility assertions remain enabled. The
+optional experience extraction check follows RB-3B-A's no-fabricated-zero
+contract and retains the canonical negative-value rejection check. Product AI,
+billing, permissions, SQL and extraction behavior were not changed.
+
+Historical change envelopes audit their verified phase endpoints rather than
+all subsequent releases: AM-1A ends at `2af28b50d875a24c44d4521530e290874ee48b7c`,
+RC-1H at `8a5768f7728f353fd6bf88677b62795902916bd2`, and the RC-1I correction
+compares `31e6806e959528bbc9fe25aaf8bb0bc30a198749` with
+`b0b98a7a01d288c4e0137039bda8f2b4ef0c2e0a`. The unavailable old RC-1I baseline
+was replaced with that verifiable correction range. No historical or security
+assertions were disabled, and missing git evidence now fails these audits.
+
+The final hosted gate outcomes and production frontend/poller/menu readbacks
+are maintained in the [release ledger](https://github.com/berthony01/haultrackerpro/pull/52).
+Local checks alone do not establish deployment or complete platform readiness.

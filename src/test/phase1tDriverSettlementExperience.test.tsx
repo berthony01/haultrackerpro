@@ -16,6 +16,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import { DRIVER_ONLY_PAGES, resolveDashboardNavigation } from '@/lib/dashboardWorkspacePolicy';
+import { assistantPageGate } from '@/lib/assistantPermissions';
 
 /* ------------------------------------------------------------------ source - */
 
@@ -1458,9 +1459,9 @@ describe('S. assistant settlement permission constants and page gate', () => {
   });
 
   it('gates the settlements page on settlements_view only', () => {
-    const gate = PERMISSIONS_SOURCE.slice(PERMISSIONS_SOURCE.indexOf('assistantPageGate'));
-    expect(gate).toMatch(/settlements[^\n]*settlements_view/);
-    expect(gate).not.toMatch(/settlements:[^\n]*settlements_manage/);
+    expect(assistantPageGate('settlements')).toBe('settlements_view');
+    expect(assistantPageGate('settlements_manage')).toBe('BLOCKED');
+    expect(assistantPageGate('settlements_finalize')).toBe('BLOCKED');
   });
 
   it('labels all three settlement permissions for the invite UI', () => {
