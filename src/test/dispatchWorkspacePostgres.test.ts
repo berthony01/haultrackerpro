@@ -72,6 +72,12 @@ describe('Dispatcher Mini App disposable real PostgreSQL',()=>{
  it('rejects contradictory mileage without inserting or consuming receipt',()=>scenario(async(c,call)=>{
   const p=dispatchPayload({...emptyDispatchForm(),relationship_id:REL,load_reference:'CREATE123',pickup_location:'A',dropoff_location:'B',loaded_miles:'200',total_miles:'1',pay_model:'manual',manual_amount:'400'});await expect(call('SELECT dispatch_mini_create($1,$2,$3,$4)',[R,REL,uid(902),p])).rejects.toThrow(/mileage_conflict/);expect((await c.query('SELECT count(*)::int n FROM dispatch_command_receipts')).rows[0].n).toBe(0);
  }));
+ it.each(['loaded_miles_only','total_miles','loaded_plus_deadhead','flat_rate','manual'] as const)('server confirms canonical %s pay and rejects tampering or omitted agreed pay',model=>scenario(async(_,call)=>{
+  const p=dispatchPayload({...emptyDispatchForm(),relationship_id:REL,load_reference:'CREATE123',pickup_location:'A',dropoff_location:'B',loaded_miles:'200.45',deadhead_miles:'10',total_miles:'210.45',pay_model:model,rate_per_mile:'2.35',deadhead_rate_per_mile:'1.15',flat_rate_amount:'400.005',manual_amount:'400.005',other_fees:'3.12'});
+  const sql='SELECT dispatch_mini_create($1,$2,$3,$4) result';await call(sql,[R,REL,uid(903),p]);
+  await expect(call(sql,[R,REL,uid(904),{...p,estimated_pay:0}])).rejects.toThrow(/pay_conflict/);
+  const field=model==='manual'?'manual_amount':model==='flat_rate'?'flat_rate_amount':'rate_per_mile';await expect(call(sql,[R,REL,uid(904),{...p,[field]:null}])).rejects.toThrow(/explicit_pay_required/);
+ }));
  it('appends actual date once, preserves scheduled/financial fields, and isolates replay actor/date/target',()=>scenario(async(c,call)=>{
   const today=(await c.query('SELECT CURRENT_DATE::text d')).rows[0].d;const before=(await c.query('SELECT to_jsonb(loads) row FROM loads WHERE id=$1',[LOAD])).rows[0].row;
   const args=statusArgs(uid(901),'completed',today);await call(statusSql,args);await call(statusSql,args);

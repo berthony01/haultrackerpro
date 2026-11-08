@@ -71,13 +71,35 @@ GRANT EXECUTE ON FUNCTION public.dispatch_mini_read(uuid,uuid,text,text,integer,
 
 CREATE FUNCTION public.dispatch_mini_create(_recruiter_id uuid, _relationship_id uuid, _idempotency_key uuid, _payload jsonb)
 RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = pg_catalog AS $$
-DECLARE _driver uuid; _uid uuid:=auth.uid(); _key text:='mini:'||_idempotency_key::text; _receipt public.dispatch_command_receipts%ROWTYPE; _row public.loads%ROWTYPE; _prior jsonb;
+DECLARE _driver uuid; _uid uuid:=auth.uid(); _key text:='mini:'||_idempotency_key::text; _receipt public.dispatch_command_receipts%ROWTYPE; _row public.loads%ROWTYPE; _prior jsonb; _field text; _value numeric; _loaded numeric; _deadhead numeric; _total numeric; _miles numeric; _pay numeric;
 BEGIN
  _driver:=public.dispatch_mini_assert_scope(_recruiter_id,_relationship_id,'loads_dispatch');
  IF _driver IS NULL OR _idempotency_key IS NULL OR _payload IS NULL OR jsonb_typeof(_payload)<>'object' OR _payload->>'relationship_id' IS DISTINCT FROM _relationship_id::text THEN RAISE EXCEPTION 'dispatch_invalid_payload'; END IF;
  IF EXISTS(SELECT 1 FROM jsonb_object_keys(_payload) k WHERE k NOT IN ('relationship_id','load_reference','pickup_location','dropoff_location','load_date','dropoff_date','loaded_miles','deadhead_miles','total_miles','pay_model','rate_per_mile','deadhead_rate_per_mile','flat_rate_amount','manual_amount','wait_fee','detention_fee','other_fees','estimated_pay','notes')) THEN RAISE EXCEPTION 'dispatch_invalid_payload'; END IF;
  IF coalesce(_payload->>'load_reference','') !~ '^[A-Z0-9][A-Z0-9_-]{3,23}$' OR _payload->>'load_reference' !~ '[0-9]' THEN RAISE EXCEPTION 'dispatch_invalid_load_reference'; END IF;
+ -- Never allow omission/null of explicit agreed pay to silently become zero.
+ IF _payload->>'pay_model' IS NULL OR _payload->>'pay_model' NOT IN ('loaded_miles_only','total_miles','loaded_plus_deadhead','flat_rate','manual') THEN RAISE EXCEPTION 'dispatch_invalid_pay_model'; END IF;
+ FOREACH _field IN ARRAY ARRAY['loaded_miles','deadhead_miles','total_miles','rate_per_mile','deadhead_rate_per_mile','flat_rate_amount','manual_amount','wait_fee','detention_fee','other_fees','estimated_pay'] LOOP
+  IF _payload->>_field IS NOT NULL THEN
+   IF jsonb_typeof(_payload->_field)<>'number' THEN RAISE EXCEPTION 'dispatch_invalid_numeric_value'; END IF;
+   _value:=(_payload->>_field)::numeric;
+   IF _value::text IN ('NaN','Infinity','-Infinity') OR _value<0 THEN RAISE EXCEPTION 'dispatch_invalid_numeric_value'; END IF;
+  END IF;
+ END LOOP;
+ IF _payload->>'estimated_pay' IS NULL OR
+    CASE _payload->>'pay_model' WHEN 'manual' THEN _payload->>'manual_amount' IS NULL WHEN 'flat_rate' THEN _payload->>'flat_rate_amount' IS NULL ELSE _payload->>'rate_per_mile' IS NULL END OR
+    (_payload->>'pay_model'='loaded_plus_deadhead' AND _payload->>'deadhead_rate_per_mile' IS NULL) THEN RAISE EXCEPTION 'dispatch_explicit_pay_required'; END IF;
  IF coalesce((_payload->>'loaded_miles')::numeric,0)+coalesce((_payload->>'deadhead_miles')::numeric,0)>0 AND _payload->>'total_miles' IS NOT NULL AND abs((_payload->>'total_miles')::numeric-(coalesce((_payload->>'loaded_miles')::numeric,0)+coalesce((_payload->>'deadhead_miles')::numeric,0)))>2 THEN RAISE EXCEPTION 'dispatch_mileage_conflict'; END IF;
+ _loaded:=coalesce((_payload->>'loaded_miles')::numeric,0); _deadhead:=coalesce((_payload->>'deadhead_miles')::numeric,0); _total:=coalesce((_payload->>'total_miles')::numeric,0);
+ _miles:=CASE WHEN _loaded+_deadhead>0 AND (_total<=0 OR abs(_total-(_loaded+_deadhead))>2) THEN _loaded+_deadhead ELSE _total END;
+ _pay:=CASE _payload->>'pay_model'
+  WHEN 'loaded_miles_only' THEN _loaded*(_payload->>'rate_per_mile')::numeric
+  WHEN 'total_miles' THEN _miles*(_payload->>'rate_per_mile')::numeric
+  WHEN 'loaded_plus_deadhead' THEN _loaded*(_payload->>'rate_per_mile')::numeric+_deadhead*(_payload->>'deadhead_rate_per_mile')::numeric
+  WHEN 'flat_rate' THEN (_payload->>'flat_rate_amount')::numeric
+  WHEN 'manual' THEN (_payload->>'manual_amount')::numeric END;
+ _pay:=round(_pay+coalesce((_payload->>'wait_fee')::numeric,0)+coalesce((_payload->>'detention_fee')::numeric,0)+coalesce((_payload->>'other_fees')::numeric,0),2);
+ IF (_payload->>'estimated_pay')::numeric IS DISTINCT FROM _pay THEN RAISE EXCEPTION 'dispatch_pay_conflict'; END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended(_recruiter_id::text||':'||_key,0));
  SELECT * INTO _receipt FROM public.dispatch_command_receipts WHERE recruiter_id=_recruiter_id AND idempotency_key=_key FOR UPDATE;
  IF FOUND THEN
