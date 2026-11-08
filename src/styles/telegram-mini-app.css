@@ -79,7 +79,7 @@
 .dispatch-error { border: 1px solid #a56564; border-radius: 12px; background: #332029; padding: 12px; color: #ffdad6; font-size: 14px; line-height: 1.5; }
 .dispatch-icon { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 30px; height: 30px; border: 1px solid #65718b; border-radius: 9px; background: #1c2a40; color: #e0e9f7; }
 .dispatch-stat { min-width: 0; border: 1px solid #34465e; border-radius: 12px; background: #142237; padding: 12px; }
-.dispatch-stat-number { margin-top: 7px; color: #f8fafc; font-size: 28px; line-height: 1.15; font-weight: 750; }
+.dispatch-stat-number { display: flex; align-items: baseline; gap: 4px; margin-top: 7px; color: #f8fafc; font-size: 28px; line-height: 1.15; font-weight: 750; }
 .dispatch-stat-number span { color: #bdcadb; font-size: 12px; font-weight: 500; }
 .dispatch-stat-detail { margin-top: 7px; color: #c5f2dc; font-size: 15px; font-weight: 600; }
 .dispatch-other-totals { border-top: 1px solid #344256; padding-top: 12px; }

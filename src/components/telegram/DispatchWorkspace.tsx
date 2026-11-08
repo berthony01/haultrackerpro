@@ -12,20 +12,21 @@ import { DispatchLoadForm } from './dispatch/DispatchLoadForm';
 const money = (n: number | null) => n === null ? 'Not supplied' : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const dateLabel = (date: string | null) => date ? `${date.slice(5, 7)}/${date.slice(8, 10)}/${date.slice(0, 4)}` : 'Not supplied';
 const number = (n: number) => Number(n).toLocaleString();
+const loadWord = (n: number) => Number(n) === 1 ? 'load' : 'loads';
 
 function DriverSummary({ summary: s, weekStart }: { summary: DispatchPage['summaries'][number]; weekStart: string }) {
   return <section className="dispatch-surface space-y-3" aria-label={`${s.display_name} delivery summary`}>
     <div className="flex items-center gap-2"><span className="dispatch-icon"><Truck className="h-4 w-4" /></span><h2 className="min-w-0 break-words font-semibold">{s.display_name}</h2></div>
     <div className="grid min-w-0 grid-cols-2 gap-3">
-      <div className="dispatch-stat"><p className="dispatch-caption">Delivered today</p><p className="dispatch-stat-number">{s.daily_count}<span> loads</span></p><p className="dispatch-stat-detail">{number(s.daily_miles)} mi</p></div>
-      <div className="dispatch-stat"><p className="dispatch-caption">This week</p><p className="dispatch-stat-number">{s.weekly_count}<span> loads</span></p><p className="dispatch-stat-detail">{number(s.weekly_miles)} mi</p></div>
+      <div className="dispatch-stat"><p className="dispatch-caption">Delivered today</p><p className="dispatch-stat-number">{s.daily_count}<span>{loadWord(s.daily_count)}</span></p><p className="dispatch-stat-detail">{number(s.daily_miles)} mi</p></div>
+      <div className="dispatch-stat"><p className="dispatch-caption">This week</p><p className="dispatch-stat-number">{s.weekly_count}<span>{loadWord(s.weekly_count)}</span></p><p className="dispatch-stat-detail">{number(s.weekly_miles)} mi</p></div>
     </div>
     <details className="dispatch-other-totals"><summary>Other load totals<span className="dispatch-caption">Week of {dateLabel(weekStart)}</span></summary>
       <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
-        <div><dt className="dispatch-caption">Completed</dt><dd>{s.completed_count} loads · {number(s.completed_miles)} mi</dd></div>
-        <div><dt className="dispatch-caption">Active</dt><dd>{s.active_count} loads · {number(s.active_miles)} mi</dd></div>
-        <div><dt className="dispatch-caption">Cancelled</dt><dd>{s.cancelled_count} loads · {number(s.cancelled_miles)} mi</dd></div>
-        <div><dt className="dispatch-caption">Delivery date unconfirmed</dt><dd>{s.unconfirmed_count} loads · {number(s.unconfirmed_miles)} mi</dd></div>
+        <div><dt className="dispatch-caption">Completed</dt><dd>{s.completed_count} {loadWord(s.completed_count)} · {number(s.completed_miles)} mi</dd></div>
+        <div><dt className="dispatch-caption">Active</dt><dd>{s.active_count} {loadWord(s.active_count)} · {number(s.active_miles)} mi</dd></div>
+        <div><dt className="dispatch-caption">Cancelled</dt><dd>{s.cancelled_count} {loadWord(s.cancelled_count)} · {number(s.cancelled_miles)} mi</dd></div>
+        <div><dt className="dispatch-caption">Delivery date unconfirmed</dt><dd>{s.unconfirmed_count} {loadWord(s.unconfirmed_count)} · {number(s.unconfirmed_miles)} mi</dd></div>
       </dl>
     </details>
   </section>;
@@ -103,7 +104,7 @@ export function DispatchWorkspace({ recruiterId }: { recruiterId: string }) {
       {add && workspace.permissions.create && <div hidden={!!workspace.error}><DispatchLoadForm key={workspace.scope} drivers={drivers} enabled={workspace.verified && !workspace.loading} save={save} close={() => setAdd(false)} /></div>}
       {page?.summaries.map(s => <DriverSummary key={s.relationship_id} summary={s} weekStart={page.week_start} />)}
       <div className="space-y-3"><div className="dispatch-view-switch" aria-label="Load lists"><Button className="dispatch-view-toggle" variant="ghost" aria-pressed={query.bucket === 'active'} onClick={() => filter({ bucket: 'active', status: '' })}>Active</Button><Button className="dispatch-view-toggle" variant="ghost" aria-pressed={query.bucket === 'history'} onClick={() => filter({ bucket: 'history', status: '' })}>History</Button></div><Select value={query.status || 'all'} onValueChange={v => filter({ status: v === 'all' ? '' : v })}><SelectTrigger aria-label="Load status" className="dispatch-field w-full"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem>{(query.bucket === 'active' ? ['pending', 'en_route'] : ['completed', 'cancelled']).map(s => <SelectItem key={s} value={s}>{s.replace('_', ' ')}</SelectItem>)}</SelectContent></Select></div>
-      <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">{query.bucket === 'active' ? 'Active loads' : 'Load history'}</h2>{page && <span className="dispatch-count">{page.total} loads</span>}</div>
+      <div className="flex items-center justify-between gap-2"><h2 className="text-lg font-bold">{query.bucket === 'active' ? 'Active loads' : 'Load history'}</h2>{page && <span className="dispatch-count">{page.total} {loadWord(page.total)}</span>}</div>
       {workspace.loading && !page && <div className="dispatch-surface space-y-3" aria-label="Loading dispatch loads"><div className="h-4 w-1/2 rounded bg-slate-700/60" /><div className="h-20 rounded-xl bg-slate-800/70" /><p className="dispatch-caption">Your loads will appear here.</p></div>}
       {page && page.loads.length === 0 && <div className="dispatch-surface py-7 text-center"><Truck className="mx-auto mb-3 h-7 w-7 text-slate-400" /><p className="font-semibold">{page.driver_total === 0 ? 'No active connected drivers.' : 'No loads match these filters.'}</p><p className="dispatch-caption mt-2">{page.driver_total === 0 ? 'Connect a driver from your workspace on HaulTrackerPro.com.' : query.bucket === 'active' ? 'New loads start here as Pending.' : 'Delivered and cancelled loads appear in History.'}</p></div>}
       {page?.loads.map(load => <LoadCard key={load.id} load={load} canUpdate={workspace.permissions.status} disabled={!workspace.verified || busy} onStatus={startStatus} />)}
