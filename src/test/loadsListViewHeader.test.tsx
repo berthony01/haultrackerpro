@@ -36,11 +36,12 @@ function makeLoad(overrides: Partial<any> = {}): any {
 const noop = () => {};
 
 describe('LoadsListView header count wording', () => {
-  it('shows "X total · Y counted" + "excludes cancelled" when totals differ', () => {
+  it('separates completed loads from pending and cancelled loads in the header', () => {
     const loads = [
       makeLoad({ id: '1', status: 'completed' }),
       makeLoad({ id: '2', status: 'completed' }),
       makeLoad({ id: '3', status: 'cancelled' }),
+      makeLoad({ id: '4', status: 'pending' }),
     ];
     render(
       <LoadsListView
@@ -52,8 +53,7 @@ describe('LoadsListView header count wording', () => {
         onDateRangeChange={noop}
       />
     );
-    expect(screen.getByText(/3 total · 2 counted/)).toBeInTheDocument();
-    expect(screen.getByText(/excludes cancelled/)).toBeInTheDocument();
+    expect(screen.getByText('4 total · 2 completed')).toBeInTheDocument();
   });
 
   it('shows single-number wording with no helper when totals match', () => {
@@ -69,7 +69,7 @@ describe('LoadsListView header count wording', () => {
       />
     );
     expect(screen.getByText(/^2 loads$/)).toBeInTheDocument();
-    expect(screen.queryByText(/excludes cancelled/)).toBeNull();
+    expect(screen.queryByText(/total · .* completed/)).toBeNull();
   });
 });
 
