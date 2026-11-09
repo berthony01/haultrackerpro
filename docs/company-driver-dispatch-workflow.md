@@ -36,15 +36,28 @@ PR #55 merged as `f998d8011a3a7ab4d08fe9f8e7f50880c6ef8368`. Both published vers
 | The same two rows changed to Completed and Cancelled in the open view | PASS |
 | Driver saved actual pay and checked October and November reports | PASS |
 | Company page, driver request and monthly Reports preset at 320 px and 375 px | PASS |
-| Reports custom date row at 320 px and 375 px | FAIL. The row extends past the viewport. A follow-up is staged in [PR #56](https://github.com/berthony01/haultrackerpro/pull/56). |
+| Reports custom date row at 320 px and 375 px | The initial release overflowed. PR #56 passed the live retest below. |
 
 The company request and driver acceptance ran through the browser. The assignments and status changes exercised the shared Dispatch functions with the QA company role while the driver tab stayed open. A separate transaction first verified the invitation replay and full lifecycle, then rolled back. The only retained test assignments are `HTP-QA-COMP-A1109` and `HTP-QA-COMP-B1109`.
 
 Both assignments agreed 14.5 miles at $2.01 per mile, so $29.145 rounded to $29.15. The completed assignment retained its October 31 scheduled date and used November 1 for reporting. After the test driver recorded $27.50 actual pay, October showed $0 and 0 miles. November counted $27.50, 14.5 raw operating miles and one completed load. The UI rounds the displayed weekly mileage to 15. The other load remains in cancelled history and adds $0 to earnings.
 
-At both widths the company and consent pages fit the viewport. The primary company controls and the driver consent buttons measured 48 px tall. The November Reports preset also fit both widths. Opening Custom Range widened the 320 px document to 390 px, or 70 px beyond the viewport. The date control fix stacks the fields and Apply on phones. It passed 118 focused tests and the production build. Its signed-in visual retest follows a separate release.
+At both widths the company and consent pages fit the viewport. The primary company controls and the driver consent buttons measured 48 px tall. The November Reports preset also fit both widths. Opening Custom Range widened the 320 px document to 390 px, or 70 px beyond the viewport. The date control fix stacks the fields and Apply on phones. It passed 118 focused tests and the production build. The signed-in production retest is recorded below.
 
 - Website Dispatch at [320 px](dispatcher-mini-app-evidence/company-dispatch-web-320.png) and [375 px](dispatcher-mini-app-evidence/company-dispatch-web-375.png).
 - Driver consent at [320 px](dispatcher-mini-app-evidence/company-driver-consent-320.png) and [375 px](dispatcher-mini-app-evidence/company-driver-consent-375.png).
 - [November report and cancelled history](dispatcher-mini-app-evidence/company-driver-report-375.png).
 - [Custom Range overflow at 375 px](dispatcher-mini-app-evidence/report-custom-range-overflow-375.png).
+
+## Reports custom date release
+
+PR #56 shipped on November 9, 2026. The public website and provider version endpoints returned `ef778953e4eeb0d3ba024700608464959abfbc19`, built at `2026-11-09T15:21:55.319Z`. Lovable deployment receipt `8f3bff13-a95e-4b8b-8dc2-43620718a03f`. [PR #56](https://github.com/berthony01/haultrackerpro/pull/56) · [Website version](https://haultrackerpro.com/version.json)
+
+The signed-in driver opened Custom Range, entered the dates, and selected Apply at both widths. Each field and the Apply button measured 48 px tall. The document width matched the viewport before and after applying each range, and no date validation errors appeared.
+
+| Viewport and document width | Applied dates | Result |
+| --- | --- | --- |
+| 320 px | November 1, 2026 | PASS · [Screenshot](dispatcher-mini-app-evidence/reports-custom-range-live-320.png) |
+| 375 px | November 1 through November 2, 2026 | PASS · [Screenshot](dispatcher-mini-app-evidence/reports-custom-range-live-375.png) |
+
+Both date ranges showed the test driver's $27.50 recorded earnings and 14.5 operating miles. The cancelled test load remained in history and contributed $0 to earnings. The release used the approved frontend patch. The browser checks changed only the displayed report filter.
