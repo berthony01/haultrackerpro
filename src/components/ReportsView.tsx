@@ -429,10 +429,8 @@ export function ReportsView({
                 </div>
                 <Button variant="ghost" size="sm" disabled={!canExport} data-testid="export-week-csv" className="mt-3 w-full text-xs h-8 rounded-lg border border-border/60 hover:border-primary/30 hover:text-primary disabled:opacity-50 disabled:cursor-not-allowed" onClick={() => {
                   if (!canExport) { toast.error('You do not have permission to export reports for this driver.'); return; }
-                  const weekLoads = loads.filter(l => {
-                    const d = new Date(getEffectiveDate(l));
-                    return d >= new Date(s.startDate) && d <= new Date(s.endDate);
-                  });
+                  const week = { start: parseISO(s.startDate), end: parseISO(s.endDate) };
+                  const weekLoads = filteredLoads.filter(l => isWithinInterval(parseISO(getEffectiveDate(l)), week));
                   exportToCSV(weekLoads, `week-${s.weekLabel.replace(/\s/g, '-')}`, stops, companyMeta);
                 }}>
 

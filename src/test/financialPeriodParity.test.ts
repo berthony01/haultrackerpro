@@ -156,6 +156,37 @@ describe('F1 canonical financial period', () => {
 });
 
 describe('F1 production page KPIs and generated exports', () => {
+  it('exports a confirmed delivery on the first local day of its week', async () => {
+    const delivered = load({
+      load_date: '2026-05-02', dropoff_date: '2026-05-03', actual_delivery_date: '2026-05-04',
+      pickup_location: 'Fixture Pickup', dropoff_location: 'Fixture Delivery',
+    });
+    let csv: Blob | undefined;
+    const createUrl = vi.fn((blob: Blob) => { csv = blob; return 'blob:week-export'; });
+    const originalCreate = URL.createObjectURL;
+    const originalRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createUrl;
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    try {
+      const view = render(createElement(ReportsView, { loads: [delivered] }));
+      fireEvent.click(view.getByTestId('export-week-csv'));
+      expect(createUrl).toHaveBeenCalledTimes(1);
+      const content = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = reject;
+        reader.onload = () => resolve(String(reader.result));
+        reader.readAsText(csv!);
+      });
+      expect(content).toContain('2026-05-04,Fixture Pickup,Fixture Delivery');
+      expect(content).not.toContain('2026-05-03,Fixture Pickup');
+    } finally {
+      URL.createObjectURL = originalCreate;
+      URL.revokeObjectURL = originalRevoke;
+      click.mockRestore();
+    }
+  });
+
   it('renders equal Dashboard/Reports all-time and selected-range headline metrics', () => {
     const loads = [load(), load({ load_date: '2026-04-30', estimated_pay: 100 })];
     const expenses = [expense(900, 'Fuel'), expense(25)];

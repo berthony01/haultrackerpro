@@ -4,6 +4,12 @@ import { render, screen, fireEvent, waitFor, cleanup, configure, act } from '@te
 import { BrowserRouter, MemoryRouter, useLocation, Link, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { computeWorkspaceAccess } from '@/lib/workspaceAccess';
+
+// The inbox has its own authorization suite. Keep the chat assertions scoped
+// to RPCs issued by the conversation and its workspace handoff.
+vi.mock('@/components/dispatch/CompanyDriverConnectionsPanel', () => ({
+  DriverCompanyConnectionNotice: () => null,
+}));
 import { deriveUserCapabilitiesView, type UserCapabilityStatus } from '@/lib/userCapabilities';
 import { HOME_INTAKE_NEXT_PATH, INTAKE_OPENING_PROMPT } from '@/lib/home/conversationIntake';
 import { HaulTrackerAssistantLauncher } from '@/components/assistant/HaulTrackerAssistantLauncher';

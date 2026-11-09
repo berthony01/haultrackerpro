@@ -7,6 +7,7 @@ on:
       - 'index.html'
       - 'src/App.tsx'
       - 'src/pages/Index.tsx'
+      - 'src/components/ReportsView.tsx'
       - 'src/components/telegram/**'
       - 'src/components/opportunities/RecruiterOpportunityManager.tsx'
       - 'src/hooks/useTelegramMiniAppConnection.ts'
@@ -23,6 +24,7 @@ on:
       - 'src/hooks/useLoads.ts'
       - 'src/lib/loadEffectiveDate.ts'
       - 'src/test/companyDispatchWorkflow.test.tsx'
+      - 'src/test/financialPeriodParity.test.ts'
       - 'src/test/dispatchWorkspace*'
       - 'supabase/migration-candidates/*company_driver_dispatch_workflow.sql'
       - 'src/test/telegramMiniApp*'
@@ -86,6 +88,8 @@ jobs:
             sudo apt-get install --no-install-recommends -y postgresql-16
           fi
           HTP_TEST_POSTGRES_BINDIR=/usr/lib/postgresql/16/bin bunx vitest run --maxWorkers=1 src/test/dispatchWorkspacePostgres.test.ts
+      - name: Verify reporting and weekly CSV dates in Central time
+        run: TZ=America/Chicago bunx vitest run src/test/financialPeriodParity.test.ts
       - name: Lint Mini App production screens
         run: >-
           bunx eslint src/components/telegram src/hooks/useTelegramMiniAppConnection.ts
