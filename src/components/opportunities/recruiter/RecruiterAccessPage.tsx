@@ -361,6 +361,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
               teamOpen={teamOpen}
               onToggleTeam={() => setTeamOpen((v) => !v)}
               onOpenConversations={() => navigate('/conversations?workspace=recruiter')}
+              onOpenDispatch={() => navigate('/dispatch')}
             />
 
             {settlementsOpen && (
@@ -526,6 +527,7 @@ function ToolsGrid({
   teamOpen,
   onToggleTeam,
   onOpenConversations,
+  onOpenDispatch,
 }: {
   canPost: boolean;
   newRequests: number;
@@ -537,11 +539,19 @@ function ToolsGrid({
   teamOpen: boolean;
   onToggleTeam: () => void;
   onOpenConversations: () => void;
+  onOpenDispatch: () => void;
 }) {
   return (
     <Card className="p-5 border-border/60">
       <h3 className="text-base font-bold text-foreground mb-4">Your Recruiting Tools</h3>
       <div className="grid sm:grid-cols-2 gap-3">
+        <ToolCard
+          icon={Truck}
+          title="Dispatch"
+          body="Connect drivers, assign loads, and confirm deliveries from your company workspace."
+          cta="Open Dispatch"
+          onClick={onOpenDispatch}
+        />
         <ToolCard
           icon={PlusCircle}
           title="Post an Opportunity"

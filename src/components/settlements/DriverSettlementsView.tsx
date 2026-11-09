@@ -937,9 +937,9 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              A carrier or recruiter has asked to share settlement statements with you.
-              Accepting lets them post statements to your account. You can decline
-              without giving any reason.
+              Accepting lets the company share settlement statements, assign loads,
+              and update those assignments in your account. You can review the
+              company name and details under Company connections.
             </p>
             {pendingInvites.map((invite) => (
               <div
@@ -949,7 +949,7 @@ export function DriverSettlementsView({ onBack }: { onBack?: () => void }) {
               >
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-foreground">
-                    Settlement sharing request
+                    Company connection request
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Requested {formatDate(invite.invited_at)}

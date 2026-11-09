@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Load, LoadUpdate } from '@/hooks/useLoads';
+import { isCompletedLoadForFinancials } from '@/lib/financialCalculations';
 import { Expense } from '@/hooks/useExpenses';
 import { useLoadStops } from '@/hooks/useLoadStops';
 import { LoadCard, LoadCardSkeleton } from '@/components/LoadCard';
@@ -31,7 +32,8 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
   const [statusFilter, setStatusFilter] = useState('all');
   const [payFilter, setPayFilter] = useState(initialPayFilter || 'all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLoad, setSelectedLoad] = useState<Load | null>(null);
+  const [selectedLoadId, setSelectedLoadId] = useState<string | null>(null);
+  const selectedLoad = selectedLoadId ? loads.find(load => load.id === selectedLoadId) ?? null : null;
   const [currentPage, setCurrentPage] = useState(0);
   const PAGE_SIZE = 50;
 
@@ -58,8 +60,8 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       if (l.payment_status !== 'short_paid') return false;
     }
     if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      if (!l.pickup_location.toLowerCase().includes(q) && !l.dropoff_location.toLowerCase().includes(q)) return false;
+      const q = searchQuery.trim().toLowerCase();
+      if (![l.pickup_location, l.dropoff_location, l.load_reference, l.dispatch_company_name].some(value => value?.toLowerCase().includes(q))) return false;
     }
     return true;
   }), [loads, statusFilter, payFilter, searchQuery]);
@@ -79,19 +81,16 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
       {/* Header */}
       {(() => {
         const totalCount = filtered.length;
-        const countedCount = filtered.filter(l => l.status !== 'cancelled').length;
+        const countedCount = filtered.filter(isCompletedLoadForFinancials).length;
         const mismatch = totalCount !== countedCount;
         return (
           <div className="flex items-end justify-between gap-3">
             <div>
               <h1 className="text-2xl font-bold tracking-tight">My Loads</h1>
               {mismatch ? (
-                <>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {totalCount} total · {countedCount} counted
-                  </p>
-                  <p className="text-[11px] text-muted-foreground/80 mt-0.5">excludes cancelled</p>
-                </>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  {totalCount} total · {countedCount} completed
+                </p>
               ) : (
                 <p className="text-sm text-muted-foreground mt-0.5">
                   {totalCount} load{totalCount !== 1 ? 's' : ''}
@@ -114,7 +113,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
           <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search city or state..."
+              placeholder="Search route or reference…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               className="h-9 text-xs pl-8 rounded-lg bg-secondary/40 border-border/60"
@@ -175,7 +174,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
                 onEdit={onEdit}
                 onDelete={onDelete}
                 onUpdate={onUpdate}
-                onTap={() => setSelectedLoad(load)}
+                onTap={() => setSelectedLoadId(load.id)}
               />
             ))}
           </div>
@@ -186,7 +185,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
               stops={stops}
               onEdit={onEdit}
               onDelete={onDelete}
-              onSelect={setSelectedLoad}
+              onSelect={load => setSelectedLoadId(load.id)}
             />
           </div>
         </>
@@ -230,7 +229,7 @@ export function LoadsListView({ loads, expenses = [], onEdit, onDelete, onUpdate
         expenses={expenses}
         stops={stops}
         open={!!selectedLoad}
-        onOpenChange={open => { if (!open) setSelectedLoad(null); }}
+        onOpenChange={open => { if (!open) setSelectedLoadId(null); }}
         onEdit={onEdit}
         onDelete={onDelete}
         onUpdate={onUpdate}

@@ -8,7 +8,10 @@ import { PGlite } from '@electric-sql/pglite';
 import { beforeAll, afterAll, describe, it, expect } from 'vitest';
 import { SOURCES, exactFunction, uid } from './fixtures/phase3AssistantBootstrap';
 import { dispatchPayload, emptyDispatchForm } from '@/lib/dispatchWorkspace';
+import { aggregateReport } from '@/lib/reportAggregator';
+import { buildReportCSV } from '@/lib/reportCsv';
 const candidate='supabase/migration-candidates/20261108140123_dispatcher_mini_app.sql';
+const companyCandidate='supabase/migration-candidates/20261108225739_company_driver_dispatch_workflow.sql';
 const read=(p:string)=>readFileSync(p,'utf8');const mig=(p:string)=>read('supabase/migrations/'+p);
 let dir='',pool:pg.Pool;
 const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!k.startsWith('PG')&&k!=='DATABASE_URL'));
@@ -35,6 +38,15 @@ beforeAll(async()=>{
  const canonical=mig('20260819162100_2a7bb78e-ad6a-4417-a7d1-28ef6ba433aa.sql');await pool.query(canonical.slice(canonical.indexOf('CREATE TABLE IF NOT EXISTS public.load_events'),canonical.indexOf('-- G. Dispatch authorization helper')));
  for(const n of ['current_user_can_dispatch_load_action','dispatch_create_driver_load','dispatch_update_driver_load_status'])await pool.query(exactFunction(canonical,n));
  await pool.query(read(candidate));
+ await pool.query(`
+   ALTER TABLE auth.users ADD COLUMN email text UNIQUE, ADD COLUMN email_confirmed_at timestamptz;
+   ALTER TABLE public.loads ADD COLUMN created_at timestamptz NOT NULL DEFAULT now(), ADD COLUMN actual_pay_received numeric;
+ `);
+ const ownerGuard = mig('20260808163500_phase1t_b2a_settlement_authorization_helpers.sql');
+ await pool.query(exactFunction(ownerGuard.replace(/CREATE FUNCTION public\./g, 'CREATE OR REPLACE FUNCTION public.'), 'settlement_current_user_can_administer_carrier'));
+ const relationshipActions = mig('20260808170500_phase1t_b2c1_carrier_driver_relationship_rpcs.sql').replace(/CREATE FUNCTION public\./g, 'CREATE OR REPLACE FUNCTION public.');
+ for (const name of ['settlement_accept_my_carrier_relationship', 'settlement_end_carrier_relationship']) await pool.query(exactFunction(relationshipActions, name));
+ await pool.query(read(companyCandidate));
 },60000);
 afterAll(async()=>{if(pool)await pool.end();if(dir){try{run('pg_ctl',['-D',join(dir,'data'),'-m','immediate','-w','stop']);}finally{rmSync(dir,{recursive:true,force:true});}}});
 async function seedFixture(c:pg.PoolClient){
@@ -127,12 +139,152 @@ describe('Dispatcher Mini App disposable real PostgreSQL',()=>{
  }));
 });
 
+const inviteDriver = 'SELECT company_driver_invite($1,$2) result';
+const respondDriver = 'SELECT company_driver_respond($1,$2) result';
+const readConnections = 'SELECT company_driver_connections($1) result';
+const readDriverLoads = 'SELECT driver_loads_page($1,$2,$3,$4,$5) result';
+const invitedEmail = 'driver-invite@example.test';
+const invitedDriver = uid(31);
+
+async function provisionInvitedDriver(c: pg.PoolClient, verified = true) {
+ await c.query('INSERT INTO auth.users(id,email,email_confirmed_at) VALUES($1,$2,CASE WHEN $3 THEN now() END)', [invitedDriver, invitedEmail, verified]);
+ await c.query("INSERT INTO user_capabilities VALUES($1,'driver','active')", [invitedDriver]);
+}
+
+describe('Company driver connection and shared load lifecycle', () => {
+ it('creates one pending request before signup and binds acceptance to the verified driver', () => scenario(async (c, call) => {
+  const [{ result: invite }] = await call(inviteDriver, [R, ' Driver-Invite@Example.Test ']);
+  const [{ result: retry }] = await call(inviteDriver, [R, invitedEmail]);
+  expect(retry).toEqual(invite);
+  expect(invite.status).toBe('pending');
+  expect((await c.query('SELECT count(*)::int AS n FROM carrier_driver_relationships')).rows[0].n).toBe(2);
+  await expect(call(respondDriver, [invite.id, true], DRIVER)).rejects.toThrow(/not_authorized/);
+
+  await provisionInvitedDriver(c, false);
+  expect((await call(readConnections, [null], invitedDriver))[0].result.invites).toEqual([]);
+  await expect(call(respondDriver, [invite.id, true], invitedDriver)).rejects.toThrow(/not_authorized/);
+  await c.query('UPDATE auth.users SET email_confirmed_at=now() WHERE id=$1', [invitedDriver]);
+  const [{ result: inbox }] = await call(readConnections, [null], invitedDriver);
+  expect(inbox.invites).toEqual([expect.objectContaining({ id: invite.id, company_name: 'Company', status: 'pending' })]);
+  expect(inbox.relationships).toEqual([]);
+
+  const [{ result: accepted }] = await call(respondDriver, [invite.id, true], invitedDriver);
+  const [{ result: replayed }] = await call(respondDriver, [invite.id, true], invitedDriver);
+  expect(accepted).toMatchObject({ status: 'accepted', replayed: false });
+  expect(replayed).toMatchObject({ relationship_id: accepted.relationship_id, replayed: true });
+  const row = (await c.query('SELECT recruiter_id,driver_user_id,status FROM carrier_driver_relationships WHERE id=$1', [accepted.relationship_id])).rows[0];
+  expect(row).toEqual({ recruiter_id: R, driver_user_id: invitedDriver, status: 'active' });
+  expect((await c.query('SELECT count(*)::int AS n FROM recruiter_members WHERE member_user_id=$1', [invitedDriver])).rows[0].n).toBe(0);
+  await expect(call('SELECT dispatch_mini_read($1)', [R], invitedDriver)).rejects.toThrow(/not_authorized/);
+ }));
+
+ it('blocks table access, unauthenticated requests, load-only staff and cross-company owners', () => scenario(async (_, call) => {
+  const [{ result: invite }] = await call(inviteDriver, [R, invitedEmail]);
+  await expect(call('SELECT * FROM company_driver_invites')).rejects.toThrow(/permission denied/);
+  await expect(call(inviteDriver, [R, invitedEmail], '', 'anon')).rejects.toThrow(/permission denied/);
+  await expect(call(inviteDriver, [R, invitedEmail], STAFF)).rejects.toThrow(/not_authorized/);
+  await expect(call(readConnections, [R], STAFF)).rejects.toThrow(/not_authorized/);
+  await expect(call(readConnections, [R], OTHER_OWNER)).rejects.toThrow(/not_authorized/);
+  await expect(call('SELECT company_driver_revoke($1,$2)', [OTHER, invite.id], OTHER_OWNER)).rejects.toThrow(/expired_or_handled/);
+  expect((await call(readConnections, [R]))[0].result.invites[0].status).toBe('pending');
+ }));
+
+ it('rejects expired and revoked requests and gives a renewed request a new identity', () => scenario(async (c, call) => {
+  await provisionInvitedDriver(c);
+  const [{ result: first }] = await call(inviteDriver, [R, invitedEmail]);
+  await c.query("UPDATE company_driver_invites SET expires_at=now()-interval '1 minute' WHERE id=$1", [first.id]);
+  await expect(call(respondDriver, [first.id, true], invitedDriver)).rejects.toThrow(/expired_or_handled/);
+  const [{ result: renewed }] = await call(inviteDriver, [R, invitedEmail]);
+  expect(renewed.id).not.toBe(first.id);
+  await expect(call(respondDriver, [first.id, true], invitedDriver)).rejects.toThrow(/not_authorized/);
+  await call('SELECT company_driver_revoke($1,$2)', [R, renewed.id]);
+  await expect(call(respondDriver, [renewed.id, true], invitedDriver)).rejects.toThrow(/expired_or_handled/);
+  expect((await c.query('SELECT count(*)::int AS n FROM carrier_driver_relationships WHERE driver_user_id=$1', [invitedDriver])).rows[0].n).toBe(0);
+ }));
+
+ it('requires an active driver and current company eligibility, and respects decline and disconnect', () => scenario(async (c, call) => {
+  await provisionInvitedDriver(c);
+  const [{ result: first }] = await call(inviteDriver, [R, invitedEmail]);
+  await c.query("UPDATE user_capabilities SET status='revoked' WHERE user_id=$1", [invitedDriver]);
+  await expect(call(respondDriver, [first.id, true], invitedDriver)).rejects.toThrow(/not_authorized/);
+  await c.query("UPDATE user_capabilities SET status='active' WHERE user_id=$1", [invitedDriver]);
+  await c.query("UPDATE recruiter_billing_profiles SET status='past_due' WHERE recruiter_id=$1", [R]);
+  await expect(call(respondDriver, [first.id, true], invitedDriver)).rejects.toThrow(/company_unavailable/);
+  expect((await call(respondDriver, [first.id, false], invitedDriver))[0].result.status).toBe('declined');
+  await expect(call(respondDriver, [first.id, true], invitedDriver)).rejects.toThrow(/expired_or_handled/);
+  await c.query("UPDATE recruiter_billing_profiles SET status='active' WHERE recruiter_id=$1", [R]);
+  const [{ result: second }] = await call(inviteDriver, [R, invitedEmail]);
+  const [{ result: accepted }] = await call(respondDriver, [second.id, true], invitedDriver);
+  await call('SELECT settlement_end_carrier_relationship($1)', [accepted.relationship_id], invitedDriver);
+  await call(respondDriver, [second.id, true], invitedDriver);
+  expect((await call(readConnections, [null], invitedDriver))[0].result.relationships[0].status).toBe('ended');
+  const [{ result: third }] = await call(inviteDriver, [R, invitedEmail]);
+  expect(third.id).not.toBe(second.id);
+  expect(third.status).toBe('pending');
+  expect((await call(readConnections, [null], invitedDriver))[0].result.relationships[0].status).toBe('ended');
+ }));
+
+ it('projects the same assigned row into driver reports and exports, with delivery and cancellation parity', () => scenario(async (c, call) => {
+  await provisionInvitedDriver(c);
+  const [{ result: invite }] = await call(inviteDriver, [R, invitedEmail]);
+  const [{ result: connection }] = await call(respondDriver, [invite.id, true], invitedDriver);
+  const relationship = connection.relationship_id;
+  const payload = dispatchPayload({
+    ...emptyDispatchForm(), relationship_id: relationship, load_reference: 'COMPANYQA1',
+    pickup_location: 'Dallas, TX', dropoff_location: 'Austin, TX',
+    load_date: '2026-01-30', dropoff_date: '2026-01-31', loaded_miles: '14.5', rate_per_mile: '2.01',
+  });
+  const create = 'SELECT dispatch_mini_create($1,$2,$3,$4) result';
+  const [{ result: assigned }] = await call(create, [R, relationship, uid(981), payload], STAFF);
+  const [{ result: cancelled }] = await call(create, [R, relationship, uid(982), { ...payload, load_reference: 'COMPANYQA2', dropoff_date: '2026-02-01' }], STAFF);
+  const query = [invitedDriver, null, null, 0, 100];
+  const [{ result: pending }] = await call(readDriverLoads, query, invitedDriver);
+  expect(pending.loads).toEqual(expect.arrayContaining([expect.objectContaining({
+    id: assigned.id, user_id: invitedDriver, status: 'pending', estimated_pay: 29.15, dispatch_company_name: 'Company',
+  })]));
+  const report = (loads: typeof pending.loads, from: string, to: string) => aggregateReport({
+    loads, expenses: [], fuelLogs: [], settings: null, range: { from, to, key: 'custom', label: 'Dispatch fixture' }, preparedFor: 'Company fixture',
+  });
+  expect(report(pending.loads, '2026-01-01', '2026-02-28').summary.grossRevenue).toBe(0);
+  await call(statusSql, [R, relationship, assigned.id, 'pending', 'completed', '2026-02-01', uid(983)], STAFF);
+  await call("SELECT dispatch_update_driver_load_status($1,$2,$3,$4,'cancelled',$5,'telegram')", [R, relationship, invitedDriver, cancelled.id, 'company-dispatch-test-cancel'], STAFF);
+
+  const [{ result: february }] = await call(readDriverLoads, [invitedDriver, '2026-02-01', '2026-02-01', 0, 100], invitedDriver);
+  expect(february.totalCount).toBe(2);
+  expect(february.loads.find((row: { id: string }) => row.id === assigned.id)).toMatchObject({ status: 'completed', dropoff_date: '2026-01-31', actual_delivery_date: '2026-02-01', estimated_pay: 29.15 });
+  const delivered = report(february.loads, '2026-02-01', '2026-02-01');
+  expect(delivered.summary).toMatchObject({ grossRevenue: 29.15, totalMiles: 14.5 });
+  expect(delivered.cancelledLoads).toHaveLength(1);
+  expect(buildReportCSV('load_summary', delivered)).toContain('Total Gross Pay,$29.15');
+  expect((await call(readDriverLoads, [invitedDriver, '2026-01-01', '2026-01-31', 0, 100], invitedDriver))[0].result.loads).toEqual([]);
+  await c.query('UPDATE loads SET actual_pay_received=27.50 WHERE id=$1', [assigned.id]);
+  const [{ result: paid }] = await call(readDriverLoads, query, invitedDriver);
+  expect(report(paid.loads, '2026-02-01', '2026-02-01').summary.grossRevenue).toBe(27.5);
+  const taxSettings = {
+    tax_estimator_enabled: true, tax_base_type: 'net', federal_tax_percent: 10,
+    state_tax_percent: 0, include_se_tax: false, se_tax_percent: 0, buffer_percent: 0,
+  } as Parameters<typeof aggregateReport>[0]['settings'];
+  const expense = { id: 'fixture-expense', user_id: invitedDriver, amount: 2.5, category: 'Maintenance', expense_date: '2026-02-01' } as Parameters<typeof aggregateReport>[0]['expenses'][number];
+  const paidReport = aggregateReport({
+    loads: paid.loads, expenses: [expense], fuelLogs: [], settings: taxSettings,
+    range: { from: '2026-02-01', to: '2026-02-01', key: 'custom', label: 'February delivery' }, preparedFor: 'Company fixture',
+  });
+  expect(paidReport.tax).toMatchObject({ grossRevenue: 27.5, netProfit: 25, totalTax: 2.5 });
+  await expect(call(readDriverLoads, query, STAFF)).rejects.toThrow(/not_authorized/);
+  await expect(call(readDriverLoads, query, OWNER)).rejects.toThrow(/not_authorized/);
+  await expect(call(readDriverLoads, query, DRIVER)).rejects.toThrow(/not_authorized/);
+  const [{ result: page }] = await call(readDriverLoads, [invitedDriver, '2026-02-01', '2026-02-01', 1, 1], invitedDriver);
+  expect(page.totalCount).toBe(2);
+  expect(page.loads).toHaveLength(1);
+ }));
+});
+
 // These probes require separate native PostgreSQL sessions. Never count the
 // single-session WASM transport as concurrency evidence.
 describe.skipIf(process.env.HTP_TEST_PGLITE==='1')('Dispatcher concurrent native transactions',()=>{
- async function concurrentCall(sql:string,args:unknown[]){
+ async function concurrentCall(sql:string,args:unknown[],actor=OWNER){
   const c=await pool.connect();
-  try{await c.query('BEGIN');await c.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[OWNER]);await c.query('SET LOCAL ROLE authenticated');const rows=(await c.query(sql,args)).rows;await c.query('COMMIT');return rows;}
+  try{await c.query('BEGIN');await c.query("SELECT set_config('request.jwt.claim.sub',$1,true)",[actor]);await c.query('SET LOCAL ROLE authenticated');const rows=(await c.query(sql,args)).rows;await c.query('COMMIT');return rows;}
   catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
  }
  it.each(['exact-create','conflicting-create','new-key-same-reference','exact-status','competing-status'])('%s commits exactly one mutation',async kind=>{
@@ -158,5 +310,32 @@ describe.skipIf(process.env.HTP_TEST_PGLITE==='1')('Dispatcher concurrent native
    if(exact){const values=results.map(result=>(result as PromiseFulfilledResult<any[]>).value[0].result);expect(values[0].id).toBe(values[1].id);expect(values.map(value=>value.replayed).sort()).toEqual([false,true]);}
   }finally{await c.query('ROLLBACK');await c.query('TRUNCATE auth.users CASCADE');c.release();}
   expect((await pool.query('SELECT count(*)::int n FROM loads')).rows[0].n).toBe(0);
+ });
+
+ it('serializes simultaneous requests and accepts a connection once across two driver sessions', async () => {
+  const c = await pool.connect();
+  try {
+   await c.query('BEGIN');
+   await seedFixture(c);
+   await provisionInvitedDriver(c);
+   await c.query('COMMIT');
+   const [first, second] = await Promise.all([
+    concurrentCall(inviteDriver, [R, invitedEmail]),
+    concurrentCall(inviteDriver, [R, invitedEmail.toUpperCase()]),
+   ]);
+   expect(first[0].result).toEqual(second[0].result);
+   const inviteId = first[0].result.id;
+   const responses = await Promise.all([
+    concurrentCall(respondDriver, [inviteId, true], invitedDriver),
+    concurrentCall(respondDriver, [inviteId, true], invitedDriver),
+   ]);
+   expect(responses.map(rows => rows[0].result.replayed).sort()).toEqual([false, true]);
+   expect(responses[0][0].result.relationship_id).toBe(responses[1][0].result.relationship_id);
+   expect((await c.query('SELECT count(*)::int AS n FROM carrier_driver_relationships WHERE recruiter_id=$1 AND driver_user_id=$2', [R, invitedDriver])).rows[0].n).toBe(1);
+  } finally {
+   await c.query('ROLLBACK');
+   await c.query('TRUNCATE auth.users CASCADE');
+   c.release();
+  }
  });
 });

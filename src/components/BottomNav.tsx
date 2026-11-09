@@ -63,6 +63,7 @@ const driverNav = [
 
 const recruiterActiveNav = [
   { id: 'recruiter-access', label: 'Home', icon: Handshake },
+  { id: 'nav:dispatch', label: 'Dispatch', icon: Truck },
   { id: 'recruiter-access:manager', label: 'Opps', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Apps', icon: Users },
   { id: 'more', label: 'More', icon: MoreHorizontal },
@@ -135,6 +136,7 @@ export function BottomNav(props: BottomNavProps) {
   type MoreItem = { label: string; icon: typeof Settings; onClick: () => void; description?: string };
 
   const driverMoreItemsFull: MoreItem[] = [
+    { label: 'Company connections', icon: Handshake, onClick: () => goHref('/driver/company-connections'), description: 'Review requests from companies that assign your loads.' },
     { label: 'HaulTracker Assistant', icon: Sparkles, onClick: openAssistant, description: 'Guided help (Free) or AI answers (Pro).' },
     { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=driver') },
     { label: 'Opportunity Preferences', icon: UserCog, onClick: () => go('opportunity-preferences'), description: 'Tell recruiters what fits you.' },
@@ -169,6 +171,7 @@ export function BottomNav(props: BottomNavProps) {
   ].filter(Boolean) as MoreItem[];
 
   const recruiterActiveMoreItems: MoreItem[] = [
+    { label: 'Dispatch', icon: Truck, onClick: () => goHref('/dispatch'), description: 'Assign loads and confirm deliveries.' },
     { label: 'Conversations', icon: MessageSquare, onClick: () => goHref('/conversations?workspace=recruiter') },
     { label: 'HaulTracker Assistant', icon: Sparkles, onClick: openAssistant, description: 'Guided help (Free) or AI answers (Pro).' },
     { label: 'Recruiter Command Center', icon: Handshake, onClick: () => go('recruiter-access') },
@@ -260,7 +263,7 @@ export function BottomNav(props: BottomNavProps) {
                 <SheetTrigger asChild>
                   <button
                     aria-label="More"
-                    className={`flex flex-col items-center gap-1 min-w-[64px] min-h-[48px] justify-center rounded-xl px-3 py-2 transition-all duration-200 active:scale-90 ${
+                    className={`flex flex-col items-center gap-1 min-w-[48px] sm:min-w-[64px] min-h-[48px] justify-center rounded-xl px-1 py-2 sm:px-3 transition-all duration-200 active:scale-90 ${
                       moreOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
                     }`}
                   >
@@ -299,9 +302,9 @@ export function BottomNav(props: BottomNavProps) {
           return (
             <button
               key={item.id}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => item.id === 'nav:dispatch' ? goHref('/dispatch') : onNavigate(item.id)}
               aria-label={item.label}
-              className={`flex flex-col items-center gap-1 min-w-[64px] min-h-[48px] justify-center rounded-xl px-3 py-2 transition-all duration-200 active:scale-90 ${
+              className={`flex flex-col items-center gap-1 min-w-[48px] sm:min-w-[64px] min-h-[48px] justify-center rounded-xl px-1 py-2 sm:px-3 transition-all duration-200 active:scale-90 ${
                 isActive
                   ? 'text-primary'
                   : 'text-muted-foreground hover:text-foreground'

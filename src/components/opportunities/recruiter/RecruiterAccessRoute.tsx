@@ -79,6 +79,7 @@ function StaffWorkspaceRoute({
   workspace: RecruiterStaffWorkspace;
   onChangeStaffWorkspace?: () => void;
 }) {
+  const navigate = useNavigate();
   const perms = useRecruiterStaffPermissions(workspace.recruiterId);
   const [staffView, setStaffView] = useState<
     | 'home'
@@ -266,6 +267,15 @@ function StaffWorkspaceRoute({
           Recruiter tools are permission-controlled. Only the areas your workspace owner
           granted are available to you.
         </p>
+        {!perms.isLoading && !perms.error && perms.canViewLoads && (
+          <button
+            type="button"
+            onClick={() => navigate('/dispatch')}
+            className="mt-4 inline-flex min-h-12 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Open Dispatch
+          </button>
+        )}
         {canOpenOpportunities && (
           <button
             type="button"
