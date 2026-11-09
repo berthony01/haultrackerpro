@@ -16,7 +16,7 @@ Help independent truck driver recruiters understand how to start on HaulTrackerP
 - No in-platform fee invoicing or commission collection established. Not a recruiting license, job-placement guarantee, or tax/legal service.
 
 ## Implemented in isolated branch
-1. Align landing page listing limits, company-type onboarding language, and Fleet availability.
+1. Align both recruiter public surfaces (`/recruiters` route and RecruiterLanding component) on listing limits, independent recruiter onboarding, and Fleet availability.
 2. Add visible link to existing recruiter guide.
 3. Add business starter steps on existing guide, with honest limitations.
 
@@ -30,7 +30,8 @@ Help independent truck driver recruiters understand how to start on HaulTrackerP
 
 ## Acceptance checklist before merge or publish
 - Static: free active limit 1; paid limits 5/15/25, Fleet preview-only; no stale unlimited free posting text.
-- Preview: landing to recruiter guide; signed-in/signed-out recruiter onboarding; no new payment flows.
+- Preview: `/recruiters` to `/recruiter/guide` at 320px and 375px; signed-in/out onboarding remains separately untested.
+- Automated CI: pull-request-only build, typecheck, and public-route Playwright smoke tests with a dummy offline backend.
 - Responsive manual tests: 320px and 375px, no overflow or clipped CTA.
 - Regression: role selection, recruiter posting, driver contact consent, applicant status, contracts, plans, agency clients, Telegram/dispatcher unchanged.
 - Owner approval required before merge, deployment, production SQL, billing changes, or enabling any new functionality.
