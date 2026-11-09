@@ -326,7 +326,7 @@ export function RecruiterAccessPage({ onBack, onOpenOnboarding, onManage, onAppl
                 </h3>
                 <p className="text-sm text-muted-foreground mb-3">
                   {state === 'incomplete'
-                    ? 'Add your recruiter name, company name, a valid recruiter email, at least one of DOT or MC number, and accept the posting terms. Standard posting unlocks the moment those are saved.'
+                    ? 'Add your recruiter name, company name, a valid recruiter email, and your company type, then accept the posting terms. Only Carrier / Motor Carrier accounts need a DOT or MC number for standard posting.'
                     : intentRecruiter
                     ? 'You signed up as a recruiter, but your recruiter profile is not complete yet. Complete the short recruiter profile to start posting.'
                     : 'Add the recruiter workspace to your account. Standard posting unlocks as soon as your profile is complete — no admin approval or paid plan is required.'}
@@ -492,7 +492,7 @@ function StateCard({
       : state === 'suspended'
       ? { Icon: Ban, title: 'Recruiter Access Suspended', body: 'Please contact support regarding your recruiter account.', tone: 'bg-destructive/10 border-destructive/30 text-destructive', cta: null }
       : state === 'active_no_billing'
-      ? { Icon: Sparkles, title: 'Standard posting enabled — post unlimited standard opportunities', body: 'Standard posting is included with your recruiter account. Upgrade only to unlock premium recruiting tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
+      ? { Icon: Sparkles, title: 'Standard posting enabled — 1 active standard opportunity with unlimited drafts', body: 'Standard posting includes 1 active opportunity and unlimited drafts. Upgrade for more active opportunities and premium tools like priority placement, featured visibility, and reports.', tone: 'bg-primary/10 border-primary/30 text-primary', cta: { label: 'See Premium Plans', onClick: onChoosePlan } }
       : null;
 
   if (!cfg) return null;
@@ -955,7 +955,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function HowItWorks() {
   const steps = [
     { n: 1, title: 'Set up your recruiter profile', body: 'Add the recruiter workspace to your account and complete the required recruiter profile fields and posting terms. Standard posting does not require admin approval or a paid plan.' },
-    { n: 2, title: 'Post structured opportunities', body: 'Post unlimited standard opportunities as soon as your recruiter profile is complete — drivers see real pay clarity, route info, and your hiring intent.' },
+    { n: 2, title: 'Post structured opportunities', body: 'Post 1 active standard opportunity free, with unlimited drafts. Paid plans increase your active listing limit, and drivers see your pay and route details.' },
     { n: 3, title: 'Review driver requests', body: 'Approved drivers request info — you review their preferences and activity.' },
     { n: 4, title: 'Request contact permission', body: 'When a driver looks like a fit, request contact permission directly.' },
     { n: 5, title: 'Manage your hiring pipeline', body: 'Move drivers through the structured hiring pipeline with clarity.' },

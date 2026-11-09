@@ -6,6 +6,8 @@ on:
       - 'src/pages/Recruiters.tsx'
       - 'src/components/landing/RecruiterLanding.tsx'
       - 'src/pages/recruiter/RecruiterGuide.tsx'
+      - 'src/components/opportunities/recruiter/RecruiterAccessPage.tsx'
+      - 'src/test/recruiterBusinessStarterCopyParity.test.ts'
       - 'tests/e2e/recruiter-business-starter-public.spec.ts'
       - '.github/workflows/recruiter-business-starter-stage.yml'
 
@@ -31,6 +33,15 @@ jobs:
         run: |
           bunx tsc -p tsconfig.app.json --noEmit
           bunx tsc -p tsconfig.node.json --noEmit
+      - name: Recruiter source parity and isolated role/eligibility regression
+        run: >-
+          bunx vitest run
+          src/test/recruiterBusinessStarterCopyParity.test.ts
+          src/test/phase1pA1RecruiterEligibilityCompanyType.test.ts
+          src/test/phase1jBWorkspaceRouting.test.tsx
+          src/test/phase1jB2ARecruiterEntry.test.tsx
+          src/test/phase1jC2RecruiterCopyReconciliation.test.tsx
+          src/test/phase1fa22R1aRenderedTrustState.test.tsx
       - name: Build frontend with isolated dummy backend
         run: bun run build
       - name: Install headless browser

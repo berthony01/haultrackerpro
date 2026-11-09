@@ -35,3 +35,9 @@ Help independent truck driver recruiters understand how to start on HaulTrackerP
 - Responsive manual tests: 320px and 375px, no overflow or clipped CTA.
 - Regression: role selection, recruiter posting, driver contact consent, applicant status, contracts, plans, agency clients, Telegram/dispatcher unchanged.
 - Owner approval required before merge, deployment, production SQL, billing changes, or enabling any new functionality.
+
+## Authenticated read-only checkpoint, 2026-11-09
+- Connected browser showed an authenticated recruiter hub with incomplete profile, zero active opportunities, and zero applications. No form submissions or account data changes were made.
+- Found conflicting incomplete-state DOT/MC copy and obsolete unlimited-free-posting wording in the recruiter command center. Staged copy-only correction and source-integrity test.
+- The existing recruiter eligibility and workspace-access tests plus mocked rendered recruiter-state tests are included in isolated CI. These **do not** replace an authenticated end-to-end staging test.
+- Authenticated applicant consent, contract hiring and paid checkout E2E remain untested, blocked by lack of an authorized staging session with suitable synthetic records. Do not mark full recruiting release acceptance PASS.
