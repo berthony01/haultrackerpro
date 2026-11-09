@@ -108,10 +108,8 @@ describe('DateRangeFilter', () => {
     render(<DateRangeFilter onRangeChange={onRangeChange} />);
     fireEvent.click(screen.getByRole('button', { name: 'Custom Range' }));
 
-    const inputs = document.querySelectorAll('input[type="date"]');
-    expect(inputs).toHaveLength(2);
-    fireEvent.change(inputs[0], { target: { value: '2026-05-11' } });
-    fireEvent.change(inputs[1], { target: { value: '2026-05-17' } });
+    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-05-11' } });
+    fireEvent.change(screen.getByLabelText('End date'), { target: { value: '2026-05-17' } });
     fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(onRangeChange).toHaveBeenCalledWith('2026-05-11', '2026-05-17');

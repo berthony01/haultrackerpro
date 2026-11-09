@@ -90,7 +90,7 @@ export function DateRangeFilter({ onRangeChange, currentRange }: DateRangeFilter
   const rangeLabel = formatShowingRange({ from: fromISO, to: toISO });
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <div className="flex flex-wrap gap-1.5">
         {resolved.map(p => {
           const isActive = activeLabel === p.label;
@@ -127,18 +127,31 @@ export function DateRangeFilter({ onRangeChange, currentRange }: DateRangeFilter
       </div>
       {showCustom && (
         <div className="space-y-1.5">
-          <div className="flex gap-2 items-end">
-            <div className="flex-1">
-              <Input type="date" value={customFrom} onChange={e => { setCustomFrom(e.target.value); setCustomError(null); }} className="h-9 text-xs rounded-lg" />
-            </div>
-            <span className="text-xs text-muted-foreground pb-2">to</span>
-            <div className="flex-1">
-              <Input type="date" value={customTo} onChange={e => { setCustomTo(e.target.value); setCustomError(null); }} className="h-9 text-xs rounded-lg" />
-            </div>
-            <Button size="sm" className="h-9 text-xs rounded-lg" onClick={handleCustom}>Apply</Button>
+          <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+            <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+              <span className="block">Start date</span>
+              <Input
+                type="date"
+                value={customFrom}
+                aria-invalid={!!customError}
+                onChange={e => { setCustomFrom(e.target.value); setCustomError(null); }}
+                className="min-h-12 min-w-0 max-w-full rounded-lg text-base sm:min-h-10 sm:text-sm"
+              />
+            </label>
+            <label className="min-w-0 space-y-1 text-xs font-medium text-muted-foreground">
+              <span className="block">End date</span>
+              <Input
+                type="date"
+                value={customTo}
+                aria-invalid={!!customError}
+                onChange={e => { setCustomTo(e.target.value); setCustomError(null); }}
+                className="min-h-12 min-w-0 max-w-full rounded-lg text-base sm:min-h-10 sm:text-sm"
+              />
+            </label>
+            <Button type="button" className="min-h-12 rounded-lg sm:min-h-10" onClick={handleCustom}>Apply</Button>
           </div>
           {customError && (
-            <p className="text-[11px] text-destructive font-medium">{customError}</p>
+            <p role="alert" className="text-[11px] font-medium text-destructive">{customError}</p>
           )}
         </div>
       )}
