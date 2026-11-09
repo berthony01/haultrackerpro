@@ -3,19 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useTargetUserId } from '@/hooks/useActingContext';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { getEffectiveDate } from '@/lib/loadEffectiveDate';
 
-export type Load = Tables<'loads'>;
+export type Load = Tables<'loads'> & { actual_delivery_date?: string | null; dispatch_company_name?: string | null };
 // `estimated_pay` is now app-written (no longer a DB-generated column) so the
 // pay-model engine (computeLoadPay) can persist correct values for flat_rate,
 // total_miles, loaded_plus_deadhead, and manual loads. Keep it optional on
 // insert/update so callers that don't compute it (legacy paths) still work.
 export type LoadInsert = Omit<TablesInsert<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at' | 'gross_revenue'> & { estimated_pay?: number | null; gross_revenue?: number | null; dropoff_date?: string | null; invoice_submitted_date?: string | null; pod_submitted_date?: string | null; payment_due_date?: string | null; paid_date?: string | null; short_paid_amount?: number | null; payment_status?: string; payment_notes?: string | null };
 export type LoadUpdate = Omit<TablesUpdate<'loads'>, 'user_id' | 'id' | 'created_at' | 'updated_at'> & { estimated_pay?: number | null; dropoff_date?: string | null; invoice_submitted_date?: string | null; pod_submitted_date?: string | null; payment_due_date?: string | null; paid_date?: string | null; short_paid_amount?: number | null; payment_status?: string; payment_notes?: string | null };
-
-/** Canonical period date: drop-off first, pickup fallback */
-function getEffectiveDate(load: Load): string {
-  return load.dropoff_date ?? load.load_date;
-}
 
 interface DateRange {
   from?: string;
@@ -24,48 +20,25 @@ interface DateRange {
 
 const PAGE_SIZE = 50;
 
-/**
- * Build a Supabase `.or()` filter so the server returns any load whose
- * load_date OR dropoff_date falls inside the requested window. Previously
- * we filtered only on load_date, which silently dropped loads picked up
- * before the window but delivered inside it.
- */
-function buildEffectiveDateOr(from?: string, to?: string): string | null {
-  const loadParts: string[] = [];
-  const dropParts: string[] = [];
-  if (from) {
-    loadParts.push(`load_date.gte.${from}`);
-    dropParts.push(`dropoff_date.gte.${from}`);
-  }
-  if (to) {
-    loadParts.push(`load_date.lte.${to}`);
-    dropParts.push(`dropoff_date.lte.${to}`);
-  }
-  if (loadParts.length === 0) return null;
-  const loadClause = loadParts.length > 1 ? `and(${loadParts.join(',')})` : loadParts[0];
-  const dropClause = dropParts.length > 1 ? `and(${dropParts.join(',')})` : dropParts[0];
-  return `${loadClause},${dropClause}`;
-}
+type DriverLoadsRpc = (fn: 'driver_loads_page', args: { _driver_user_id: string; _from: string | null; _to: string | null; _offset: number; _limit: number }) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>;
+const readDriverLoads = supabase.rpc.bind(supabase) as unknown as DriverLoadsRpc;
 
-export function useLoads(dateRange?: DateRange, page?: number) {
+export function useLoads(dateRange?: DateRange, page?: number, options?: { enabled?: boolean; watchDispatch?: boolean }) {
   const { user } = useAuth();
   const targetUserId = useTargetUserId();
   const queryClient = useQueryClient();
 
   const loadsQuery = useQuery({
-    queryKey: ['loads', targetUserId, dateRange?.from, dateRange?.to, page],
+    queryKey: ['loads', user?.id, targetUserId, dateRange?.from, dateRange?.to, page],
     queryFn: async () => {
       if (!targetUserId) return { loads: [], totalCount: 0 };
 
-      const buildQuery = () => {
-        let q = supabase
-          .from('loads')
-          .select('*', { count: 'exact' })
-          .eq('user_id', targetUserId)
-          .order('load_date', { ascending: false });
-        const orFilter = buildEffectiveDateOr(dateRange?.from, dateRange?.to);
-        if (orFilter) q = q.or(orFilter);
-        return q;
+      const readPage = async (offset: number, limit: number) => {
+        const { data, error } = await readDriverLoads('driver_loads_page', { _driver_user_id: targetUserId, _from: dateRange?.from ?? null, _to: dateRange?.to ?? null, _offset: offset, _limit: limit });
+        if (error) throw error;
+        const result = data as { loads?: Load[]; totalCount?: number } | null;
+        if (!result || !Array.isArray(result.loads) || !Number.isInteger(result.totalCount) || result.totalCount! < 0) throw new Error('Load refresh was not confirmed.');
+        return { loads: result.loads, count: result.totalCount! };
       };
 
       let rawData: Load[] = [];
@@ -73,21 +46,17 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
       if (page !== undefined) {
         const fromIdx = page * PAGE_SIZE;
-        const toIdx = fromIdx + PAGE_SIZE - 1;
-        const { data, error, count: c } = await buildQuery().range(fromIdx, toIdx);
-        if (error) throw error;
-        rawData = (data ?? []) as Load[];
-        count = c;
+        const result = await readPage(fromIdx, PAGE_SIZE);
+        rawData = result.loads;
+        count = result.count;
       } else {
         const FETCH_SIZE = 1000;
         let offset = 0;
         for (let i = 0; i < 50; i++) {
-          const { data, error, count: c } = await buildQuery().range(offset, offset + FETCH_SIZE - 1);
-          if (error) throw error;
-          const batch = (data ?? []) as Load[];
+          const { loads: batch, count: c } = await readPage(offset, FETCH_SIZE);
           rawData.push(...batch);
           if (typeof c === 'number') count = c;
-          if (batch.length < FETCH_SIZE) break;
+          if (batch.length < FETCH_SIZE || rawData.length >= c) break;
           offset += FETCH_SIZE;
         }
       }
@@ -103,7 +72,13 @@ export function useLoads(dateRange?: DateRange, page?: number) {
 
       return { loads: filtered, totalCount: count ?? filtered.length };
     },
-    enabled: !!targetUserId,
+    enabled: !!user?.id && !!targetUserId && options?.enabled !== false,
+    // Cross-account dispatch changes reach an already open driver dashboard.
+    // Background reads retain same-scope data and pause while the tab is hidden.
+    refetchInterval: options?.watchDispatch && user?.id === targetUserId ? 15_000 : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 
   const addLoad = useMutation({
@@ -121,13 +96,20 @@ export function useLoads(dateRange?: DateRange, page?: number) {
   });
 
   const updateLoad = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: LoadUpdate }) => {
+    mutationFn: async ({ id, data, expectedStatus }: { id: string; data: LoadUpdate; expectedStatus?: string }) => {
       if (!targetUserId) throw new Error('Not authenticated');
-      const { error } = await supabase
+      const update = supabase
         .from('loads')
         .update(data)
         .eq('id', id)
         .eq('user_id', targetUserId);
+      if (expectedStatus !== undefined) {
+        const { data: changed, error } = await update.eq('status', expectedStatus).select('id').maybeSingle();
+        if (error) throw error;
+        if (!changed) throw new Error('The load status changed. Reopen the load before updating its status.');
+        return;
+      }
+      const { error } = await update;
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['loads'] }),
@@ -148,9 +130,11 @@ export function useLoads(dateRange?: DateRange, page?: number) {
   });
 
   return {
-    loads: loadsQuery.data?.loads ?? [],
-    totalCount: loadsQuery.data?.totalCount ?? 0,
+    loads: (loadsQuery.error as { code?: string } | null)?.code === '42501' ? [] : loadsQuery.data?.loads ?? [],
+    totalCount: (loadsQuery.error as { code?: string } | null)?.code === '42501' ? 0 : loadsQuery.data?.totalCount ?? 0,
     isLoading: loadsQuery.isLoading,
+    error: loadsQuery.error,
+    refetch: loadsQuery.refetch,
     addLoad,
     updateLoad,
     deleteLoad,

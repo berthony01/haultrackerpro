@@ -91,6 +91,8 @@ const AgencyInviteAccept = lazy(() => import("./pages/AgencyInviteAccept"));
 const AgencyRequestPublic = lazy(() => import("./pages/AgencyRequestPublic"));
 const DriverDelegationApprovals = lazy(() => import("./pages/DriverDelegationApprovals"));
 const DriverAssistantControl = lazy(() => import("./pages/DriverAssistantControl"));
+const DispatchDashboard = lazy(() => import("./pages/DispatchDashboard"));
+const DriverCompanyConnections = lazy(() => import("./pages/DriverCompanyConnections"));
 const DriverWorkItems = lazy(() => import("./pages/DriverWorkItems"));
 const AgencySlugRedirect = lazy(() => import("./pages/AgencySlugRedirect"));
 const AssistantsAgencies = lazy(() => import("./pages/AssistantsAgencies"));
@@ -337,6 +339,8 @@ const App = () => (
               <Route path="/agency/request/:agencyId" element={<AgencyRequestPublic />} />
               <Route path="/driver/agency-approvals" element={<ProtectedRoute><DriverDelegationApprovals /></ProtectedRoute>} />
               <Route path="/driver/assistant-control" element={<ProtectedRoute><DriverAssistantControl /></ProtectedRoute>} />
+              <Route path="/dispatch" element={<ProtectedRoute><DispatchDashboard /></ProtectedRoute>} />
+              <Route path="/driver/company-connections" element={<ProtectedRoute><DriverCompanyConnections /></ProtectedRoute>} />
               <Route path="/driver/work-items" element={<ProtectedRoute><DriverWorkItems /></ProtectedRoute>} />
               <Route path="/driver/work-items/:id" element={<ProtectedRoute><DriverWorkItems /></ProtectedRoute>} />
               <Route path="/a/:slug" element={<AgencySlugRedirect />} />

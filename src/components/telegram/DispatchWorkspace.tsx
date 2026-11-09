@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, A
 import { DispatchIntent, dispatchMiles, localDispatchDate, validDeliveryDate, type DispatchLoad, type DispatchPage } from '@/lib/dispatchWorkspace';
 import { dispatchRpc, useDispatchWorkspace, type DispatchQuery } from '@/hooks/useDispatchWorkspace';
 import { DispatchLoadForm } from './dispatch/DispatchLoadForm';
+import '@/styles/dispatch-workspace.css';
 
 const money = (n: number | null) => n === null ? 'Not supplied' : Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 const dateLabel = (date: string | null) => date ? `${date.slice(5, 7)}/${date.slice(8, 10)}/${date.slice(0, 4)}` : 'Not supplied';

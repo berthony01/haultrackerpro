@@ -150,6 +150,7 @@ function useCarrierDriverRelationshipMutation<TArgs, TData>(
   return useMutation({
     mutationFn: (args: TArgs) => mutationFn(args),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['company-driver-connections'] });
       queryClient.invalidateQueries({
         queryKey: carrierDriverRelationshipQueryKeys.all,
       });

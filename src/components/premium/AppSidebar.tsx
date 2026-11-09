@@ -42,6 +42,7 @@ const ASSISTANT_ITEM: NavItem = { id: 'nav:haultracker-assistant', label: 'HaulT
 const driverItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'loads', label: 'Loads', icon: Truck },
+  { id: 'nav:company-connections', label: 'Company connections', icon: Handshake, href: '/driver/company-connections' },
   ASSISTANT_ITEM,
   { id: 'opportunities', label: 'Opportunities', icon: BriefcaseBusiness },
   { id: 'nav:conversations', label: 'Conversations', icon: MessageSquare, href: '/conversations?workspace=driver' },
@@ -58,6 +59,7 @@ const driverItems: NavItem[] = [
 
 const recruiterActiveItems: NavItem[] = [
   { id: 'recruiter-access', label: 'Recruiter Command Center', icon: Handshake },
+  { id: 'nav:dispatch', label: 'Dispatch', icon: Truck, href: '/dispatch' },
   { id: 'recruiter-access:manager', label: 'Manage Opportunities', icon: ClipboardList },
   { id: 'recruiter-access:applications', label: 'Applications', icon: Users },
   { id: 'recruiter-access:reports', label: 'Reports', icon: BarChart3 },

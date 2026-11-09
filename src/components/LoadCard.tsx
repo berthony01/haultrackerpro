@@ -66,7 +66,7 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
       return;
     }
     const updates: LoadUpdate = { actual_pay_received: val };
-    if (load.status === 'pending') updates.status = 'completed';
+    if (load.status === 'pending' && !load.carrier_driver_relationship_id) updates.status = 'completed';
     onUpdate?.(load.id, updates);
     setShowPayInput(false);
     setPayValue('');
@@ -83,6 +83,11 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
       data-marker={load.notes ?? ''}
     >
       <CardContent className="p-4">
+        {load.carrier_driver_relationship_id && (
+          <p className="mb-2 break-words text-xs font-semibold text-primary">
+            {load.dispatch_company_name || 'Company assignment'}{load.load_reference ? ' · ' + load.load_reference : ''}
+          </p>
+        )}
         {/* Top meta row */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2 flex-wrap min-w-0">

@@ -15,10 +15,8 @@ import {
   fleetEffectiveRPM,
 } from '@/lib/loadMetrics';
 
-/** Get the effective date for grouping — uses dropoff_date if available, otherwise load_date */
-export function getEffectiveDate(load: Load): string {
-  return (load as any).dropoff_date ?? load.load_date;
-}
+import { getEffectiveDate } from '@/lib/loadEffectiveDate';
+export { getEffectiveDate } from '@/lib/loadEffectiveDate';
 
 /**
  * Phase 29 (legacy/parser-only): Derive the final drop-off date from a raw

@@ -69,7 +69,7 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
       return;
     }
     const updates: LoadUpdate = { actual_pay_received: val };
-    if (load.status === 'pending') updates.status = 'completed';
+    if (load.status === 'pending' && !load.carrier_driver_relationship_id) updates.status = 'completed';
     onUpdate(load.id, updates);
     setEditingPay(false);
     toast.success('Payment recorded');
@@ -99,13 +99,21 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
         </SheetHeader>
 
         <div className="space-y-5 pt-2">
+          {load.carrier_driver_relationship_id && (
+            <p className="break-words text-sm font-semibold text-primary">
+              {load.dispatch_company_name || 'Company assignment'}{load.load_reference ? ' · ' + load.load_reference : ''}
+            </p>
+          )}
           {/* Dates */}
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Calendar className="h-4 w-4" />
-              <span>Drop-off: {format(parseISO(getEffectiveDate(load)), 'EEEE, MMM d, yyyy')}</span>
+              <span>{load.status === 'completed' && load.actual_delivery_date ? 'Actual delivery' : load.dropoff_date ? 'Delivery date' : 'Pickup'}: {format(parseISO(getEffectiveDate(load)), 'EEEE, MMM d, yyyy')}</span>
             </div>
-            {load.dropoff_date && load.dropoff_date !== load.load_date && (
+            {load.status === 'completed' && load.actual_delivery_date && load.dropoff_date && load.dropoff_date !== load.actual_delivery_date && (
+              <p className="pl-6 text-sm text-muted-foreground">Scheduled delivery: {format(parseISO(load.dropoff_date), 'MMM d, yyyy')}</p>
+            )}
+            {getEffectiveDate(load) !== load.load_date && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
                 <span>Pickup: {format(parseISO(load.load_date), 'EEEE, MMM d, yyyy')}</span>

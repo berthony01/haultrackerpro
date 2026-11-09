@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLoads, Load, LoadInsert, LoadUpdate } from '@/hooks/useLoads';
+import { getEffectiveDate } from '@/lib/loadEffectiveDate';
 import SEOHead from '@/components/SEOHead';
 import { useExpenses, ExpenseInsert, Expense } from '@/hooks/useExpenses';
 import { useLoadStops, LoadStopInput } from '@/hooks/useLoadStops';
@@ -58,6 +59,7 @@ const WhatsNewModal = lazy(() => import('@/components/WhatsNewModal').then(m => 
 const DriverContractsView = lazy(() => import('@/components/contracts/DriverContractsView').then(m => ({ default: m.DriverContractsView })));
 const RecruiterContractsView = lazy(() => import('@/components/contracts/RecruiterContractsView').then(m => ({ default: m.RecruiterContractsView })));
 const DriverSettlementsView = lazy(() => import('@/components/settlements/DriverSettlementsView').then(m => ({ default: m.DriverSettlementsView })));
+const DriverCompanyConnectionNotice = lazy(() => import('@/components/dispatch/CompanyDriverConnectionsPanel').then(m => ({ default: m.DriverCompanyConnectionNotice })));
 import { ContractActionsCard } from '@/components/contracts/ContractActionsCard';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import AssistantBlockedNotice from '@/components/assistants/AssistantBlockedNotice';
@@ -185,17 +187,20 @@ const Index = () => {
     setShowWhatsNew(false);
   };
 
-  const allLoadsQuery = useLoads();
+  const allLoadsQuery = useLoads(undefined, undefined, {
+    enabled: !workspaceLoading && !workspaceError && effectiveRole === 'driver',
+    watchDispatch: !isActingAsAssistant,
+  });
   const { addLoad, updateLoad, deleteLoad } = allLoadsQuery;
 
   // Client-side effective-date filter for the Loads list view.
-  // Effective date = dropoff_date ?? load_date (matches useLoads contract).
+  // Match the driver report date, including confirmed Dispatch delivery.
   // from/to are inclusive ISO yyyy-mm-dd strings; invalid/missing dates are skipped.
   const filteredLoadsForList = useMemo(() => {
     const { from, to } = dateRange;
     if (!from && !to) return allLoadsQuery.loads;
     return allLoadsQuery.loads.filter((l) => {
-      const eff = l.dropoff_date ?? l.load_date;
+      const eff = getEffectiveDate(l);
       if (!eff) return false;
       if (from && eff < from) return false;
       if (to && eff > to) return false;
@@ -634,7 +639,15 @@ const Index = () => {
 
   const handleUpdateLoad = (data: LoadInsert, stops?: LoadStopInput[]) => {
     if (!editingLoad) return;
-    updateLoad.mutate({ id: editingLoad.id, data }, {
+    const update: LoadUpdate = { ...data };
+    let expectedStatus: string | undefined;
+    if (editingLoad.carrier_driver_relationship_id) {
+      // A pay or route edit must not overwrite a Dispatch status change
+      // made while the driver had this form open.
+      if (update.status === editingLoad.status) delete update.status;
+      else if (update.status !== undefined) expectedStatus = editingLoad.status;
+    }
+    updateLoad.mutate({ id: editingLoad.id, data: update, expectedStatus }, {
       onSuccess: () => {
         loadStopsHook.saveStopsForLoad.mutate({ loadId: editingLoad.id, stops: stops ?? [] });
         toast.success('Load updated!');
@@ -673,6 +686,9 @@ const Index = () => {
       id: '',
       load_date: today,
       dropoff_date: today,
+      actual_delivery_date: null,
+      dispatch_company_name: null,
+      carrier_driver_relationship_id: null,
       actual_pay_received: null,
       status: 'pending',
     };
@@ -1136,6 +1152,15 @@ const Index = () => {
           <ViewFallback />
         ) : (
           <>
+        {!isRecruiterView && allLoadsQuery.error && (
+          <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-card p-3 text-sm">
+            <p>{allLoadsQuery.loads.length ? 'Load refresh failed. Showing the last available data.' : 'Loads could not be refreshed.'}</p>
+            <Button variant="outline" className="min-h-11" onClick={() => void allLoadsQuery.refetch()}>Refresh loads</Button>
+          </div>
+        )}
+        {page === 'dashboard' && effectiveRole === 'driver' && !isActingAsAssistant && (
+          <Suspense fallback={null}><DriverCompanyConnectionNotice /></Suspense>
+        )}
         {/* Smart Reminders */}
         {!showOnboarding && page === 'dashboard' && !isRecruiterView && (
           <div className="mb-4">
