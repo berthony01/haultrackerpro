@@ -17,12 +17,14 @@ test('public recruiter landing and business guide at narrow mobile widths', asyn
     await expect(page.getByRole('heading', { name: /Recruit Drivers Through a/i })).toBeVisible();
     await expect(page.getByText('1 active opportunity, unlimited drafts')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Read the Recruiter Business Starter Guide' })).toBeVisible();
+    await page.screenshot({ path: `test-results/recruiter-landing-${width}.png`, fullPage: true, animations: 'disabled' });
     await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
     await page.getByRole('button', { name: 'Read the Recruiter Business Starter Guide' }).click();
     await expect(page).toHaveURL(/\/recruiter\/guide$/);
     await expect(page.getByRole('heading', { name: 'Start an independent trucking recruiting business' })).toBeVisible();
     await expect(page.getByText(/Carrier-client invoicing, commissions, and actual payment take place outside the platform/)).toBeVisible();
+    await page.screenshot({ path: `test-results/recruiter-guide-${width}.png`, fullPage: true, animations: 'disabled' });
     await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   }
 });

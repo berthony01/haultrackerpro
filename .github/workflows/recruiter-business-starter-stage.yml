@@ -43,11 +43,11 @@ jobs:
             sleep 1
           done
           bunx playwright test tests/e2e/recruiter-business-starter-public.spec.ts --project=desktop
-      - name: Upload failure evidence
-        if: failure()
+      - name: Upload browser screenshots and failure evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: recruiter-business-starter-playwright-evidence
+          name: recruiter-business-starter-public-mobile-evidence
           path: |
             test-results/
             playwright-report/
