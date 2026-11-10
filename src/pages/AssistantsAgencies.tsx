@@ -22,6 +22,14 @@ const faqs = [
     a: 'Yes. Driver Assistants can help one or more drivers with load entry, expenses, fuel logs, reports, and basic account organization — but only after the driver explicitly approves their access and chooses which permissions to grant.',
   },
   {
+    q: 'Who pays for direct Driver Assistant access?',
+    a: 'The invited assistant pays no HaulTracker Pro assistant fee. Direct assistant access requires the inviting driver to have an active Driver Pro plan and approve the specific permissions. Paid agency delegation follows separate agency billing and driver-approved permissions.',
+  },
+  {
+    q: 'Can an agency subscription dispatch loads for another carrier automatically?',
+    a: 'No. An Agency Workspace subscription does not automatically grant access to another carrier\'s Dispatch workspace. Company dispatching requires separate authorized company access, appropriate staff permissions, and accepted carrier-driver connections. The Agency Console focuses on driver-approved back-office services.',
+  },
+  {
     q: 'Can I start a back-office agency with HaulTracker Pro?',
     a: 'Yes. Create an Agency Workspace, publish service packages, share your private agency request link with drivers, and manage approved driver clients from a shared work queue. This is an opportunity to build a back-office side hustle — it is not a guarantee of clients or income.',
   },
