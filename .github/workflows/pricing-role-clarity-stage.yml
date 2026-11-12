@@ -7,6 +7,7 @@ on:
       - 'src/pages/AssistantsAgencies.tsx'
       - 'src/lib/agencyPlans.ts'
       - 'src/test/pricingRoleClarityCopy.test.ts'
+      - 'src/test/pricingStripeMappingParity.test.ts'
       - '.github/workflows/pricing-role-clarity-stage.yml'
 
 permissions:
@@ -27,6 +28,8 @@ jobs:
           bun-version: '1.3.14'
       - run: bun install --frozen-lockfile
       - run: bun run test src/test/pricingRoleClarityCopy.test.ts src/test/phase1mPricingArchitecture.test.tsx
+      - name: Checkout/webhook price environment key contract (no network)
+        run: bunx vitest run src/test/pricingStripeMappingParity.test.ts
       - name: Expanded role, entitlement, and checkout regression (isolated; no live Stripe)
         run: |
           bunx vitest run \
