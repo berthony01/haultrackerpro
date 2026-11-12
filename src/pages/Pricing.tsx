@@ -48,8 +48,8 @@ const AUDIENCE_LABEL: Record<Audience, string> = {
 const AUDIENCE_DESCRIPTION: Record<Audience, string> = {
   driver: 'Track loads, expenses, profit, taxes, and business performance.',
   recruiter:
-    'Post opportunities and manage applicants, contracts, referrals, and hiring performance.',
-  agency: 'Assist drivers individually or run a multi-client agency.',
+    'Manage recruiting, applicant pipelines, contracts, and authorized company dispatch.',
+  agency: 'Support approved drivers or run a multi-client back-office business.',
 };
 
 function isAudience(value: unknown): value is Audience {
@@ -923,6 +923,12 @@ function RecruiterView({
             listings is a separate trust-display review.
 
           </p>
+          <p className="mt-3 text-xs sm:text-sm max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
+            Company Dispatch is an authorized company-workspace capability, not a separate
+            subscription tier. Access depends on company eligibility, staff permissions, and
+            driver-approved company connections. A recruiter plan does not grant access to
+            another company's loads.
+          </p>
         </div>
 
         {/* Recruiter Standard — foundational free callout */}
@@ -1170,8 +1176,9 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
             className="mt-3 text-sm sm:text-base max-w-2xl mx-auto"
             style={{ color: 'hsl(220, 10%, 60%)' }}
           >
-            Helping a driver through an approved invitation is free. Paid Agency Workspace plans
-            are for managing clients, team members, service packages, requests, and shared work.
+            Driver Assistants pay no assistant subscription fee. Direct assistant access requires
+            the inviting driver's Pro plan and approval. Paid Agency Workspace plans support
+            authorized driver clients, team members, service packages, requests, and shared work.
           </p>
         </div>
 
@@ -1240,6 +1247,10 @@ function AgencyView({ navigate }: { navigate: (path: string) => void }) {
             Multi-client back-office plans. Agency subscriptions are live and billed through Stripe —
             that subscription pays HaulTracker Pro for software access only. HaulTracker Pro does not
             process service payments between an agency and its driver clients.
+          </p>
+          <p className="text-sm mt-2" style={{ color: 'hsl(220, 10%, 60%)' }}>
+            Agency subscriptions do not automatically grant access to a carrier's Dispatch
+            workspace. The carrier separately controls company permissions and driver connections.
           </p>
 
         </div>

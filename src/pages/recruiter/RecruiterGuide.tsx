@@ -21,6 +21,14 @@ const steps = [
 
 ];
 
+const businessStarterSteps = [
+  { title: 'Prepare your business', detail: 'Choose Independent Recruiter, Third-Party Recruiting Company, or Staffing Agency when appropriate. Check applicable state or local business and recruiting requirements. An account on HaulTrackerPro is not a business license.' },
+  { title: 'Obtain carrier authorization', detail: 'Find a legitimate carrier needing drivers. Arrange an authorized hiring request and written agreement on recruiting fees and payment outside HaulTrackerPro. Existing recruiter contract tools apply to driver-facing contracts, not carrier-client service agreements.' },
+  { title: 'Post a real opportunity', detail: 'Complete your recruiter profile and accept the current posting terms. The free tier has 1 active listing at a time and unlimited drafts; paid tiers increase active limits.' },
+  { title: 'Manage driver applications', detail: 'Review applicants inside your pipeline. Request contact information through the consent-based workflow. Do not disclose private driver contact details without permission.' },
+  { title: 'Coordinate placements and external payment', detail: 'The carrier makes its hiring decision. Carrier-client invoicing, commissions, and actual payment take place outside the platform; dedicated carrier-client CRM and commission management are not yet available.' },
+];
+
 const tips = [
   'Be specific about pay — drivers convert better on transparent CPM, deductions, and home-time than on vague "up to $X" claims.',
   'Respond fast. Response time is one of the biggest drivers of conversion across the pipeline.',
@@ -70,6 +78,29 @@ export default function RecruiterGuide() {
           </h1>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">
             From workspace setup to hired driver — a clear walkthrough of how to use HaulTrackerPro as a recruiter.
+          </p>
+        </div>
+      </section>
+
+      <section id="business-starter" className="border-b border-border bg-muted/30">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+          <h2 className="text-2xl sm:text-3xl font-black font-heading mb-3">Start an independent trucking recruiting business</h2>
+          <p className="text-sm sm:text-base text-muted-foreground mb-7">
+            You do not need to own trucks to use an Independent Recruiter workspace. Follow these steps, and note which business operations still happen outside HaulTrackerPro.
+          </p>
+          <ol className="space-y-3">
+            {businessStarterSteps.map((step, index) => (
+              <li key={step.title} className="rounded-xl border border-border bg-card p-4 sm:p-5 flex gap-4">
+                <span className="text-primary font-bold shrink-0">{index + 1}.</span>
+                <div>
+                  <h3 className="font-bold mb-1">{step.title}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{step.detail}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="text-sm text-muted-foreground mt-5">
+            A recruiter workspace does not guarantee carrier clients, placements, income, or compliance with local requirements.
           </p>
         </div>
       </section>
