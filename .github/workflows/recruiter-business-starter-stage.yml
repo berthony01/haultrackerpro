@@ -47,7 +47,7 @@ jobs:
         run: bun run build
       - name: Install headless browser
         run: bunx playwright install --with-deps chromium
-      - name: Run public-only mobile smoke test
+      - name: Run public recruiter and pricing 320/375px mobile smoke tests
         run: |
           bun run preview -- --host 127.0.0.1 --port 4173 > /tmp/htp-recruiter-stage-preview.log 2>&1 &
           for i in $(seq 1 30); do
