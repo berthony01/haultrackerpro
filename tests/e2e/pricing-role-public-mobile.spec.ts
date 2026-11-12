@@ -13,9 +13,24 @@ test('driver, recruiter, and agency pricing are readable at 320 and 375 px', asy
   });
 
   const assertNoPageOverflow = async () => {
-    await expect.poll(async () => page.evaluate(
-      () => document.documentElement.scrollWidth <= window.innerWidth,
-    )).toBe(true);
+    const measurements = await page.evaluate(() => {
+      const viewport = window.innerWidth;
+      const pageWidth = document.documentElement.scrollWidth;
+      const offenders = Array.from(document.querySelectorAll<HTMLElement>('body *'))
+        .map(el => ({ el, rect: el.getBoundingClientRect() }))
+        .filter(({ rect }) => rect.width > 0 && rect.right > viewport + 1)
+        .sort((a, b) => b.rect.right - a.rect.right)
+        .slice(0, 12)
+        .map(({ el, rect }) => ({
+          tag: el.tagName.toLowerCase(),
+          css: typeof el.className === 'string' ? el.className.slice(0, 100) : '',
+          right: Math.round(rect.right),
+          width: Math.round(rect.width),
+          text: el.textContent?.trim().slice(0, 60),
+        }));
+      return { viewport, pageWidth, offenders };
+    });
+    expect(measurements.pageWidth, JSON.stringify(measurements)).toBeLessThanOrEqual(measurements.viewport);
   };
 
   for (const width of [320, 375]) {
