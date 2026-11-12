@@ -243,7 +243,7 @@ describe('Phase 1J-D2A — RecruiterLanding separates Fleet current from future 
       </HelmetProvider>,
     );
 
-    expect(screen.getAllByText(/Available Now/i).length).toBeGreaterThanOrEqual(4);
+    expect(screen.getAllByText(/Available Now/i).length).toBeGreaterThanOrEqual(3);
     expect(screen.getAllByText(/Coming Soon/i).length).toBeGreaterThanOrEqual(1);
 
     for (const item of [
@@ -348,35 +348,20 @@ describe('Phase 1J-D2A — Recruiters.tsx plan preview truth', () => {
     expect(src).toMatch(/Recruiter Standard/);
   });
 
-  it('Fleet tagline names all four coming-soon items', () => {
+  it('Fleet plan preview accurately states existing-only access and excludes unshipped tools', () => {
     const fleetTagline = src.match(/name:\s*'Fleet'[\s\S]{0,400}?tagline:\s*'([^']+)'/);
     expect(fleetTagline, 'Fleet plan entry with tagline must exist in Recruiters.tsx').not.toBeNull();
     const tagline = fleetTagline![1];
-    for (const item of [
-      'Team seats',
-      'Bulk opportunity tools',
-      'Custom recruiter profile',
-      'Company-level hiring dashboard',
+    expect(tagline).toMatch(/Up to 25 active opportunities/i);
+    expect(tagline).toMatch(/existing or included Fleet access/i);
+    expect(tagline).toMatch(/New standalone Fleet checkout unavailable/i);
+    // These planned features must never appear as benefits available in the teaser.
+    for (const futureFeature of [
+      'Team seats', 'Bulk opportunity tools', 'Custom recruiter profile',
+      'Company-level hiring dashboard', 'Advanced analytics',
     ]) {
-      expect(
-        new RegExp(item, 'i').test(tagline),
-        `Fleet tagline must explicitly name "${item}". Actual: ${tagline}`,
-      ).toBe(true);
+      expect(tagline).not.toMatch(new RegExp(futureFeature, 'i'));
     }
-  });
-
-  it('Fleet tagline distinguishes today from coming soon and avoids vague/false claims', () => {
-    const fleetTagline = src.match(/name:\s*'Fleet'[\s\S]{0,400}?tagline:\s*'([^']+)'/)![1];
-    expect(/today/i.test(fleetTagline), 'Fleet tagline must mark current features with "today".').toBe(true);
-    expect(/coming soon/i.test(fleetTagline), 'Fleet tagline must mark future features with "coming soon".').toBe(true);
-    expect(
-      /&\s*more\s+coming\s+soon/i.test(fleetTagline),
-      'Fleet tagline must not use the vague "& more coming soon" phrase.',
-    ).toBe(false);
-    expect(
-      /Advanced analytics/i.test(fleetTagline),
-      'Fleet tagline must not claim "Advanced analytics".',
-    ).toBe(false);
   });
 });
 

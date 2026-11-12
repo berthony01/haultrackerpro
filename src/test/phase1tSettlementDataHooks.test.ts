@@ -479,18 +479,19 @@ describe('E. relationship mutation hooks map to the exact service function', () 
 
 describe('F. relationship invalidation contract', () => {
   it.each(relationshipCases.map((c) => [c.name, c] as const))(
-    '%s invalidates both roots on success',
+    '%s invalidates company connections, relationships and settlements on success',
     async (_name, testCase) => {
       const client = makeClient();
       const spy = vi.mocked(testCase.spy() as ReturnType<typeof vi.fn>);
       spy.mockResolvedValue('ok');
       const invalidate = vi.spyOn(client, 'invalidateQueries');
       await testCase.run(client);
-      expect(invalidate).toHaveBeenCalledTimes(2);
-      expect(invalidate).toHaveBeenNthCalledWith(1, {
+      expect(invalidate).toHaveBeenCalledTimes(3);
+      expect(invalidate).toHaveBeenNthCalledWith(1, { queryKey: ['company-driver-connections'] });
+      expect(invalidate).toHaveBeenNthCalledWith(2, {
         queryKey: ['carrier-driver-relationships'],
       });
-      expect(invalidate).toHaveBeenNthCalledWith(2, { queryKey: ['settlements'] });
+      expect(invalidate).toHaveBeenNthCalledWith(3, { queryKey: ['settlements'] });
     },
   );
 
