@@ -17,7 +17,7 @@ Date: 2026-11-12. Status: **RELEASE HOLD**. This document is a checkpoint, not a
 
 ## Release-blocking acceptance gates
 1. Run integrated candidate CI; all pricing/role, driver finance, public mobile and PostgreSQL jobs must pass on this branch's **same head SHA**.
-2. Confirm Lovable preview/published build version parity. Published dashboard rendered -100% for a zero-to-zero week; Main logic correctly returns null. Repeat after an actual release candidate staging deployment or identify stale build/cache. Do not publish misleading trends.
+2. Confirm staged and published build identities at release time. The earlier published -100% dashboard screenshot is explained by one completed dispatch load with a November 1 actual-delivery event in the previous week and no completed loads this week. The displayed week-over-week declines are valid. Retain zero-denominator trend tests as protection against future misleading calculations; do not misclassify this account's real previous-week decline.
 3. Authenticated positive and **negative** permission tests on this combined candidate for owner, Free/Pro Driver, Recruiter, Recruiter Staff, Driver Assistant, Agency owner/member and authorized Company Dispatcher, including 320/375 px, refresh/back, and unauthorized access.
 4. Lovable's enabled Stripe integration: verify deployed LIVE environment Price IDs against actual Stripe Product/Price catalog, billing intervals, currency and entitlement effects. Test-mode payment workflow only if the owner authorizes. Never perform an unapproved real charge.
 5. Telegram and dispatch production acceptance: group binding and permissions, intake/posting, review, Cancel/Delivered, driver-ledger propagation, Mini App reliability, response time and idempotence. Historical update receipts alone are not a fresh E2E acceptance test.
@@ -30,7 +30,7 @@ Date: 2026-11-12. Status: **RELEASE HOLD**. This document is a checkpoint, not a
 - Grandfathered manual-beta agency billing selector now defaults to its current plan with optional-checkout copy.
 - Unfinished loads no longer trigger completed-load payment/profit alerts.
 - Driver dashboard Actual Earnings empty state explicitly refers to selected date period.
-- Zero-baseline -100% is **not yet confirmed fixed on published site**; unit/render tests prove only candidate code path.
+- The prior live -100% dashboard trend is **correct**, not a defect: read-only dispatch event history gives one completed load in Nov 1–7 ($27.50 actual pay recorded), zero in Nov 8–14. This corrects an earlier audit error. Zero-baseline unit/render tests remain preventive regressions only.
 
 ## Safety / no surprises
 - NO owner password or role reset, customer account creation, subscription, checkout session, plan change, posting terms acceptance, real load edit, database mutation, or automatic rollout.
