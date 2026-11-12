@@ -1128,7 +1128,7 @@ function RecruiterView({
           <Button
             onClick={onWorkspace}
             size="lg"
-            className="text-base font-bold rounded-xl h-12 px-8 gap-2"
+            className="w-full sm:w-auto max-w-full min-w-0 whitespace-normal text-center text-sm sm:text-base font-bold rounded-xl min-h-12 h-auto px-3 sm:px-8 py-3 gap-2"
             style={{
               background: 'hsl(25, 95%, 53%)',
               color: 'hsl(0, 0%, 100%)',
