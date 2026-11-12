@@ -27,4 +27,22 @@ jobs:
           bun-version: '1.3.14'
       - run: bun install --frozen-lockfile
       - run: bun run test src/test/pricingRoleClarityCopy.test.ts src/test/phase1mPricingArchitecture.test.tsx
+      - name: Expanded role, entitlement, and checkout regression (isolated; no live Stripe)
+        run: |
+          bunx vitest run \
+            src/test/phase1rE1PricingEntitlementAlignment.test.ts \
+            src/test/phase1sA1PricingTruthAcceptance.test.ts \
+            src/test/phase1sA2AgencyPaidPlanEnforcement.test.ts \
+            src/test/phase1rD1AgencyCheckoutOrchestrator.test.ts \
+            src/test/phase1rD1BusinessCheckoutGuard.test.ts \
+            src/test/phase1rD2B3BusinessCheckoutIntegration.test.ts \
+            src/test/phase1rD2B6B1RecruiterCheckoutEligibilityAlignment.test.ts \
+            src/test/phase8AgencyStripe.test.ts \
+            src/test/phaseDA1DriverAssistantHardening.test.ts \
+            src/test/phaseRC1BRecruiterStaffPermissionContract.test.ts \
+            src/test/companyDispatchWorkflow.test.tsx \
+            src/test/dispatchWorkspace.test.ts \
+            src/test/phaseTG2E3O4OwnerQaAgencyBillingSafety.test.tsx \
+            src/test/phaseTG2E3OOwnerQaPersona.test.tsx \
+            src/test/phase1aDriverBillingResolution.test.ts
       - run: bun run build
