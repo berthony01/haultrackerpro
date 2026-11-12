@@ -1,0 +1,67 @@
+name: Launch candidate comprehensive regression and public version audit
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'supabase/**'
+      - 'tests/**'
+      - 'docs/launch-readiness-2026-11-12.md'
+      - '.github/workflows/launch-candidate-full-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  full-app-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      VITE_SUPABASE_URL: http://127.0.0.1:65432
+      VITE_SUPABASE_PUBLISHABLE_KEY: synthetic-staging-only
+      VITE_SUPABASE_PROJECT_ID: isolated-stage-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - run: bun install --frozen-lockfile
+      - name: Check frontend and build TypeScript
+        run: |
+          bunx tsc -p tsconfig.app.json --noEmit
+          bunx tsc -p tsconfig.node.json --noEmit
+      - name: Run complete isolated Vitest suite
+        run: bun run test
+      - name: Build launch candidate
+        run: bun run build
+
+  read-only-published-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch public build fingerprint without credentials
+        shell: bash
+        env:
+          CURRENT_MAIN_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 2 --max-time 20 \
+            -H 'Cache-Control: no-cache' \
+            "https://haultrackerpro.com/version.json?qa-run=${{ github.run_id }}" \
+            --output /tmp/htp-live-version.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const v = JSON.parse(fs.readFileSync('/tmp/htp-live-version.json', 'utf8'));
+          if (v.app !== 'haultrackerpro' || !/^[0-9a-f]{40}$/i.test(v.sha)) {
+            console.error('Published site does not expose a verifiable HaulTracker Pro build SHA.');
+            process.exit(1);
+          }
+          console.log('PUBLISHED_BUILD_SHA=' + v.sha);
+          console.log('PUBLISHED_BUILT_AT=' + v.builtAt);
+          console.log('MAIN_BRANCH_SHA=' + process.env.CURRENT_MAIN_SHA);
+          if (v.sha !== process.env.CURRENT_MAIN_SHA) {
+            console.log('NOTICE: Published build differs from current Main. Investigate release/version and browser cache before treating Main regression fixes as deployed.');
+          } else {
+            console.log('PASS: Published build matches current Main commit.');
+          }
+          NODE
