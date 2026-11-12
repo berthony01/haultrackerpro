@@ -1,0 +1,36 @@
+name: Driver financial dashboard stabilization
+
+on:
+  pull_request:
+    paths:
+      - 'src/hooks/useSmartAlerts.ts'
+      - 'src/lib/financialCalculations.ts'
+      - 'src/components/DashboardView.tsx'
+      - 'src/components/premium/PremiumKpiCard.tsx'
+      - 'src/test/driverFinancialAlertEligibility.test.ts'
+      - 'src/test/driverZeroBaselineTrendRendering.test.tsx'
+      - '.github/workflows/driver-financial-stabilization.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  driver-financial-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: http://127.0.0.1:65432
+      VITE_SUPABASE_PUBLISHABLE_KEY: synthetic-staging-only
+      VITE_SUPABASE_PROJECT_ID: isolated-stage-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.14'
+      - run: bun install --frozen-lockfile
+      - name: Completed-load payment and financial alert regressions
+        run: bunx vitest run src/test/driverFinancialAlertEligibility.test.ts src/test/financialConsistency.test.ts
+      - name: Zero-baseline dashboard financial presentation
+        run: bunx vitest run src/test/driverZeroBaselineTrendRendering.test.tsx src/test/dashboardTrendPct.test.ts src/test/dashboardDateRangeParity.test.ts
+      - name: Build all application routes
+        run: bun run build
