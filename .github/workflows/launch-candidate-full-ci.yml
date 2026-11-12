@@ -20,12 +20,22 @@ jobs:
       VITE_SUPABASE_URL: http://127.0.0.1:65432
       VITE_SUPABASE_PUBLISHABLE_KEY: synthetic-staging-only
       VITE_SUPABASE_PROJECT_ID: isolated-stage-only
+      HTP_TEST_POSTGRES_BINDIR: /usr/lib/postgresql/16/bin
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.3.14'
       - run: bun install --frozen-lockfile
+      - name: Prepare native PostgreSQL 16 for isolated SQL integration tests
+        run: |
+          if [ ! -x /usr/lib/postgresql/16/bin/postgres ]; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y postgresql-16
+          fi
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
       - name: Check frontend and build TypeScript
         run: |
           bunx tsc -p tsconfig.app.json --noEmit
