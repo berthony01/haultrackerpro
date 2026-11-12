@@ -625,7 +625,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                   label="Actual Earnings"
                   value={formatCurrency(actual)}
                   icon={DollarSign}
-                  subtitle={paidLoads.length > 0 ? `${paidLoads.length} paid in this period` : 'No actual pay recorded in this period'}
+                  subtitle={paidLoads.length > 0 ? `Actual pay entered for ${paidLoads.length} load${paidLoads.length === 1 ? '' : 's'} in this period` : 'No actual pay recorded in this period'}
                 />
                 <StatCard label="Loaded Miles" value={formatNumber(loadedMiles)} icon={Route} />
                 <TooltipProvider>
