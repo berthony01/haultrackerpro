@@ -6,6 +6,8 @@ on:
       - 'src/pages/Pricing.tsx'
       - 'src/pages/AssistantsAgencies.tsx'
       - 'src/lib/agencyPlans.ts'
+      - 'src/components/agency/AgencyPlanLimitsCard.tsx'
+      - 'src/test/phaseTG2E3O4OwnerQaAgencyBillingSafety.test.tsx'
       - 'src/test/pricingRoleClarityCopy.test.ts'
       - 'src/test/pricingStripeMappingParity.test.ts'
       - 'src/test/businessMultiRoleBetaParity.test.ts'
