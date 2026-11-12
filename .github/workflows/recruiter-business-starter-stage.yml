@@ -9,6 +9,7 @@ on:
       - 'src/components/opportunities/recruiter/RecruiterAccessPage.tsx'
       - 'src/test/recruiterBusinessStarterCopyParity.test.ts'
       - 'tests/e2e/recruiter-business-starter-public.spec.ts'
+      - 'tests/e2e/pricing-role-public-mobile.spec.ts'
       - '.github/workflows/recruiter-business-starter-stage.yml'
 
 permissions:
@@ -53,7 +54,7 @@ jobs:
             if curl --fail --silent http://127.0.0.1:4173/recruiters > /dev/null; then break; fi
             sleep 1
           done
-          bunx playwright test tests/e2e/recruiter-business-starter-public.spec.ts --project=desktop
+          bunx playwright test tests/e2e/recruiter-business-starter-public.spec.ts tests/e2e/pricing-role-public-mobile.spec.ts --project=desktop
       - name: Upload browser screenshots and failure evidence
         if: always()
         uses: actions/upload-artifact@v4
