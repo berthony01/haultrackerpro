@@ -29,17 +29,17 @@ export default function Recruiters() {
   const steps = [
     'Add the recruiter workspace',
     'Complete required recruiter details and accept posting terms',
-    'Post unlimited standard opportunities',
+    'Publish 1 standard opportunity free, with unlimited drafts',
     'Request separate Verified Recruiter badge review if desired',
     'Manage driver requests',
     'Upgrade for premium tools when needed',
   ];
 
   const plans = [
-    { name: 'Recruiter Standard', price: 'Free', tagline: 'For complete, active recruiter profiles — unlimited standard posts' },
-    { name: 'Starter', price: '$19', tagline: 'Enhanced applicant tracking & trust tools' },
-    { name: 'Growth', price: '$49', tagline: 'Priority placement, reports, and contract-management + AI risk review', highlight: true },
-    { name: 'Fleet', price: '$149', tagline: 'Everything in Growth, top-placement eligibility, and priority support today; team seats, bulk opportunity tools, custom recruiter profile, and company-level hiring dashboard coming soon' },
+    { name: 'Recruiter Standard', price: 'Free', tagline: '1 active opportunity, unlimited drafts' },
+    { name: 'Starter', price: '$19', tagline: 'Up to 5 active opportunities plus enhanced applicant tracking' },
+    { name: 'Growth', price: '$49', tagline: 'Up to 15 active opportunities, reports, and contract-management + AI risk review', highlight: true },
+    { name: 'Fleet', price: '$149', tagline: 'Up to 25 active opportunities for existing or included Fleet access. New standalone Fleet checkout unavailable.' },
   ];
 
 
@@ -56,7 +56,7 @@ export default function Recruiters() {
     <div className="min-h-screen" style={{ background: 'hsl(220, 20%, 8%)' }}>
       <SEOHead
         title="For Recruiters — Truck Driver Recruiter Platform | HaulTrackerPro"
-        description="Trucking recruiter platform: complete, active recruiter workspaces post unlimited standard driver opportunities without badge approval or a paid plan. Verified Recruiter badge review is separate. Paid plans add premium visibility, recruiter reports, and contract-management with AI risk review."
+        description="Trucking recruiter platform: complete, active recruiter workspaces can post 1 active standard driver opportunity free with unlimited drafts, without badge approval. Verified Recruiter badge review is separate. Paid plans add premium visibility, recruiter reports, and contract-management with AI risk review."
         path="/recruiters"
         jsonLd={buildBreadcrumbSchema([{ name: 'Home', path: '/' }, { name: 'For Recruiters', path: '/recruiters' }])}
       />
@@ -95,6 +95,15 @@ export default function Recruiters() {
         </div>
       </section>
 
+
+      <section className="px-4 sm:px-6 py-6 text-center" style={{ background: 'hsl(220, 20%, 6%)' }}>
+        <p className="text-sm max-w-2xl mx-auto mb-2" style={{ color: 'hsl(220, 10%, 70%)' }}>
+          Starting an independent trucking recruiting business? You do not need trucks or a DOT/MC number to post standard opportunities as an Independent Recruiter.
+        </p>
+        <button type="button" onClick={() => navigate('/recruiter/guide')} className="underline text-sm font-bold" style={{ color: 'hsl(25, 95%, 60%)' }}>
+          Read the Recruiter Business Starter Guide
+        </button>
+      </section>
 
       {/* Why */}
       <section className="py-14 sm:py-20" style={{ background: 'hsl(220, 20%, 6%)' }}>
@@ -140,7 +149,7 @@ export default function Recruiters() {
             Recruiter Plans
           </h2>
           <p className="text-center text-sm mb-10 max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 55%)' }}>
-            Complete, active recruiter workspaces can post unlimited standard opportunities for free — no badge approval or paid plan required. Paid plans add premium visibility, recruiter reports, and contract-management with AI-assisted risk review.
+            Complete, active recruiter workspaces can keep 1 standard opportunity active for free, with unlimited drafts. Paid plans increase active limits: Starter 5, Growth 15; Fleet 25 for existing or included access only. New standalone Fleet checkout is unavailable.
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
 
