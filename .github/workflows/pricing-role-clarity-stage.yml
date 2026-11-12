@@ -8,6 +8,7 @@ on:
       - 'src/lib/agencyPlans.ts'
       - 'src/test/pricingRoleClarityCopy.test.ts'
       - 'src/test/pricingStripeMappingParity.test.ts'
+      - 'src/test/businessMultiRoleBetaParity.test.ts'
       - '.github/workflows/pricing-role-clarity-stage.yml'
 
 permissions:
@@ -30,6 +31,8 @@ jobs:
       - run: bun run test src/test/pricingRoleClarityCopy.test.ts src/test/phase1mPricingArchitecture.test.tsx
       - name: Check all 8 Stripe price environment key contracts (no network)
         run: bunx vitest run src/test/pricingStripeMappingParity.test.ts
+      - name: Synthetic non-admin multi-role beta entitlement regression
+        run: bunx vitest run src/test/businessMultiRoleBetaParity.test.ts
       - name: Expanded role, entitlement, and checkout regression (isolated; no live Stripe)
         run: |
           bunx vitest run \
