@@ -62,11 +62,12 @@ export interface UseOwnerQaPersonaResult {
 }
 
 export function useOwnerQaPersona(): UseOwnerQaPersonaResult {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { role, isLoading: adminLoading } = useAdmin();
   const qc = useQueryClient();
 
-  const isOwner = !!user && !adminLoading && role === 'super_admin';
+  const isOwner =
+    !!user && !authLoading && !adminLoading && role === 'super_admin';
 
   const query = useQuery({
     queryKey: OWNER_QA_QUERY_KEY,
@@ -156,7 +157,7 @@ export function useOwnerQaPersona(): UseOwnerQaPersonaResult {
       : null,
     expiresAt: selection ? (row?.expires_at ?? null) : null,
     selection,
-    isLoading: isOwner ? query.isLoading : false,
+    isLoading: authLoading || adminLoading || (isOwner && query.isLoading),
     isMutating: setMutation.isPending || disableMutation.isPending,
     error:
       ((query.error ?? setMutation.error ?? disableMutation.error) as
