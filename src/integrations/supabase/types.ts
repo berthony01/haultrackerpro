@@ -971,6 +971,60 @@ export type Database = {
           },
         ]
       }
+      company_driver_invites: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          email: string
+          expires_at: string
+          id: string
+          recruiter_id: string
+          relationship_id: string | null
+          responded_by_user_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          email: string
+          expires_at?: string
+          id?: string
+          recruiter_id: string
+          relationship_id?: string | null
+          responded_by_user_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          recruiter_id?: string
+          relationship_id?: string | null
+          responded_by_user_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_driver_invites_recruiter_id_fkey"
+            columns: ["recruiter_id"]
+            isOneToOne: false
+            referencedRelation: "recruiter_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "company_driver_invites_relationship_id_fkey"
+            columns: ["relationship_id"]
+            isOneToOne: false
+            referencedRelation: "carrier_driver_relationships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       contract_audit_log: {
         Row: {
           action: string
@@ -6041,6 +6095,26 @@ export type Database = {
         Args: { _thread_id: string }
         Returns: string
       }
+      company_driver_connections: {
+        Args: { _recruiter_id?: string }
+        Returns: Json
+      }
+      company_driver_invite: {
+        Args: { _email: string; _recruiter_id: string }
+        Returns: Json
+      }
+      company_driver_owner_eligible: {
+        Args: { _recruiter_id: string }
+        Returns: boolean
+      }
+      company_driver_respond: {
+        Args: { _accept: boolean; _invite_id: string }
+        Returns: Json
+      }
+      company_driver_revoke: {
+        Args: { _invite_id: string; _recruiter_id: string }
+        Returns: undefined
+      }
       complete_approved_contract_hire: {
         Args: { _application_id: string }
         Returns: string
@@ -6574,6 +6648,16 @@ export type Database = {
         }
       }
       driver_has_active_pro: { Args: { _driver: string }; Returns: boolean }
+      driver_loads_page: {
+        Args: {
+          _driver_user_id: string
+          _from?: string
+          _limit?: number
+          _offset?: number
+          _to?: string
+        }
+        Returns: Json
+      }
       driver_respond_to_work_item: {
         Args: { _id: string; _response: string }
         Returns: string
