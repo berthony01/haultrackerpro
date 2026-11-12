@@ -10,7 +10,7 @@ const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf
 function envMap(text: string, constant: string): Record<string, string> {
   const block = text.match(new RegExp('const\\s+' + constant + '[^=]*=\\s*\\{([\\s\\S]*?)\\};'));
   expect(block, `Missing map ${constant}`).not.toBeNull();
-  const entries = [...(block?.[1] ?? '').matchAll(/^\\s*(\\w+):\\s*["'](STRIPE_[A-Z_]+)["'],?\\s*$/gm)];
+  const entries = [...(block?.[1] ?? '').matchAll(/^\s*(\w+):\s*["'](STRIPE_[A-Z_]+)["'],?\s*$/gm)];
   return Object.fromEntries(entries.map(([, key, value]) => [key, value]));
 }
 
@@ -63,7 +63,7 @@ describe('Pricing checkout and webhook environment-key parity', () => {
   });
 
   it('blocks new recruiter Fleet checkout before reading any Stripe price or creating a session', () => {
-    expect(recruiter).toMatch(/PREVIEW_ONLY_RECRUITER_PLANS[^;]*=\\s*new Set<[\\s\\S]*?\\(\\["fleet"\\]\\)/);
+    expect(recruiter).toMatch(/PREVIEW_ONLY_RECRUITER_PLANS[^;]*=\s*new Set<[\s\S]*?\(\["fleet"\]\)/);
     const guard = recruiter.indexOf('if (PREVIEW_ONLY_RECRUITER_PLANS.has(plan))');
     const priceLookup = recruiter.indexOf('const priceId = Deno.env.get(PLAN_TO_ENV[plan])');
     const sessionCreation = recruiter.indexOf('stripe.checkout.sessions.create(');
