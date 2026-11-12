@@ -9,6 +9,8 @@ on:
       - 'src/components/opportunities/recruiter/RecruiterAccessPage.tsx'
       - 'src/test/recruiterBusinessStarterCopyParity.test.ts'
       - 'tests/e2e/recruiter-business-starter-public.spec.ts'
+      - 'src/pages/Pricing.tsx'
+      - 'src/lib/agencyPlans.ts'
       - 'tests/e2e/pricing-role-public-mobile.spec.ts'
       - '.github/workflows/recruiter-business-starter-stage.yml'
 
