@@ -36,6 +36,18 @@ const faqs = [
     a: 'Billing runs through Stripe. HaulTrackerPro never stores card numbers — only Stripe customer and subscription identifiers. Manage your card and billing history through the in-app billing portal.',
   },
   {
+    q: 'What is the difference between a recruiting opportunity and a Dispatch load?',
+    a: 'An opportunity is a job listing that drivers can review or apply to. Dispatch creates an actual load assigned to a driver with an accepted company connection. Opening a recruiting workspace does not automatically assign loads, and an agency subscription does not automatically grant another carrier’s Dispatch access. Company owners and authorized staff access Dispatch through their own workspace.',
+  },
+  {
+    q: 'How do I connect drivers and use website Dispatch?',
+    a: 'Open Dispatch in your authorized company workspace. The company owner selects Connect drivers and sends a request to the driver’s HaulTracker account email. That driver signs in, reviews the company and accepts in Driver Company Connections. After acceptance, authorized company users can create pending loads for that driver, confirm delivery with an actual date, or cancel a load. The driver views the same loads in their own account. Pending and cancelled loads do not contribute to completed earnings.',
+  },
+  {
+    q: 'How do the Telegram bot, group and Mini App work with Dispatch?',
+    a: 'First link your personal Telegram account to HaulTracker Pro. The private @HaulTrackerBot command /start dispatch opens the signed Mini App, where the linked, authorized owner or staff member can use the same Dispatch records as the website. Connecting a Telegram group is a separate step: add the bot, generate a one-time group connection command in your recruiter workspace, and send it from the linked Telegram identity before the 15-minute expiry. Group load-status updates use an authorized review process. Adding the bot alone does not give group members Dispatch permissions. Drivers do not need the bot to receive assigned loads in their Driver account.',
+  },
+  {
     q: 'Can I issue settlement statements to drivers?',
     a: 'Yes, with an active STANDALONE paid recruiter subscription plus an active carrier↔driver relationship the driver has accepted. An agency-included recruiter entitlement is a recruiting entitlement only and does not grant carrier-issued settlements. Once a driver accepts your carrier-to-driver relationship invitation, you can prepare a settlement statement with line items, finalize it, void it, or supersede it with a correction, and the driver can view and reconcile the finalized statement. This is recordkeeping only — HaulTrackerPro does not process payroll, send ACH or direct deposit, or pay, hold, transfer, verify, or guarantee any settlement amount, and payment happens outside the platform.',
   },
@@ -45,7 +57,7 @@ const faqs = [
   },
   {
     q: 'Can I message drivers in-app?',
-    a: 'Today, once a driver approves your contact request you respond via email or phone. In-app messaging is on the roadmap; meanwhile every status change on an application is logged so you and the driver share a clean timeline.',
+    a: 'Yes. Use your authorized Conversations inbox for in-app conversations with drivers in your workspace. The Telegram Mini App also provides a permitted recruiter inbox. Driver contact details remain permissioned and are not automatically revealed just because a conversation is available. AI Assistant chat is separate from conversations with real drivers.',
   },
   {
     q: 'Can drivers refer other drivers to my opportunities?',
