@@ -19,6 +19,9 @@ describe('Dispatch, Telegram Mini App and permissions in public guidance', () =>
     expect(home).toContain('authorized company Dispatch workspace');
     expect(recruiter).toContain('Company Dispatch and Telegram Mini App');
     expect(recruiter).toContain('drivers who accepted a company connection');
+    const about = read('src/pages/About.tsx');
+    expect(about).toContain('structured opportunities from an eligible recruiter workspace');
+    expect(about).not.toContain('Post verified opportunities');
   });
 
   it('documents the signed Mini App, 15-minute group linking and consent lifecycle', () => {
