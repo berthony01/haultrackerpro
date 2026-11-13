@@ -18,7 +18,7 @@ describe('Dispatch, Telegram Mini App and permissions in public guidance', () =>
     const recruiter = read('src/pages/Recruiters.tsx');
     expect(home).toContain('authorized company Dispatch workspace');
     expect(recruiter).toContain('Company Dispatch and Telegram Mini App');
-    expect(recruiter).toContain('drivers who accepted a company connection');
+    expect(recruiter).toContain('connect drivers with consent');
     const about = read('src/pages/About.tsx');
     expect(about).toContain('structured opportunities from an eligible recruiter workspace');
     expect(about).not.toContain('Post verified opportunities');
