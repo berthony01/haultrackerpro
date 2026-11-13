@@ -138,7 +138,6 @@ export function useDriverOpportunityConversation(
     return () => { currentScope.current = ''; };
   }, []);
   const [snapshot, setSnapshot] = useState<{ scope: string; thread: ConversationThread | null; messages: ConversationMessage[]; error: string | null }>({ scope: '', thread: null, messages: [], error: null });
-  const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [busyScope, setBusyScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
   const refetch = useCallback(() => setToken(t => t + 1), []);
@@ -148,7 +147,6 @@ export function useDriverOpportunityConversation(
   useEffect(() => {
     let cancelled = false;
     if (!active || !userId) return;
-    setLoadingScope(scope);
     void (async () => {
       try {
         let query = supabase.from('conversation_threads').select('*').eq('driver_user_id', userId);
@@ -163,8 +161,6 @@ export function useDriverOpportunityConversation(
         if (!cancelled && currentScope.current === scope) setSnapshot({ scope, thread: found, messages, error: null });
       } catch {
         if (!cancelled && currentScope.current === scope) setSnapshot({ scope, thread: null, messages: [], error: 'Unable to load this conversation.' });
-      } finally {
-        if (!cancelled && currentScope.current === scope) setLoadingScope(null);
       }
     })();
     return () => { cancelled = true; };
@@ -197,7 +193,7 @@ export function useDriverOpportunityConversation(
     return rpc('close_conversation_thread', { _thread_id: thread.id }, 'Unable to close this conversation.');
   }), [run, thread]);
   return { thread, messages: visible ? snapshot.messages : [], error: visible ? snapshot.error : null,
-    isLoading: active && (!visible || loadingScope === scope), isBusy: busyScope === scope,
+    isLoading: active && !visible, isBusy: busyScope === scope,
     refetch, startConversation, sendMessage, closeConversation };
 }
 
@@ -223,13 +219,11 @@ function useScopedConversationThreads(recruiterId: string | null | undefined, en
     return () => { currentScope.current = ''; };
   }, []);
   const [snapshot, setSnapshot] = useState<{ scope: string; threads: ConversationThread[]; opportunityTitles: Record<string, string>; error: string | null }>({ scope: '', threads: [], opportunityTitles: {}, error: null });
-  const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
   const refetch = useCallback(() => setToken(t => t + 1), []);
   useEffect(() => {
     let cancelled = false;
     if (!active || !userId) return;
-    setLoadingScope(scope);
     void (async () => {
       try {
         let query = supabase.from('conversation_threads').select('*');
@@ -248,8 +242,6 @@ function useScopedConversationThreads(recruiterId: string | null | undefined, en
         if (!cancelled && currentScope.current === scope) setSnapshot({ scope, threads, opportunityTitles, error: null });
       } catch {
         if (!cancelled && currentScope.current === scope) setSnapshot({ scope, threads: [], opportunityTitles: {}, error: 'Unable to load conversations.' });
-      } finally {
-        if (!cancelled && currentScope.current === scope) setLoadingScope(null);
       }
     })();
     return () => { cancelled = true; };
@@ -259,7 +251,7 @@ function useScopedConversationThreads(recruiterId: string | null | undefined, en
   const threads = visible ? snapshot.threads : [];
   return { threads, requestedCount: threads.filter(t => t.status === 'requested').length,
     opportunityTitles: visible ? snapshot.opportunityTitles : {}, error: visible ? snapshot.error : null,
-    isLoading: active && (!visible || loadingScope === scope), refetch };
+    isLoading: active && !visible, refetch };
 }
 
 export function useDriverConversationThreads(enabled: boolean) {
@@ -289,21 +281,17 @@ export function useConversationMessages(threadId: string | null | undefined, ena
     return () => { currentScope.current = ''; };
   }, []);
   const [snapshot, setSnapshot] = useState<{ scope: string; messages: ConversationMessage[]; error: string | null }>({ scope: '', messages: [], error: null });
-  const [loadingScope, setLoadingScope] = useState<string | null>(null);
   const [token, setToken] = useState(0);
   const refetch = useCallback(() => setToken(t => t + 1), []);
   useEffect(() => {
     let cancelled = false;
     if (!active || !threadId) return;
-    setLoadingScope(scope);
     void (async () => {
       try {
         const messages = await fetchMessages(threadId);
         if (!cancelled && currentScope.current === scope) setSnapshot({ scope, messages, error: null });
       } catch {
         if (!cancelled && currentScope.current === scope) setSnapshot({ scope, messages: [], error: 'Unable to load messages.' });
-      } finally {
-        if (!cancelled && currentScope.current === scope) setLoadingScope(null);
       }
     })();
     return () => { cancelled = true; };
@@ -311,7 +299,7 @@ export function useConversationMessages(threadId: string | null | undefined, ena
   usePoll(active, refetch);
   const visible = active && snapshot.scope === scope;
   return { messages: visible ? snapshot.messages : [], error: visible ? snapshot.error : null,
-    isLoading: active && (!visible || loadingScope === scope), refetch };
+    isLoading: active && !visible, refetch };
 }
 
 export interface RecruiterConversationActions {
