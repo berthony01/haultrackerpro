@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useDriverConversationThreads } from '@/hooks/conversations/useConversations';
 import { DriverConversationDialog } from './DriverConversationDialog';
+import { DriverJobSearchInvitations } from './DriverJobSearchInvitations';
 
 interface Props {
   selectedThreadId: string | null;
@@ -15,6 +16,7 @@ export function DriverConversationInbox({ selectedThreadId, onSelectedThreadChan
   const selected = threads.find(t => t.id === selectedThreadId) ?? null;
   return (
     <section aria-label="Driver conversations" className="space-y-4">
+      <DriverJobSearchInvitations onOpenThread={onSelectedThreadChange} />
       {error && <p role="alert" className="text-destructive">Unable to load conversations.</p>}
       {isLoading && threads.length === 0 ? <p role="status">Loading conversations…</p> :
         threads.length === 0 ? (

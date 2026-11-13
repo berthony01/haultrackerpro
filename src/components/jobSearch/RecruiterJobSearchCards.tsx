@@ -2,6 +2,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Users, RefreshCw } from 'lucide-react';
 import { useRecruiterCardScope, useRecruiterJobSearchCards, type RecruiterCardsState } from '@/hooks/jobSearch/useJobSearchCard';
+import { useEffect, useState } from 'react';
+import { invitationsAvailable } from '@/lib/jobSearch/jobSearchInvitationApi';
+import { InviteToOpportunityDialog } from './InviteToOpportunityDialog';
 import { CARD_ERRORS, EmploymentCardDetails } from './DriverJobSearchCard';
 export default function RecruiterJobSearchCards({ recruiterId }: {
   recruiterId: string;
@@ -18,11 +21,22 @@ function ConnectedRecruiterCards({ recruiterId, scope }: {
   scope: ReturnType<typeof useRecruiterCardScope>;
 }) {
   const state = useRecruiterJobSearchCards(scope, recruiterId);
-  return <RecruiterJobSearchCardsView state={state} />;
+  return <RecruiterJobSearchCardsView state={state} recruiterId={recruiterId} />;
 }
-export function RecruiterJobSearchCardsView({ state }: {
+export function RecruiterJobSearchCardsView({ state, recruiterId }: {
   state: RecruiterCardsState;
+  recruiterId?: string;
 }) {
+  // Invite control appears only after the server confirms the HJ-2 backend
+  // and its flags; otherwise an honest unavailable note, never a dead button.
+  const [canInvite, setCanInvite] = useState(false);
+  const [inviteCard, setInviteCard] = useState<string | null>(null);
+  useEffect(() => {
+    if (!recruiterId || !state.loaded) return;
+    let live = true;
+    void invitationsAvailable().then(ok => { if (live) setCanInvite(ok); });
+    return () => { live = false; };
+  }, [recruiterId, state.loaded]);
   return <section aria-label="Available drivers" className="min-w-0 space-y-5 text-foreground">
     <header className="flex flex-wrap items-center gap-3">
       <Users className="h-6 w-6 text-primary" />
@@ -52,8 +66,12 @@ export function RecruiterJobSearchCardsView({ state }: {
         <p className="text-xs text-muted-foreground">
           {`Available until ${new Date(card.expires_at).toLocaleDateString('en-US')}`}
         </p>
+        {recruiterId && (canInvite
+          ? <Button variant="outline" size="sm" onClick={() => setInviteCard(card.id)}>Invite to opportunity</Button>
+          : <p className="text-xs text-muted-foreground">Invitations are not available yet.</p>)}
       </Card>)}
     </div>
+    {recruiterId && inviteCard && <InviteToOpportunityDialog recruiterId={recruiterId} cardId={inviteCard} open onOpenChange={o => { if (!o) setInviteCard(null); }} />}
     {state.more && <Button variant="outline" disabled={state.busy} onClick={() => void state.load(true)}>
       Next page
     </Button>}

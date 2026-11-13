@@ -24,6 +24,9 @@ const state = vi.hoisted(() => ({
   completeHire: vi.fn(),
   rpc: vi.fn(async (_fn: string, _args: Record<string, unknown>) => ({ data: 'ok', error: null })),
 }));
+// HJ-2 invitations section is covered by jobSearchInvitationUi.test.tsx; isolate it so
+// these navigation tests keep asserting zero conversation RPCs.
+vi.mock('@/components/conversations/DriverJobSearchInvitations', () => ({ DriverJobSearchInvitations: () => null }));
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: state.user, loading: state.loading, signOut: vi.fn() }) }));
 vi.mock('@/hooks/useViewMode', () => ({ useViewMode: () => state.access }));
 vi.mock('@/hooks/useActingContext', () => ({ useActingContext: () => ({ isActingAsAssistant: state.acting, isLoadingManagedDrivers: false }) }));
