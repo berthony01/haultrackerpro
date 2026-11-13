@@ -98,6 +98,11 @@ function LoadCardImpl({ load, stops = [], onEdit, onDelete, onUpdate, onTap }: L
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${statusStyles[load.status] ?? ''}`}>
               {load.status}
             </Badge>
+            {load.status === 'completed' && load.carrier_driver_relationship_id && !load.actual_delivery_date && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-semibold text-warning border-warning/30">
+                Delivery date unconfirmed
+              </Badge>
+            )}
             <Badge
               variant="outline"
               className={`text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wide ${paymentBadgeStyles[paymentStatus]}`}
