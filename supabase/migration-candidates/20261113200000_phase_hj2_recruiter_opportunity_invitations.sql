@@ -13,6 +13,9 @@
 --     (staff denied), unrestricted actor, a REAL active approved opportunity
 --     owned by that same workspace, a published unexpired v1 card whose owner is
 --     an active unrestricted driver who has not blocked the workspace.
+--   * Send AND accept also require the driver's separate contact consent:
+--     driver_opportunity_profiles.visibility = 'verified_recruiters' AND
+--     allow_verified_recruiter_contact IS TRUE. Decline/block never require it.
 --   * Exactly one invitation per recruiter+driver+opportunity ever (no re-send
 --     after decline/accept/expiry), command-id idempotency, per-workspace rate
 --     limits, all serialized by a per-workspace advisory lock.
@@ -118,7 +121,9 @@ BEGIN
       AND NOT public.user_has_blocking_messaging_restriction(c.owner_user_id)
       AND NOT public.is_qa_fixture_root('user', c.owner_user_id)
       AND NOT EXISTS (SELECT 1 FROM job_search_private.recruiter_invitation_blocks b WHERE b.driver_user_id = c.owner_user_id AND b.recruiter_id = _recruiter_id)
-    FOR SHARE;
+      AND EXISTS (SELECT 1 FROM public.driver_opportunity_profiles dp WHERE dp.user_id = c.owner_user_id
+        AND dp.visibility = 'verified_recruiters' AND dp.allow_verified_recruiter_contact IS TRUE)
+    FOR SHARE OF c;
   IF _driver IS NULL THEN RAISE EXCEPTION 'Card unavailable' USING ERRCODE = '42501'; END IF;
   IF EXISTS (SELECT 1 FROM job_search_private.recruiter_opportunity_invitations i
       WHERE i.driver_user_id = _driver AND i.recruiter_id = _recruiter_id AND i.opportunity_id = _opportunity_id) THEN
@@ -203,8 +208,12 @@ BEGIN
     END IF;
     RETURN pg_catalog.jsonb_build_object('status', 'declined', 'thread_id', NULL);
   END IF;
-  -- ACCEPT: re-validate every party live.
-  IF public.user_has_blocking_messaging_restriction(_uid)
+  -- ACCEPT: re-validate every party and BOTH driver consents live.
+  IF NOT EXISTS (SELECT 1 FROM job_search_private.driver_job_search_cards c WHERE c.id = _inv.card_id AND c.owner_user_id = _uid
+      AND c.status = 'published' AND c.expires_at > _now AND c.audience = 'approved_recruiters' AND c.consent_version = 'job_search_card_v1')
+    OR NOT EXISTS (SELECT 1 FROM public.driver_opportunity_profiles dp WHERE dp.user_id = _uid
+      AND dp.visibility = 'verified_recruiters' AND dp.allow_verified_recruiter_contact IS TRUE)
+    OR public.user_has_blocking_messaging_restriction(_uid)
     OR NOT EXISTS (SELECT 1 FROM public.user_capabilities c WHERE c.user_id = _uid AND c.capability = 'driver' AND c.status = 'active')
     OR public.user_has_blocking_messaging_restriction(_inv.sender_user_id)
     OR NOT EXISTS (SELECT 1 FROM public.user_capabilities c WHERE c.user_id = _inv.sender_user_id AND c.capability = 'recruiter' AND c.status = 'active')

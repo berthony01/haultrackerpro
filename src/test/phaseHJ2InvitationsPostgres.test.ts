@@ -71,8 +71,9 @@ beforeAll(async () => {
     ${readyHelper}
     ${qaHelper}
     ${conversationDdl}
+    CREATE TABLE public.driver_opportunity_profiles(user_id uuid PRIMARY KEY,visibility text NOT NULL DEFAULT 'private',allow_verified_recruiter_contact boolean NOT NULL DEFAULT false,contact_preference text NOT NULL DEFAULT 'in_app',private_phone text);
   `);
-  for (const t of ['user_capabilities', 'recruiter_profiles', 'opportunities', 'qa_fixture_roots', 'marketplace_user_restrictions'])
+  for (const t of ['user_capabilities', 'recruiter_profiles', 'opportunities', 'qa_fixture_roots', 'marketplace_user_restrictions', 'driver_opportunity_profiles'])
     await pool.query(`REVOKE ALL ON public.${t} FROM PUBLIC,anon,authenticated; ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY`);
   await pool.query(src('supabase/migration-candidates/20261024041952_phase_hj1a_job_search_card_foundation.sql'));
   await pool.query(src('supabase/migration-candidates/20261024045239_phase_hj1b_job_search_discovery.sql'));
@@ -81,7 +82,7 @@ beforeAll(async () => {
 afterAll(async () => { if (pool) await pool.end(); if (dir) { try { run('pg_ctl', ['-D', join(dir, 'data'), '-m', 'immediate', '-w', 'stop']); } finally { rmSync(dir, { recursive: true, force: true }); } } });
 
 beforeEach(async () => {
-  await pool.query('TRUNCATE job_search_private.recruiter_opportunity_invitations,job_search_private.recruiter_invitation_blocks,job_search_private.job_search_card_events,job_search_private.driver_job_search_cards,public.conversation_threads,public.user_capabilities,public.recruiter_profiles,public.opportunities,public.qa_fixture_roots,public.marketplace_user_restrictions,auth.users CASCADE');
+  await pool.query('TRUNCATE job_search_private.recruiter_opportunity_invitations,job_search_private.recruiter_invitation_blocks,job_search_private.job_search_card_events,job_search_private.driver_job_search_cards,public.conversation_threads,public.user_capabilities,public.recruiter_profiles,public.opportunities,public.qa_fixture_roots,public.marketplace_user_restrictions,public.driver_opportunity_profiles,auth.users CASCADE');
   for (const u of [ids.owner, ids.driver, ids.driver2, ids.other, ids.staff]) await pool.query('INSERT INTO auth.users VALUES($1)', [u]);
   for (const u of [ids.driver, ids.driver2]) await pool.query("INSERT INTO public.user_capabilities(user_id,capability,status) VALUES($1,'driver','active')", [u]);
   for (const u of [ids.owner, ids.other, ids.staff]) await pool.query("INSERT INTO public.user_capabilities(user_id,capability,status) VALUES($1,'recruiter','active')", [u]);
@@ -92,6 +93,7 @@ beforeEach(async () => {
     ($3,$2,'active','approved','Dedicated','Acme Freight','Austin','TX','Dedicated'),
     ($4,$5,'active','approved','Foreign','Other Co',NULL,NULL,NULL),
     ($6,$2,'draft','pending','Draft','Acme Freight',NULL,NULL,NULL)`, [ids.opp, ids.ws, ids.opp2, ids.foreignOpp, ids.foreign, ids.draftOpp]);
+  for (const u of [ids.driver, ids.driver2]) await pool.query("INSERT INTO public.driver_opportunity_profiles(user_id,visibility,allow_verified_recruiter_contact,private_phone) VALUES($1,'verified_recruiters',true,'555-DO-NOT-LEAK')", [u]);
   await flags(true, true, true);
   card.d1 = await publish(ids.driver); card.d2 = await publish(ids.driver2);
 });
@@ -222,4 +224,56 @@ it('race: concurrent duplicate sends create exactly one invitation; concurrent a
   const acc = await Promise.all(Array.from({ length: 4 }, () => respond(ids.driver, id, 'accept')));
   expect(new Set(acc.map(a => a.thread_id)).size).toBe(1);
   expect((await pool.query('SELECT count(*)::int n FROM public.conversation_threads')).rows[0].n).toBe(1);
+});
+
+const setConsent = (u: string, vis: string, allow: boolean) => pool.query('UPDATE public.driver_opportunity_profiles SET visibility=$2,allow_verified_recruiter_contact=$3 WHERE user_id=$1', [u, vis, allow]);
+const threads = async () => (await pool.query('SELECT count(*)::int n FROM public.conversation_threads')).rows[0].n;
+it('real table defaults are private + contact false', async () => {
+  const d = (await pool.query("SELECT column_name,column_default FROM information_schema.columns WHERE table_name='driver_opportunity_profiles' AND column_name IN ('visibility','allow_verified_recruiter_contact') ORDER BY 1")).rows;
+  expect(d).toEqual([{ column_name: 'allow_verified_recruiter_contact', column_default: 'false' }, { column_name: 'visibility', column_default: "'private'::text" }]);
+});
+it('contact consent: missing profile, private, apply_only, verified_recruiters+false all fail closed with generic Card unavailable', async () => {
+  await pool.query('DELETE FROM public.driver_opportunity_profiles WHERE user_id=$1', [ids.driver]);
+  await expect(send(ids.owner, card.d1)).rejects.toMatchObject({ code: '42501', message: 'Card unavailable' });
+  for (const [vis, allow] of [['private', true], ['apply_only', true], ['verified_recruiters', false], ['private', false]] as const) {
+    await setConsent(ids.driver2, vis, allow);
+    await expect(send(ids.owner, card.d2)).rejects.toMatchObject({ code: '42501', message: 'Card unavailable' });
+  }
+  expect((await pool.query('SELECT count(*)::int n FROM job_search_private.recruiter_opportunity_invitations')).rows[0].n).toBe(0);
+});
+it('contact revoked after invite: accept denied, no thread; decline and block still work', async () => {
+  const a = await send(ids.owner, card.d1); const b = await send(ids.owner, card.d1, ids.opp2);
+  await setConsent(ids.driver, 'verified_recruiters', false);
+  await expect(respond(ids.driver, a.invitation_id, 'accept')).rejects.toMatchObject({ code: '42501' });
+  await setConsent(ids.driver, 'apply_only', true);
+  await expect(respond(ids.driver, a.invitation_id, 'accept')).rejects.toMatchObject({ code: '42501' });
+  expect(await threads()).toBe(0);
+  expect((await respond(ids.driver, a.invitation_id, 'decline')).status).toBe('declined');
+  expect((await respond(ids.driver, b.invitation_id, 'block')).status).toBe('declined');
+});
+it('card withdrawn, paused or expired after invite: accept denied, no thread', async () => {
+  const a = await send(ids.owner, card.d1); const b = await send(ids.owner, card.d2);
+  for (const st of ['withdrawn', 'paused']) {
+    await pool.query('UPDATE job_search_private.driver_job_search_cards SET status=$2 WHERE id=$1', [card.d1, st]);
+    await expect(respond(ids.driver, a.invitation_id, 'accept')).rejects.toMatchObject({ code: '42501' });
+  }
+  await pool.query("UPDATE job_search_private.driver_job_search_cards SET published_at=now()-interval '2 days',created_at=now()-interval '2 days',expires_at=now()-interval '1 second' WHERE id=$1", [card.d2]);
+  await expect(respond(ids.driver2, b.invitation_id, 'accept')).rejects.toMatchObject({ code: '42501' });
+  expect(await threads()).toBe(0);
+  expect((await respond(ids.driver, a.invitation_id, 'decline')).status).toBe('declined');
+});
+it('restricted driver: cannot be invited, and restriction after invite blocks accept', async () => {
+  const a = await send(ids.owner, card.d1);
+  await pool.query("INSERT INTO public.marketplace_user_restrictions(user_id,scope,restriction) VALUES($1,'messaging','blocked'),($2,'all','read_only')", [ids.driver, ids.driver2]);
+  await expect(send(ids.owner, card.d2)).rejects.toMatchObject({ code: '42501', message: 'Card unavailable' });
+  await expect(respond(ids.driver, a.invitation_id, 'accept')).rejects.toMatchObject({ code: '42501' });
+  expect(await threads()).toBe(0);
+});
+it('restricted recruiter cannot send', async () => {
+  await pool.query("INSERT INTO public.marketplace_user_restrictions(user_id,scope,restriction) VALUES($1,'messaging','blocked')", [ids.owner]);
+  await expect(send(ids.owner, card.d1)).rejects.toMatchObject({ code: '42501' });
+});
+it('list output never contains driver contact data', async () => {
+  await send(ids.owner, card.d1);
+  expect(JSON.stringify(await list(ids.driver))).not.toContain('555-DO-NOT-LEAK');
 });
