@@ -7044,6 +7044,7 @@ export type Database = {
         Returns: string
       }
       issue_telegram_link_token: { Args: never; Returns: string }
+      job_search_invitations_available: { Args: never; Returns: boolean }
       list_agency_audit_log: {
         Args: { _agency_id: string; _limit?: number }
         Returns: {
@@ -7360,6 +7361,7 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_my_job_search_invitations: { Args: never; Returns: Json }
       list_my_pending_assistant_invites: {
         Args: never
         Returns: {
@@ -7474,6 +7476,15 @@ export type Database = {
         Args: { _recruiter_id: string }
         Returns: Json[]
       }
+      list_recruiter_job_search_cards: {
+        Args: {
+          _after_card_id?: string
+          _after_published_at?: string
+          _limit?: number
+          _recruiter_id: string
+        }
+        Returns: Json
+      }
       list_recruiter_members: {
         Args: { _recruiter_id: string }
         Returns: {
@@ -7527,6 +7538,16 @@ export type Database = {
           _metadata?: Json
         }
         Returns: string
+      }
+      manage_my_job_search_card: {
+        Args: {
+          _action: string
+          _client_command_id?: string
+          _consent_version?: string
+          _expected_revision?: number
+          _payload?: Json
+        }
+        Returns: Json
       }
       mark_all_notifications_read: { Args: never; Returns: number }
       mark_notification_read: {
@@ -7682,6 +7703,10 @@ export type Database = {
         Returns: string
       }
       resolve_agency_slug: { Args: { _slug: string }; Returns: string }
+      respond_job_search_invitation: {
+        Args: { _invitation_id: string; _response: string }
+        Returns: Json
+      }
       respond_to_contact_request: {
         Args: { decision: string; driver_note?: string; request_id: string }
         Returns: undefined
@@ -7727,6 +7752,16 @@ export type Database = {
       revoke_recruiter_member: { Args: { _member_id: string }; Returns: Json }
       save_telegram_opportunity_draft_payload: {
         Args: { _draft_id: string; _payload: Json }
+        Returns: Json
+      }
+      send_job_search_invitation: {
+        Args: {
+          _card_id: string
+          _client_command_id: string
+          _message: string
+          _opportunity_id: string
+          _recruiter_id: string
+        }
         Returns: Json
       }
       set_agency_client_request_status: {
