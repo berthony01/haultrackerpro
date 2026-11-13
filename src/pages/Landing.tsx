@@ -147,6 +147,7 @@ export default function Landing() {
         'Post trucking opportunities from your recruiter workspace.',
         'Manage driver inquiries in one organized queue.',
         'Continue the conversation with interested drivers.',
+        'Coordinate assigned loads with connected drivers in an authorized company Dispatch workspace.',
       ],
       workflow: ['Post an opportunity', 'Manage inquiries', 'Continue the conversation'],
       actions: [
@@ -366,7 +367,7 @@ export default function Landing() {
               <div className="mt-5 space-y-3">
                 {[
                   { icon: Truck, label: 'Drivers', note: 'Find work and track the business', inset: 'ml-0', accent: AMBER_BRIGHT },
-                  { icon: Users, label: 'Carriers & Recruiters', note: 'Post opportunities, manage inquiries', inset: 'ml-4 sm:ml-8', accent: TEAL },
+                  { icon: Users, label: 'Carriers & Recruiters', note: 'Recruiting and permissioned company Dispatch', inset: 'ml-4 sm:ml-8', accent: TEAL },
                   { icon: Briefcase, label: 'Assistants & Agencies', note: 'Support drivers with granted access', inset: 'ml-8 sm:ml-16', accent: AMBER_BRIGHT },
                 ].map((row) => (
                   <div
