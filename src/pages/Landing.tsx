@@ -512,7 +512,7 @@ export default function Landing() {
                 Describe your preferred lanes and work style in a guided conversation. Review your answers before saving them or continuing to opportunities.
               </p>
               <div className="mt-8 rounded-2xl border p-5 sm:p-6" style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
-                <h3 className="text-base font-bold text-white">How finding work works</h3>
+                <h3 className="text-base font-bold text-white">How finding work works.</h3>
                 <ol className="mt-5 space-y-0">
                   {[
                     { key: 'talk', text: 'Describe the trucking work you want.', detail: 'Start with a route type or explain your preferences.' },
@@ -650,7 +650,7 @@ export default function Landing() {
                 { key: 'resources', icon: ClipboardList, label: 'Resources', description: 'Practical guides for trucking finances, operations, and getting started.', href: '/resources' },
                 { key: 'dispatch', icon: Users, label: 'Dispatch & Telegram', description: 'Understand company connections, authorized load management, and the Mini App.', href: '/recruiter/guide' },
               ].map((tool) => (
-                <a key={tool.key} href={tool.href} data-testid={'secondary-tool-' + tool.key}
+                <button key={tool.key} type="button" onClick={() => navigate(tool.href)} data-testid={'secondary-tool-' + tool.key}
                   className="group flex min-w-0 flex-col rounded-2xl border p-5 transition-colors hover:border-orange-500/40 hover:bg-white/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}>
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl"
@@ -662,7 +662,7 @@ export default function Landing() {
                   <span className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-bold" style={{ color: AMBER_BRIGHT }}>
                     Explore <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" aria-hidden="true" />
                   </span>
-                </a>
+                </button>
               ))}
             </div>
           </div>
@@ -680,7 +680,7 @@ export default function Landing() {
                 </p>
                 <h2 className="mt-4 text-3xl font-black tracking-tight text-white sm:text-4xl">Your data. Your decisions.</h2>
                 <p className="mt-4 text-sm leading-7 sm:text-base" style={{ color: TEXT_MUTED }}>
-                  You choose what to share. Review your Find Work answers before saving. Driver-company connections and delegated assistant or agency access require approval.
+                  You choose what to share. Review your Find Work answers before saving your preferences. Company connections require the driver to review and accept. Driver assistant and agency access requires driver approval and is limited to granted permissions.
                 </p>
                 <a href="/docs" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-bold"
                   style={{ color: AMBER_BRIGHT }}>
@@ -739,7 +739,7 @@ export default function Landing() {
             </div>
             <a href="/auth?intent=driver" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               style={{ background: AMBER, color: 'white' }}>
-              Start free as a driver <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Create driver account <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </a>
           </div>
           <div className="grid grid-cols-2 gap-x-5 gap-y-8 lg:grid-cols-4 lg:gap-10">
