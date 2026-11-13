@@ -22,6 +22,7 @@ export default function Recruiters() {
     { icon: Search, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions — they evaluate opportunities by the numbers.' },
     { icon: ClipboardList, title: 'Post structured opportunities', desc: 'Required fields for pay, lanes, equipment, and deductions create clear, comparable listings.' },
     { icon: Handshake, title: 'Manage driver requests', desc: 'A built-in applications dashboard lets you review interest and respond from one place.' },
+    { icon: Users, title: 'Company Dispatch and Telegram Mini App', desc: 'An authorized company can connect drivers with consent, assign real loads, and manage Dispatch through the website or the signed Telegram Mini App. Recruiter job listings and Dispatch assignments remain separate.' },
     { icon: ShieldCheck, title: 'Build trust through transparency', desc: 'Complete, active recruiter workspaces post standard opportunities. Verified Recruiter badge review is a separate trust-display process, and platform moderation still applies to opportunities.' },
     { icon: Users, title: 'Driver-to-driver referral tracking', desc: 'Drivers can refer other drivers to your opportunities. Track referral progress and set your external referral terms — HaulTrackerPro tracks referral progress only, bonuses are paid externally by you.' },
   ];
@@ -79,7 +80,7 @@ export default function Recruiters() {
             <span style={{ color: 'hsl(25, 95%, 53%)' }}>Profit-First Trucking Platform</span>
           </h1>
           <p className="mt-5 text-base sm:text-lg max-w-2xl mx-auto" style={{ color: 'hsl(220, 10%, 60%)' }}>
-            HaulTrackerPro helps complete, active recruiter workspaces post structured trucking opportunities, manage driver requests, and connect with drivers who care about real numbers.
+            HaulTrackerPro helps complete, active recruiter workspaces post structured opportunities and manage driver requests. Authorized company workspaces can also connect drivers with consent and manage real loads through website Dispatch and the Telegram Mini App.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Button onClick={goRecruiterAccess} size="lg" className="text-base font-bold rounded-xl h-13 px-8 gap-2" style={{ background: 'hsl(25, 95%, 53%)', color: 'hsl(0, 0%, 100%)', boxShadow: '0 4px 20px -4px hsl(25, 95%, 53%, 0.5)' }}>
