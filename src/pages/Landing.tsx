@@ -535,7 +535,7 @@ export default function Landing() {
                     </li>
                   ))}
                 </ol>
-                <Button onClick={focusConversation} className="min-h-11 w-full gap-2 font-bold sm:w-auto" style={{ background: AMBER, color: 'white' }}>
+                <Button onClick={focusConversation} className="h-auto min-h-11 min-w-0 w-full gap-2 whitespace-normal py-3 text-center font-bold sm:w-auto" style={{ background: AMBER, color: 'white' }}>
                   Start the guided conversation <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </div>
