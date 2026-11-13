@@ -77,7 +77,7 @@ export default function RecruiterGuide() {
             Recruiter <span className="text-primary">User Guide</span>
           </h1>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-            From workspace setup to hired driver — a clear walkthrough of how to use HaulTrackerPro as a recruiter.
+            From recruiter setup to driver applications and company Dispatch, including the Telegram Mini App.
           </p>
         </div>
       </section>
@@ -122,6 +122,30 @@ export default function RecruiterGuide() {
               </CardContent>
             </Card>
           ))}
+        </div>
+      </section>
+
+      <section id="dispatch" className="scroll-mt-20 border-t border-border bg-muted/20" aria-labelledby="dispatch-guide-heading">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+          <div className="flex items-center gap-2 mb-3">
+            <Truck className="h-6 w-6 text-primary" aria-hidden="true" />
+            <h2 id="dispatch-guide-heading" className="text-2xl sm:text-3xl font-black font-heading">Company Dispatch and Telegram Mini App</h2>
+          </div>
+          <p className="text-sm sm:text-base text-muted-foreground mb-6">
+            Recruiting opportunities and Dispatch loads are different workflows. Posting a job does not assign a load. Dispatch is for an authorized company workspace with drivers who accept a company connection.
+          </p>
+          <ol className="list-decimal pl-5 space-y-4 text-sm sm:text-base text-foreground/90">
+            <li><strong>Open your company Dispatch workspace.</strong> The owner opens Dispatch from the recruiter workspace or the website Dispatch page. Staff require company-granted load viewing, creation or status-update permissions for their assigned actions.</li>
+            <li><strong>Connect the driver first.</strong> The company owner uses Connect drivers to invite an existing or new HaulTracker Pro driver by account email. The verified driver reviews and accepts the request under Driver Company Connections. This is separate from a recruiter job application.</li>
+            <li><strong>Create and manage the assigned load.</strong> Select a connected driver, enter route, miles and agreed pay, then save. Loads start Pending. Delivered and Cancelled require confirmation. Delivered from the Dispatch board requires an actual delivery date. Drivers see the same load in their own account, including cancellations, while unfinished and cancelled loads are excluded from completed earnings.</li>
+            <li><strong>Open Dispatch inside Telegram.</strong> Link your personal Telegram identity with HaulTracker Pro. In a private chat with @HaulTrackerBot, use <code>/start dispatch</code> to open the signed Mini App. Sign in with the connected HaulTracker account. The website and Mini App share load records, but do not share a browser sign-in session automatically.</li>
+            <li><strong>Connect a group separately if needed.</strong> Use the Dispatch Telegram group setup in your recruiter workspace: add the bot to the chosen group, generate a one-time connection command, and send it from your linked Telegram account within 15 minutes. Group updates require matching load references and authorized review. Simply adding the bot never grants group members permission to dispatch loads.</li>
+          </ol>
+          <p className="mt-5 text-sm text-muted-foreground">A completed older group update may have no confirmed actual delivery date. The driver interface labels this clearly, and reports use the scheduled delivery or pickup date until a confirmed date exists. Drivers do not need company staff or Telegram bot access to view assigned loads.</p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button asChild className="min-h-11"><Link to="/dispatch">Open authorized Dispatch <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+            <Button asChild variant="outline" className="min-h-11"><Link to="/recruiter/faq">Dispatch and Telegram FAQ</Link></Button>
+          </div>
         </div>
       </section>
 
