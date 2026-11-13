@@ -571,7 +571,7 @@ export default function Landing() {
           </div>
         </section>
 
-        {/* 4 — Role overview: four substantial cards */}
+        {/* 4 — How the work connects: four-stage process */}
         <section
           className="border-t"
           style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 10%)' }}
@@ -579,76 +579,60 @@ export default function Landing() {
         >
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
             <p className="text-xs font-bold uppercase tracking-widest" style={{ color: TEAL }}>
-              Connected when you need it. Permissioned where it matters.
+              Separate steps. Driver approval in between.
             </p>
             <h2 className="mt-2 text-2xl sm:text-4xl font-black tracking-tight text-white">
-              One platform. Clear tools for every role.
+              How the work connects
             </h2>
             <p className="mt-3 max-w-2xl text-sm sm:text-base leading-relaxed" style={{ color: TEXT_MUTED }}>
-              Recruiting job opportunities and authorized freight load assignments are separate
-              workflows. Each role sees only what it is permitted to see.
+              Recruiting and freight load assignments are separate workflows. Nothing moves from one
+              to the next without the driver's approval.
             </p>
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <ol className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                {
-                  key: 'drivers',
-                  icon: Truck,
-                  title: 'Drivers',
-                  body: 'Find trucking work, track loads, expenses and profit, and decide who can connect to your account.',
-                  cta: 'Track my trucking',
-                  href: '/auth?intent=driver',
-                },
-                {
-                  key: 'recruiters',
-                  icon: Users,
-                  title: 'Recruiters & Carriers',
-                  body: 'Post recruiting job opportunities and manage driver inquiries. Hiring conversations stay in your recruiter workspace.',
-                  cta: 'Recruiting tools',
-                  href: '/recruiters',
-                },
-                {
-                  key: 'dispatch',
-                  icon: Navigation,
-                  title: 'Company Dispatch',
-                  body: 'Coordinate authorized freight load assignments with connected drivers. Access is limited to granted permissions.',
-                  cta: 'Dispatch guide',
-                  href: '/recruiter/guide',
-                },
-                {
-                  key: 'assistants',
-                  icon: Briefcase,
-                  title: 'Assistants & Agencies',
-                  body: 'Support driver records and paperwork. Access requires driver approval and stays limited to granted permissions.',
-                  cta: 'Assistant & agency tools',
-                  href: '/assistants-agencies',
-                },
-              ].map((r) => (
-                <div
-                  key={r.key}
-                  data-testid={`role-card-${r.key}`}
-                  className="flex flex-col rounded-xl border p-5 sm:p-6"
+                { key: 'recruit', icon: Users, title: 'Recruiting', body: 'Companies post recruiting job opportunities and answer applicant inquiries. These are jobs, not freight assignments.' },
+                { key: 'connect', icon: UserCheck, title: 'Driver approves a connection', body: 'A driver separately accepts a company connection. Applying to a job or joining a Telegram group does not grant one.' },
+                { key: 'assign', icon: Navigation, title: 'Authorized staff assign loads', body: 'Only authorized company staff create, assign and manage loads, and only for drivers connected to them.' },
+                { key: 'track', icon: Truck, title: 'Driver sees the load', body: 'Assigned loads and status appear in the driver\'s own account. Telegram is an optional Dispatch interface for authorized users only.' },
+              ].map((step, i) => (
+                <li
+                  key={step.key}
+                  data-testid={`connect-step-${step.key}`}
+                  className="relative flex flex-col rounded-xl border p-5"
                   style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
                 >
-                  <span
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-lg"
-                    style={{ background: 'hsl(25, 95%, 53%, 0.12)', color: AMBER_BRIGHT }}
-                  >
-                    <r.icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-4 text-lg font-black text-white">{r.title}</h3>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-                    {r.body}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate(r.href)}
-                    className="mt-5 inline-flex min-h-[44px] items-center gap-2 self-start rounded-lg text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    style={{ color: AMBER_BRIGHT }}
-                  >
-                    {r.cta} <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black"
+                      style={{ background: AMBER_BRIGHT, color: 'hsl(220, 20%, 10%)' }}
+                      aria-hidden="true"
+                    >
+                      {i + 1}
+                    </span>
+                    <step.icon className="h-5 w-5" style={{ color: TEAL }} aria-hidden="true" />
+                  </div>
+                  <h3 className="mt-4 text-base font-black text-white">{step.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>{step.body}</p>
+                </li>
               ))}
+            </ol>
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <Button
+                type="button"
+                onClick={() => navigate('/recruiter/guide')}
+                className="h-auto min-h-[44px] w-full sm:w-auto whitespace-normal py-3 font-bold"
+                data-testid="connect-guide-cta"
+              >
+                Read the Recruiter &amp; Dispatch guide <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+              </Button>
+              <button
+                type="button"
+                onClick={() => navigate('/docs')}
+                className="min-h-[44px] text-sm font-semibold underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                style={{ color: TEXT_MUTED }}
+              >
+                More in the Help Center
+              </button>
             </div>
           </div>
         </section>
@@ -669,32 +653,32 @@ export default function Landing() {
             <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[
                 { key: 'assistants', icon: Briefcase, label: 'Assistants & Agencies', body: 'Approved support for driver records, within the permissions each driver grants.', href: '/assistants-agencies' },
-                { key: 'parking', icon: MapPin, label: 'Truck Parking', body: 'Keep track of parking spots and notes you rely on.', href: '/parking' },
+                { key: 'parking', icon: MapPin, label: 'Truck Parking', body: 'Save parking spots and notes in your account. Sign-in required.', href: '/parking' },
                 { key: 'calculators', icon: Calculator, label: 'Calculators & Tools', body: 'Estimate load profit, cost per mile and fuel cost before you commit.', href: '/trucking-profit-calculator' },
                 { key: 'reports', icon: BarChart3, label: 'Reports & Taxes', body: 'Weekly closeouts, expense categories and tax planning estimates.', href: '/features' },
                 { key: 'resources', icon: BookOpen, label: 'Resources', body: 'Practical guides on expenses, contracts, RPM and running a trucking business.', href: '/resources' },
-                { key: 'telegram', icon: Send, label: 'Dispatch & Telegram', body: 'Connect Telegram for load updates within authorized company Dispatch.', href: '/telegram' },
+                { key: 'telegram', icon: Send, label: 'Dispatch & Telegram', body: 'Use Telegram for load updates where a company has authorized you for Dispatch.', href: '/telegram' },
               ].map((s) => (
                 <button
                   key={s.key}
                   type="button"
                   data-testid={`secondary-tool-${s.key}`}
                   onClick={() => navigate(s.href)}
-                  className="group flex min-h-[44px] items-start gap-4 rounded-xl border p-5 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  className="group flex h-full min-h-[44px] items-start gap-4 rounded-xl border p-5 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
                 >
                   <span
                     className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
-                    style={{ background: 'hsl(185, 65%, 38%, 0.14)', color: TEAL }}
+                    style={{ background: 'hsl(185, 65%, 38%, 0.2)', color: TEAL }}
                   >
                     <s.icon className="h-5 w-5" aria-hidden="true" />
                   </span>
                   <span className="min-w-0">
-                    <span className="flex items-center gap-1.5 text-sm font-bold text-white">
+                    <span className="flex items-center gap-1.5 text-base font-bold text-white">
                       {s.label}
                       <ArrowRight className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:translate-x-0.5" style={{ color: AMBER_BRIGHT }} aria-hidden="true" />
                     </span>
-                    <span className="mt-1 block text-xs leading-relaxed" style={{ color: TEXT_MUTED }}>{s.body}</span>
+                    <span className="mt-1 block text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>{s.body}</span>
                   </span>
                 </button>
               ))}
