@@ -58,4 +58,12 @@ describe('Dispatch, Telegram Mini App and permissions in public guidance', () =>
     expect(featureList.some(cat => cat.category === 'Company Dispatch & Telegram')).toBe(true);
     expect(recruiterFeatureList.some(cat => cat.category === 'Company Dispatch & Telegram Mini App')).toBe(true);
   });
+
+  it('records the released company Dispatch and Telegram workflow in recruiter What’s New', () => {
+    const notes = read('src/lib/recruiterReleaseNotes.ts');
+    expect(notes).toContain("version: '2026.11'");
+    expect(notes).toContain('Company Dispatch, connected drivers, and Telegram Mini App');
+    expect(notes).toContain('company Dispatch permissions');
+    expect(notes).toContain('/recruiter/guide#dispatch');
+  });
 });
