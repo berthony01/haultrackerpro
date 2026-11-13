@@ -34,15 +34,15 @@ const features = [
   { icon: ClipboardList, title: 'Structured opportunity postings', desc: 'Required fields for pay, lanes, equipment, deductions, and home-time create clear, comparable listings.' },
   { icon: Users, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions. They evaluate opportunities by the numbers.' },
   { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, manage driver contact requests, and track status from one dashboard — no spreadsheets.' },
-  { icon: BarChart3, title: 'Free standard posting', desc: 'Complete, active recruiter workspaces post unlimited standard opportunities at no cost. Upgrade for premium recruiting tools.' },
+  { icon: BarChart3, title: 'Free standard posting', desc: 'Complete, active recruiter workspaces can keep 1 standard opportunity active for free, with unlimited drafts. Paid plans increase active limits and add premium tools.' },
   { icon: Search, title: 'Recruiter contract-management + AI risk review (Growth & Fleet)', desc: "Growth and Fleet unlock the recruiter contract-management dashboard and AI-assisted risk review. Universal driver protections — review, approve, request changes, reject, optional in-app signature, and the hired-status protection that requires driver approval before hiring — apply to every driver plan." },
   { icon: Share2, title: 'Driver-to-driver referral tracking', desc: 'Drivers can refer other drivers to your opportunities. Track referral progress, set your external referral terms, and see referral analytics. Referral bonuses, if offered, are paid externally by you — HaulTrackerPro does not process referral payments.' },
 ];
 
 const steps = [
-  { n: '1', title: 'Add recruiter workspace and complete required profile fields', desc: 'Add the recruiter workspace to your account and fill in the required recruiter details (company, DOT/MC, address, hiring states, equipment, contact email).' },
+  { n: '1', title: 'Add recruiter workspace and complete required profile fields', desc: 'Add the recruiter workspace to your account and provide your recruiter name, company name, recruiter email, and company type. DOT/MC is required only for Carrier / Motor Carrier accounts.' },
   { n: '2', title: 'Accept posting terms and unlock standard posting', desc: 'Once your profile is complete, posting terms are accepted, and your account is active, standard posting is unlocked.' },
-  { n: '3', title: 'Post unlimited standard opportunities', desc: 'Fill in lanes, pay structure, equipment, and deductions in a structured form. Post as many standard opportunities as you need.' },
+  { n: '3', title: 'Publish your first standard opportunity', desc: 'Enter lanes, pay, equipment, and deductions. Free Recruiter Standard allows 1 active listing at a time, plus unlimited drafts.' },
   { n: '4', title: 'Optionally request Verified Recruiter badge review', desc: 'The Verified Recruiter badge shown on driver listings is a separate trust-display review. Pending or rejected badge review does not by itself disable standard posting.' },
   { n: '5', title: 'Manage applicants and add premium tools when needed', desc: 'Drivers who request info show up in your pipeline. Upgrade to Starter, Growth, or Fleet when you want premium visibility, recruiter contract-management with AI risk review, and analytics.' },
 ];
@@ -60,9 +60,10 @@ const plans: RecruiterPlanCard[] = [
   {
     name: 'Recruiter Standard',
     price: '$0',
-    limit: 'Unlimited standard posts',
+    limit: '1 active opportunity',
     availableBullets: [
-      'Unlimited standard opportunity posts',
+      '1 active opportunity at a time',
+      'Unlimited drafts',
       'Standard marketplace placement',
       'Basic applicant and contact-request flow',
       'Opportunity management: edit, pause, and close listings',
@@ -72,9 +73,10 @@ const plans: RecruiterPlanCard[] = [
   {
     name: 'Starter',
     price: '$19',
-    limit: 'Premium tools',
+    limit: 'Up to 5 active opportunities',
     availableBullets: [
       'Everything in Recruiter Standard',
+      'Up to 5 active opportunities',
       'Enhanced applicant tracking',
       'Applicant status history',
       'Basic referral tracking view',
@@ -83,10 +85,11 @@ const plans: RecruiterPlanCard[] = [
   {
     name: 'Growth',
     price: '$49',
-    limit: 'Premium tools',
+    limit: 'Up to 15 active opportunities',
     highlight: true,
     availableBullets: [
       'Everything in Starter',
+      'Up to 15 active opportunities',
       'Priority-placement eligibility',
       'Featured-listing eligibility',
       'Recruiter reports (PDF + CSV)',
@@ -100,9 +103,10 @@ const plans: RecruiterPlanCard[] = [
   {
     name: 'Fleet',
     price: '$149',
-    limit: 'Premium tools',
+    limit: 'Up to 25 active opportunities (existing access only)',
     availableBullets: [
       'Everything in Growth',
+      'Up to 25 active opportunities for existing Fleet access',
       'Top-placement eligibility',
       'Priority support',
     ],
@@ -132,7 +136,7 @@ const faqs = [
   { q: 'Do drivers see my direct contact info?', a: 'Only after a driver opts in by requesting more information on your opportunity. Driver-initiated contact only — no scraping or off-platform solicitation is allowed.' },
   { q: 'Can drivers refer other drivers to my opportunity?', a: 'Yes. Drivers can refer another driver to your opportunity. You see each referral in your pipeline and can mark it contacted, interviewed, hired, closed, or marked paid externally. HaulTrackerPro tracks referral progress only — referral bonuses, if offered, are paid externally by you according to your own terms.' },
   { q: 'Does HaulTrackerPro pay referral bonuses?', a: 'No. HaulTrackerPro does not process, hold, or guarantee referral payments. You set your external referral terms, and you pay any bonus directly to the referring driver outside the platform.' },
-  { q: 'Can I post before paying?', a: 'Yes. Complete, active recruiter workspaces can post unlimited standard opportunities at no cost. Paid plans unlock premium tools like priority placement, featured listings, and recruiter contract-management with AI risk review. You can cancel anytime from Recruiter Settings → Billing.' },
+  { q: 'Can I post before paying?', a: 'Yes. Complete, active recruiter workspaces can keep 1 standard opportunity active for free with unlimited drafts. Paid plans increase active listing limits and unlock premium tools like priority placement, featured listings, and recruiter contract-management with AI risk review. You can cancel anytime from Recruiter Settings → Billing.' },
 ];
 
 export default function RecruiterLanding() {
@@ -210,6 +214,13 @@ export default function RecruiterLanding() {
             </span>
           </div>
         </div>
+      </section>
+
+      <section className="px-4 sm:px-6 py-5 text-center" style={{ background: NAVY_2 }}>
+        <p className="text-sm mb-2" style={{ color: MUTED }}>Starting an independent trucking recruiting business?</p>
+        <button onClick={() => navigate('/recruiter/guide')} className="underline text-sm font-bold" style={{ color: AMBER }}>
+          Read the recruiter business starter guide
+        </button>
       </section>
 
       {/* PAIN */}
@@ -304,7 +315,7 @@ export default function RecruiterLanding() {
             Recruiter plans
           </h2>
           <p className="text-center text-sm mb-10" style={{ color: MUTED }}>
-            Complete, active recruiter workspaces post unlimited standard opportunities. Upgrade for premium tools.
+            Complete, active recruiter workspaces can keep 1 standard opportunity active for free, with unlimited drafts. Upgrade for higher limits and premium tools.
           </p>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {plans.map((p) => (
@@ -339,7 +350,7 @@ export default function RecruiterLanding() {
                   {p.limit}
                 </p>
                 <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: 'hsl(152, 60%, 52%)' }}>
-                  Available Now
+                  {p.name === 'Fleet' ? 'Existing access only' : 'Available now'}
                 </p>
                 <ul className="space-y-2 text-sm mb-4" style={{ color: MUTED }}>
                   {p.availableBullets.map((feat) => (
@@ -377,7 +388,7 @@ export default function RecruiterLanding() {
                     border: `1px solid ${p.highlight ? AMBER : BORDER}`,
                   }}
                 >
-                  Get started
+                  {p.name === 'Fleet' ? 'View workspace' : 'Get started'}
                 </Button>
               </div>
             ))}

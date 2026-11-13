@@ -113,6 +113,11 @@ export function LoadDetailSheet({ load, expenses = [], stops = [], open, onOpenC
             {load.status === 'completed' && load.actual_delivery_date && load.dropoff_date && load.dropoff_date !== load.actual_delivery_date && (
               <p className="pl-6 text-sm text-muted-foreground">Scheduled delivery: {format(parseISO(load.dropoff_date), 'MMM d, yyyy')}</p>
             )}
+            {load.status === 'completed' && load.carrier_driver_relationship_id && !load.actual_delivery_date && (
+              <p role="status" className="pl-6 text-xs text-warning">
+                Actual delivery date unconfirmed. Reports currently use the {load.dropoff_date ? 'scheduled delivery date' : 'pickup date'} until a confirmed date is recorded.
+              </p>
+            )}
             {getEffectiveDate(load) !== load.load_date && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />

@@ -738,7 +738,7 @@ describe('H. no raw identifiers are rendered', () => {
     };
     render(<DriverSettlementsView />);
     expect(screen.getByTestId('pending-invitations').textContent).toMatch(
-      /carrier or recruiter has asked to share settlement statements/i,
+      /Accepting lets the company share settlement statements, assign loads/i,
     );
     expect(VIEW_SOURCE).not.toContain('recruiter_profiles');
     expect(VIEW_SOURCE).not.toContain('recruiter_id');

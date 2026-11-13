@@ -97,6 +97,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   setQaOff();
   agencyState.data = { my_role: 'agency_owner' };
+  entitlementState.entitlement.planKey = 'agency_starter';
   entitlementState.entitlement.status = 'cancelled';
   entitlementState.entitlement.stripeCustomerId = null;
   entitlementState.entitlement.stripeSubscriptionId = null;
@@ -203,5 +204,35 @@ describe('TG-2E3-O4 — Owner QA agency billing safety', () => {
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
     expect((invoke.mock.calls[0] as unknown[])[0]).toBe('create-agency-checkout');
     expect(setPersona).not.toHaveBeenCalled();
+  });
+
+  it('7. Grandfathered Starter beta defaults billing selection to its current plan, not Agency Team', () => {
+    entitlementState.entitlement.status = 'manual_beta';
+    renderCard();
+    expect(
+      screen.getByRole('button', { name: /Start Agency Billing — Agency Starter/i }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Paid billing is optional for/)).toBeTruthy();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('8. Grandfathered Team beta defaults to its own plan without starting checkout', () => {
+    entitlementState.entitlement.status = 'manual_beta';
+    entitlementState.entitlement.planKey = 'agency_team';
+    renderCard();
+    expect(
+      screen.getByRole('button', { name: /Start Agency Billing — Agency Team/i }),
+    ).toBeTruthy();
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it('9. Changing the optional beta plan selector never invokes Stripe until checkout is separately clicked', () => {
+    entitlementState.entitlement.status = 'manual_beta';
+    renderCard();
+    fireEvent.click(screen.getByRole('button', { name: /Agency Team \$79\/mo/i }));
+    expect(
+      screen.getByRole('button', { name: /Start Agency Billing — Agency Team/i }),
+    ).toBeTruthy();
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

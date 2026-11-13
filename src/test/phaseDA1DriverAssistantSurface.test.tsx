@@ -318,7 +318,9 @@ describe('DA-1 · Driver Pro pricing truth', () => {
   it('never claims assistants reach billing, account deletion, or recruiter features', () => {
     const SRC = read('src/pages/Pricing.tsx');
     const assistantCopy = SRC.split('\n').filter((l) => /assistant/i.test(l)).join('\n');
-    expect(assistantCopy).not.toMatch(/assistant[^\n]*\b(billing|subscription|payment method|delete (the |your )?account|recruiter)/i);
+    expect(assistantCopy).toContain('Driver Assistants pay no assistant subscription fee.');
+    expect(SRC).toMatch(/Direct assistant access requires\s+the inviting driver's Pro plan and approval/);
+    expect(assistantCopy).not.toMatch(/assistants? (can|may|will|are able to|have access to)[^\n]*\b(billing|subscription management|payment methods|delete (the |your )?account|recruiter tools)\b/i);
     expect(assistantCopy).not.toMatch(/invite (more|additional|other) assistants/i);
   });
 });

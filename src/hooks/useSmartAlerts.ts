@@ -12,7 +12,7 @@ import {
   sumOperatingMiles,
   sumDeadheadMiles,
 } from '@/lib/loadMetrics';
-import { excludeCancelled, getLoadRealizedRevenue } from '@/lib/financialCalculations';
+import { onlyFinanciallyCompleted, getLoadRealizedRevenue } from '@/lib/financialCalculations';
 
 import { usePersonalIntelligence } from '@/hooks/usePersonalIntelligence';
 import { useUserSettings } from '@/hooks/useUserSettings';
@@ -46,8 +46,11 @@ export function computeAlerts(loadsIn: Load[], expenses: Expense[], weekStartsOn
   const alerts: SmartAlert[] = [];
   const now = new Date();
 
-  // Phase 23A.5: cancelled loads must never participate in alert math.
-  const loads = excludeCancelled(loadsIn);
+  // Financial and payment alerts must only consider completed loads.
+  // Pending, en-route and cancelled loads have not earned payment yet, so
+  // treating them as overdue or including their revenue creates false alerts.
+  // Legacy null statuses retain the canonical completed-load compatibility.
+  const loads = onlyFinanciallyCompleted(loadsIn);
 
   // Current week loads/expenses
   const thisWeek = getWeekRange(0, weekStartsOn);

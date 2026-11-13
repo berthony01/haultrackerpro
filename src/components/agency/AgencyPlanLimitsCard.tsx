@@ -47,11 +47,11 @@ function fmtLimit(used: number, limit: number | null) {
 }
 
 // Sanitize ?plan= against the strict agency plan allowlist. Phase 8B.
-function sanitizeAgencyPlanKey(raw: string | null | undefined): AssistantAgencyPlanKey {
+function sanitizeAgencyPlanKey(raw: string | null | undefined): AssistantAgencyPlanKey | null {
   if (raw && (ALL_AGENCY_PLAN_KEYS as string[]).includes(raw)) {
     return raw as AssistantAgencyPlanKey;
   }
-  return 'agency_team';
+  return null;
 }
 
 /**
@@ -82,7 +82,7 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
 
   const isOwner = agency?.my_role === 'agency_owner';
   const preselectedPlan = sanitizeAgencyPlanKey(searchParams.get('plan'));
-  const [selectedPlan, setSelectedPlan] = useState<AssistantAgencyPlanKey>(preselectedPlan);
+  const [selectedPlanOverride, setSelectedPlan] = useState<AssistantAgencyPlanKey | null>(preselectedPlan);
 
 
   if (isLoading) {
@@ -117,6 +117,12 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
     !entitlement.stripeSubscriptionId;
   const previouslyCancelled = entitlement.status === 'cancelled' && !billingNeverStarted;
   const isGrandfatheredBeta = entitlement.status === 'manual_beta';
+  // Do not default an existing grandfathered beta agency to a different paid tier.
+  // An explicit ?plan= choice or a user click still takes precedence.
+  const selectedPlan = selectedPlanOverride ??
+    (isGrandfatheredBeta && (ALL_AGENCY_PLAN_KEYS as readonly string[]).includes(entitlement.planKey)
+      ? entitlement.planKey
+      : 'agency_team');
 
   const statusBadge: Record<typeof entitlement.status, { label: string; tone: string }> = {
     manual_beta: { label: 'Beta', tone: 'bg-amber-500/15 text-amber-600 border-amber-500/30' },
@@ -302,7 +308,9 @@ export function AgencyPlanLimitsCard({ agencyId }: Props) {
             <Info className="h-4 w-4 mt-0.5 shrink-0" />
             <span>
               Grandfathered beta workspace — this agency keeps {plan.label} limits at no
-              charge. New agencies must start a paid plan.
+              charge. New agencies must start a paid plan. Paid billing is optional for
+              this existing beta agency; the options below start a separate paid
+              Stripe checkout only if the owner chooses to proceed.
             </span>
           </div>
         )}

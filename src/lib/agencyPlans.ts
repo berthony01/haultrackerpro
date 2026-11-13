@@ -78,6 +78,7 @@ export const ASSISTANT_AGENCY_PLANS: Record<AssistantAgencyPlanKey, AssistantAge
     },
     publicBullets: [
       'Free — no HaulTracker Pro fee just to assist a driver',
+      'For direct assistance, the inviting driver needs an active Driver Pro plan',
       'Access begins only after a driver-approved delegation',
       'Help with loads, expenses, fuel logs, and reports (per-driver permissions)',
       'Settlements: view only if the driver granted settlement view permission',
