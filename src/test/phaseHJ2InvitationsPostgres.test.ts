@@ -277,3 +277,45 @@ it('list output never contains driver contact data', async () => {
   await send(ids.owner, card.d1);
   expect(JSON.stringify(await list(ids.driver))).not.toContain('555-DO-NOT-LEAK');
 });
+
+const discover = async (u: string | null, w = ids.ws) =>
+  (await as(u, 'SELECT public.list_recruiter_job_search_cards($1,20,NULL,NULL) AS r', [w])) as Array<{ id: string; payload: Record<string, unknown> }>;
+const setContact = (u: string, vis: string, allow: boolean) =>
+  pool.query('UPDATE public.driver_opportunity_profiles SET visibility=$2, allow_verified_recruiter_contact=$3 WHERE user_id=$1', [u, vis, allow]);
+
+it('HJ-1B discovery lists only drivers with both card and live contact consent', async () => {
+  const visible = async () => (await discover(ids.owner)).map((c) => c.id).sort();
+  expect(await visible()).toEqual([card.d1, card.d2].sort());
+  const page = await discover(ids.owner);
+  expect(JSON.stringify(page)).not.toContain(ids.driver);
+  expect(JSON.stringify(page)).not.toContain('555-DO-NOT-LEAK');
+  for (const [vis, allow] of [['private', true], ['apply_only', true], ['verified_recruiters', false], ['private', false]] as const) {
+    await setContact(ids.driver, vis, allow);
+    expect(await visible()).toEqual([card.d2]);
+  }
+  await setContact(ids.driver, 'verified_recruiters', true);
+  expect(await visible()).toEqual([card.d1, card.d2].sort());
+  await pool.query('DELETE FROM public.driver_opportunity_profiles WHERE user_id=$1', [ids.driver2]);
+  expect(await visible()).toEqual([card.d1]);
+  await pool.query("UPDATE job_search_private.driver_job_search_cards SET status='withdrawn' WHERE id=$1", [card.d1]);
+  expect(await visible()).toEqual([]);
+});
+it('HJ-1B discovery toggling contact off removes card immediately and re-enabling restores it', async () => {
+  await setContact(ids.driver, 'verified_recruiters', false);
+  expect((await discover(ids.owner)).map((c) => c.id)).toEqual([card.d2]);
+  await setContact(ids.driver, 'verified_recruiters', true);
+  expect((await discover(ids.owner)).map((c) => c.id).sort()).toEqual([card.d1, card.d2].sort());
+  await pool.query("UPDATE job_search_private.driver_job_search_cards SET expires_at=now()-interval '1 second', published_at=now()-interval '2 days', created_at=now()-interval '2 days' WHERE id=$1", [card.d1]);
+  await setContact(ids.driver, 'verified_recruiters', false);
+  await setContact(ids.driver, 'verified_recruiters', true);
+  expect((await discover(ids.owner)).map((c) => c.id)).toEqual([card.d2]);
+});
+it('HJ-1B discovery denies anonymous, staff, other-workspace and driver actors; anon has no EXECUTE', async () => {
+  await expect(discover(null)).rejects.toMatchObject({ code: '42501' });
+  await expect(discover(ids.staff)).rejects.toMatchObject({ code: '42501' });
+  await expect(discover(ids.other)).rejects.toMatchObject({ code: '42501' });
+  await expect(discover(ids.driver)).rejects.toMatchObject({ code: '42501' });
+  const r = (await pool.query("SELECT has_function_privilege('anon',p.oid,'EXECUTE') a FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE proname='list_recruiter_job_search_cards'")).rows;
+  expect(r.length).toBe(2); for (const x of r) expect(x.a).toBe(false);
+  await expect(as(ids.owner, 'SELECT count(*) AS r FROM job_search_private.driver_job_search_cards')).rejects.toMatchObject({ code: '42501' });
+});

@@ -58,6 +58,12 @@ BEGIN
         WHERE cap.user_id = c.owner_user_id AND cap.capability = 'driver' AND cap.status = 'active')
       AND NOT public.user_has_blocking_messaging_restriction(c.owner_user_id)
       AND NOT public.is_qa_fixture_root('user', c.owner_user_id)
+      -- Live recruiter-contact consent (same rule as HJ-2 send/accept);
+      -- missing profile row = not discoverable.
+      AND EXISTS (SELECT 1 FROM public.driver_opportunity_profiles dop
+        WHERE dop.user_id = c.owner_user_id
+          AND dop.visibility = 'verified_recruiters'
+          AND dop.allow_verified_recruiter_contact IS TRUE)
       AND (_after_published_at IS NULL OR (c.published_at, c.id) < (_after_published_at, _after_card_id))
     ORDER BY c.published_at DESC, c.id DESC LIMIT _limit
   ) page;
