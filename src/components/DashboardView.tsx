@@ -404,9 +404,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-black font-heading">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Your hauling overview</p>
+      <div className="space-y-1">
+        <h2 className="text-xl font-black font-heading">Your work, at a glance</h2>
+        <p className="text-sm text-muted-foreground">Start with a time period, then record loads and costs as they happen.</p>
       </div>
 
       {/* Phase DA-1 — self-only tier-up detection (signed-in user's own state) */}
@@ -441,7 +441,9 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
             <p className="text-[11px] text-muted-foreground font-medium pl-0.5">{label}</p>
           ) : null;
         })()}
-        <p className="text-[11px] text-muted-foreground pl-0.5">These totals follow the selected date range.</p>
+        <p className="text-[11px] leading-relaxed text-muted-foreground pl-0.5">
+          Metrics use completed loads and recorded costs in this period. If it looks empty, choose All Time to find historical activity.
+        </p>
       </div>
 
       {/* === PRIMARY FINANCIALS (scoped to the selected period) === */}
@@ -449,12 +451,15 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <TooltipProvider>
-              <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-gross-revenue" data-value={grossRevenue}><PremiumKpiCard label="Gross Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} trendLabel={trendSuffix} delay={0} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.grossRevenue}</TooltipContent></Tooltip>
-              <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-net-profit" data-value={netProfit}><PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} trendLabel={trendSuffix} delay={0.05} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netProfit}</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-gross-revenue" data-value={grossRevenue}><PremiumKpiCard label="Gross Revenue" value={formatCurrency(grossRevenue)} icon={DollarSign} trendPct={trendRevenue} trendLabel={trendSuffix} delay={0} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.grossRevenue} Calculated from your records; not proof that money was received.</TooltipContent></Tooltip>
+              <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-net-profit" data-value={netProfit}><PremiumKpiCard label="Net Profit" value={formatCurrency(netProfit)} icon={TrendingUp} trendPct={trendNet} trendLabel={trendSuffix} delay={0.05} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netProfit} Calculated from your records; not proof that money was received.</TooltipContent></Tooltip>
               <Tooltip><TooltipTrigger asChild><div data-testid="dashboard-net-rpm" data-value={netRPM}><PremiumKpiCard label="Net RPM" value={formatCurrency(netRPM)} icon={Route} trendPct={trendPpm} trendLabel={trendSuffix} delay={0.1} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">{FINANCIAL_TOOLTIPS.netRPM}</TooltipContent></Tooltip>
               <Tooltip><TooltipTrigger asChild><div><PremiumKpiCard label="Loads Completed" value={summary.loadCount.toString()} icon={Truck} trendPct={trendLoads} trendLabel={trendSuffix} delay={0.15} /></div></TooltipTrigger><TooltipContent side="bottom" className="max-w-[260px] text-xs">Completed loads only; pending, en-route and cancelled excluded.{summary.cancelledCount > 0 ? ` ${summary.cancelledCount} cancelled load${summary.cancelledCount === 1 ? '' : 's'} not counted.` : ''}</TooltipContent></Tooltip>
             </TooltipProvider>
           </div>
+          <p className="-mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            Gross Revenue and Net Profit are calculated amounts, not confirmation of money received. Record actual pay on each load to track payments.
+          </p>
 
           {/* Hidden E2E fixture — exposes the full KPI set with stable testids.
               Visually hidden (no UI change). Used by tests/e2e/driver-journey.spec.ts. */}
@@ -480,10 +485,15 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
 
       {/* === QUICK ACTIONS === */}
       {!isLoading && showPersonalWidgets && onNavigate && (
-        <div className="grid grid-cols-4 gap-2">
+        <section className="space-y-2" aria-labelledby="dashboard-quick-actions">
+          <div>
+            <h2 id="dashboard-quick-actions" className="text-sm font-bold">Quick actions</h2>
+            <p className="text-[11px] text-muted-foreground">Record work and costs as they happen.</p>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
           <Button
             variant="outline"
-            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
+            className="h-16 flex-col gap-1 rounded-xl border-primary/20 text-foreground [&_svg]:text-primary font-bold text-[11px] sm:text-xs active:scale-95 transition-all px-1"
             onClick={() => onNavigate('add_expense')}
           >
             <Receipt className="h-4 w-4 shrink-0" />
@@ -491,7 +501,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           </Button>
           <Button
             variant="outline"
-            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
+            className="h-16 flex-col gap-1 rounded-xl border-primary/20 text-foreground [&_svg]:text-primary font-bold text-[11px] sm:text-xs active:scale-95 transition-all px-1"
             onClick={() => onNavigate('add')}
           >
             <Truck className="h-4 w-4 shrink-0" />
@@ -499,7 +509,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           </Button>
           <Button
             variant="outline"
-            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
+            className="h-16 flex-col gap-1 rounded-xl border-primary/20 text-foreground [&_svg]:text-primary font-bold text-[11px] sm:text-xs active:scale-95 transition-all px-1"
             onClick={() => onNavigate('add_fuel')}
           >
             <Fuel className="h-4 w-4 shrink-0" />
@@ -507,13 +517,14 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
           </Button>
           <Button
             variant="outline"
-            className="h-11 gap-1 rounded-xl border-primary/20 text-primary font-bold text-xs active:scale-95 transition-all px-1"
+            className="h-16 flex-col gap-1 rounded-xl border-primary/20 text-foreground [&_svg]:text-primary font-bold text-[11px] sm:text-xs active:scale-95 transition-all px-1"
             onClick={() => onNavigate('parking')}
           >
             <ParkingCircle className="h-4 w-4 shrink-0" />
             Parking
           </Button>
-        </div>
+          </div>
+        </section>
       )}
 
       {/* === ALERTS === */}
@@ -542,7 +553,7 @@ export function DashboardView({ loads, expenses = [], fuelLogs = [], isLoading, 
                 <p className="font-bold text-sm">No loads in this period</p>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                   {loads.length > 0
-                    ? 'Choose another period to review your recorded loads.'
+                    ? 'Choose another period or select All Time to review your historical activity.'
                     : 'Log your first load to start seeing earnings, miles, and profit here.'}
                 </p>
                 {loads.length === 0 && showPersonalWidgets && onNavigate && (

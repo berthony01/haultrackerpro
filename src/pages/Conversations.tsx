@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { MessageSquareText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useViewMode } from '@/hooks/useViewMode';
@@ -45,9 +46,17 @@ export default function Conversations() {
   return (
     <main className="app-shell min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-8 sm:px-6">
-        <header className="space-y-3">
-          <h1 className="text-2xl font-bold">Conversations</h1>
-          <p className="text-sm text-muted-foreground">{workspace === 'recruiter' ? 'Your conversations with drivers.' : 'Your conversations with recruiters.'}</p>
+        <header className="premium-card space-y-4 p-4 sm:p-6">
+          <div className="flex items-start gap-3">
+            <div className="rounded-xl bg-primary/10 p-2.5 text-primary ring-1 ring-primary/20">
+              <MessageSquareText className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-label">Workspace inbox</p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight">Conversations</h1>
+              <p className="mt-1 text-sm text-muted-foreground">{workspace === 'recruiter' ? 'Your conversations with drivers.' : 'Your conversations with recruiters.'}</p>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline"><Link onClick={() => { if (allowed && (workspace === 'driver' || workspace === 'recruiter')) access.setViewMode(workspace); }} to={workspace === 'recruiter' ? '/dashboard?page=recruiter-access' : '/dashboard'}>Return to Dashboard</Link></Button>
             <Button asChild variant="ghost"><Link to="/start">Workspaces</Link></Button>

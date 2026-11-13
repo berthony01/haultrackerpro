@@ -174,6 +174,18 @@ export function ReportsView({
         </p>
       </div>
 
+      <nav aria-label="Report sections" className="premium-card flex flex-wrap gap-2 p-2">
+        <Button asChild variant="ghost" size="sm" className="min-h-10 flex-1 whitespace-normal px-2 text-xs text-foreground hover:text-foreground sm:flex-none">
+          <a href="#financial-summary">Financial summary</a>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="min-h-10 flex-1 whitespace-normal px-2 text-xs text-foreground hover:text-foreground sm:flex-none">
+          <a href="#payment-details">Payment details</a>
+        </Button>
+        <Button asChild variant="ghost" size="sm" className="min-h-10 flex-1 whitespace-normal px-2 text-xs text-foreground hover:text-foreground sm:flex-none">
+          <a href="#weekly-breakdown">Weekly breakdown</a>
+        </Button>
+      </nav>
+
       {/* Report Center: type + range + download */}
       <div className="premium-card p-4 space-y-4">
         <div className="grid sm:grid-cols-2 gap-3">
@@ -193,6 +205,9 @@ export function ReportsView({
             <DateRangeFilter currentRange={dateRange} onRangeChange={(from, to) => setDateRange({ from, to })} />
           </div>
         </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          This date filter scopes every total, breakdown, and export below. All Time includes your full history; This Week only includes the current pay week.
+        </p>
 
         {!canExport && (
           <div
@@ -248,6 +263,11 @@ export function ReportsView({
       </div>
 
       {/* Financial KPI Strip */}
+      <section id="financial-summary" aria-labelledby="financial-summary-heading" className="space-y-3 scroll-mt-24">
+        <div>
+          <h2 id="financial-summary-heading" className="text-lg font-bold">Financial summary</h2>
+          <p className="text-xs text-muted-foreground">Calculated totals for the selected date range.</p>
+        </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="premium-card p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -292,6 +312,7 @@ export function ReportsView({
           <p className="text-[11px] text-muted-foreground mt-1">{formatNumber(summary.loadedMiles)} loaded · {formatNumber(summary.deadheadMiles)} DH</p>
         </div>
       </div>
+      </section>
 
       {/* Hidden E2E fixture — exposes Reports KPIs with stable testids for parity assertions. */}
       <div data-testid="reports-metrics" className="sr-only" aria-hidden="true">
@@ -305,8 +326,9 @@ export function ReportsView({
       </div>
 
       {/* Detailed Financial Breakdown */}
-      <div className="premium-card p-4">
-        <p className="text-label mb-3">Financial Breakdown</p>
+      <section id="payment-details" aria-labelledby="payment-details-heading" className="premium-card scroll-mt-24 p-4">
+        <h2 id="payment-details-heading" className="text-lg font-bold">Payment details</h2>
+        <p className="text-label mb-3 mt-1">Financial Breakdown</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs">
           <div>
             <p className="text-muted-foreground">Actual Pay Received</p>
@@ -356,7 +378,7 @@ export function ReportsView({
         <p className="text-[10px] text-muted-foreground/70 mt-3 pt-3 border-t border-border/40">
           Pending, en-route and cancelled loads are excluded from earnings, mileage, and completed load counts.
         </p>
-      </div>
+      </section>
 
       {/* Cancelled Loads Section */}
       {cancelledLoads.length > 0 && (
@@ -395,9 +417,10 @@ export function ReportsView({
       {/* Legacy raw exports removed — replaced by the unified Report Center above. */}
 
       {/* Weekly Breakdown */}
-      {summaries.length > 0 && (
-        <div>
-          <h2 className="text-label mb-3">Weekly Breakdown</h2>
+      <section id="weekly-breakdown" aria-labelledby="weekly-breakdown-heading" className="scroll-mt-24">
+        <h2 id="weekly-breakdown-heading" className="mb-1 text-lg font-bold">Weekly breakdown</h2>
+        <p className="mb-3 text-xs text-muted-foreground">Expected and actual pay grouped by pay week within the selected range.</p>
+        {summaries.length > 0 ? (
           <div className="space-y-2">
             {summaries.map(s => (
               <div key={s.startDate} className="premium-card p-4">
@@ -439,8 +462,10 @@ export function ReportsView({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="premium-card p-4 text-sm text-muted-foreground">No completed loads fall within this date range.</p>
+        )}
+      </section>
     </div>
   );
 }
