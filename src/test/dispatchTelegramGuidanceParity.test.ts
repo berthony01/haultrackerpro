@@ -15,7 +15,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 describe('Dispatch, Telegram Mini App and permissions in public guidance', () => {
   it('explains company Dispatch separately from public recruiting on both landing pages', () => {
     const home = read('src/pages/Landing.tsx');
-    const recruiter = read('src/components/landing/RecruiterLanding.tsx');
+    const recruiter = read('src/pages/Recruiters.tsx');
     expect(home).toContain('authorized company Dispatch workspace');
     expect(recruiter).toContain('Company Dispatch and Telegram Mini App');
     expect(recruiter).toContain('drivers who accepted a company connection');
