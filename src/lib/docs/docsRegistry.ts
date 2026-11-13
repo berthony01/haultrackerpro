@@ -112,14 +112,14 @@ const DOCS_ENTRIES: readonly DocsEntry[] = Object.freeze(
       // Recruiters
       {
         id: 'recruiter-guide',
-        title: 'Recruiter guide',
+        title: 'Recruiter, Dispatch & Telegram Mini App guide',
         description:
-          'How recruiters and carriers post opportunities, review applications and manage outreach.',
+          'Posting opportunities, company Dispatch, driver connections, authorized staff access, Telegram bot group setup and the Mini App.',
         category: 'recruiters',
         audiences: ['recruiter'],
         route: '/recruiter/guide',
         status: 'live',
-        keywords: ['recruiter', 'guide', 'opportunities', 'hiring', 'workflow'],
+        keywords: ['recruiter', 'guide', 'opportunities', 'hiring', 'workflow', 'dispatch', 'telegram', 'bot', 'mini app', 'driver connection', 'group'],
       },
       {
         id: 'recruiter-faq',
