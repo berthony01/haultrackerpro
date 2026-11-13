@@ -77,7 +77,7 @@ export default function RecruiterGuide() {
             Recruiter <span className="text-primary">User Guide</span>
           </h1>
           <p className="text-base text-muted-foreground max-w-2xl mx-auto">
-            From recruiter setup to driver applications and company Dispatch, including the Telegram Mini App.
+            From workspace setup to hired driver, with separate company Dispatch and Telegram Mini App guidance.
           </p>
         </div>
       </section>
