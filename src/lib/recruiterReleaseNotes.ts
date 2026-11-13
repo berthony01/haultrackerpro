@@ -6,6 +6,26 @@ import type { ReleaseNote } from './releaseNotes';
  */
 export const RECRUITER_RELEASE_NOTES: ReleaseNote[] = [
   {
+    id: 'rec-v2026-11-company-dispatch-telegram',
+    version: '2026.11',
+    date: '2026-11-12',
+    title: 'Company Dispatch, connected drivers, and Telegram Mini App',
+    summary:
+      'Authorized company teams can connect consenting drivers and manage assigned loads through the website and signed Telegram Mini App, alongside existing recruiter opportunity tools.',
+    highlights: [
+      'Company Dispatch is a separate, permission-controlled workflow from posting recruiting opportunities. Company owners can invite drivers to accept a company connection before assigning loads.',
+      'Authorized owners and staff use the website Dispatch board or linked Telegram Mini App to manage connected-driver loads. Changes appear in the driver’s own load history.',
+      'Delivered and Cancelled actions require confirmation. The Dispatch board requires a delivery date; older group-delivered loads missing actual dates are labeled unconfirmed.',
+      'Telegram group setup requires a separate account link, the bot and a one-time group connection command. A group member does not gain company Dispatch permissions by adding the bot.',
+      'Recruiter and driver guidance now distinguishes assigned loads, recruiting applications, the Conversations inbox and account-specific access.',
+    ],
+    links: [
+      { label: 'Company Dispatch guide', to: '/recruiter/guide#dispatch' },
+      { label: 'Recruiter FAQ', to: '/recruiter/faq' },
+      { label: 'Dispatch', to: '/dispatch' },
+    ],
+  },
+  {
     id: 'rec-v2026-05-recruiter-experience',
     version: '2026.05',
     date: '2026-05-16',

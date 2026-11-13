@@ -90,7 +90,7 @@ export default function About() {
               { icon: Truck, title: 'Owner-operators', desc: 'Track loads, fuel, expenses, and net profit across your authority.' },
               { icon: Users, title: 'Lease drivers', desc: 'Understand what you keep after settlements, fuel, and deductions.' },
               { icon: FileSignature, title: '1099 truck drivers', desc: 'Organize income, expenses, and contract details for cleaner records.' },
-              { icon: Briefcase, title: 'Trucking recruiters & carriers', desc: 'Post verified opportunities, manage applicants, and track referrals.' },
+              { icon: Briefcase, title: 'Trucking recruiters & carriers', desc: 'Post structured opportunities from an eligible recruiter workspace, manage applicants, and track referrals.' },
             ].map((a) => (
               <div key={a.title} className="flex gap-4 p-5 rounded-xl border" style={{ background: 'hsl(220, 20%, 10%)', borderColor: 'hsl(220, 16%, 16%)' }}>
                 <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ background: 'hsl(25, 95%, 53%, 0.12)' }}>

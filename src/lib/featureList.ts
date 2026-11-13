@@ -141,9 +141,17 @@ export const featureList: FeatureCategory[] = [
     ],
   },
   {
+    category: 'Company Dispatch & Telegram',
+    features: [
+      { icon: Users, title: 'Driver-Approved Company Connections', description: 'A company owner can invite a driver by HaulTracker Pro account email. The verified driver must accept the company connection before company Dispatch can assign that driver a load. This relationship is separate from a job application or assistant delegation.' },
+      { icon: Truck, title: 'One Website and Telegram Dispatch Load Ledger', description: 'Authorized company owners and staff can manage connected-driver loads from website Dispatch and the signed Telegram Mini App. New assignments start Pending. Delivery and cancellation require confirmation, and delivery in the Dispatch board requires an actual delivery date. Drivers see assigned loads and status changes in their own account.' },
+      { icon: ShieldCheck, title: 'Permissioned Telegram Group Review', description: 'A recruiter workspace can link a Telegram group after personal account linking, bot setup and a one-time expiring group command. Supported status messages are routed through authorized review rather than granting any group participant Dispatch access. Completed legacy group updates without an actual delivery date are labeled unconfirmed.' },
+    ],
+  },
+  {
     category: 'Team & Agency Workflow',
     features: [
-      { icon: Users, title: 'Driver Assistants', description: 'Direct driver invitations to a spouse, dispatcher, or back-office helper are available without a Driver Pro subscription. Access always remains driver-approved and permission-based (loads, expenses, fuel, reports, settings). Settlement access follows the same rule: an assistant can view settlements only with settlement view permission, and can manage or finalize only with the matching settlement-management or settlement-finalize permission. Advanced reconciliation and imported statements follow the recipient driver\'s Pro entitlement, never the assistant\'s own plan, and finalizing requires finalize permission plus recipient driver Pro. Every action is logged and you can revoke access any time.' },
+      { icon: Users, title: 'Driver Assistants', description: 'Direct driver invitations to a spouse or back-office helper require the inviting driver to have an active Driver Pro plan; the invited assistant pays no separate assistant subscription fee. Access always remains driver-approved and permission-based (loads, expenses, fuel, reports, settings). Settlement access follows the same rule: an assistant can view settlements only with settlement view permission, and can manage or finalize only with the matching settlement-management or settlement-finalize permission. Advanced reconciliation and imported statements follow the recipient driver\'s Pro entitlement, never the assistant\'s own plan, and finalizing requires finalize permission plus recipient driver Pro. Every action is logged and you can revoke access any time.' },
       { icon: ClipboardPaste, title: 'Recruiter Paste Opportunity to Auto-Fill', description: 'Recruiters can paste an existing job post, recruiter pitch, or rate sheet and AI extracts the structured opportunity fields into the form. The recruiter reviews and edits every extracted field, and the extractor itself does not save anything — nothing is saved until the recruiter submits the form.' },
 
       { icon: Shield, title: 'Driver Control Center', description: 'One screen at /driver/assistant-control to see every person and agency with access to your account — direct invites and agency delegations — and end any access in one tap.' },

@@ -71,6 +71,14 @@ export const recruiterFeatureList: RecruiterFeatureCategory[] = [
     ],
   },
   {
+    category: 'Company Dispatch & Telegram Mini App',
+    features: [
+      { icon: Users, title: 'Connect Drivers with Consent', description: 'The company owner invites a driver by verified HaulTracker Pro account email. A driver must accept the company connection before assigned loads can be created. Recruiting applications are separate.' },
+      { icon: Briefcase, title: 'Shared Company Dispatch Board', description: 'Authorized company owners and staff can view connected-driver loads in website Dispatch or the signed Telegram Mini App. Posting opportunities and assigning Dispatch loads are different workflows. Load creation and status changes require their own staff permissions.' },
+      { icon: ShieldCheck, title: 'Telegram Group Status Review', description: 'After linking your personal Telegram identity and connecting a group with a one-time command, supported group messages can request a load status update for authorized review. The bot does not grant other group members company access.' },
+    ],
+  },
+  {
     category: 'Trust & Moderation',
     features: [
       { icon: ShieldCheck, title: 'Admin Oversight', description: 'HaulTrackerPro admins can review, flag, or suspend listings that mislead drivers — keeping the platform credible for both sides.' },

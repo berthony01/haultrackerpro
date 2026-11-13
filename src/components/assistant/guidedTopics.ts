@@ -33,6 +33,7 @@ export const GUIDE_TOPICS: Record<GuideAudience, GuideTopic[]> = {
       ],
     },
     { id: 'reports', label: 'Reports and profit', body: 'See weekly and monthly profit, and export reports.', links: [{ label: 'Reports', to: '/dashboard?page=reports', hint: 'Weekly and monthly profit.' }] },
+    { id: 'company-loads', label: 'Company connections and assigned loads', body: 'A company can assign loads to your Driver account only after you accept its company connection. Pending or cancelled loads do not count as completed earnings. You do not need access to the company Dispatch bot.', links: [{ label: 'Company connections', to: '/driver/company-connections', hint: 'Review and manage company connection requests.' }, { label: 'My loads', to: '/dashboard?page=loads', hint: 'View your assigned and personal loads.' }] },
     {
       id: 'helpers', label: 'Assistants and work items', body: 'Choose what you want to manage.',
       children: [
@@ -44,6 +45,7 @@ export const GUIDE_TOPICS: Record<GuideAudience, GuideTopic[]> = {
   ],
   recruiter: [
     { id: 'opportunities', label: 'Opportunities', body: 'Create and manage the jobs you post to drivers.', links: [{ label: 'Manage opportunities', to: '/recruiter/manage', hint: 'Post and edit opportunities.' }, { label: 'Recruiter guide', to: '/recruiter/guide', hint: 'How posting works.' }] },
+    { id: 'dispatch', label: 'Company Dispatch and Telegram', body: 'Dispatch assigns real loads to drivers who accepted your company connection. It is separate from job postings. The website and signed Telegram Mini App share load history and respect company staff permissions.', links: [{ label: 'Open Dispatch', to: '/dispatch', hint: 'Authorized company load board.' }, { label: 'Dispatch setup guide', to: '/recruiter/guide#dispatch', hint: 'Connect drivers, link Telegram, and use the Mini App.' }] },
     { id: 'applications', label: 'Applications', body: 'Review drivers who applied to your opportunities.', links: [{ label: 'Applications', to: '/recruiter/applications', hint: 'Review driver applications.' }] },
     { id: 'conversations', label: 'Conversations', body: 'Messages with real drivers live in Conversations, separate from this assistant.', links: [{ label: 'Conversations', to: '/conversations', hint: 'Your driver messages.' }] },
     {
