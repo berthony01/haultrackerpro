@@ -34,6 +34,7 @@ const features = [
   { icon: ClipboardList, title: 'Structured opportunity postings', desc: 'Required fields for pay, lanes, equipment, deductions, and home-time create clear, comparable listings.' },
   { icon: Users, title: 'Reach financially serious drivers', desc: 'HaulTrackerPro drivers track real profit, RPM, and deductions. They evaluate opportunities by the numbers.' },
   { icon: Handshake, title: 'In-app applicant pipeline', desc: 'Review interest, manage driver contact requests, and track status from one dashboard — no spreadsheets.' },
+  { icon: Users, title: 'Company Dispatch and Telegram Mini App', desc: 'Authorized company owners and staff can assign loads to drivers who accepted a company connection. Website Dispatch and the signed Telegram Mini App share those load records; staff permissions and driver consent still apply.' },
   { icon: BarChart3, title: 'Free standard posting', desc: 'Complete, active recruiter workspaces can keep 1 standard opportunity active for free, with unlimited drafts. Paid plans increase active limits and add premium tools.' },
   { icon: Search, title: 'Recruiter contract-management + AI risk review (Growth & Fleet)', desc: "Growth and Fleet unlock the recruiter contract-management dashboard and AI-assisted risk review. Universal driver protections — review, approve, request changes, reject, optional in-app signature, and the hired-status protection that requires driver approval before hiring — apply to every driver plan." },
   { icon: Share2, title: 'Driver-to-driver referral tracking', desc: 'Drivers can refer other drivers to your opportunities. Track referral progress, set your external referral terms, and see referral analytics. Referral bonuses, if offered, are paid externally by you — HaulTrackerPro does not process referral payments.' },
@@ -169,8 +170,8 @@ export default function RecruiterLanding() {
           </h1>
           <p className="text-base sm:text-lg max-w-2xl mx-auto" style={{ color: MUTED }}>
             HaulTrackerPro connects recruiters with financially serious owner-operators and
-            lease drivers. Structured postings, in-app pipeline, contract-management with AI risk
-            review on Growth & Fleet — all in one place.
+            lease drivers. Structured postings, in-app conversations and contract tools are
+            joined by a separate, permissioned company Dispatch workspace for accepted driver connections.
             <span className="block mt-2 text-xs">
               Driver?{' '}
               <button
