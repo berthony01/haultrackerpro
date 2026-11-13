@@ -15,10 +15,7 @@ import {
   Calculator,
   BookOpen,
   Send,
-  UserPlus,
   UserCheck,
-  KeyRound,
-  HelpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -705,48 +702,27 @@ export default function Landing() {
             <p className="mt-3 max-w-2xl text-sm sm:text-base leading-relaxed" style={{ color: TEXT_MUTED }}>
               Review your Find Work answers before saving your preferences. Driver assistant and agency access requires driver approval and is limited to granted permissions.
             </p>
-            <p className="mt-6 text-xs font-bold uppercase tracking-widest" style={{ color: TEXT_DIM }}>
-              Illustrative example
-            </p>
-            <ol className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { icon: UserPlus, title: 'Connection request', body: 'A company, assistant or agency asks to connect with a driver.' },
-                { icon: UserCheck, title: 'Driver review', body: 'The driver reviews who is asking and what they would be able to see or do.' },
-                { icon: KeyRound, title: 'Approved access', body: 'Only after driver approval does access begin, limited to granted permissions.' },
-              ].map((step, i) => (
-                <li
-                  key={step.title}
-                  className="rounded-xl border p-5"
-                  style={{ background: NAVY_SURFACE, borderColor: NAVY_BORDER }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black"
-                      style={{ background: 'hsl(25, 95%, 53%, 0.15)', color: AMBER_BRIGHT }}
-                    >
-                      {i + 1}
-                    </span>
-                    <step.icon className="h-5 w-5" style={{ color: TEAL }} aria-hidden="true" />
-                    <span className="text-sm font-bold text-white">{step.title}</span>
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>{step.body}</p>
-                </li>
-              ))}
-            </ol>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-              <p className="rounded-lg border px-4 py-4" style={{ borderColor: NAVY_BORDER }}>
-                <span className="font-bold text-white">Company connections: </span>
-                a driver approves a company connection before that company can coordinate
-                authorized load assignments. Adding the bot to a Telegram group does not grant
-                anyone access to a driver's records.
-              </p>
-              <p className="rounded-lg border px-4 py-4" style={{ borderColor: NAVY_BORDER }}>
-                <span className="font-bold text-white">Assistant &amp; agency delegation: </span>
-                a separate approval. Each driver chooses what an assistant or agency may help with,
-                and can review that access later.
-              </p>
+            <div
+              className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 border-t pt-6 text-sm leading-relaxed"
+              style={{ borderColor: NAVY_BORDER, color: TEXT_MUTED }}
+            >
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-white">Company connections</p>
+                <p className="mt-2">
+                  A driver approves a company connection before that company can coordinate authorized
+                  load assignments. Joining a Telegram group or installing the bot does not by itself grant
+                  any company Dispatch or driver-record permission.
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-white">Assistant &amp; agency permissions</p>
+                <p className="mt-2">
+                  A separate approval from company connections. Each driver chooses what an assistant or
+                  agency may help with, and can review that access later.
+                </p>
+              </div>
             </div>
-            <p className="mt-5 text-xs" style={{ color: TEXT_DIM }}>
+            <p className="mt-6 text-xs" style={{ color: TEXT_DIM }}>
               Service payments between drivers and assistants or agencies are arranged outside
               HaulTracker Pro. HaulTracker Pro does not process service payments.
             </p>
@@ -756,37 +732,12 @@ export default function Landing() {
 
       {/* FOOTER */}
       <footer
-        className="border-t py-12"
+        className="border-t py-10"
         style={{ borderColor: 'hsl(220, 16%, 14%)', background: 'hsl(220, 20%, 6%)' }}
       >
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-10">
-          <div className="grid gap-8 lg:grid-cols-[1.2fr_2fr]">
-            <div>
-              <div className="flex items-center gap-2">
-                <Truck className="h-6 w-6" style={{ color: AMBER }} aria-hidden="true" />
-                <span className="text-lg font-black tracking-tight text-white">HaulTrackerPro</span>
-              </div>
-              <p className="mt-3 max-w-sm text-sm leading-relaxed" style={{ color: TEXT_MUTED }}>
-                Find trucking work, run your business, and work with the people you approve.
-              </p>
-              <div className="mt-5 flex flex-col sm:flex-row gap-3">
-                <Button
-                  onClick={goToDriver}
-                  className="min-h-[44px] h-auto whitespace-normal rounded-lg font-bold gap-2 px-5"
-                  style={{ background: AMBER, color: 'white' }}
-                >
-                  Create driver account <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => navigate('/docs')}
-                  className="min-h-[44px] h-auto whitespace-normal rounded-lg gap-2 border border-sidebar-border"
-                >
-                  <HelpCircle className="h-4 w-4" aria-hidden="true" /> Help Center
-                </Button>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 space-y-8">
+          <div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-8">
             {[
               {
                 title: 'Product',
@@ -845,7 +796,7 @@ export default function Landing() {
                       onClick={() => {
                         if ((link as { track?: boolean }).track) trackStarterKitCTAClicked('footer');
                       }}
-                      className="flex min-h-[44px] items-center rounded text-xs font-medium text-sidebar-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      className="flex min-h-[40px] items-center rounded text-sm text-sidebar-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       {link.label}
                     </a>
