@@ -635,7 +635,7 @@ export default function HomeConversationFlow({
         <div
           ref={transcriptRef}
           data-testid="home-conversation-transcript"
-          className="h-[220px] sm:h-[240px] space-y-2 overflow-y-auto overscroll-contain pr-1"
+          className="h-[180px] sm:h-[200px] space-y-2 overflow-y-auto overscroll-contain pr-1"
           aria-live="polite"
         >
           {bubbles.map((b) => (
