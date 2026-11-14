@@ -9,8 +9,8 @@
 --      signups get nothing. Existing capability rows are untouched.
 --      (Signup metadata is user-supplied; it can only ever opt the user into
 --      the low-privilege self Driver workspace, never anything privileged.)
---   2. has_active_driver_capability(uuid): SECURITY DEFINER helper used by
---      RLS (avoids recursion through user_capabilities RLS).
+--   2. has_my_active_driver_capability(): no-argument SECURITY DEFINER helper
+--      used by RLS; checks only auth.uid() so it cannot reveal other users.
 --   3. activate_my_driver_workspace(): self-only, idempotent, explicit opt-in.
 --      Never reactivates a suspended/revoked row; never touches other users.
 --   4. Own-record INSERT/UPDATE/DELETE policies on loads, expenses, fuel_logs,
@@ -42,24 +42,24 @@ REVOKE EXECUTE ON FUNCTION public._provision_driver_capability_for_new_user() FR
 GRANT EXECUTE ON FUNCTION public._provision_driver_capability_for_new_user() TO service_role;
 
 -- 2. RLS helper ---------------------------------------------------------------
-CREATE OR REPLACE FUNCTION public.has_active_driver_capability(_user_id uuid)
+CREATE OR REPLACE FUNCTION public.has_my_active_driver_capability()
 RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = pg_catalog
 AS $$
-  SELECT _user_id IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.user_capabilities
-     WHERE user_id = _user_id
-       AND capability = 'driver'::public.user_capability_type
-       AND status = 'active'::public.user_capability_status
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.user_capabilities uc
+     WHERE uc.user_id = auth.uid()
+       AND uc.capability = 'driver'::public.user_capability_type
+       AND uc.status = 'active'::public.user_capability_status
   )
 $$;
 
-REVOKE ALL ON FUNCTION public.has_active_driver_capability(uuid) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION public.has_active_driver_capability(uuid) FROM anon;
-GRANT EXECUTE ON FUNCTION public.has_active_driver_capability(uuid) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.has_my_active_driver_capability() FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.has_my_active_driver_capability() FROM anon;
+GRANT EXECUTE ON FUNCTION public.has_my_active_driver_capability() TO authenticated, service_role;
 
 -- 3. Explicit self opt-in -----------------------------------------------------
 CREATE OR REPLACE FUNCTION public.activate_my_driver_workspace()
@@ -110,61 +110,61 @@ GRANT EXECUTE ON FUNCTION public.activate_my_driver_workspace() TO authenticated
 -- loads
 DROP POLICY IF EXISTS "Users can insert own loads" ON public.loads;
 CREATE POLICY "Users can insert own loads" ON public.loads FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can update own loads" ON public.loads;
 CREATE POLICY "Users can update own loads" ON public.loads FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()))
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability())
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can delete own loads" ON public.loads;
 CREATE POLICY "Users can delete own loads" ON public.loads FOR DELETE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability());
 
 -- expenses
 DROP POLICY IF EXISTS "Users can insert own expenses" ON public.expenses;
 CREATE POLICY "Users can insert own expenses" ON public.expenses FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can update own expenses" ON public.expenses;
 CREATE POLICY "Users can update own expenses" ON public.expenses FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()))
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability())
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can delete own expenses" ON public.expenses;
 CREATE POLICY "Users can delete own expenses" ON public.expenses FOR DELETE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability());
 
 -- fuel_logs
 DROP POLICY IF EXISTS "Users can insert own fuel logs" ON public.fuel_logs;
 CREATE POLICY "Users can insert own fuel logs" ON public.fuel_logs FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can update own fuel logs" ON public.fuel_logs;
 CREATE POLICY "Users can update own fuel logs" ON public.fuel_logs FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()))
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability())
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can delete own fuel logs" ON public.fuel_logs;
 CREATE POLICY "Users can delete own fuel logs" ON public.fuel_logs FOR DELETE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability());
 
 -- load_stops (keeps the existing parent-load ownership check)
 DROP POLICY IF EXISTS "Users can insert own load stops" ON public.load_stops;
 CREATE POLICY "Users can insert own load stops" ON public.load_stops FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid())
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability()
     AND EXISTS (SELECT 1 FROM public.loads WHERE loads.id = load_stops.load_id AND loads.user_id = auth.uid()));
 DROP POLICY IF EXISTS "Users can update own load stops" ON public.load_stops;
 CREATE POLICY "Users can update own load stops" ON public.load_stops FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()))
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid())
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability())
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability()
     AND EXISTS (SELECT 1 FROM public.loads WHERE loads.id = load_stops.load_id AND loads.user_id = auth.uid()));
 DROP POLICY IF EXISTS "Users can delete own load stops" ON public.load_stops;
 CREATE POLICY "Users can delete own load stops" ON public.load_stops FOR DELETE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability());
 
 -- recurring_expense_templates
 DROP POLICY IF EXISTS "Users can insert own templates" ON public.recurring_expense_templates;
 CREATE POLICY "Users can insert own templates" ON public.recurring_expense_templates FOR INSERT TO authenticated
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can update own templates" ON public.recurring_expense_templates;
 CREATE POLICY "Users can update own templates" ON public.recurring_expense_templates FOR UPDATE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()))
-  WITH CHECK (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability())
+  WITH CHECK (auth.uid() = user_id AND public.has_my_active_driver_capability());
 DROP POLICY IF EXISTS "Users can delete own templates" ON public.recurring_expense_templates;
 CREATE POLICY "Users can delete own templates" ON public.recurring_expense_templates FOR DELETE TO authenticated
-  USING (auth.uid() = user_id AND public.has_active_driver_capability(auth.uid()));
+  USING (auth.uid() = user_id AND public.has_my_active_driver_capability());

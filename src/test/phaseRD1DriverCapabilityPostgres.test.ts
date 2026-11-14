@@ -128,6 +128,29 @@ describe.skipIf(BASELINE)('activate_my_driver_workspace', () => {
   it('promotes setup to active', async () => expect(await act(u.setup)).toBe('active'));
 });
 
+describe.skipIf(BASELINE)('has_my_active_driver_capability (self-only helper)', () => {
+  const me = (a: string | null) => as(a, 'SELECT public.has_my_active_driver_capability() AS r').then((r) => r.rows[0].r);
+  it('no callable has_active_driver_capability(uuid) exists', async () => {
+    expect((await pool.query("SELECT count(*)::int n FROM pg_proc WHERE proname='has_active_driver_capability'")).rows[0].n).toBe(0);
+    await expect(as(u.recruiter, 'SELECT public.has_active_driver_capability($1)', [u.driver])).rejects.toThrow(/does not exist/);
+  });
+  it('takes no user-id argument', async () => {
+    await expect(as(u.recruiter, 'SELECT public.has_my_active_driver_capability($1)', [u.driver])).rejects.toThrow(/does not exist/);
+  });
+  it('reflects only the current auth id', async () => {
+    expect(await me(u.driver)).toBe(true);
+    expect(await me(u.recruiter)).toBe(false);
+    expect(await me(u.suspended)).toBe(false);
+    expect(await me(u.revoked)).toBe(false);
+    expect(await me(null)).toBe(false);
+  });
+  it('anon has no EXECUTE; SECURITY DEFINER with pg_catalog search_path', async () => {
+    const c = await pool.connect(); try { await c.query('SET ROLE anon'); await expect(c.query('SELECT public.has_my_active_driver_capability()')).rejects.toThrow(/permission denied/); } finally { await c.query('RESET ROLE'); c.release(); }
+    const r = (await pool.query("SELECT prosecdef, proconfig, pronargs FROM pg_proc WHERE proname='has_my_active_driver_capability'")).rows[0];
+    expect(r).toEqual({ prosecdef: true, proconfig: ['search_path=pg_catalog'], pronargs: 0 });
+  });
+});
+
 describe('own-record writes require active driver', () => {
   for (const t of TABLES) {
     it(`${t}: recruiter-only INSERT denied`, async () => {

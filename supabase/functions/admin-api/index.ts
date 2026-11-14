@@ -474,7 +474,8 @@ Deno.serve(async (req) => {
         else if (r.total_points >= 50) tiers.Silver++;
         else tiers.Bronze++;
       }
-      // Source-aligned driver counts (each label means exactly one source).
+      // Source-aligned driver counts. NOTE: intended_role="driver" is stored role intent only;
+      // legacy Assistant/Agency signups also stored "driver". Active capability is counted separately.
       const [intentRes, capRes, loadOwnersRes, recruiterIntentRes] = await Promise.all([
         adminDb.from("profiles").select("user_id", { count: "exact", head: true }).eq("intended_role", "driver"),
         adminDb.from("user_capabilities").select("user_id", { count: "exact", head: true }).eq("capability", "driver").eq("status", "active"),

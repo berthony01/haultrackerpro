@@ -864,7 +864,7 @@ export default function Admin() {
                                   <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
                                 )}
                                 {u.intended_role && (
-                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">signed up: {u.intended_role}</Badge>
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4" title="Stored profile field; legacy Assistant/Agency signups may show driver. Not proof of what the user selected.">Stored role intent: {u.intended_role}</Badge>
                                 )}
                                 {u.driver_capability_status && (
                                   <Badge variant={u.driver_capability_status === 'active' ? 'secondary' : 'outline'} className="text-[9px] px-1 py-0 h-4">driver: {u.driver_capability_status}</Badge>
@@ -1061,11 +1061,11 @@ export default function Admin() {
                     { label: 'Active This Week', value: driverOverview.active_drivers_week },
                     { label: 'Total Points Awarded', value: driverOverview.total_points_awarded },
                     { label: 'Top Streak (days)', value: driverOverview.top_streak },
-                    { label: 'Signed up as Driver', value: driverOverview.driver_signup_intent_count ?? '—' },
+                    { label: 'Driver role intent (legacy)', value: driverOverview.driver_signup_intent_count ?? '—' },
                     { label: 'Active Driver access', value: driverOverview.active_driver_capability_count ?? '—' },
                     { label: 'Accounts with loads', value: driverOverview.distinct_load_owners ?? '—' },
                     { label: 'Leaderboard members', value: driverOverview.leaderboard_participants ?? driverOverview.total_drivers },
-                    { label: 'Signed up as Recruiter', value: driverOverview.recruiter_signup_intent_count ?? '—' },
+                    { label: 'Recruiter role intent', value: driverOverview.recruiter_signup_intent_count ?? '—' },
                   ].map((s) => (
                     <Card key={s.label} className="shadow-card">
                       <CardContent className="p-4">
@@ -1078,6 +1078,7 @@ export default function Admin() {
                     </Card>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground">Legacy Assistant/Agency signups may also have Driver intent; active Driver access is counted separately.</p>
                 <Card>
                   <CardHeader className="pb-2"><CardTitle className="text-sm">Tier Distribution</CardTitle></CardHeader>
                   <CardContent className="grid grid-cols-4 gap-2">
