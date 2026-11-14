@@ -5796,6 +5796,10 @@ export type Database = {
         Args: { _version: string }
         Returns: string
       }
+      activate_my_driver_workspace: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_capability_status"]
+      }
       agency_team_occupied_seats: {
         Args: { _agency_id: string }
         Returns: number
@@ -6971,6 +6975,7 @@ export type Database = {
         }
         Returns: string
       }
+      has_my_active_driver_capability: { Args: never; Returns: boolean }
       invite_agency_member: {
         Args: {
           _agency_id: string
