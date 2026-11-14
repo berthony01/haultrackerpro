@@ -3,7 +3,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import {
+  activateDriverWorkspaceRpc,
   beginRecruiterSetupRpc,
+  type ActivateDriverResult,
   deriveUserCapabilitiesView,
   parseUserCapabilityRows,
   type UserCapabilityRow,
@@ -26,6 +28,8 @@ export interface UseUserCapabilitiesResult extends UserCapabilitiesView {
   refetch: () => Promise<unknown>;
   beginRecruiterSetup: () => Promise<UserCapabilityStatus>;
   beginRecruiterSetupPending: boolean;
+  activateDriverWorkspace: () => Promise<ActivateDriverResult>;
+  activateDriverWorkspacePending: boolean;
 }
 
 const EMPTY: UserCapabilityRow[] = [];
@@ -59,6 +63,19 @@ export function useUserCapabilities(): UseUserCapabilitiesResult {
     },
   });
 
+  const driverMutation = useMutation({
+    mutationFn: (): Promise<ActivateDriverResult> =>
+      activateDriverWorkspaceRpc(userId, () =>
+        (supabase as any).rpc('activate_my_driver_workspace') as Promise<{ data: unknown; error: unknown }>,
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['user-capabilities', userId] }),
+  });
+
+  const activateDriverWorkspace = useCallback(async () => {
+    if (!userId) throw new Error('Not authenticated');
+    return await driverMutation.mutateAsync();
+  }, [driverMutation, userId]);
+
   const beginRecruiterSetup = useCallback(async () => {
     if (!userId) {
       throw new Error('Not authenticated');
@@ -78,5 +95,7 @@ export function useUserCapabilities(): UseUserCapabilitiesResult {
     refetch: query.refetch,
     beginRecruiterSetup,
     beginRecruiterSetupPending: mutation.isPending,
+    activateDriverWorkspace,
+    activateDriverWorkspacePending: driverMutation.isPending,
   };
 }

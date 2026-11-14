@@ -12,6 +12,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import fs from 'node:fs';
 import path from 'node:path';
+// RD-1: launcher reads server capabilities; these tiles tests run as an active driver.
+vi.mock('@/hooks/useUserCapabilities', () => ({
+  useUserCapabilities: () => ({ isLoading: false, error: null, driverCapabilityStatus: 'active', activateDriverWorkspace: vi.fn(), activateDriverWorkspacePending: false }),
+}));
 import CapabilityLauncher from '@/pages/CapabilityLauncher';
 
 const INTENT_KEY = 'htp_workspace_intent';

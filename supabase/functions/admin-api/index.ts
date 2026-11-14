@@ -474,12 +474,26 @@ Deno.serve(async (req) => {
         else if (r.total_points >= 50) tiers.Silver++;
         else tiers.Bronze++;
       }
+      // Source-aligned driver counts (each label means exactly one source).
+      const [intentRes, capRes, loadOwnersRes, recruiterIntentRes] = await Promise.all([
+        adminDb.from("profiles").select("user_id", { count: "exact", head: true }).eq("intended_role", "driver"),
+        adminDb.from("user_capabilities").select("user_id", { count: "exact", head: true }).eq("capability", "driver").eq("status", "active"),
+        adminDb.from("loads").select("user_id").limit(100000),
+        adminDb.from("profiles").select("user_id", { count: "exact", head: true }).eq("intended_role", "recruiter"),
+      ]);
+      const loadOwners = new Set(((loadOwnersRes.data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
       return json({
         active_drivers_week: activeWeek,
         total_points_awarded: totalAwarded,
         top_streak: topStreak,
         tiers,
+        // Back-compat: total_drivers now means leaderboard participants only.
         total_drivers: all.length,
+        leaderboard_participants: all.length,
+        driver_signup_intent_count: intentRes.count ?? 0,
+        recruiter_signup_intent_count: recruiterIntentRes.count ?? 0,
+        active_driver_capability_count: capRes.count ?? 0,
+        distinct_load_owners: loadOwners.size,
       });
     }
 
@@ -534,7 +548,7 @@ Deno.serve(async (req) => {
       // Fetch profiles
       let query = adminDb
         .from("profiles")
-        .select("user_id, display_name, subscription_status, subscription_plan, created_at", { count: "exact" });
+        .select("user_id, display_name, subscription_status, subscription_plan, created_at, intended_role", { count: "exact" });
 
       if (email) {
         query = query.ilike("display_name", `%${email}%`);
@@ -563,11 +577,19 @@ Deno.serve(async (req) => {
 
       // Get counts for paginated results only
       const userIdsForPage = paginated.map((p) => p.user_id);
-      const [{ data: settingsRows }, { data: subsRows }, { data: pointsRows }] = await Promise.all([
+      const [{ data: settingsRows }, { data: subsRows }, { data: pointsRows }, { data: capRows }] = await Promise.all([
         adminDb.from("user_settings").select("user_id, lifecycle_emails_opt_in").in("user_id", userIdsForPage),
         adminDb.from("subscriptions").select("user_id, status, plan_key").in("user_id", userIdsForPage),
         adminDb.from("driver_points").select("user_id, total_points").in("user_id", userIdsForPage),
+        adminDb.from("user_capabilities").select("user_id, capability, status").in("user_id", userIdsForPage),
       ]);
+      const capMap = new Map<string, { driver: string | null; recruiter: string | null }>();
+      for (const c of (capRows || []) as Array<{ user_id: string; capability: string; status: string }>) {
+        const e = capMap.get(c.user_id) ?? { driver: null, recruiter: null };
+        if (c.capability === "driver") e.driver = c.status;
+        if (c.capability === "recruiter") e.recruiter = c.status;
+        capMap.set(c.user_id, e);
+      }
       const optedOut = new Set<string>();
       for (const s of (settingsRows || []) as Array<{ user_id: string; lifecycle_emails_opt_in: boolean | null }>) {
         if (s.lifecycle_emails_opt_in === false) optedOut.add(s.user_id);
@@ -598,6 +620,8 @@ Deno.serve(async (req) => {
             sub_status: sub?.status ?? "free",
             sub_plan_key: sub?.plan_key ?? "free",
             lifecycle_opted_out: optedOut.has(p.user_id),
+            driver_capability_status: capMap.get(p.user_id)?.driver ?? null,
+            recruiter_capability_status: capMap.get(p.user_id)?.recruiter ?? null,
           };
         })
       );

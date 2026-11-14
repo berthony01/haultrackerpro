@@ -197,6 +197,7 @@ export default function Auth() {
       if (mode === 'signup') {
         const { error } = await signUp(form.email, form.password, form.name, role, {
           emailRedirectNext: effectiveNext,
+          signupCapability: capability,
         });
         if (error) throw error;
         trackSignUp('email');

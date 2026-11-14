@@ -134,6 +134,9 @@ interface UserRow {
   sub_status?: string;
   sub_plan_key?: string;
   lifecycle_opted_out?: boolean;
+  intended_role?: string | null;
+  driver_capability_status?: string | null;
+  recruiter_capability_status?: string | null;
 }
 
 interface ParkingOverviewData {
@@ -158,6 +161,11 @@ interface DriverOverviewData {
   total_points_awarded: number;
   top_streak: number;
   total_drivers: number;
+  leaderboard_participants?: number;
+  driver_signup_intent_count?: number;
+  recruiter_signup_intent_count?: number;
+  active_driver_capability_count?: number;
+  distinct_load_owners?: number;
   tiers: { Bronze: number; Silver: number; Gold: number; Platinum: number };
 }
 interface LeaderboardRow {
@@ -855,6 +863,15 @@ export default function Admin() {
                                 {u.lifecycle_opted_out && (
                                   <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">opted out</Badge>
                                 )}
+                                {u.intended_role && (
+                                  <Badge variant="outline" className="text-[9px] px-1 py-0 h-4">signed up: {u.intended_role}</Badge>
+                                )}
+                                {u.driver_capability_status && (
+                                  <Badge variant={u.driver_capability_status === 'active' ? 'secondary' : 'outline'} className="text-[9px] px-1 py-0 h-4">driver: {u.driver_capability_status}</Badge>
+                                )}
+                                {u.recruiter_capability_status && (
+                                  <Badge variant={u.recruiter_capability_status === 'active' ? 'secondary' : 'outline'} className="text-[9px] px-1 py-0 h-4">recruiter: {u.recruiter_capability_status}</Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -1044,7 +1061,11 @@ export default function Admin() {
                     { label: 'Active This Week', value: driverOverview.active_drivers_week },
                     { label: 'Total Points Awarded', value: driverOverview.total_points_awarded },
                     { label: 'Top Streak (days)', value: driverOverview.top_streak },
-                    { label: 'Total Drivers', value: driverOverview.total_drivers },
+                    { label: 'Signed up as Driver', value: driverOverview.driver_signup_intent_count ?? '—' },
+                    { label: 'Active Driver access', value: driverOverview.active_driver_capability_count ?? '—' },
+                    { label: 'Accounts with loads', value: driverOverview.distinct_load_owners ?? '—' },
+                    { label: 'Leaderboard members', value: driverOverview.leaderboard_participants ?? driverOverview.total_drivers },
+                    { label: 'Signed up as Recruiter', value: driverOverview.recruiter_signup_intent_count ?? '—' },
                   ].map((s) => (
                     <Card key={s.label} className="shadow-card">
                       <CardContent className="p-4">

@@ -3,8 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { sanitizeNextPath } from '@/lib/authNavigation';
 import type { User, Session } from '@supabase/supabase-js';
 
+export type SignupCapability = 'driver' | 'recruiter' | 'assistant' | 'agency';
+
 interface SignUpOptions {
   emailRedirectNext?: string | null;
+  /** Explicit workspace chosen on the sign-up form. Only 'driver' lets the
+   *  server grant the self Driver workspace at signup (RD-1). */
+  signupCapability?: SignupCapability;
 }
 
 interface AuthContextValue {
@@ -68,6 +73,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = useCallback(async (email: string, password: string, displayName?: string, intendedRole?: 'driver' | 'recruiter', options?: SignUpOptions) => {
     const role = intendedRole === 'recruiter' ? 'recruiter' : 'driver';
+    const signupCapability: SignupCapability =
+      options?.signupCapability ?? (role === 'recruiter' ? 'recruiter' : 'driver');
     const safeNext = sanitizeNextPath(options?.emailRedirectNext ?? null);
     const emailRedirectTo = safeNext
       ? `${window.location.origin}/auth?next=${encodeURIComponent(safeNext)}`
@@ -77,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       options: {
         emailRedirectTo,
-        data: { display_name: displayName, intended_role: role },
+        data: { display_name: displayName, intended_role: role, signup_capability: signupCapability },
       },
     });
     return { error };

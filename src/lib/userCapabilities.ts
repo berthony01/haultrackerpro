@@ -228,3 +228,29 @@ export async function beginRecruiterSetupRpc(
   }
   return parseUserCapabilityStatus(data);
 }
+
+/**
+ * RD-1 — explicit self opt-in to the Driver workspace. Server derives the
+ * user from the session (no user-id argument). Returns 'unavailable' when the
+ * backend function is not installed yet so the UI can say so honestly.
+ */
+export type ActivateDriverResult = UserCapabilityStatus | 'unavailable';
+
+export function isMissingRpcError(error: unknown): boolean {
+  const e = error as { code?: string; message?: string } | null;
+  if (!e) return false;
+  return e.code === 'PGRST202' || e.code === '42883' || /could not find the function|does not exist/i.test(e.message ?? '');
+}
+
+export async function activateDriverWorkspaceRpc(
+  userId: string | null | undefined,
+  rpc: () => Promise<{ data: unknown; error: unknown }>,
+): Promise<ActivateDriverResult> {
+  if (!userId) throw new Error('Not authenticated');
+  const { data, error } = await rpc();
+  if (error) {
+    if (isMissingRpcError(error)) return 'unavailable';
+    throw error instanceof Error ? error : new Error(String((error as any)?.message ?? error));
+  }
+  return parseUserCapabilityStatus(data);
+}

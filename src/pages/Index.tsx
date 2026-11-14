@@ -1143,6 +1143,11 @@ const Index = () => {
               <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
                 Try Again
               </Button>
+              {!workspaceError && (
+                <Button variant="outline" size="sm" onClick={() => navigate('/start')}>
+                  Choose a workspace
+                </Button>
+              )}
               <Button variant="ghost" size="sm" onClick={signOut}>
                 <LogOut className="h-4 w-4 mr-1.5" /> Sign Out
               </Button>

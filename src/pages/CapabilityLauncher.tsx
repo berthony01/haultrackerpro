@@ -2,6 +2,8 @@ import { useNavigate } from 'react-router-dom';
 import { Truck, Briefcase, Users, Building2, ArrowRight, ArrowLeft } from 'lucide-react';
 import SEOHead from '@/components/SEOHead';
 import { useActingContext } from '@/hooks/useActingContext';
+import { useUserCapabilities } from '@/hooks/useUserCapabilities';
+import { useState } from 'react';
 
 const AMBER = 'hsl(25, 95%, 53%)';
 const NAVY_BG = 'hsl(220, 20%, 8%)';
@@ -67,6 +69,30 @@ function recordWorkspaceIntent(id: Tile['id']) {
 export default function CapabilityLauncher() {
   const navigate = useNavigate();
   const { exitActingAs } = useActingContext();
+  const caps = useUserCapabilities();
+  const [driverMsg, setDriverMsg] = useState<string | null>(null);
+  // Fail-closed: only an explicit server 'active' row opens the driver tile.
+  const driverStatus = caps.isLoading || caps.error ? 'unknown' : (caps.driverCapabilityStatus ?? 'none');
+  const driverNeedsOptIn = driverStatus === 'none' || driverStatus === 'setup';
+  const driverBlocked = driverStatus === 'suspended' || driverStatus === 'revoked';
+
+  const enableDriver = async () => {
+    setDriverMsg(null);
+    try {
+      const r = await caps.activateDriverWorkspace();
+      if (r === 'active') {
+        exitActingAs();
+        recordWorkspaceIntent('driver');
+        navigate('/dashboard');
+      } else if (r === 'unavailable') {
+        setDriverMsg('Driver tools can’t be turned on yet. This option is pending activation.');
+      } else {
+        setDriverMsg('Driver tools are not available on this account. Contact support if this looks wrong.');
+      }
+    } catch {
+      setDriverMsg('Couldn’t turn on Driver tools. Please try again.');
+    }
+  };
   return (
     <div className="min-h-screen px-4 py-10" style={{ background: NAVY_BG }}>
 
@@ -94,7 +120,39 @@ export default function CapabilityLauncher() {
         </p>
 
         <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {TILES.map((t) => (
+          {TILES.map((t) => t.id === 'driver' && driverStatus !== 'active' ? (
+            <div
+              key={t.id}
+              data-capability="driver"
+              data-driver-status={driverStatus}
+              className="text-left rounded-2xl border p-5"
+              style={{ background: NAVY_CARD, borderColor: NAVY_BORDER }}
+            >
+              <div className="inline-flex items-center justify-center rounded-xl p-2.5" style={{ background: 'rgba(249,115,22,0.12)' }}>
+                <t.Icon className="h-5 w-5" style={{ color: AMBER }} />
+              </div>
+              <div className="mt-4 font-bold text-base text-white">{t.label}</div>
+              <p className="mt-1 text-xs leading-snug" style={{ color: TEXT_MUTED }}>
+                {driverBlocked
+                  ? 'Driver tools are paused on this account.'
+                  : driverStatus === 'unknown'
+                    ? 'Checking your access…'
+                    : 'Track your own loads, expenses and fuel. Turn this on only if you drive.'}
+              </p>
+              {driverNeedsOptIn && (
+                <button
+                  type="button"
+                  onClick={enableDriver}
+                  disabled={caps.activateDriverWorkspacePending}
+                  className="mt-3 rounded-lg px-3 py-2 text-xs font-bold disabled:opacity-60"
+                  style={{ background: AMBER, color: NAVY_BG }}
+                >
+                  {caps.activateDriverWorkspacePending ? 'Turning on…' : 'Enable Driver tools'}
+                </button>
+              )}
+              {driverMsg && <p role="status" className="mt-2 text-xs" style={{ color: TEXT_MUTED }}>{driverMsg}</p>}
+            </div>
+          ) : (
             <button
               key={t.id}
               data-capability={t.id}
