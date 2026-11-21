@@ -4,76 +4,85 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 /**
- * Durable role-intent reconciler.
- *
- * Problem this solves:
- *   `lovable.auth.signInWithOAuth('google', …)` cannot carry
- *   `raw_user_meta_data.intended_role`, so `handle_new_user()` writes
- *   `profiles.intended_role = 'driver'` for every Google signup — even when
- *   the user clicked "Sign up as recruiter". Only sessionStorage was tracking
- *   the intent, which evaporates with the tab and silently demotes recruiters
- *   to drivers on their next login.
- *
- * Fix:
- *   When the user is authenticated AND we see a recruiter intent flag
- *   (sessionStorage `htp_auth_intent` set by the Auth page, or `?intent=recruiter`
- *   on the post-OAuth URL), upsert `profiles.intended_role = 'recruiter'`
- *   exactly once per session, then invalidate the role query so the rest of
- *   the app sees the recruiter role immediately.
- *
- * Email signups already work via `signUp({ options: { data: { intended_role } } })`
- * which feeds `handle_new_user()` — this hook just brings Google parity.
+ * Reconcile only an explicit recruiter continuation from the Auth page or
+ * OAuth redirect. The server RPC can reclassify a fresh Driver-intent profile;
+ * calling it on an ordinary login is therefore NOT safe. These hints request
+ * reconciliation only, never authorize a workspace or grant a capability.
  */
 export function useRoleIntentReconciler() {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
-  const ranForUser = useRef<string | null>(null);
+  const attempts = useRef(new Map<string, symbol>());
+  const identity = useRef({ userId: user?.id ?? null, generation: 0 });
+  const mounted = useRef(true);
+  if (identity.current.userId !== (user?.id ?? null)) {
+    identity.current = {
+      userId: user?.id ?? null,
+      generation: identity.current.generation + 1,
+    };
+  }
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
 
   useEffect(() => {
     if (loading || !user) return;
-    if (ranForUser.current === user.id) return;
+    if (attempts.current.has(user.id)) return;
 
     let recruiterIntent = false;
     try {
       const stored = sessionStorage.getItem('htp_auth_intent');
       if (stored === 'recruiter') recruiterIntent = true;
-      const urlIntent = new URLSearchParams(window.location.search).get('intent');
-      if (urlIntent === 'recruiter') recruiterIntent = true;
     } catch {}
+    const urlIntent = new URLSearchParams(window.location.search).get('intent');
+    if (urlIntent === 'recruiter') recruiterIntent = true;
+    if (!recruiterIntent) return;
 
-    ranForUser.current = user.id;
+    const userId = user.id;
+    const generation = identity.current.generation;
+    const token = Symbol(userId);
+    attempts.current.set(userId, token);
+    const isCurrent = () => mounted.current &&
+      identity.current.userId === userId && identity.current.generation === generation;
+    const allowRetry = () => {
+      // A late failure may release A's guard, never another account's attempt.
+      if (attempts.current.get(userId) === token) attempts.current.delete(userId);
+    };
 
-    // Phase 1E: even without a fresh hint, verify server-side once per
-    // session. The RPC is SECURITY DEFINER and idempotent — it only
-    // flips intent for fresh signups or existing recruiters, so calling
-    // it for every session is safe and closes the gap where an OAuth
-    // recruiter lost the sessionStorage hint on tab close.
     (async () => {
       let applied = false;
       try {
         const { data, error } = await supabase.rpc('apply_recruiter_intent');
         if (error) {
           // Transient failure — allow retry on next mount, don't flip UI.
-          ranForUser.current = null;
+          allowRetry();
           return;
         }
         const payload = (data ?? {}) as { applied?: boolean };
         applied = !!payload.applied;
       } catch {
-        ranForUser.current = null;
+        allowRetry();
         return;
       }
-      // Clear the session hint regardless of outcome so we don't loop on
-      // an ineligible driver. If they later complete the real recruiter
-      // application, that flow will set intended_role server-side.
-      if (recruiterIntent) {
-        try {
+      if (!isCurrent()) return;
+      // A settled response consumes only still-matching explicit hints.
+      // Errors retain them for retry; stale responses cannot clear B's hints.
+      try {
+        if (sessionStorage.getItem('htp_auth_intent') === 'recruiter') {
           sessionStorage.removeItem('htp_auth_intent');
-        } catch {}
+        }
+      } catch {}
+      if (urlIntent === 'recruiter') {
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('intent') === 'recruiter') {
+          url.searchParams.delete('intent');
+          window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+        }
       }
       if (applied) {
-        queryClient.invalidateQueries({ queryKey: ['user-role-profile-intent', user.id] });
-        queryClient.invalidateQueries({ queryKey: ['user-role-recruiter-check', user.id] });
+        queryClient.invalidateQueries({ queryKey: ['user-role-profile-intent', userId] });
+        queryClient.invalidateQueries({ queryKey: ['user-role-recruiter-check', userId] });
       }
     })();
   }, [user, loading, queryClient]);

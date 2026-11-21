@@ -92,7 +92,8 @@ describe('authNavigation - resolvePostAuthDestination', () => {
     expect(resolvePostAuthDestination('?next=%2F%2Fevil.com')).toBe('/dashboard');
   });
   it('preserves legacy recruiter intent', () => {
-    expect(resolvePostAuthDestination('?intent=recruiter')).toBe('/dashboard?page=recruiter-access');
+    expect(resolvePostAuthDestination('?intent=recruiter')).toBe('/recruiter');
+    expect(resolvePostAuthDestination('?intent=recruiter&next=%2F%2Fevil.com')).toBe('/recruiter');
   });
   it('next takes precedence over recruiter intent', () => {
     expect(resolvePostAuthDestination('?intent=recruiter&next=%2Fagency')).toBe('/agency');

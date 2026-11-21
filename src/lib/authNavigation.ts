@@ -75,7 +75,7 @@ export function getCapabilityFromNext(nextPath: string | null | undefined): Capa
  * Resolve where to send the user after a successful sign-in/sign-up.
  * Priority:
  *   1. Safe `next` query param
- *   2. Legacy `intent=recruiter` → recruiter access page (preserved behavior)
+ *   2. Legacy `intent=recruiter` → canonical recruiter entry
  *   3. Default dashboard
  */
 export function resolvePostAuthDestination(search: string | URLSearchParams): string {
@@ -84,6 +84,6 @@ export function resolvePostAuthDestination(search: string | URLSearchParams): st
     : search;
   const next = sanitizeNextPath(params.get('next'));
   if (next) return next;
-  if (params.get('intent') === 'recruiter') return '/dashboard?page=recruiter-access';
+  if (params.get('intent') === 'recruiter') return '/recruiter';
   return DEFAULT_DEST;
 }

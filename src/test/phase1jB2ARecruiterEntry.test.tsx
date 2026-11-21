@@ -33,6 +33,12 @@ type CapsMock = {
   beginRecruiterSetup: ReturnType<typeof vi.fn>;
 };
 type ViewMock = {
+  isLoading?: boolean;
+  staffLoading?: boolean;
+  staffWorkspaceError?: Error | null;
+  staffSelectionRequired?: boolean;
+  selectedStaffWorkspace?: { recruiterId: string } | null;
+  staffWorkspaces?: { membershipId: string; recruiterId: string; companyName: string; memberRole: string }[];
   setViewMode: ReturnType<typeof vi.fn>;
   recruiterHubAllowed: boolean;
   recruiterCapabilityStatus: UserCapabilityStatus | null;
@@ -331,7 +337,8 @@ describe('RecruiterEntryRoute — revoked', () => {
     expect(screen.getByRole('alert')).toBeTruthy();
     expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
     expect(viewState.setViewMode).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: /back to driver dashboard/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /back to workspaces/i }));
+    expect(screen.getByTestId('location').textContent).toBe('/start');
   });
 });
 
@@ -339,6 +346,17 @@ describe('RecruiterEntryRoute — revoked', () => {
 // I. Fail-closed on malformed/empty/driver-non-active
 // -----------------------------------------------------------------------
 describe('RecruiterEntryRoute — fail-closed capability', () => {
+  it.each(['suspended', 'setup', 'unknown'])('blocks noneligible Driver status %s', status => {
+    viewState = defaultView({ driverCapabilityStatus: status as UserCapabilityStatus });
+    renderRoute();
+    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+    expect(viewState.setViewMode).not.toHaveBeenCalled();
+  });
+  it('blocks corrupt undefined capability status rather than treating it as absence', () => {
+    viewState = defaultView({ driverCapabilityStatus: undefined });
+    renderRoute();
+    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+  });
   it('I1. driver revoked → blocked, no RPC', () => {
     viewState = defaultView({
       driverCapabilityStatus: 'revoked',
@@ -349,20 +367,61 @@ describe('RecruiterEntryRoute — fail-closed capability', () => {
     expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
   });
 
-  it('I2. empty capability rows (driver null) → blocked, no RPC', () => {
+  it('I2. settled no-Driver account can explicitly add recruiter without Driver activation', async () => {
     viewState = defaultView({
       driverCapabilityStatus: null,
       recruiterCapabilityStatus: null,
     });
     renderRoute();
-    expect(screen.getByRole('alert')).toBeTruthy();
-    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+    await waitFor(() => expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1));
+    expect(capsState.refetch).toHaveBeenCalledTimes(1);
+    expect(viewState.setViewMode).not.toHaveBeenCalled();
   });
 
   it('I3. capability query error → blocked, no RPC', () => {
     capsState = defaultCaps({ error: new Error('boom') });
     renderRoute();
     expect(screen.getByRole('alert')).toBeTruthy();
+    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+  });
+});
+
+describe('RecruiterEntryRoute — coordinated no-Driver identities and staff boundaries', () => {
+  it.each(['recruiter-only', 'assistant-only', 'agency-only'])('%s adds only Recruiter and waits for verified setup before onboarding', async persona => {
+    authState = { user: { id: persona }, loading: false };
+    viewState = defaultView({ driverCapabilityStatus: null });
+    const { rerender } = renderRoute();
+    await waitFor(() => expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
+    expect(viewState.setViewMode).not.toHaveBeenCalled();
+    viewState = defaultView({ driverCapabilityStatus: null, recruiterCapabilityStatus: 'setup', recruiterHubAllowed: true });
+    rerender(<Tree />);
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/dashboard?page=recruiter-access:onboarding'));
+    expect(viewState.setViewMode).toHaveBeenCalledWith('recruiter');
+    expect(capsState.beginRecruiterSetup).toHaveBeenCalledTimes(1);
+  });
+  it.each(['view', 'staff', 'staff-error', 'multi-company', 'unselected-staff'])('no Driver account waits or blocks on %s discovery', async state => {
+    viewState = defaultView({
+      driverCapabilityStatus: null,
+      isLoading: state === 'view', staffLoading: state === 'staff',
+      staffWorkspaceError: state === 'staff-error' ? new Error('unavailable') : null,
+      staffSelectionRequired: state === 'multi-company',
+      staffWorkspaces: state === 'multi-company' || state === 'unselected-staff' ? [
+        { membershipId: 'm1', recruiterId: 'r1', companyName: 'One', memberRole: 'dispatcher' },
+        { membershipId: 'm2', recruiterId: 'r2', companyName: 'Two', memberRole: 'recruiter_staff' },
+      ] : [],
+    });
+    renderRoute();
+    await act(async () => {});
+    expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
+    expect(viewState.setViewMode).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location').textContent).toBe('/recruiter');
+  });
+  it.each(['dispatcher', 'recruiter_staff'])('selected %s uses organizational hub without personal activation', async persona => {
+    authState = { user: { id: persona }, loading: false };
+    viewState = defaultView({ driverCapabilityStatus: null, selectedStaffWorkspace: { recruiterId: 'company-r' }, recruiterHubAllowed: true });
+    renderRoute();
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/dashboard?page=recruiter-access'));
     expect(capsState.beginRecruiterSetup).not.toHaveBeenCalled();
   });
 });

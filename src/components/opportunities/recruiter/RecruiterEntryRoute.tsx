@@ -2,7 +2,7 @@
  * Phase 1J-B2A — Controlled recruiter entry activation route.
  *
  * Replaces the blind `/recruiter` redirect. Adds recruiter capability to
- * the SAME authenticated driver account (never creates a new account).
+ * the SAME authenticated account, with or without Driver access.
  *
  * Authorization inputs (only): `useAuth`, `useUserCapabilities`,
  * `useViewMode`. No admin flags, intended_role, localStorage reads,
@@ -38,15 +38,15 @@ function NeutralLoading({ label = 'Loading…' }: { label?: string }) {
   );
 }
 
-function BackToDriverButton() {
+function BackToWorkspaceButton() {
   const navigate = useNavigate();
   return (
     <button
       type="button"
-      onClick={() => navigate('/dashboard', { replace: true })}
+      onClick={() => navigate('/start', { replace: true })}
       className="mt-4 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow hover:opacity-90"
     >
-      Back to Driver Dashboard
+      Back to Workspaces
     </button>
   );
 }
@@ -65,7 +65,7 @@ function BlockedPanel({
     >
       <h1 className="text-xl font-semibold">{title}</h1>
       <p className="mt-2 text-sm text-muted-foreground">{message}</p>
-      <BackToDriverButton />
+      <BackToWorkspaceButton />
     </div>
   );
 }
@@ -149,8 +149,8 @@ export default function RecruiterEntryRoute() {
     userId !== null &&
     attempt.ownerUserId === userId &&
     attempt.ownerGeneration === currentGeneration;
-  const rpcError: Error | null = attemptVisible ? attempt!.error : null;
-  const rpcPending: boolean = attemptVisible ? attempt!.pending : false;
+  const rpcError: Error | null = attemptVisible ? attempt?.error ?? null : null;
+  const rpcPending: boolean = attemptVisible ? attempt?.pending ?? false : false;
 
   const beginRecruiterSetup = caps.beginRecruiterSetup;
   const refetch = caps.refetch;
@@ -203,7 +203,7 @@ export default function RecruiterEntryRoute() {
       staffWorkspaces.length > 0);
 
   // Auto-invoke activation only when validated rows prove:
-  //   driver.status === 'active' AND recruiter capability absent
+  //   Driver capability absent OR active, AND recruiter capability absent
   //   AND staff discovery completed successfully with ZERO workspaces.
   // Fail-closed on loading, missing user, capability error, or any
   // other capability shape. Uses the current-user-visible error only.
@@ -211,7 +211,7 @@ export default function RecruiterEntryRoute() {
     !isLoading &&
     !capsError &&
     !!userId &&
-    driverStatus === 'active' &&
+    (driverStatus === null || driverStatus === 'active') &&
     recruiterStatus === null &&
     !staffPathBlocksActivation &&
     rpcError === null;
@@ -291,7 +291,7 @@ export default function RecruiterEntryRoute() {
     return (
       <BlockedPanel
         title="Recruiter access is unavailable"
-        message="Recruiter access is not available on this account. Your driver workspace is still available."
+        message="Recruiter access is not available on this account. You can return to your workspaces."
       />
     );
   }
@@ -345,16 +345,16 @@ export default function RecruiterEntryRoute() {
             </li>
           ))}
         </ul>
-        <BackToDriverButton />
+        <BackToWorkspaceButton />
       </div>
     );
   }
 
-  if (driverStatus !== 'active') {
+  if (driverStatus !== null && driverStatus !== 'active') {
     return (
       <BlockedPanel
         title="Recruiter access unavailable"
-        message="Recruiter access requires an active driver account."
+        message="We can't add recruiter access while your existing Driver access is unavailable."
       />
     );
   }
@@ -381,7 +381,7 @@ export default function RecruiterEntryRoute() {
         >
           Try Again
         </button>
-        <BackToDriverButton />
+        <BackToWorkspaceButton />
       </div>
     );
   }
